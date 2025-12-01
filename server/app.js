@@ -436,20 +436,40 @@ app.post('/api/purchases', async (req, res) => {
   res.json({ success: true, purchase })
 })
 
+// Support both GET and POST for score lookup
 app.get('/api/score', (req, res) => {
-  const { product } = req.query
+  const { product, item } = req.query
+  const input = typeof product === 'string' && product.trim().length > 0
+    ? product
+    : (typeof item === 'string' ? item : '')
   if (!product || typeof product !== 'string' || product.trim().length === 0) {
-    return res.status(400).json({ error: 'missing_product' })
+    if (!input || input.trim().length === 0) {
+      return res.status(400).json({ error: 'missing_product' })
+    }
   }
 
-  const evaluation = evaluateProduct(product)
+  const evaluation = evaluateProduct(input || product)
   res.json(evaluation)
 })
 
 app.get('/api/score/search', (req, res) => {
-  const { query } = req.query
-  const results = searchProducts(typeof query === 'string' ? query : '')
+  // Accept query or q as the search param for compatibility
+  const { query, q } = req.query
+  const term = typeof query === 'string' && query.length > 0 ? query : (typeof q === 'string' ? q : '')
+  const results = searchProducts(term)
   res.json({ results })
+})
+
+app.post('/api/score', (req, res) => {
+  const { product, item } = req.body || {}
+  const input = typeof product === 'string' && product.trim().length > 0
+    ? product
+    : (typeof item === 'string' ? item : '')
+  if (!input || input.trim().length === 0) {
+    return res.status(400).json({ error: 'missing_product' })
+  }
+  const evaluation = evaluateProduct(input)
+  res.json(evaluation)
 })
 
 app.get('/api/suggestions', (req, res) => {
