@@ -1,0 +1,163 @@
+nohup: ignoring input
+
+> sustainable-shop-webapp@1.0.0 dev
+> concurrently "npm run dev:client" "npm run dev:server"
+
+[0] 
+[0] > sustainable-shop-webapp@1.0.0 dev:client
+[0] > vite
+[0] 
+[1] 
+[1] > sustainable-shop-webapp@1.0.0 dev:server
+[1] > nodemon server/index.js
+[1] 
+[1] [33m[nodemon] 3.1.11[39m
+[1] [33m[nodemon] to restart at any time, enter `rs`[39m
+[1] [33m[nodemon] watching path(s): *.*[39m
+[1] [33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[1] [32m[nodemon] starting `node server/index.js`[39m
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `node server/index.js`[39m
+[0] Port 3000 is in use, trying another one...
+[0] 
+[0]   VITE v5.4.21  ready in 1576 ms
+[0] 
+[0]   ➜  Local:   http://localhost:3001/
+[0]   ➜  Network: use --host to expose
+[1] node:events:502
+[1]       throw er; // Unhandled 'error' event
+[1]       ^
+[1] 
+[1] Error: listen EADDRINUSE: address already in use :::3001
+[1]     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+[1]     at listenInCluster (node:net:1965:12)
+[1]     at Server.listen (node:net:2067:7)
+[1]     at Function.listen (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/express/lib/application.js:635:24)
+[1]     at file:///home/montague/Downloads/AH2/sustainable-shop-webapp/server/index.js:178:5
+[1]     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+[1]     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+[1]     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[1] Emitted 'error' event on Server instance at:
+[1]     at emitErrorNT (node:net:1944:8)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+[1]   code: 'EADDRINUSE',
+[1]   errno: -98,
+[1]   syscall: 'listen',
+[1]   address: '::',
+[1]   port: 3001
+[1] }
+[1] 
+[1] Node.js v20.19.5
+[1] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `node server/index.js`[39m
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `node server/index.js`[39m
+[1] node:events:502
+[1]       throw er; // Unhandled 'error' event
+[1]       ^
+[1] 
+[1] Error: listen EADDRINUSE: address already in use :::3001
+[1]     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+[1]     at listenInCluster (node:net:1965:12)
+[1]     at Server.listen (node:net:2067:7)
+[1]     at Function.listen (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/express/lib/application.js:635:24)
+[1]     at file:///home/montague/Downloads/AH2/sustainable-shop-webapp/server/index.js:178:5
+[1]     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+[1]     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+[1]     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[1] Emitted 'error' event on Server instance at:
+[1]     at emitErrorNT (node:net:1944:8)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+[1]   code: 'EADDRINUSE',
+[1]   errno: -98,
+[1]   syscall: 'listen',
+[1]   address: '::',
+[1]   port: 3001
+[1] }
+[1] 
+[1] Node.js v20.19.5
+[1] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[0] 3:20:40 PM [vite] http proxy error: /api/purchases
+[0] Error: connect EADDRNOTAVAIL 127.0.0.1:3001 - Local (0.0.0.0:0)
+[0]     at internalConnect (node:net:1098:16)
+[0]     at defaultTriggerAsyncIdScope (node:internal/async_hooks:464:18)
+[0]     at GetAddrInfoReqWrap.emitLookup [as callback] (node:net:1497:9)
+[0]     at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8)
+[0] 3:20:40 PM [vite] http proxy error: /api/insights
+[0] Error: connect EADDRNOTAVAIL 127.0.0.1:3001 - Local (0.0.0.0:0)
+[0]     at internalConnect (node:net:1098:16)
+[0]     at defaultTriggerAsyncIdScope (node:internal/async_hooks:464:18)
+[0]     at GetAddrInfoReqWrap.emitLookup [as callback] (node:net:1497:9)
+[0]     at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8)
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `node server/index.js`[39m
+[1] node:events:502
+[1]       throw er; // Unhandled 'error' event
+[1]       ^
+[1] 
+[1] Error: listen EADDRINUSE: address already in use :::3001
+[1]     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+[1]     at listenInCluster (node:net:1965:12)
+[1]     at Server.listen (node:net:2067:7)
+[1]     at Function.listen (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/express/lib/application.js:635:24)
+[1]     at file:///home/montague/Downloads/AH2/sustainable-shop-webapp/server/index.js:178:5
+[1]     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+[1]     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+[1]     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[1] Emitted 'error' event on Server instance at:
+[1]     at emitErrorNT (node:net:1944:8)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+[1]   code: 'EADDRINUSE',
+[1]   errno: -98,
+[1]   syscall: 'listen',
+[1]   address: '::',
+[1]   port: 3001
+[1] }
+[1] 
+[1] Node.js v20.19.5
+[1] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[0] 3:21:41 PM [vite] http proxy error: /api/purchases
+[0] Error: connect EADDRNOTAVAIL 127.0.0.1:3001 - Local (0.0.0.0:0)
+[0]     at internalConnect (node:net:1098:16)
+[0]     at defaultTriggerAsyncIdScope (node:internal/async_hooks:464:18)
+[0]     at GetAddrInfoReqWrap.emitLookup [as callback] (node:net:1497:9)
+[0]     at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8)
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `node server/index.js`[39m
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `node server/index.js`[39m
+[1] node:events:502
+[1]       throw er; // Unhandled 'error' event
+[1]       ^
+[1] 
+[1] Error: listen EADDRINUSE: address already in use :::3001
+[1]     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+[1]     at listenInCluster (node:net:1965:12)
+[1]     at Server.listen (node:net:2067:7)
+[1]     at Function.listen (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/express/lib/application.js:635:24)
+[1]     at file:///home/montague/Downloads/AH2/sustainable-shop-webapp/server/index.js:178:5
+[1]     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+[1]     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+[1]     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[1] Emitted 'error' event on Server instance at:
+[1]     at emitErrorNT (node:net:1944:8)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+[1]   code: 'EADDRINUSE',
+[1]   errno: -98,
+[1]   syscall: 'listen',
+[1]   address: '::',
+[1]   port: 3001
+[1] }
+[1] 
+[1] Node.js v20.19.5
+[1] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[0] 3:22:22 PM [vite] http proxy error: /api/insights
+[0] Error: connect EADDRNOTAVAIL 127.0.0.1:3001 - Local (0.0.0.0:0)
+[0]     at internalConnect (node:net:1098:16)
+[0]     at defaultTriggerAsyncIdScope (node:internal/async_hooks:464:18)
+[0]     at GetAddrInfoReqWrap.emitLookup [as callback] (node:net:1497:9)
+[0]     at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8)
+[0] Killed
+[0] npm run dev:client exited with code 137
+Killed

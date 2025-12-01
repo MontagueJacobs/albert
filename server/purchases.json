@@ -1,0 +1,79 @@
+[
+  {
+    "date": "2025-11-22T13:47:55.620Z",
+    "product": "Bio Melk",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 10
+  },
+  {
+    "date": "2025-11-22T15:21:14.125888",
+    "product": "AH Courgette",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 8
+  },
+  {
+    "date": "2025-11-22T15:21:14.125985",
+    "product": "AH Snoepgroente tomaat",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 8
+  },
+  {
+    "date": "2025-11-22T15:21:14.126040",
+    "product": "AH Winterpeen",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 8
+  },
+  {
+    "date": "2025-11-22T15:21:14.126083",
+    "product": "AH Handsinaasappelen",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 4
+  },
+  {
+    "date": "2025-11-22T15:21:14.126127",
+    "product": "AH Pizzadeeg",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 3
+  },
+  {
+    "date": "2025-11-22T15:21:14.126169",
+    "product": "AH Tortelloni verdi ricotta spinaci",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 3
+  },
+  {
+    "date": "2025-11-22T15:21:14.126220",
+    "product": "AH Lasagne all uovo",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 3
+  },
+  {
+    "date": "2025-11-22T15:21:14.126260",
+    "product": "Colgate Triple action extra whitening tandpasta",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 3
+  },
+  {
+    "date": "2025-11-22T15:21:14.126305",
+    "product": "Heineken Premium pilsener",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 5
+  },
+  {
+    "date": "2025-11-29T13:51:30.289Z",
+    "product": "bananas",
+    "quantity": 1,
+    "price": 0,
+    "sustainability_score": 5
+  }
+]

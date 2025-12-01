@@ -1,0 +1,597 @@
+import express from 'express'
+import cors from 'cors'
+import bodyParser from 'body-parser'
+import fs from 'fs/promises'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { spawn } from 'child_process'
+import dotenv from 'dotenv'
+
+import {
+  getCatalogIndex,
+  refreshCatalog,
+  ensureCatalogLoaded,
+  catalogReady,
+  supabaseEnabled,
+  getCatalogMeta,
+  normalizeProductName
+} from './catalogLoader.js'
+
+// Ensure .env is loaded from the webapp root regardless of cwd
+dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env') })
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const app = express()
+const PROJECT_ROOT = path.join(__dirname, '..', '..')
+const SYNC_SCRIPT = path.join(PROJECT_ROOT, 'sync_account.py')
+const PYTHON_CMD = process.env.PYTHON || 'python3'
+const MAX_LOG_ENTRIES = 200
+const CATALOG_REFRESH_INTERVAL_MS = Number.parseInt(process.env.CATALOG_REFRESH_INTERVAL_MS ?? '900000', 10) || 900000
+
+const syncState = {
+  running: false,
+  startedAt: null,
+  lastRun: null,
+  logs: []
+}
+
+function appendSyncLog(stream, chunk) {
+  const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk)
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  for (const line of lines) {
+    syncState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream,
+      message: line
+    })
+  }
+  if (syncState.logs.length > MAX_LOG_ENTRIES) {
+    syncState.logs = syncState.logs.slice(syncState.logs.length - MAX_LOG_ENTRIES)
+  }
+}
+
+app.use(cors())
+app.use(bodyParser.json())
+
+// Data file path
+const DATA_FILE = path.join(__dirname, 'purchases.json')
+
+// Sustainability database
+const SUSTAINABILITY_DB = {
+  categories: {
+    organic: { score: 10, icon: '🌱' },
+    local: { score: 8, icon: '🏡' },
+    plant_based: { score: 9, icon: '🥬' },
+    fair_trade: { score: 8, icon: '🤝' },
+    plastic_free: { score: 7, icon: '♻️' },
+    meat: { score: 2, icon: '🥩' },
+    processed: { score: 3, icon: '📦' },
+    imported: { score: 4, icon: '✈️' },
+    fruit: { score: 5, icon: '🍎' },
+    vegetable: { score: 5, icon: '🥕' },
+    dairy: { score: 5, icon: '🥛' },
+    grain: { score: 5, icon: '🌾' },
+    legume: { score: 5, icon: '🫘' },
+    plant_protein: { score: 5, icon: '🌿' },
+    snack: { score: 5, icon: '🍫' },
+    beverage: { score: 5, icon: '🥤' },
+    egg: { score: 5, icon: '🥚' },
+    seafood: { score: 5, icon: '🐟' }
+  },
+  products: {
+    'bio melk': { categories: ['organic', 'local'], co2: 1.2 },
+    'gewone melk': { categories: ['local'], co2: 1.5 },
+    havermelk: { categories: ['plant_based'], co2: 0.3 },
+    sojamelk: { categories: ['plant_based'], co2: 0.4 },
+    amandelmelk: { categories: ['plant_based'], co2: 0.7 },
+    rundvlees: { categories: ['meat'], co2: 27.0 },
+    kip: { categories: ['meat'], co2: 6.9 },
+    varkensvlees: { categories: ['meat'], co2: 12.1 },
+    tofu: { categories: ['plant_based'], co2: 2.0 },
+    tempeh: { categories: ['plant_based'], co2: 2.0 },
+    'bananen fair trade': { categories: ['fair_trade'], co2: 0.7 },
+    bananen: { categories: ['imported'], co2: 0.7 },
+    appels: { categories: ['local'], co2: 0.3 },
+    tomaten: { categories: ['local'], co2: 0.7 },
+    brood: { categories: ['local'], co2: 0.6 },
+    pasta: { categories: ['processed'], co2: 1.0 },
+    rijst: { categories: ['imported'], co2: 2.7 }
+  }
+}
+
+const CATEGORY_KEYS = new Set(Object.keys(SUSTAINABILITY_DB.categories))
+
+const KEYWORD_RULES = [
+  { code: 'keyword_bio', delta: 2, match: (name) => name.includes('bio') || name.includes('organic') },
+  { code: 'keyword_fair', delta: 2, match: (name) => name.includes('fair trade') },
+  { code: 'keyword_local', delta: 1, match: (name) => name.includes('lokaal') || name.includes('local') },
+  { code: 'keyword_plant', delta: 2, match: (name) => name.includes('plant') || name.includes('vega') || name.includes('soja') || name.includes('tofu') || name.includes('havermelk') },
+  { code: 'keyword_meat', delta: -3, match: (name) => name.includes('vlees') || name.includes('beef') || name.includes('rund') || name.includes('kip') || name.includes('meat') },
+  { code: 'keyword_plastic', delta: -1, match: (name) => name.includes('plastic') || name.includes('verpakt') }
+]
+
+// Helper functions
+async function loadPurchases() {
+  try {
+    const data = await fs.readFile(DATA_FILE, 'utf8')
+    return JSON.parse(data)
+  } catch (error) {
+    return []
+  }
+}
+
+async function savePurchases(purchases) {
+  await fs.writeFile(DATA_FILE, JSON.stringify(purchases, null, 2))
+}
+
+function roundClamp(value) {
+  return Math.max(0, Math.min(10, Math.round(value)))
+}
+
+function clamp(value) {
+  return Math.max(0, Math.min(10, value))
+}
+
+function findCatalogMatch(productName = '') {
+  const normalized = normalizeProductName(productName)
+  if (!normalized) return null
+
+  const catalogIndex = getCatalogIndex()
+  let bestEntry = null
+  let bestRank = 0
+  let bestMatchName = null
+
+  for (const entry of catalogIndex) {
+    for (const candidate of entry.normalizedNames) {
+      if (!candidate) continue
+      let rank = 0
+      if (candidate === normalized) {
+        rank = 5
+      } else if (candidate.startsWith(normalized) || normalized.startsWith(candidate)) {
+        rank = 4
+      } else if (candidate.includes(normalized) || normalized.includes(candidate)) {
+        rank = 3
+      } else {
+        const tokens = normalized.split(' ')
+        if (tokens.length > 1 && tokens.every((token) => candidate.includes(token))) {
+          rank = 2
+        } else if (tokens.some((token) => token && candidate.includes(token))) {
+          rank = Math.max(rank, 1)
+        }
+      }
+
+      if (rank > bestRank) {
+        bestRank = rank
+        bestEntry = entry
+        bestMatchName = candidate
+      }
+    }
+  }
+
+  if (!bestEntry) return null
+
+  return {
+    entry: bestEntry,
+    matchedName: bestMatchName,
+    rank: bestRank,
+    normalizedQuery: normalized
+  }
+}
+
+function evaluateProduct(productName = '') {
+  const input = typeof productName === 'string' ? productName : ''
+  const normalized = normalizeProductName(input)
+  const lowerProduct = input.toLowerCase()
+  let workingScore = 5
+  const adjustments = []
+  const matchedCategories = []
+  const matchedKeywords = []
+  const categorySet = new Set()
+  let suggestions = getSuggestions(input)
+  let notes = null
+  let matchedProduct = null
+
+  const applyCategory = (category) => {
+    if (!category || categorySet.has(category) || !CATEGORY_KEYS.has(category)) return
+    categorySet.add(category)
+    const catData = SUSTAINABILITY_DB.categories[category]
+    if (catData) {
+      matchedCategories.push({
+        category,
+        icon: catData.icon,
+        referenceScore: catData.score
+      })
+      const delta = catData.score - 5
+      if (delta) {
+        workingScore += delta
+        adjustments.push({
+          type: 'category',
+          code: `category_${category}`,
+          category,
+          delta,
+          resultingScore: clamp(workingScore)
+        })
+      }
+    }
+  }
+
+  const applyDelta = (type, code, delta) => {
+    if (!delta) return
+    workingScore += delta
+    adjustments.push({
+      type,
+      code,
+      delta,
+      resultingScore: clamp(workingScore)
+    })
+  }
+
+  const catalogMatch = findCatalogMatch(input)
+  if (catalogMatch) {
+    const { entry } = catalogMatch
+    matchedProduct = {
+      id: entry.id,
+      canonicalName: entry.names[0],
+      matchedName: catalogMatch.matchedName,
+      rank: catalogMatch.rank,
+      baseScore: entry.baseScore ?? 5
+    }
+
+    if (entry.notes) {
+      notes = entry.notes
+    }
+
+    if (Array.isArray(entry.suggestions) && entry.suggestions.length > 0) {
+      suggestions = entry.suggestions
+    }
+
+    const baseDelta = (entry.baseScore ?? 5) - 5
+    if (baseDelta) {
+      applyDelta('catalog', 'catalog_base', baseDelta)
+    }
+
+    if (Array.isArray(entry.categories)) {
+      for (const category of entry.categories) {
+        applyCategory(category)
+      }
+    }
+
+    if (Array.isArray(entry.adjustments)) {
+      for (const adj of entry.adjustments) {
+        if (!adj || typeof adj.delta !== 'number') continue
+        applyDelta('catalog', adj.code, adj.delta)
+      }
+    }
+  }
+
+  const productData = SUSTAINABILITY_DB.products[normalized] || SUSTAINABILITY_DB.products[lowerProduct]
+  if (productData && Array.isArray(productData.categories)) {
+    for (const category of productData.categories) {
+      applyCategory(category)
+    }
+  }
+
+  for (const rule of KEYWORD_RULES) {
+    if (rule.match(lowerProduct)) {
+      applyDelta('keyword', rule.code, rule.delta)
+      matchedKeywords.push(rule.code)
+    }
+  }
+
+  const rawScore = clamp(workingScore)
+  const finalScore = roundClamp(workingScore)
+
+  return {
+    product: input,
+    normalized,
+    baseScore: matchedProduct?.baseScore ?? 5,
+    rawScore,
+    score: finalScore,
+    adjustments,
+    categories: matchedCategories,
+    keywords: matchedKeywords,
+    suggestions,
+    rating: getRating(finalScore),
+    notes,
+    matched: matchedProduct
+  }
+}
+
+function calculateScore(productName) {
+  return evaluateProduct(productName).score
+}
+
+function searchProducts(query = '') {
+  const normalized = normalizeProductName(query)
+  if (!normalized) return []
+
+  const catalogIndex = getCatalogIndex()
+  const results = []
+  const seen = new Set()
+
+  for (const entry of catalogIndex) {
+    let bestRank = 0
+    for (const candidate of entry.normalizedNames) {
+      if (!candidate) continue
+      let rank = 0
+      if (candidate === normalized) {
+        rank = 5
+      } else if (candidate.startsWith(normalized) || normalized.startsWith(candidate)) {
+        rank = 4
+      } else if (candidate.includes(normalized) || normalized.includes(candidate)) {
+        rank = 3
+      } else {
+        const tokens = normalized.split(' ')
+        if (tokens.length > 1 && tokens.every((token) => candidate.includes(token))) {
+          rank = 2
+        } else if (tokens.some((token) => token && candidate.includes(token))) {
+          rank = Math.max(rank, 1)
+        }
+      }
+      if (rank > bestRank) {
+        bestRank = rank
+      }
+    }
+
+    if (bestRank > 0 && !seen.has(entry.id)) {
+      const displayName = entry.names[0]
+      const evalResult = evaluateProduct(displayName)
+      results.push({
+        name: displayName,
+        score: evalResult.score,
+        categories: entry.categories || [],
+        rank: bestRank,
+        id: entry.id
+      })
+      seen.add(entry.id)
+    }
+  }
+
+  if (results.length === 0) {
+    for (const name of Object.keys(SUSTAINABILITY_DB.products)) {
+      const candidate = normalizeProductName(name)
+      if (!candidate.includes(normalized)) continue
+      const evalResult = evaluateProduct(name)
+      results.push({
+        name,
+        score: evalResult.score,
+        categories: SUSTAINABILITY_DB.products[name].categories || [],
+        rank: 1,
+        id: `legacy-${name}`
+      })
+    }
+  }
+
+  results.sort((a, b) => {
+    if (b.rank !== a.rank) return b.rank - a.rank
+    if (b.score !== a.score) return b.score - a.score
+    return a.name.localeCompare(b.name)
+  })
+
+  return results.slice(0, 10)
+}
+
+function getSuggestions(productName) {
+  const suggestions = []
+  const lowerProduct = productName.toLowerCase()
+
+  if ((lowerProduct.includes('melk') || lowerProduct.includes('milk')) && !lowerProduct.includes('haver') && !lowerProduct.includes('soja')) {
+    suggestions.push('🥬 Probeer havermelk of sojamelk - 75% minder CO2!')
+  }
+
+  if (lowerProduct.includes('vlees') || lowerProduct.includes('beef') || lowerProduct.includes('rund')) {
+    suggestions.push('🥬 Probeer tofu of tempeh - 90% minder CO2!')
+  }
+
+  if (lowerProduct.includes('kip') || lowerProduct.includes('chicken')) {
+    suggestions.push('🥬 Probeer plantaardige kip alternatieven')
+  }
+
+  if (!lowerProduct.includes('bio') && !lowerProduct.includes('organic') && !lowerProduct.includes('fair')) {
+    suggestions.push('🌱 Zoek naar biologische of Fair Trade varianten')
+  }
+
+  if (lowerProduct.includes('plastic') || lowerProduct.includes('verpakt')) {
+    suggestions.push('♻️ Kies voor producten met minder verpakking')
+  }
+
+  return suggestions.length > 0 ? suggestions : ['Geweldig! Je maakt al een goede keuze! ✨']
+}
+
+function getRating(avgScore) {
+  if (avgScore >= 8) return "🌟 Excellent! You're making great sustainable choices!"
+  if (avgScore >= 6) return '👍 Good! Room for improvement though.'
+  if (avgScore >= 4) return '😐 Average. Consider more sustainable alternatives.'
+  return "⚠️ Needs work. Let's find better options!"
+}
+
+function minutes(ms) {
+  return Math.round(ms / 60000)
+}
+
+// API Routes
+app.get('/api/purchases', async (req, res) => {
+  const purchases = await loadPurchases()
+  res.json(purchases)
+})
+
+app.post('/api/purchases', async (req, res) => {
+  const { product, quantity, price } = req.body
+  const evaluation = evaluateProduct(product)
+
+  const purchase = {
+    date: new Date().toISOString(),
+    product: product,
+    quantity: parseInt(quantity) || 1,
+    price: parseFloat(price) || 0,
+    sustainability_score: evaluation.score
+  }
+
+  const purchases = await loadPurchases()
+  purchases.push(purchase)
+  await savePurchases(purchases)
+
+  res.json({ success: true, purchase })
+})
+
+app.get('/api/score', (req, res) => {
+  const { product } = req.query
+  if (!product || typeof product !== 'string' || product.trim().length === 0) {
+    return res.status(400).json({ error: 'missing_product' })
+  }
+
+  const evaluation = evaluateProduct(product)
+  res.json(evaluation)
+})
+
+app.get('/api/score/search', (req, res) => {
+  const { query } = req.query
+  const results = searchProducts(typeof query === 'string' ? query : '')
+  res.json({ results })
+})
+
+app.get('/api/suggestions', (req, res) => {
+  const { product } = req.query
+  const suggestions = getSuggestions(product || '')
+  res.json({ suggestions })
+})
+
+app.get('/api/insights', async (req, res) => {
+  const purchases = await loadPurchases()
+
+  if (purchases.length === 0) {
+    return res.json({ message: 'No purchases yet!' })
+  }
+
+  const totalScore = purchases.reduce((sum, p) => sum + p.sustainability_score, 0)
+  const avgScore = totalScore / purchases.length
+
+  const best = purchases.reduce((max, p) => (p.sustainability_score > max.sustainability_score ? p : max))
+  const worst = purchases.reduce((min, p) => (p.sustainability_score < min.sustainability_score ? p : min))
+
+  res.json({
+    total_purchases: purchases.length,
+    average_score: avgScore,
+    rating: getRating(avgScore),
+    best_purchase: best.product,
+    worst_purchase: worst.product,
+    total_spent: purchases.reduce((sum, p) => sum + p.price, 0)
+  })
+})
+
+app.get('/api/profile_suggestions', async (req, res) => {
+  try {
+    const dataPath = path.join(__dirname, '..', '..', 'predictions.json')
+    const content = await fs.readFile(dataPath, 'utf8')
+    const parsed = JSON.parse(content)
+    res.json(parsed)
+  } catch (err) {
+    res.status(500).json({ error: 'predictions not available', details: err.message })
+  }
+})
+
+app.get('/api/catalog/meta', async (req, res) => {
+  if (req.query.refresh === 'true') {
+    await refreshCatalog({ force: true })
+  }
+  res.json(getCatalogMeta())
+})
+
+app.post('/api/sync', async (req, res) => {
+  if (syncState.running) {
+    return res.status(409).json({ error: 'sync_in_progress', startedAt: syncState.startedAt })
+  }
+
+  try {
+    await fs.access(SYNC_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ error: 'sync_script_missing', details: 'sync_account.py not found' })
+  }
+
+  const startedAt = new Date().toISOString()
+  syncState.running = true
+  syncState.startedAt = startedAt
+  syncState.lastRun = { status: 'running', startedAt }
+  appendSyncLog('info', `Starting sync using ${PYTHON_CMD} ${SYNC_SCRIPT}`)
+
+  let syncProcess
+  try {
+    syncProcess = spawn(PYTHON_CMD, [SYNC_SCRIPT], {
+      cwd: PROJECT_ROOT,
+      env: process.env
+    })
+  } catch (error) {
+    syncState.running = false
+    syncState.startedAt = null
+    syncState.lastRun = {
+      status: 'error',
+      startedAt,
+      completedAt: new Date().toISOString(),
+      exitCode: null,
+      durationMs: 0,
+      error: error.message
+    }
+    appendSyncLog('stderr', `Failed to launch sync: ${error.message}`)
+    return res.status(500).json({ error: 'sync_launch_failed', details: error.message })
+  }
+
+  syncProcess.stdout.on('data', (chunk) => appendSyncLog('stdout', chunk))
+  syncProcess.stderr.on('data', (chunk) => appendSyncLog('stderr', chunk))
+
+  syncProcess.on('error', (error) => {
+    appendSyncLog('stderr', `Sync process error: ${error.message}`)
+  })
+
+  syncProcess.on('close', (code) => {
+    const completedAt = new Date().toISOString()
+    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    syncState.running = false
+    syncState.startedAt = null
+    syncState.lastRun = {
+      status: code === 0 ? 'success' : 'error',
+      exitCode: code,
+      startedAt,
+      completedAt,
+      durationMs,
+      error: code === 0 ? null : `Sync exited with code ${code}`
+    }
+    appendSyncLog('info', code === 0 ? 'Sync completed successfully.' : `Sync exited with code ${code}`)
+  })
+
+  return res.status(202).json({ status: 'started', startedAt })
+})
+
+app.get('/api/sync/status', (req, res) => {
+  res.json({
+    status: syncState.running ? 'running' : 'idle',
+    running: syncState.running,
+    startedAt: syncState.startedAt,
+    lastRun: syncState.lastRun,
+    logs: syncState.logs.slice(-100)
+  })
+})
+
+if (supabaseEnabled && !process.env.VERCEL) {
+  const intervalMs = CATALOG_REFRESH_INTERVAL_MS
+  const timer = setInterval(() => {
+    refreshCatalog().catch((err) => {
+      console.error('[catalogLoader] Background refresh failed:', err.message)
+    })
+  }, intervalMs)
+  if (typeof timer.unref === 'function') {
+    timer.unref()
+  }
+}
+
+await catalogReady
+  .then((meta) => {
+    console.log(`📦 Catalog ready (${meta.itemCount} items from ${meta.source})`)
+  })
+  .catch((err) => {
+    console.error('[catalogLoader] Initial catalog load failed:', err?.message || err)
+  })
+
+export default app
+export { ensureCatalogLoaded, minutes, calculateScore, evaluateProduct, searchProducts, getCatalogMeta }

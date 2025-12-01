@@ -1,0 +1,280 @@
+
+> sustainable-shop-webapp@1.0.0 dev
+> concurrently "npm run dev:client" "npm run dev:server"
+
+[0] 
+[0] > sustainable-shop-webapp@1.0.0 dev:client
+[0] > vite --port 3000
+[0] 
+[1] 
+[1] > sustainable-shop-webapp@1.0.0 dev:server
+[1] > PORT=3001 node server/index.js
+[1] 
+[1] 🌱 Sustainable Shop API running on http://localhost:3001
+[0] 
+[0]   VITE v5.4.21  ready in 307 ms
+[0] 
+[0]   ➜  Local:   http://localhost:3000/
+[0]   ➜  Network: use --host to expose
+[0] 3:15:14 PM [vite] Pre-transform error: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx: Unterminated regular expression. (17:8)
+[0] 
+[0]   15 |     fetchPurchases()
+[0]   16 |     fetchInsights()
+[0] > 17 |       </div>
+[0]      |         ^
+[0]   18 |
+[0]   19 |       <div className="tabs">
+[0]   20 |         <button
+[0] 3:15:14 PM [vite] Internal server error: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx: Unterminated regular expression. (17:8)
+[0] 
+[0]   15 |     fetchPurchases()
+[0]   16 |     fetchInsights()
+[0] > 17 |       </div>
+[0]      |         ^
+[0]   18 |
+[0]   19 |       <div className="tabs">
+[0]   20 |         <button
+[0]   Plugin: vite:react-babel
+[0]   File: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx:17:8
+[0]   15 |      fetchPurchases()
+[0]   16 |      fetchInsights()
+[0]   17 |        </div>
+[0]      |          ^
+[0]   18 |  
+[0]   19 |        <div className="tabs">
+[0]       at constructor (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:367:19)
+[0]       at JSXParserMixin.raise (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:6624:19)
+[0]       at JSXParserMixin.readRegexp (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:6353:20)
+[0]       at JSXParserMixin.parseExprAtom (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11377:16)
+[0]       at JSXParserMixin.parseExprAtom (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:4793:20)
+[0]       at JSXParserMixin.parseExprSubscripts (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11145:23)
+[0]       at JSXParserMixin.parseUpdate (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11130:21)
+[0]       at JSXParserMixin.parseMaybeUnary (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11110:23)
+[0]       at JSXParserMixin.parseMaybeUnaryOrPrivate (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10963:61)
+[0]       at JSXParserMixin.parseExprOpBaseRightExpr (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11050:34)
+[0]       at JSXParserMixin.parseExprOpRightExpr (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11045:21)
+[0]       at JSXParserMixin.parseExprOp (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11011:27)
+[0]       at JSXParserMixin.parseExprOps (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10972:17)
+[0]       at JSXParserMixin.parseMaybeConditional (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10945:23)
+[0]       at JSXParserMixin.parseMaybeAssign (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10895:21)
+[0]       at JSXParserMixin.parseExpressionBase (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10848:23)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10844:39
+[0]       at JSXParserMixin.allowInAnd (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12495:16)
+[0]       at JSXParserMixin.parseExpression (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10844:17)
+[0]       at JSXParserMixin.parseStatementContent (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12971:23)
+[0]       at JSXParserMixin.parseStatementLike (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12843:17)
+[0]       at JSXParserMixin.parseStatementListItem (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12823:17)
+[0]       at JSXParserMixin.parseBlockOrModuleBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13392:61)
+[0]       at JSXParserMixin.parseBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13385:10)
+[0]       at JSXParserMixin.parseBlock (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13373:10)
+[0]       at JSXParserMixin.parseFunctionBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12174:24)
+[0]       at JSXParserMixin.parseArrowExpression (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12149:10)
+[0]       at JSXParserMixin.parseParenAndDistinguishExpression (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11759:12)
+[0]       at JSXParserMixin.parseExprAtom (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11395:23)
+[0]       at JSXParserMixin.parseExprAtom (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:4793:20)
+[0]       at JSXParserMixin.parseExprSubscripts (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11145:23)
+[0]       at JSXParserMixin.parseUpdate (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11130:21)
+[0]       at JSXParserMixin.parseMaybeUnary (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11110:23)
+[0]       at JSXParserMixin.parseMaybeUnaryOrPrivate (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10963:61)
+[0]       at JSXParserMixin.parseExprOps (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10968:23)
+[0]       at JSXParserMixin.parseMaybeConditional (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10945:23)
+[0]       at JSXParserMixin.parseMaybeAssign (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10895:21)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10864:39
+[0]       at JSXParserMixin.allowInAnd (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12500:12)
+[0]       at JSXParserMixin.parseMaybeAssignAllowIn (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10864:17)
+[0]       at JSXParserMixin.parseMaybeAssignAllowInOrVoidPattern (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12567:17)
+[0]       at JSXParserMixin.parseExprListItem (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12249:18)
+[0]       at JSXParserMixin.parseCallExpressionArguments (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11316:22)
+[0]       at JSXParserMixin.parseCoverCallAndAsyncArrowHead (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11250:29)
+[0]       at JSXParserMixin.parseSubscript (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11184:19)
+[0]       at JSXParserMixin.parseSubscripts (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11158:19)
+[0]       at JSXParserMixin.parseExprSubscripts (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11149:17)
+[0]       at JSXParserMixin.parseUpdate (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11130:21)
+[0]       at JSXParserMixin.parseMaybeUnary (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:11110:23)
+[0]       at JSXParserMixin.parseMaybeUnaryOrPrivate (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:10963:61)
+[0] 3:28:50 PM [vite] Pre-transform error: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx: Identifier 'useState' has already been declared. (104:9)
+[0] 
+[0]   102 |
+[0]   103 | export default App
+[0] > 104 | import { useState, useEffect } from 'react'
+[0]       |          ^
+[0]   105 | import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   106 | import AddPurchase from './components/AddPurchase'
+[0]   107 | import { useState, useEffect } from 'react'
+[0] 3:28:50 PM [vite] Internal server error: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx: Identifier 'useState' has already been declared. (104:9)
+[0] 
+[0]   102 |
+[0]   103 | export default App
+[0] > 104 | import { useState, useEffect } from 'react'
+[0]       |          ^
+[0]   105 | import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   106 | import AddPurchase from './components/AddPurchase'
+[0]   107 | import { useState, useEffect } from 'react'
+[0]   Plugin: vite:react-babel
+[0]   File: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx:104:9
+[0]   102|  
+[0]   103|  export default App
+[0]   104|  import { useState, useEffect } from 'react'
+[0]      |           ^
+[0]   105|  import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   106|  import AddPurchase from './components/AddPurchase'
+[0]       at constructor (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:367:19)
+[0]       at JSXParserMixin.raise (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:6624:19)
+[0]       at ScopeHandler.checkRedeclarationInScope (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:1646:19)
+[0]       at ScopeHandler.declareName (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:1612:12)
+[0]       at JSXParserMixin.declareNameFromIdentifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7594:16)
+[0]       at JSXParserMixin.checkIdentifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7590:12)
+[0]       at JSXParserMixin.checkLVal (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7527:12)
+[0]       at JSXParserMixin.finishImportSpecifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14342:10)
+[0]       at JSXParserMixin.parseImportSpecifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14499:17)
+[0]       at JSXParserMixin.parseNamedImportSpecifiers (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14478:36)
+[0]       at JSXParserMixin.parseImportSpecifiersAndAfter (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14318:37)
+[0]       at JSXParserMixin.parseImport (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14311:17)
+[0]       at JSXParserMixin.parseStatementContent (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12952:27)
+[0]       at JSXParserMixin.parseStatementLike (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12843:17)
+[0]       at JSXParserMixin.parseModuleItem (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12820:17)
+[0]       at JSXParserMixin.parseBlockOrModuleBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13392:36)
+[0]       at JSXParserMixin.parseBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13385:10)
+[0]       at JSXParserMixin.parseProgram (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12698:10)
+[0]       at JSXParserMixin.parseTopLevel (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12688:25)
+[0]       at JSXParserMixin.parse (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14568:25)
+[0]       at parse (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14602:38)
+[0]       at parser (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/parser/index.js:41:34)
+[0]       at parser.next (<anonymous>)
+[0]       at normalizeFile (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+[0]       at normalizeFile.next (<anonymous>)
+[0]       at run (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transformation/index.js:22:50)
+[0]       at run.next (<anonymous>)
+[0]       at transform (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transform.js:22:33)
+[0]       at transform.next (<anonymous>)
+[0]       at step (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:261:32)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:273:13
+[0]       at async.call.result.err.err (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:223:11)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:189:28
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:113:33
+[0]       at step (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:287:14)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:273:13
+[0]       at async.call.result.err.err (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:223:11)
+[0] 3:31:35 PM [vite] Internal server error: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx: Identifier 'useState' has already been declared. (104:9)
+[0] 
+[0]   102 |
+[0]   103 | export default App
+[0] > 104 | import { useState, useEffect } from 'react'
+[0]       |          ^
+[0]   105 | import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   106 | import AddPurchase from './components/AddPurchase'
+[0]   107 | import { useState, useEffect } from 'react'
+[0]   Plugin: vite:react-babel
+[0]   File: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx:104:9
+[0]   102|  
+[0]   103|  export default App
+[0]   104|  import { useState, useEffect } from 'react'
+[0]      |           ^
+[0]   105|  import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   106|  import AddPurchase from './components/AddPurchase'
+[0]       at constructor (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:367:19)
+[0]       at JSXParserMixin.raise (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:6624:19)
+[0]       at ScopeHandler.checkRedeclarationInScope (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:1646:19)
+[0]       at ScopeHandler.declareName (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:1612:12)
+[0]       at JSXParserMixin.declareNameFromIdentifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7594:16)
+[0]       at JSXParserMixin.checkIdentifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7590:12)
+[0]       at JSXParserMixin.checkLVal (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7527:12)
+[0]       at JSXParserMixin.finishImportSpecifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14342:10)
+[0]       at JSXParserMixin.parseImportSpecifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14499:17)
+[0]       at JSXParserMixin.parseNamedImportSpecifiers (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14478:36)
+[0]       at JSXParserMixin.parseImportSpecifiersAndAfter (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14318:37)
+[0]       at JSXParserMixin.parseImport (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14311:17)
+[0]       at JSXParserMixin.parseStatementContent (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12952:27)
+[0]       at JSXParserMixin.parseStatementLike (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12843:17)
+[0]       at JSXParserMixin.parseModuleItem (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12820:17)
+[0]       at JSXParserMixin.parseBlockOrModuleBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13392:36)
+[0]       at JSXParserMixin.parseBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13385:10)
+[0]       at JSXParserMixin.parseProgram (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12698:10)
+[0]       at JSXParserMixin.parseTopLevel (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12688:25)
+[0]       at JSXParserMixin.parse (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14568:25)
+[0]       at parse (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14602:38)
+[0]       at parser (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/parser/index.js:41:34)
+[0]       at parser.next (<anonymous>)
+[0]       at normalizeFile (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+[0]       at normalizeFile.next (<anonymous>)
+[0]       at run (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transformation/index.js:22:50)
+[0]       at run.next (<anonymous>)
+[0]       at transform (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transform.js:22:33)
+[0]       at transform.next (<anonymous>)
+[0]       at step (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:261:32)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:273:13
+[0]       at async.call.result.err.err (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:223:11)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:189:28
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:113:33
+[0]       at step (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:287:14)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:273:13
+[0]       at async.call.result.err.err (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:223:11)
+[0] 3:33:39 PM [vite] Pre-transform error: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx: Identifier 'useState' has already been declared. (4:9)
+[0] 
+[0]   2 | import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   3 | import AddPurchase from './components/AddPurchase'
+[0] > 4 | import { useState, useEffect } from 'react'
+[0]     |          ^
+[0]   5 | import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   6 | import AddPurchase from './components/AddPurchase'
+[0]   7 | import Dashboard from './components/Dashboard'
+[0] 3:33:40 PM [vite] Internal server error: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx: Identifier 'useState' has already been declared. (4:9)
+[0] 
+[0]   2 | import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   3 | import AddPurchase from './components/AddPurchase'
+[0] > 4 | import { useState, useEffect } from 'react'
+[0]     |          ^
+[0]   5 | import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   6 | import AddPurchase from './components/AddPurchase'
+[0]   7 | import Dashboard from './components/Dashboard'
+[0]   Plugin: vite:react-babel
+[0]   File: /home/montague/Downloads/AH2/sustainable-shop-webapp/src/App.jsx:4:9
+[0]   2  |  import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   3  |  import AddPurchase from './components/AddPurchase'
+[0]   4  |  import { useState, useEffect } from 'react'
+[0]      |           ^
+[0]   5  |  import { Leaf, TrendingUp, ShoppingBag, Award } from 'lucide-react'
+[0]   6  |  import AddPurchase from './components/AddPurchase'
+[0]       at constructor (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:367:19)
+[0]       at JSXParserMixin.raise (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:6624:19)
+[0]       at ScopeHandler.checkRedeclarationInScope (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:1646:19)
+[0]       at ScopeHandler.declareName (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:1612:12)
+[0]       at JSXParserMixin.declareNameFromIdentifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7594:16)
+[0]       at JSXParserMixin.checkIdentifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7590:12)
+[0]       at JSXParserMixin.checkLVal (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:7527:12)
+[0]       at JSXParserMixin.finishImportSpecifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14342:10)
+[0]       at JSXParserMixin.parseImportSpecifier (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14499:17)
+[0]       at JSXParserMixin.parseNamedImportSpecifiers (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14478:36)
+[0]       at JSXParserMixin.parseImportSpecifiersAndAfter (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14318:37)
+[0]       at JSXParserMixin.parseImport (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14311:17)
+[0]       at JSXParserMixin.parseStatementContent (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12952:27)
+[0]       at JSXParserMixin.parseStatementLike (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12843:17)
+[0]       at JSXParserMixin.parseModuleItem (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12820:17)
+[0]       at JSXParserMixin.parseBlockOrModuleBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13392:36)
+[0]       at JSXParserMixin.parseBlockBody (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:13385:10)
+[0]       at JSXParserMixin.parseProgram (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12698:10)
+[0]       at JSXParserMixin.parseTopLevel (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:12688:25)
+[0]       at JSXParserMixin.parse (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14568:25)
+[0]       at parse (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/parser/lib/index.js:14602:38)
+[0]       at parser (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/parser/index.js:41:34)
+[0]       at parser.next (<anonymous>)
+[0]       at normalizeFile (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+[0]       at normalizeFile.next (<anonymous>)
+[0]       at run (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transformation/index.js:22:50)
+[0]       at run.next (<anonymous>)
+[0]       at transform (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/transform.js:22:33)
+[0]       at transform.next (<anonymous>)
+[0]       at step (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:261:32)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:273:13
+[0]       at async.call.result.err.err (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:223:11)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:189:28
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:113:33
+[0]       at step (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:287:14)
+[0]       at /home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:273:13
+[0]       at async.call.result.err.err (/home/montague/Downloads/AH2/sustainable-shop-webapp/node_modules/gensync/index.js:223:11)
+[0] 3:35:50 PM [vite] page reload src/main.jsx
+[1] npm run dev:server exited with code SIGHUP
+[0] npm run dev:client exited with code SIGHUP
