@@ -26,11 +26,19 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 const SYNC_SCRIPT = path.join(PROJECT_ROOT, 'sync_account.py')
+const SCRAPE_SCRIPT = path.join(PROJECT_ROOT, 'scrape_account.py')
 const PYTHON_CMD = process.env.PYTHON || 'python3'
 const MAX_LOG_ENTRIES = 200
 const CATALOG_REFRESH_INTERVAL_MS = Number.parseInt(process.env.CATALOG_REFRESH_INTERVAL_MS ?? '900000', 10) || 900000
 
 const syncState = {
+  running: false,
+  startedAt: null,
+  lastRun: null,
+  logs: []
+}
+
+const scrapeState = {
   running: false,
   startedAt: null,
   lastRun: null,
@@ -49,6 +57,21 @@ function appendSyncLog(stream, chunk) {
   }
   if (syncState.logs.length > MAX_LOG_ENTRIES) {
     syncState.logs = syncState.logs.slice(syncState.logs.length - MAX_LOG_ENTRIES)
+  }
+}
+
+function appendScrapeLog(stream, chunk) {
+  const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk)
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  for (const line of lines) {
+    scrapeState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream,
+      message: line
+    })
+  }
+  if (scrapeState.logs.length > MAX_LOG_ENTRIES) {
+    scrapeState.logs = scrapeState.logs.slice(scrapeState.logs.length - MAX_LOG_ENTRIES)
   }
 }
 
@@ -590,6 +613,81 @@ app.get('/api/sync/status', (req, res) => {
     startedAt: syncState.startedAt,
     lastRun: syncState.lastRun,
     logs: syncState.logs.slice(-100)
+  })
+})
+
+// New: trigger account scraping instead of traditional sync
+app.post('/api/scrape', async (req, res) => {
+  if (scrapeState.running) {
+    return res.status(409).json({ error: 'scrape_in_progress', startedAt: scrapeState.startedAt })
+  }
+
+  try {
+    await fs.access(SCRAPE_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ error: 'scrape_script_missing', details: 'scrape_account.py not found' })
+  }
+
+  const startedAt = new Date().toISOString()
+  scrapeState.running = true
+  scrapeState.startedAt = startedAt
+  scrapeState.lastRun = { status: 'running', startedAt }
+  appendScrapeLog('info', `Starting scrape using ${PYTHON_CMD} ${SCRAPE_SCRIPT}`)
+
+  let scrapeProcess
+  try {
+    scrapeProcess = spawn(PYTHON_CMD, [SCRAPE_SCRIPT], {
+      cwd: PROJECT_ROOT,
+      env: process.env
+    })
+  } catch (error) {
+    scrapeState.running = false
+    scrapeState.startedAt = null
+    scrapeState.lastRun = {
+      status: 'error',
+      startedAt,
+      completedAt: new Date().toISOString(),
+      exitCode: null,
+      durationMs: 0,
+      error: error.message
+    }
+    appendScrapeLog('stderr', `Failed to launch scrape: ${error.message}`)
+    return res.status(500).json({ error: 'scrape_launch_failed', details: error.message })
+  }
+
+  scrapeProcess.stdout.on('data', (chunk) => appendScrapeLog('stdout', chunk))
+  scrapeProcess.stderr.on('data', (chunk) => appendScrapeLog('stderr', chunk))
+
+  scrapeProcess.on('error', (error) => {
+    appendScrapeLog('stderr', `Scrape process error: ${error.message}`)
+  })
+
+  scrapeProcess.on('close', (code) => {
+    const completedAt = new Date().toISOString()
+    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    scrapeState.running = false
+    scrapeState.startedAt = null
+    scrapeState.lastRun = {
+      status: code === 0 ? 'success' : 'error',
+      exitCode: code,
+      startedAt,
+      completedAt,
+      durationMs,
+      error: code === 0 ? null : `Scrape exited with code ${code}`
+    }
+    appendScrapeLog('info', code === 0 ? 'Scrape completed successfully.' : `Scrape exited with code ${code}`)
+  })
+
+  return res.status(202).json({ status: 'started', startedAt })
+})
+
+app.get('/api/scrape/status', (req, res) => {
+  res.json({
+    status: scrapeState.running ? 'running' : 'idle',
+    running: scrapeState.running,
+    startedAt: scrapeState.startedAt,
+    lastRun: scrapeState.lastRun,
+    logs: scrapeState.logs.slice(-100)
   })
 })
 
