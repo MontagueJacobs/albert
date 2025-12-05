@@ -561,17 +561,18 @@ app.post('/api/ingest/scrape', async (req, res) => {
     if (!items.length) return res.status(400).json({ error: 'no_items' })
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
-    const seen = new Set()
-    const cleaned = []
+  const seen = new Set()
+  const cleaned = []
+  const seenIds = new Set()
     for (const raw of items) {
       const name = (raw?.name || '').toString().trim()
       if (!name) continue
       const url = (raw?.url || '').toString().trim()
       const source = (raw?.source || 'ah_bonus').toString().trim()
-      const normalized_name = normalizeProductName(name)
-      const key = url || `${normalized_name}::${source}`
-      if (seen.has(key)) continue
-      seen.add(key)
+  const normalized_name = normalizeProductName(name)
+  const key = url || `${normalized_name}::${source}`
+  if (seen.has(key)) continue
+  seen.add(key)
       // Human-readable ID: try to extract AH slug from URL, else prefix normalized_name
       let id = null
       if (url) {
@@ -590,6 +591,12 @@ app.post('/api/ingest/scrape', async (req, res) => {
       if (!id) {
         id = `ah-${normalized_name.replace(/\s+/g, '-')}`
       }
+
+      // De-duplicate by final id to avoid ON CONFLICT multiple-affect error
+      if (seenIds.has(id)) {
+        continue
+      }
+      seenIds.add(id)
       cleaned.push({
         id,
         name,
