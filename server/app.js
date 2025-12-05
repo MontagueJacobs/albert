@@ -572,9 +572,24 @@ app.post('/api/ingest/scrape', async (req, res) => {
       const key = url || `${normalized_name}::${source}`
       if (seen.has(key)) continue
       seen.add(key)
-      // Deterministic ID from source + (url or normalized_name)
-      const idBasis = `${source}|${url || normalized_name}`
-      const id = crypto.createHash('sha1').update(idBasis).digest('hex')
+      // Human-readable ID: try to extract AH slug from URL, else prefix normalized_name
+      let id = null
+      if (url) {
+        try {
+          const u = new URL(url)
+          // Expected: /producten/product/<wi...>/<slug>
+          const parts = u.pathname.split('/').filter(Boolean)
+          const slug = parts[parts.length - 1]
+          if (slug && /^[a-z0-9\-]+$/.test(slug)) {
+            id = slug
+          }
+        } catch (_) {
+          // ignore URL parsing errors
+        }
+      }
+      if (!id) {
+        id = `ah-${normalized_name.replace(/\s+/g, '-')}`
+      }
       cleaned.push({
         id,
         name,
