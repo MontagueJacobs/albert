@@ -547,21 +547,35 @@ app.post('/api/sync', async (req, res) => {
     return res.status(409).json({ error: 'sync_in_progress', startedAt: syncState.startedAt })
   }
 
+  const mode = (req.body?.mode || req.query?.mode || process.env.SYNC_MODE || 'sync').toString()
+
+  // Serverless environments (like Vercel) cannot run local Python/browser flows
+  if (process.env.VERCEL) {
+    return res.status(501).json({ error: 'not_supported_on_vercel', details: 'Run this endpoint locally.' })
+  }
+
+  const scriptPath = mode === 'scrape' ? SCRAPE_SCRIPT : SYNC_SCRIPT
+  const scriptName = path.basename(scriptPath)
+
   try {
-    await fs.access(SYNC_SCRIPT)
+    await fs.access(scriptPath)
   } catch (error) {
-    return res.status(500).json({ error: 'sync_script_missing', details: 'sync_account.py not found' })
+    return res.status(500).json({ error: `${mode}_script_missing`, details: `${scriptName} not found` })
   }
 
   const startedAt = new Date().toISOString()
   syncState.running = true
   syncState.startedAt = startedAt
-  syncState.lastRun = { status: 'running', startedAt }
-  appendSyncLog('info', `Starting sync using ${PYTHON_CMD} ${SYNC_SCRIPT}`)
+  syncState.lastRun = { status: 'running', startedAt, mode }
+  appendSyncLog('info', `Starting ${mode} using ${PYTHON_CMD} ${scriptPath}`)
+
+  if (mode === 'scrape') {
+    appendSyncLog('info', 'This flow opens a browser for you to log into AH, then scrapes your account pages.')
+  }
 
   let syncProcess
   try {
-    syncProcess = spawn(PYTHON_CMD, [SYNC_SCRIPT], {
+    syncProcess = spawn(PYTHON_CMD, [scriptPath], {
       cwd: PROJECT_ROOT,
       env: process.env
     })
@@ -574,17 +588,18 @@ app.post('/api/sync', async (req, res) => {
       completedAt: new Date().toISOString(),
       exitCode: null,
       durationMs: 0,
-      error: error.message
+      error: error.message,
+      mode
     }
-    appendSyncLog('stderr', `Failed to launch sync: ${error.message}`)
-    return res.status(500).json({ error: 'sync_launch_failed', details: error.message })
+    appendSyncLog('stderr', `Failed to launch ${mode}: ${error.message}`)
+    return res.status(500).json({ error: `${mode}_launch_failed`, details: error.message })
   }
 
   syncProcess.stdout.on('data', (chunk) => appendSyncLog('stdout', chunk))
   syncProcess.stderr.on('data', (chunk) => appendSyncLog('stderr', chunk))
 
   syncProcess.on('error', (error) => {
-    appendSyncLog('stderr', `Sync process error: ${error.message}`)
+    appendSyncLog('stderr', `${mode} process error: ${error.message}`)
   })
 
   syncProcess.on('close', (code) => {
@@ -598,12 +613,13 @@ app.post('/api/sync', async (req, res) => {
       startedAt,
       completedAt,
       durationMs,
-      error: code === 0 ? null : `Sync exited with code ${code}`
+      error: code === 0 ? null : `${mode} exited with code ${code}`,
+      mode
     }
-    appendSyncLog('info', code === 0 ? 'Sync completed successfully.' : `Sync exited with code ${code}`)
+    appendSyncLog('info', code === 0 ? `${mode} completed successfully.` : `${mode} exited with code ${code}`)
   })
 
-  return res.status(202).json({ status: 'started', startedAt })
+  return res.status(202).json({ status: 'started', startedAt, mode })
 })
 
 app.get('/api/sync/status', (req, res) => {
