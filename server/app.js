@@ -575,6 +575,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
   seen.add(key)
       // Human-readable ID: try to extract AH slug from URL, else prefix normalized_name
       let id = null
+      let slugName = null
       if (url) {
         try {
           const u = new URL(url)
@@ -583,6 +584,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
           const slug = parts[parts.length - 1]
           if (slug && /^[a-z0-9\-]+$/.test(slug)) {
             id = slug
+            // Create display name from slug
+            slugName = slug.replace(/-/g, ' ')
+            slugName = slugName.replace(/\b[a-z]/g, (c) => c.toUpperCase())
           }
         } catch (_) {
           // ignore URL parsing errors
@@ -597,10 +601,13 @@ app.post('/api/ingest/scrape', async (req, res) => {
         continue
       }
       seenIds.add(id)
+      const finalName = slugName || name
+      const finalNormalized = id ? normalizeProductName((slugName || '').toLowerCase()) : normalizeProductName(finalName)
+
       cleaned.push({
         id,
-        name,
-        normalized_name,
+        name: finalName,
+        normalized_name: finalNormalized,
         url: url || null,
         image_url: (raw?.image || '').toString().trim() || null,
         source,
