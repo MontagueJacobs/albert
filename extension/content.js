@@ -68,8 +68,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items, source: 'ah_bonus', scraped_at: new Date().toISOString() })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'ingest_failed');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.detail || data?.error || 'ingest_failed');
       alert(`Uploaded ${data.stored || items.length} items.`);
     } catch (e) {
       console.error('Scrape upload failed:', e);

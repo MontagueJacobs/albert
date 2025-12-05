@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 import { spawn } from 'child_process'
 import dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 import {
   getCatalogIndex,
@@ -567,11 +568,17 @@ app.post('/api/ingest/scrape', async (req, res) => {
       if (!name) continue
       const url = (raw?.url || '').toString().trim()
       const source = (raw?.source || 'ah_bonus').toString().trim()
-      const key = url || `${normalizeProductName(name)}::${source}`
+      const normalized_name = normalizeProductName(name)
+      const key = url || `${normalized_name}::${source}`
       if (seen.has(key)) continue
       seen.add(key)
+      // Deterministic ID from source + (url or normalized_name)
+      const idBasis = `${source}|${url || normalized_name}`
+      const id = crypto.createHash('sha1').update(idBasis).digest('hex')
       cleaned.push({
+        id,
         name,
+        normalized_name,
         url: url || null,
         image_url: (raw?.image || '').toString().trim() || null,
         source,
@@ -585,7 +592,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
     if (supabase) {
       const { error } = await supabase
         .from(SUPABASE_PRODUCTS_TABLE)
-        .insert(cleaned)
+        .upsert(cleaned, { onConflict: 'id' })
       if (error) return res.status(500).json({ error: 'supabase_insert_failed', detail: error.message })
       stored = cleaned.length
     }
