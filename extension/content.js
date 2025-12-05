@@ -1,5 +1,5 @@
 (function () {
-  const API_BASE = 'https://YOUR-VERCEL-DOMAIN.vercel.app'; // CHANGE THIS
+  const API_BASE = 'https://albert-eosin.vercel.app';
 
   function addButton() {
     if (document.getElementById('ah-bonus-scrape-btn')) return;

@@ -159,7 +159,10 @@ What’s included:
 - A small Chrome extension in `extension/` that injects a “Scrape this page” button on AH Bonus → “Eerder gekocht”. It extracts items and uploads them to your API.
 
 Steps:
+Deployment domain: https://albert-eosin.vercel.app/
+
 1) Update `extension/manifest.json` and `extension/content.js` — replace `YOUR-VERCEL-DOMAIN` with your deployed domain.
+   - Already configured in this repo to: `https://albert-eosin.vercel.app`.
 2) Chrome → Extensions → Enable Developer Mode → Load Unpacked → select `sustainable-shop-webapp/extension`.
 3) Visit https://www.ah.nl/bonus/eerder-gekocht, log in, scroll to load products, click “Scrape this page”.
 4) Items are sent to `/api/ingest/scrape` and stored in Supabase table `ah_products` (server uses your `SUPABASE_SERVICE_ROLE_KEY`).
