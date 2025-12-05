@@ -8,6 +8,7 @@ function AccountSync({ onSyncCompleted }) {
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
+  const [hostedGuide, setHostedGuide] = useState(false)
   const pollRef = useRef(null)
   const lastCompletedRef = useRef(null)
 
@@ -89,7 +90,8 @@ function AccountSync({ onSyncCompleted }) {
         setError(t('sync_conflict'))
       } else if (res.status === 501) {
         // Hosted env (e.g., Vercel) cannot run interactive scraping
-        setError('Interactive scraping is not supported on the hosted version. Please run the app locally to log in and scrape your account.')
+        setError('Interactive scraping is not supported on the hosted version. Use the browser bookmarklet below to scrape from the AH site, then we will ingest to your account automatically.')
+        setHostedGuide(true)
       } else if (!res.ok) {
         const payload = await res.json().catch(() => ({}))
         throw new Error(payload?.error || 'failed to start sync')
@@ -119,6 +121,18 @@ function AccountSync({ onSyncCompleted }) {
     return `[${timestamp}] ${level}: ${entry.message}`
   })
 
+  // Hosted-friendly bookmarklet approach (no extension required)
+  const BOOKMARKLET_HREF = useMemo(() => {
+    const api = 'https://albert-eosin.vercel.app'
+    const code = (
+      `(()=>{try{const API='${api}';function ex(){const links=document.querySelectorAll('a[href^="/producten/product/"], article a[href^="/producten/product/"]');const items=[];const seen=new Set();links.forEach(a=>{const url=new URL(a.href,location.origin).toString();if(seen.has(url))return;seen.add(url);let name=a.getAttribute('aria-label')||a.textContent||'';name=name.replace(/\\s+/g,' ').trim();if(!name){const title=a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');name=(title?.textContent||'').trim()}const card=a.closest('article')||a.closest('[data-testhook="product-card"]')||a.parentElement;let price=null;const priceEl=card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');const raw=priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);if(raw)price=parseFloat(raw[1]);const imgEl=card?.querySelector('img');const image=imgEl?.src||'';if(name){items.push({name,url,price,image,source:'ah_bonus'})}});return items}const items=ex();if(!items.length){alert('No products found yet. Scroll to load more and try again.');return}fetch(API+'/api/ingest/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'ah_bonus',scraped_at:new Date().toISOString()})}).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{if(!ok)throw new Error((data&&data.error)||'ingest_failed');alert('Uploaded '+((data&&data.stored)||items.length)+' items.')}).catch(e=>{console.error('Scrape upload failed:',e);alert('Upload failed: '+e.message)})}catch(e){alert('Error: '+e.message)}})()`
+    )
+      // Strip newlines/spaces to make it compact
+      .replace(/\n/g, '')
+      .replace(/\s{2,}/g, ' ')
+    return `javascript:${code}`
+  }, [])
+
   return (
     <section style={{ marginTop: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -140,6 +154,26 @@ function AccountSync({ onSyncCompleted }) {
       </div>
 
       {error && <div style={{ color: '#c0392b', marginBottom: '0.75rem' }}>{error}</div>}
+      {hostedGuide && (
+        <div style={{ border: '1px dashed #b5c2ff', background: '#f7f9ff', color: '#283a89', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+          <h4 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Scrape via bookmarklet (no install)</h4>
+          <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            <li>
+              Open AH earlier-purchased page: {' '}
+              <a href="https://www.ah.nl/bonus/eerder-gekocht" target="_blank" rel="noreferrer">ah.nl/bonus/eerder-gekocht</a>
+            </li>
+            <li>Make sure you’re logged in and scroll to load products.</li>
+            <li>
+              Drag this button to your bookmarks bar: {' '}
+              <a href={BOOKMARKLET_HREF} style={{ padding: '0.35rem 0.6rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', textDecoration: 'none' }}>AH: Scrape this page</a>
+              <div style={{ fontSize: '0.85rem', color: '#49557a', marginTop: '0.4rem' }}>
+                Tip: If you can’t see the bookmarks bar, press Ctrl+Shift+B (Windows/Linux) or Cmd+Shift+B (macOS).
+              </div>
+            </li>
+            <li>On the AH page, click the bookmarklet you just saved. We’ll upload the items to your account automatically.</li>
+          </ol>
+        </div>
+      )}
       {status?.running && <div style={{ color: '#555', marginBottom: '0.75rem' }}>{t('sync_running_hint')}</div>}
 
       <div style={{ border: '1px solid #e6e6e6', borderRadius: '12px', padding: '1rem', background: '#fff' }}>
