@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "AH Bonus Scraper",
+  "version": "1.0.0",
+  "description": "Scrape 'Eerder gekocht' from AH Bonus in your own browser and upload to your account.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.ah.nl/*",
+    "https://YOUR-VERCEL-DOMAIN.vercel.app/*",
+    "https://YOUR-CUSTOM-DOMAIN/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.ah.nl/bonus/eerder-gekocht*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

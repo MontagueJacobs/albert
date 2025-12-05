@@ -150,6 +150,25 @@ Products are scored based on:
 4. Push the code to GitHub (or another git host) and connect the repo, or run `vercel --prod` locally to deploy.
 5. After deploy, visit `<your-app>/api/catalog/meta` to ensure the API can see the Supabase catalog.
 
+## Browser-based scraping (Akamai-friendly)
+
+Serverless hosts (like Vercel) cannot run Chromium/Selenium, and anti-bot platforms block typical headless traffic. Let users scrape in their own browser and upload to your API instead.
+
+What’s included:
+- An ingest API on your server: `POST /api/ingest/scrape` (expects `{ items: [...] }`)
+- A small Chrome extension in `extension/` that injects a “Scrape this page” button on AH Bonus → “Eerder gekocht”. It extracts items and uploads them to your API.
+
+Steps:
+1) Update `extension/manifest.json` and `extension/content.js` — replace `YOUR-VERCEL-DOMAIN` with your deployed domain.
+2) Chrome → Extensions → Enable Developer Mode → Load Unpacked → select `sustainable-shop-webapp/extension`.
+3) Visit https://www.ah.nl/bonus/eerder-gekocht, log in, scroll to load products, click “Scrape this page”.
+4) Items are sent to `/api/ingest/scrape` and stored in Supabase table `ah_products` (server uses your `SUPABASE_SERVICE_ROLE_KEY`).
+
+Notes:
+- This uses the user’s real browser and IP, which typically passes Akamai.
+- You can later add a per-user identifier and store scrapes in a dedicated table.
+- CORS is permissive by default in the API; harden it to your domain(s) if needed.
+
 ## Future Enhancements
 
 - [ ] Import data from AH API when available

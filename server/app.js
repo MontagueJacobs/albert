@@ -7,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { spawn } from 'child_process'
 import dotenv from 'dotenv'
+import { createClient } from '@supabase/supabase-js'
 
 import {
   getCatalogIndex,
@@ -30,6 +31,13 @@ const SYNC_SCRIPT = path.join(PROJECT_ROOT, 'sync_account.py')
 const SCRAPE_SCRIPT = path.join(PROJECT_ROOT, 'scrape_account.py')
 const CLIENT_DIST = path.join(__dirname, '..', 'dist')
 const CLIENT_INDEX = path.join(CLIENT_DIST, 'index.html')
+// Supabase client (server-side) for ingesting scraped items
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_PRODUCTS_TABLE = process.env.SUPABASE_PRODUCTS_TABLE || 'ah_products'
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null
 const PYTHON_CMD = process.env.PYTHON || 'python3'
 const MAX_LOG_ENTRIES = 200
 const CATALOG_REFRESH_INTERVAL_MS = Number.parseInt(process.env.CATALOG_REFRESH_INTERVAL_MS ?? '900000', 10) || 900000
@@ -79,7 +87,7 @@ function appendScrapeLog(stream, chunk) {
 }
 
 app.use(cors())
-app.use(bodyParser.json())
+app.use(bodyParser.json({ limit: '2mb' }))
 
 // Data file path
 const DATA_FILE = path.join(__dirname, 'purchases.json')
@@ -543,6 +551,49 @@ app.get('/api/catalog/meta', async (req, res) => {
     await refreshCatalog({ force: true })
   }
   res.json(getCatalogMeta())
+})
+
+// Ingest scraped items from the user's browser (extension/bookmarklet)
+app.post('/api/ingest/scrape', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : []
+    if (!items.length) return res.status(400).json({ error: 'no_items' })
+
+    // Normalize and de-duplicate by URL if present, else by normalized name + source
+    const seen = new Set()
+    const cleaned = []
+    for (const raw of items) {
+      const name = (raw?.name || '').toString().trim()
+      if (!name) continue
+      const url = (raw?.url || '').toString().trim()
+      const source = (raw?.source || 'ah_bonus').toString().trim()
+      const key = url || `${normalizeProductName(name)}::${source}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      cleaned.push({
+        name,
+        url: url || null,
+        image_url: (raw?.image || '').toString().trim() || null,
+        source,
+        updated_at: new Date().toISOString()
+      })
+    }
+
+    if (!cleaned.length) return res.status(400).json({ error: 'no_valid_items' })
+
+    let stored = 0
+    if (supabase) {
+      const { error } = await supabase
+        .from(SUPABASE_PRODUCTS_TABLE)
+        .insert(cleaned)
+      if (error) return res.status(500).json({ error: 'supabase_insert_failed', detail: error.message })
+      stored = cleaned.length
+    }
+
+    return res.json({ ok: true, received: items.length, stored })
+  } catch (e) {
+    return res.status(500).json({ error: 'ingest_failed', detail: e.message })
+  }
 })
 
 app.post('/api/sync', async (req, res) => {
