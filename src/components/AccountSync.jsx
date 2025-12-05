@@ -80,9 +80,16 @@ function AccountSync({ onSyncCompleted }) {
     setError(null)
 
     try {
-      const res = await fetch('/api/sync', { method: 'POST' })
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'scrape' })
+      })
       if (res.status === 409) {
         setError(t('sync_conflict'))
+      } else if (res.status === 501) {
+        // Hosted env (e.g., Vercel) cannot run interactive scraping
+        setError('Interactive scraping is not supported on the hosted version. Please run the app locally to log in and scrape your account.')
       } else if (!res.ok) {
         const payload = await res.json().catch(() => ({}))
         throw new Error(payload?.error || 'failed to start sync')
