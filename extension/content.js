@@ -1,6 +1,19 @@
 (function () {
   const API_BASE = 'https://albert-eosin.vercel.app';
 
+  function getIngestKey() {
+    try {
+      const k = (localStorage.getItem('ah_ingest_key') || '').trim();
+      if (k) return k;
+    } catch (_) {}
+    const entered = prompt('Enter your ingest key from the app');
+    if (entered && entered.trim()) {
+      try { localStorage.setItem('ah_ingest_key', entered.trim()); } catch (_) {}
+      return entered.trim();
+    }
+    return null;
+  }
+
   function addButton() {
     if (document.getElementById('ah-bonus-scrape-btn')) return;
     const btn = document.createElement('button');
@@ -58,6 +71,11 @@
 
   async function scrapeAndSend() {
     try {
+      const ingest_key = getIngestKey();
+      if (!ingest_key) {
+        alert('Ingest cancelled: no key provided');
+        return;
+      }
       const items = extractProducts();
       if (!items.length) {
         alert('No products found yet. Scroll to load more and try again.');
@@ -66,7 +84,7 @@
       const res = await fetch(`${API_BASE}/api/ingest/scrape`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, source: 'ah_bonus', scraped_at: new Date().toISOString() })
+        body: JSON.stringify({ ingest_key, items, source: 'ah_bonus', scraped_at: new Date().toISOString() })
       });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.detail || data?.error || 'ingest_failed');

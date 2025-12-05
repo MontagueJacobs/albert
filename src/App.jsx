@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Leaf, TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon } from 'lucide-react'
+import Auth from './components/Auth'
 import AddPurchase from './components/AddPurchase'
 import Dashboard from './components/Dashboard'
 import PurchaseList from './components/PurchaseList'
@@ -9,7 +10,7 @@ import AccountSync from './components/AccountSync'
 import ScoreLookup from './components/ScoreLookup'
 import { I18nProvider, useI18n, getSavedLang, saveLang } from './i18n.jsx'
 
-function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, purchases, insights, syncVersion }) {
+function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, purchases, insights, syncVersion, onProfileReady }) {
   const { t, lang, setLang } = useI18n()
 
   const handleToggleLanguage = useCallback(() => {
@@ -27,14 +28,17 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, p
           </h1>
           <p>{t('app_subtitle')}</p>
         </div>
-        <button
-          type="button"
-          onClick={handleToggleLanguage}
-          className="btn btn-secondary"
-          aria-label={t('toggle_language_aria')}
-        >
-          {t('toggle_language')}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={handleToggleLanguage}
+            className="btn btn-secondary"
+            aria-label={t('toggle_language_aria')}
+          >
+            {t('toggle_language')}
+          </button>
+          <Auth onProfileReady={onProfileReady} />
+        </div>
       </div>
 
       <div className="tabs">
@@ -112,6 +116,7 @@ function App() {
   const [insights, setInsights] = useState(null)
   const [lang, setLang] = useState(() => getSavedLang())
   const [syncVersion, setSyncVersion] = useState(0)
+  const [ingestKey, setIngestKey] = useState(null)
 
   const fetchPurchases = useCallback(async () => {
     try {
@@ -165,6 +170,7 @@ function App() {
         purchases={purchases}
         insights={insights}
         syncVersion={syncVersion}
+        onProfileReady={(p) => setIngestKey(p?.ingest_key || null)}
       />
     </I18nProvider>
   )

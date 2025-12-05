@@ -9,6 +9,7 @@ function AccountSync({ onSyncCompleted }) {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
   const [hostedGuide, setHostedGuide] = useState(false)
+  const [ingestKey, setIngestKey] = useState('')
   const pollRef = useRef(null)
   const lastCompletedRef = useRef(null)
 
@@ -44,6 +45,24 @@ function AccountSync({ onSyncCompleted }) {
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
+
+  // Load/save ingest key locally (used to generate bookmarklet with embedded key)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ah_ingest_key') || ''
+      if (saved) setIngestKey(saved)
+    } catch (_) {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (ingestKey) localStorage.setItem('ah_ingest_key', ingestKey)
+    } catch (_) {
+      // ignore
+    }
+  }, [ingestKey])
 
   useEffect(() => {
     if (!status) return
@@ -124,14 +143,15 @@ function AccountSync({ onSyncCompleted }) {
   // Hosted-friendly bookmarklet approach (no extension required)
   const BOOKMARKLET_HREF = useMemo(() => {
     const api = 'https://albert-eosin.vercel.app'
+    // Safely embed the key; if empty, the bookmarklet will prompt on first use
+    const embeddedKey = ingestKey ? JSON.stringify(ingestKey) : "''"
     const code = (
-      `(()=>{try{const API='${api}';function ex(){const links=document.querySelectorAll('a[href^="/producten/product/"], article a[href^="/producten/product/"]');const items=[];const seen=new Set();links.forEach(a=>{const url=new URL(a.href,location.origin).toString();if(seen.has(url))return;seen.add(url);let name=a.getAttribute('aria-label')||a.textContent||'';name=name.replace(/\\s+/g,' ').trim();if(!name){const title=a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');name=(title?.textContent||'').trim()}const card=a.closest('article')||a.closest('[data-testhook="product-card"]')||a.parentElement;let price=null;const priceEl=card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');const raw=priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);if(raw)price=parseFloat(raw[1]);const imgEl=card?.querySelector('img');const image=imgEl?.src||'';if(name){items.push({name,url,price,image,source:'ah_bonus'})}});return items}const items=ex();if(!items.length){alert('No products found yet. Scroll to load more and try again.');return}fetch(API+'/api/ingest/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'ah_bonus',scraped_at:new Date().toISOString()})}).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{if(!ok)throw new Error((data&&data.error)||'ingest_failed');alert('Uploaded '+((data&&data.stored)||items.length)+' items.')}).catch(e=>{console.error('Scrape upload failed:',e);alert('Upload failed: '+e.message)})}catch(e){alert('Error: '+e.message)}})()`
+      `(()=>{try{const API='${api}';const KEY=${embeddedKey};function ex(){const links=document.querySelectorAll('a[href^="/producten/product/"], article a[href^="/producten/product/"]');const items=[];const seen=new Set();links.forEach(a=>{const url=new URL(a.href,location.origin).toString();if(seen.has(url))return;seen.add(url);let name=a.getAttribute('aria-label')||a.textContent||'';name=name.replace(/\\s+/g,' ').trim();if(!name){const title=a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');name=(title?.textContent||'').trim()}const card=a.closest('article')||a.closest('[data-testhook="product-card"]')||a.parentElement;let price=null;const priceEl=card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');const raw=priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);if(raw)price=parseFloat(raw[1]);const imgEl=card?.querySelector('img');const image=imgEl?.src||'';if(name){items.push({name,url,price,image,source:'ah_bonus'})}});return items}const items=ex();if(!items.length){alert('No products found yet. Scroll to load more and try again.');return}let ingest_key = KEY && typeof KEY==='string' && KEY.trim()? KEY.trim(): (localStorage.getItem('ah_ingest_key')||'').trim();if(!ingest_key){ingest_key=prompt('Enter your ingest key from the app');if(!ingest_key){alert('Ingest cancelled: no key provided');return}try{localStorage.setItem('ah_ingest_key',ingest_key)}catch(_){}}fetch(API+'/api/ingest/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ingest_key,items,source:'ah_bonus',scraped_at:new Date().toISOString()})}).then(r=>r.json().then(d=>({ok:r.ok,data:d,status:r.status}))).then(({ok,data,status})=>{if(!ok){const msg=(data&&data.error)||data?.detail||('ingest_failed ('+status+')');throw new Error(msg)}alert('Uploaded '+((data&&data.stored)||items.length)+' items.')}).catch(e=>{console.error('Scrape upload failed:',e);alert('Upload failed: '+e.message)})}catch(e){alert('Error: '+e.message)}})()`
     )
-      // Strip newlines/spaces to make it compact
       .replace(/\n/g, '')
       .replace(/\s{2,}/g, ' ')
     return `javascript:${code}`
-  }, [])
+  }, [ingestKey])
 
   return (
     <section style={{ marginTop: '1.5rem' }}>
@@ -172,6 +192,26 @@ function AccountSync({ onSyncCompleted }) {
             </li>
             <li>On the AH page, click the bookmarklet you just saved. We’ll upload the items to your account automatically.</li>
           </ol>
+          <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#eef3ff', borderRadius: '8px' }}>
+            <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>Your ingest key</div>
+            <div style={{ fontSize: '0.9rem', color: '#3a4784', marginBottom: '0.35rem' }}>
+              Paste your personal ingest key here to embed it into the bookmarklet. If left empty, the bookmarklet will prompt for it the first time.
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                value={ingestKey}
+                onChange={(e) => setIngestKey(e.target.value)}
+                placeholder="paste ingest key"
+                style={{ flex: 1, padding: '0.5rem 0.6rem', border: '1px solid #cbd5ff', borderRadius: '8px' }}
+              />
+              <button
+                type="button"
+                onClick={() => { try { navigator.clipboard.writeText(ingestKey || '') } catch (_) {} }}
+                className="btn"
+                style={{ padding: '0.45rem 0.7rem' }}
+              >Copy</button>
+            </div>
+          </div>
         </div>
       )}
       {status?.running && <div style={{ color: '#555', marginBottom: '0.75rem' }}>{t('sync_running_hint')}</div>}

@@ -36,6 +36,8 @@ const CLIENT_INDEX = path.join(CLIENT_DIST, 'index.html')
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const SUPABASE_PRODUCTS_TABLE = process.env.SUPABASE_PRODUCTS_TABLE || 'ah_products'
+const SUPABASE_USER_PRODUCTS_TABLE = process.env.SUPABASE_USER_PRODUCTS_TABLE || 'user_products'
+const SUPABASE_PROFILES_TABLE = process.env.SUPABASE_PROFILES_TABLE || 'profiles'
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null
@@ -559,6 +561,26 @@ app.post('/api/ingest/scrape', async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : []
     if (!items.length) return res.status(400).json({ error: 'no_items' })
+    const ingestKey = (req.body?.ingest_key || '').toString().trim()
+    if (!ingestKey) {
+      return res.status(401).json({ error: 'missing_ingest_key' })
+    }
+    if (!supabase) {
+      return res.status(500).json({ error: 'supabase_not_configured', detail: 'Server-side Supabase URL/service-role key missing' })
+    }
+
+    // Resolve user by ingest key
+    let userId = null
+    if (supabase) {
+      const { data: profile, error: profileErr } = await supabase
+        .from(SUPABASE_PROFILES_TABLE)
+        .select('user_id')
+        .eq('ingest_key', ingestKey)
+        .maybeSingle()
+      if (profileErr) return res.status(500).json({ error: 'profile_lookup_failed', detail: profileErr.message })
+      if (!profile) return res.status(401).json({ error: 'invalid_ingest_key' })
+      userId = profile.user_id
+    }
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
   const seen = new Set()
@@ -620,10 +642,30 @@ app.post('/api/ingest/scrape', async (req, res) => {
 
     let stored = 0
     if (supabase) {
-      const { error } = await supabase
+      // Upsert per-user products
+      const userRows = cleaned.map((row) => ({ ...row, user_id: userId }))
+      const { error: upUserErr } = await supabase
+        .from(SUPABASE_USER_PRODUCTS_TABLE)
+        .upsert(userRows, { onConflict: 'user_id,id' })
+      if (upUserErr) return res.status(500).json({ error: 'supabase_user_insert_failed', detail: upUserErr.message })
+
+      // Optionally keep global table as well (legacy)
+      const { error: upGlobalErr } = await supabase
         .from(SUPABASE_PRODUCTS_TABLE)
         .upsert(cleaned, { onConflict: 'id' })
-      if (error) return res.status(500).json({ error: 'supabase_insert_failed', detail: error.message })
+      if (upGlobalErr) return res.status(500).json({ error: 'supabase_insert_failed', detail: upGlobalErr.message })
+
+      // Ensure entries exist in product_catalog for unknown products (best-effort)
+      for (const row of cleaned) {
+        try {
+          if (!row?.id || !row?.name) continue
+          await supabase
+            .from(process.env.SUPABASE_CATALOG_TABLE || 'product_catalog')
+            .upsert({ id: row.id, names: [row.name] }, { onConflict: 'id' })
+        } catch (_) {
+          // ignore
+        }
+      }
       stored = cleaned.length
     }
 
@@ -796,6 +838,82 @@ app.get('/api/scrape/status', (req, res) => {
     lastRun: scrapeState.lastRun,
     logs: scrapeState.logs.slice(-100)
   })
+})
+
+// Lightweight, non-OAuth account creation: generate a profile with ingest_key
+app.post('/api/profile/register', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'supabase_not_configured' })
+  try {
+    // Optional: accept a display name or email for convenience (not used for auth)
+    const display_name = (req.body?.display_name || '').toString().trim() || null
+    // Generate a random user_id and an ingest_key
+    const user_id = crypto.randomUUID()
+    const ingest_key = crypto.randomBytes(24).toString('hex')
+
+    const { error: insertErr } = await supabase
+      .from(SUPABASE_PROFILES_TABLE)
+      .insert({ user_id, ingest_key, display_name })
+    if (insertErr) return res.status(500).json({ error: 'profile_create_failed', detail: insertErr.message })
+
+    return res.json({ user_id, ingest_key })
+  } catch (e) {
+    return res.status(500).json({ error: 'profile_register_failed', detail: e.message })
+  }
+})
+
+// Fetch minimal profile info using ingest_key (no OAuth); useful to show key, stats, etc.
+app.get('/api/profile', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'supabase_not_configured' })
+  const ingestKey = (req.query?.ingest_key || req.headers['x-ingest-key'] || '').toString().trim()
+  if (!ingestKey) return res.status(400).json({ error: 'missing_ingest_key' })
+  try {
+    const { data: profile, error: profileErr } = await supabase
+      .from(SUPABASE_PROFILES_TABLE)
+      .select('user_id, ingest_key, display_name')
+      .eq('ingest_key', ingestKey)
+      .maybeSingle()
+    if (profileErr) return res.status(500).json({ error: 'profile_lookup_failed', detail: profileErr.message })
+    if (!profile) return res.status(404).json({ error: 'profile_not_found' })
+
+    // Optionally include counts of user products
+    const { count, error: countErr } = await supabase
+      .from(SUPABASE_USER_PRODUCTS_TABLE)
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', profile.user_id)
+    if (countErr) {
+      return res.json({ user_id: profile.user_id, ingest_key: profile.ingest_key, display_name: profile.display_name })
+    }
+    return res.json({ user_id: profile.user_id, ingest_key: profile.ingest_key, display_name: profile.display_name, product_count: count ?? 0 })
+  } catch (e) {
+    return res.status(500).json({ error: 'profile_fetch_failed', detail: e.message })
+  }
+})
+
+// Regenerate ingest key (authenticated by existing key). Returns new key.
+app.post('/api/profile/regenerate_key', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'supabase_not_configured' })
+  const ingestKey = (req.body?.ingest_key || req.headers['x-ingest-key'] || '').toString().trim()
+  if (!ingestKey) return res.status(400).json({ error: 'missing_ingest_key' })
+  try {
+    const { data: profile, error: profileErr } = await supabase
+      .from(SUPABASE_PROFILES_TABLE)
+      .select('user_id')
+      .eq('ingest_key', ingestKey)
+      .maybeSingle()
+    if (profileErr) return res.status(500).json({ error: 'profile_lookup_failed', detail: profileErr.message })
+    if (!profile) return res.status(404).json({ error: 'invalid_ingest_key' })
+
+    const newKey = crypto.randomBytes(24).toString('hex')
+    const { error: updErr } = await supabase
+      .from(SUPABASE_PROFILES_TABLE)
+      .update({ ingest_key: newKey })
+      .eq('user_id', profile.user_id)
+    if (updErr) return res.status(500).json({ error: 'profile_update_failed', detail: updErr.message })
+
+    return res.json({ ingest_key: newKey })
+  } catch (e) {
+    return res.status(500).json({ error: 'profile_regenerate_failed', detail: e.message })
+  }
 })
 
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
