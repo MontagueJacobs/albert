@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import bodyParser from 'body-parser'
 import fs from 'fs/promises'
+import { existsSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { spawn } from 'child_process'
@@ -27,6 +28,8 @@ const app = express()
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 const SYNC_SCRIPT = path.join(PROJECT_ROOT, 'sync_account.py')
 const SCRAPE_SCRIPT = path.join(PROJECT_ROOT, 'scrape_account.py')
+const CLIENT_DIST = path.join(__dirname, '..', 'dist')
+const CLIENT_INDEX = path.join(CLIENT_DIST, 'index.html')
 const PYTHON_CMD = process.env.PYTHON || 'python3'
 const MAX_LOG_ENTRIES = 200
 const CATALOG_REFRESH_INTERVAL_MS = Number.parseInt(process.env.CATALOG_REFRESH_INTERVAL_MS ?? '900000', 10) || 900000
@@ -706,6 +709,17 @@ app.get('/api/scrape/status', (req, res) => {
     logs: scrapeState.logs.slice(-100)
   })
 })
+
+// Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
+if (existsSync(CLIENT_INDEX)) {
+  app.use(express.static(CLIENT_DIST))
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).end()
+    }
+    res.sendFile(CLIENT_INDEX)
+  })
+}
 
 if (supabaseEnabled && !process.env.VERCEL) {
   const intervalMs = CATALOG_REFRESH_INTERVAL_MS
