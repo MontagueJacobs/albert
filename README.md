@@ -121,6 +121,7 @@ Products are scored based on:
         normalized_name text not null,
         url text,
         image_url text,
+         price numeric,
         source text,
         tags jsonb,
         updated_at timestamp with time zone default now()

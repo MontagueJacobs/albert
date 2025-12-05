@@ -610,6 +610,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
         normalized_name: finalNormalized,
         url: url || null,
         image_url: (raw?.image || '').toString().trim() || null,
+        price: (typeof raw?.price === 'number' && !Number.isNaN(raw.price)) ? raw.price : null,
         source,
         updated_at: new Date().toISOString()
       })
