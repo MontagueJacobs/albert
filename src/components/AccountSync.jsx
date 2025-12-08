@@ -75,36 +75,11 @@ function AccountSync({ onSyncCompleted }) {
     }
   }, [])
 
-  const handleStart = useCallback(async () => {
-    if (starting || status?.running) return
-    setStarting(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'scrape' })
-      })
-      if (res.status === 409) {
-        setError(t('sync_conflict'))
-      } else if (res.status === 501) {
-        // Hosted env (e.g., Vercel) cannot run interactive scraping
-        setError('Interactive scraping is not supported on the hosted version. Use the browser bookmarklet below to scrape from the AH site, then we will ingest to your account automatically.')
-        setHostedGuide(true)
-      } else if (!res.ok) {
-        const payload = await res.json().catch(() => ({}))
-        throw new Error(payload?.error || 'failed to start sync')
-      } else {
-        fetchStatus()
-      }
-    } catch (err) {
-      console.error('Failed to start sync:', err)
-      setError(t('sync_error_generic'))
-    } finally {
-      setStarting(false)
-    }
-  }, [starting, status, fetchStatus, t])
+  // Server-side scraping is no longer supported (AH blocks it).
+  // Show the bookmarklet guide directly instead.
+  const handleStart = useCallback(() => {
+    setHostedGuide(true)
+  }, [])
 
   const logs = status?.logs ?? []
   const lastRun = status?.lastRun
@@ -114,7 +89,7 @@ function AccountSync({ onSyncCompleted }) {
     : t('sync_last_run_never')
 
   const currentStatus = status?.running ? t('sync_status_running') : t('sync_status_idle')
-  const buttonDisabled = starting || status?.running
+  const buttonDisabled = false
   const logLines = logs.slice(-30).map((entry) => {
     const timestamp = formatDateTime(entry.timestamp) || entry.timestamp
     const level = entry.stream.toUpperCase()
@@ -148,8 +123,8 @@ function AccountSync({ onSyncCompleted }) {
           disabled={buttonDisabled}
           style={{ minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
         >
-          {buttonDisabled ? <Loader2 size={18} className="spin" /> : <RefreshCw size={18} />}
-          {buttonDisabled ? t('sync_button_running') : t('sync_button')}
+          <RefreshCw size={18} />
+          {hostedGuide ? t('sync_button') : 'Show Scrape Guide'}
         </button>
       </div>
 
