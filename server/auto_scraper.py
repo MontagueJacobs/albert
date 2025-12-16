@@ -298,15 +298,15 @@ class AHAutoScraper:
         print("[INFO] Navigating to previously purchased products...", flush=True)
         
         try:
-            # Try the bonus route (less protected)
-            await self.page.goto('https://www.ah.nl/bonus/eerder-gekocht', wait_until='networkidle')
+            # Start with the main eerder-gekocht page sorted by purchase date
+            await self.page.goto('https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date&page=0', wait_until='networkidle')
             await self.human_delay(2000, 3000)
             
             # Check if blocked
             page_content = await self.page.content()
             if 'access denied' in page_content.lower() or 'permission' in page_content.lower():
-                print("[WARNING] Access denied - trying alternative route...", flush=True)
-                await self.page.goto('https://www.ah.nl/producten/eerder-gekocht', wait_until='networkidle')
+                print("[WARNING] Access denied on main page - trying bonus route...", flush=True)
+                await self.page.goto('https://www.ah.nl/bonus/eerder-gekocht', wait_until='networkidle')
                 await self.human_delay(2000, 3000)
             
             # Wait for products to load
@@ -334,6 +334,107 @@ class AHAutoScraper:
             print(f"[ERROR] Navigation failed: {e}", flush=True)
             return False
     
+    async def scrape_all_pages(self) -> List[Dict[str, Any]]:
+        """Scrape products from multiple pages to get complete purchase history."""
+        all_products = []
+        seen_urls = set()
+        
+        # Pages to scrape
+        pages_to_scrape = [
+            ('https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date&page=0', 'Purchase History'),
+            ('https://www.ah.nl/bonus/eerder-gekocht', 'Bonus Products'),
+        ]
+        
+        for page_url, page_name in pages_to_scrape:
+            print(f"[INFO] Scraping {page_name}...", flush=True)
+            
+            try:
+                # Navigate with longer timeout
+                await self.page.goto(page_url, wait_until='load', timeout=60000)
+                await self.human_delay(3000, 4000)
+                
+                # Wait for page to stabilize
+                try:
+                    await self.page.wait_for_load_state('networkidle', timeout=10000)
+                except:
+                    pass  # Continue even if networkidle times out
+                
+                await self.human_delay(2000, 3000)
+                
+                # Check if we have access
+                try:
+                    page_content = await self.page.content()
+                    if 'access denied' in page_content.lower():
+                        print(f"[WARNING] Access denied to {page_name}, skipping...", flush=True)
+                        continue
+                except:
+                    print(f"[WARNING] Could not read page content for {page_name}", flush=True)
+                    continue
+                
+                # Wait for products
+                try:
+                    await self.page.wait_for_selector('article a[href*="/producten/product/"]', timeout=15000)
+                except:
+                    print(f"[WARNING] No products found on {page_name}", flush=True)
+                    continue
+                
+                # Scroll to load all products on this page
+                await self.scroll_and_load_all()
+                
+                # Also try to load more pages via pagination
+                await self.load_all_pagination_pages()
+                
+                # Extract products
+                products = await self.extract_products()
+                
+                # Add only new products (dedupe by URL)
+                new_count = 0
+                for product in products:
+                    if product['url'] not in seen_urls:
+                        seen_urls.add(product['url'])
+                        all_products.append(product)
+                        new_count += 1
+                
+                print(f"[SUCCESS] Found {new_count} new products from {page_name} (total: {len(all_products)})", flush=True)
+                
+            except Exception as e:
+                print(f"[WARNING] Error scraping {page_name}: {e}", flush=True)
+                continue
+        
+        return all_products
+    
+    async def load_all_pagination_pages(self, max_pages: int = 10):
+        """Load additional pages via pagination if available."""
+        for page_num in range(1, max_pages):
+            try:
+                # Check if there's a "load more" button or pagination
+                load_more_selectors = [
+                    'button:has-text("Meer laden")',
+                    'button:has-text("Load more")',
+                    '[data-testhook="load-more"]',
+                    'a[href*="page=' + str(page_num) + '"]',
+                ]
+                
+                clicked = False
+                for selector in load_more_selectors:
+                    try:
+                        button = await self.page.query_selector(selector)
+                        if button:
+                            await button.click()
+                            await self.human_delay(2000, 3000)
+                            print(f"[INFO] Loaded page {page_num + 1}", flush=True)
+                            clicked = True
+                            break
+                    except:
+                        continue
+                
+                if not clicked:
+                    # No more pages to load
+                    break
+                    
+            except Exception as e:
+                break
+
     async def scroll_and_load_all(self, max_scrolls: int = 20):
         """Scroll down to load all lazy-loaded products."""
         print("[INFO] Scrolling to load all products...", flush=True)
@@ -522,16 +623,8 @@ class AHAutoScraper:
                 if save_cookies_to:
                     await self.save_cookies(save_cookies_to)
             
-            # Navigate to products page
-            if not await self.navigate_to_products():
-                result['error'] = 'navigation_failed'
-                return result
-            
-            # Scroll to load all products
-            await self.scroll_and_load_all()
-            
-            # Extract products
-            products = await self.extract_products()
+            # Scrape all pages (purchase history + bonus products)
+            products = await self.scrape_all_pages()
             
             if not products:
                 result['error'] = 'no_products_found'

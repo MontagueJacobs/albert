@@ -21,3 +21,4 @@ webapp.log
 coverage/
 *.swp
 *.swo
+.vercel
