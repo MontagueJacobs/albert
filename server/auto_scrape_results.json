@@ -1,0 +1,37 @@
+{
+  "success": true,
+  "products": [
+    {
+      "name": "2.19250 g3 voor 5.00",
+      "url": "https://www.ah.nl/producten/product/wi490796/ah-snoepgroente-tomaat",
+      "price": 2.19,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393430313934?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape"
+    },
+    {
+      "name": "2.391 lVega2e gratis",
+      "url": "https://www.ah.nl/producten/product/wi569888/coolbest-fruit-drink-orange",
+      "price": 2.39,
+      "image": "https://static.ah.nl/dam/product/AHI_7a58757a52445a365359712d65374c42434469414351?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape"
+    },
+    {
+      "name": "2.4975 ml2e gratis",
+      "url": "https://www.ah.nl/producten/product/wi477776/colgate-triple-action-extra-whitening-tandpasta",
+      "price": 2.49,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313034363333?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape"
+    },
+    {
+      "name": "3.391.99500 gPrijsfavorietVegan500 GRAM VOOR 1.99",
+      "url": "https://www.ah.nl/producten/product/wi231922/ah-kiwi-groen",
+      "price": 3.39,
+      "image": "https://static.ah.nl/dam/product/AHI_434d50313937363739?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape"
+    }
+  ],
+  "error": null,
+  "scraped_at": "2025-12-16T19:39:54.149825+01:00",
+  "login_method": "cookies",
+  "count": 4
+}

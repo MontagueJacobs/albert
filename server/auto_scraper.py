@@ -342,28 +342,41 @@ class AHAutoScraper:
         stable_count = 0
         
         for i in range(max_scrolls):
-            # Scroll down
-            await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-            await self.human_delay(1000, 2000)
-            
-            # Check if page height increased (new content loaded)
-            current_height = await self.page.evaluate('document.body.scrollHeight')
-            
-            if current_height == previous_height:
-                stable_count += 1
-                if stable_count >= 3:
-                    print(f"[INFO] Finished scrolling after {i+1} scrolls", flush=True)
+            try:
+                # Check if we're still on the right page
+                current_url = self.page.url
+                if 'eerder-gekocht' not in current_url and 'producten' not in current_url:
+                    print(f"[WARNING] Page navigated away to {current_url}, stopping scroll", flush=True)
                     break
-            else:
-                stable_count = 0
-                previous_height = current_height
-            
-            if (i + 1) % 5 == 0:
-                print(f"[INFO] Scrolled {i+1} times...", flush=True)
+                
+                # Scroll down smoothly
+                await self.page.evaluate('window.scrollBy(0, 800)')
+                await self.human_delay(800, 1200)
+                
+                # Check if page height increased (new content loaded)
+                current_height = await self.page.evaluate('document.body.scrollHeight')
+                
+                if current_height == previous_height:
+                    stable_count += 1
+                    if stable_count >= 3:
+                        print(f"[INFO] Finished scrolling after {i+1} scrolls", flush=True)
+                        break
+                else:
+                    stable_count = 0
+                    previous_height = current_height
+                
+                if (i + 1) % 5 == 0:
+                    print(f"[INFO] Scrolled {i+1} times, page height: {current_height}px", flush=True)
+            except Exception as e:
+                print(f"[WARNING] Scroll error: {e}", flush=True)
+                break
         
         # Scroll back to top
-        await self.page.evaluate('window.scrollTo(0, 0)')
-        await self.human_delay(500, 1000)
+        try:
+            await self.page.evaluate('window.scrollTo(0, 0)')
+            await self.human_delay(500, 1000)
+        except:
+            pass
     
     async def extract_products(self) -> List[Dict[str, Any]]:
         """Extract product information from the page."""
@@ -374,37 +387,74 @@ class AHAutoScraper:
                 const items = [];
                 const seen = new Set();
                 
-                // Find all product links
-                const links = document.querySelectorAll('a[href*="/producten/product/"], article a[href*="/producten/product/"]');
+                // Find all product cards/articles
+                const cards = document.querySelectorAll('article, [data-testhook="product-card"]');
                 
-                links.forEach(a => {
-                    const url = new URL(a.href, location.origin).toString();
+                cards.forEach(card => {
+                    // Find product link
+                    const link = card.querySelector('a[href*="/producten/product/"]');
+                    if (!link) return;
+                    
+                    const url = new URL(link.href, location.origin).toString();
                     if (seen.has(url)) return;
                     seen.add(url);
                     
-                    // Get product name
-                    let name = a.getAttribute('aria-label') || a.textContent || '';
-                    name = name.replace(/\\s+/g, ' ').trim();
+                    // Get product name - try multiple strategies
+                    let name = '';
                     
-                    if (!name) {
-                        const title = a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');
-                        name = (title?.textContent || '').trim();
+                    // Strategy 1: Look for product title element
+                    const titleEl = card.querySelector('[data-testhook="product-title"], [class*="title"]');
+                    if (titleEl) {
+                        name = titleEl.textContent.trim();
                     }
                     
-                    // Get parent card
-                    const card = a.closest('article') || a.closest('[data-testhook="product-card"]') || a.parentElement;
+                    // Strategy 2: Look for header elements
+                    if (!name) {
+                        const header = card.querySelector('h1, h2, h3, h4');
+                        if (header) {
+                            name = header.textContent.trim();
+                        }
+                    }
+                    
+                    // Strategy 3: Use aria-label
+                    if (!name) {
+                        name = link.getAttribute('aria-label') || '';
+                    }
+                    
+                    // Strategy 4: Extract from URL
+                    if (!name) {
+                        const match = url.match(/\\/product\\/wi\\d+\\/(.+)$/);
+                        if (match) {
+                            name = match[1].replace(/-/g, ' ').replace(/^ah-/, 'AH ');
+                        }
+                    }
+                    
+                    // Clean the name - remove price/promo text that may have leaked in
+                    name = name.replace(/\\d+[,.]\\d{2}[\\s€]?/g, ' ')  // Remove prices like 2.19
+                              .replace(/\\d+(e)? gratis/gi, '')  // Remove "2e gratis" type promos
+                              .replace(/\\d+ voor \\d+[,.]\\d+/gi, '')  // Remove "3 voor 5.00" type promos
+                              .replace(/\\d+ (gram|ml|liter|kg|g|l) voor/gi, '')  // Remove quantity promos
+                              .replace(/Prijsfavoriet/gi, '')
+                              .replace(/Vegan/gi, '')  // Will re-detect this from product data
+                              .replace(/\\s+/g, ' ')
+                              .trim();
                     
                     // Get price
                     let price = null;
-                    const priceEl = card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');
-                    const raw = priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);
-                    if (raw) price = parseFloat(raw[1]);
+                    const priceEl = card.querySelector('[data-testhook="product-price"], [class*="price"]');
+                    if (priceEl) {
+                        const priceText = priceEl.textContent.replace(',', '.');
+                        const priceMatch = priceText.match(/(\\d+\\.\\d{2})/);
+                        if (priceMatch) {
+                            price = parseFloat(priceMatch[1]);
+                        }
+                    }
                     
                     // Get image
-                    const imgEl = card?.querySelector('img');
+                    const imgEl = card.querySelector('img');
                     const image = imgEl?.src || '';
                     
-                    if (name) {
+                    if (name && name.length > 2) {
                         items.push({
                             name,
                             url,
@@ -471,7 +521,6 @@ class AHAutoScraper:
                 # Save cookies after successful login if requested
                 if save_cookies_to:
                     await self.save_cookies(save_cookies_to)
-                return result
             
             # Navigate to products page
             if not await self.navigate_to_products():
