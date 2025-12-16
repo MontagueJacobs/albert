@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 Automated Albert Heijn Scraper using Playwright
-This script logs in with user credentials and scrapes their purchase history
+This script logs in with user credentials and scrapes their purchase history.
+
+Supports:
+- Local Playwright browser (for development/self-hosted)
+- Remote browser services like Browserless.io (for Vercel/serverless)
 """
 
 import asyncio
@@ -13,7 +17,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 try:
-    from playwright.async_api import async_playwright, Page, Browser
+    from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 except ImportError:
     print("ERROR: Playwright not installed. Run: pip install playwright && playwright install chromium", file=sys.stderr)
     sys.exit(1)
@@ -22,36 +26,57 @@ except ImportError:
 class AHAutoScraper:
     """Automated scraper for Albert Heijn using Playwright."""
     
-    def __init__(self, headless: bool = True):
+    def __init__(self, headless: bool = True, browserless_url: Optional[str] = None):
+        """
+        Initialize the scraper.
+        
+        Args:
+            headless: Run browser in headless mode (for local browser)
+            browserless_url: URL to connect to Browserless.io or similar service
+                             e.g., "wss://chrome.browserless.io?token=YOUR_TOKEN"
+        """
         self.headless = headless
+        self.browserless_url = browserless_url
         self.browser: Optional[Browser] = None
+        self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
         self.products: List[Dict[str, Any]] = []
+        self._playwright = None
         
     async def setup(self):
-        """Initialize the browser."""
-        print("[INFO] Starting browser...", flush=True)
-        playwright = await async_playwright().start()
+        """Initialize the browser (local or remote)."""
+        self._playwright = await async_playwright().start()
         
-        # Use Chromium for better compatibility
-        self.browser = await playwright.chromium.launch(
-            headless=self.headless,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-            ]
-        )
+        if self.browserless_url:
+            # Connect to remote browser service (Browserless, Browserbase, etc.)
+            print(f"[INFO] Connecting to remote browser service...", flush=True)
+            try:
+                self.browser = await self._playwright.chromium.connect_over_cdp(self.browserless_url)
+                print("[INFO] Connected to remote browser", flush=True)
+            except Exception as e:
+                print(f"[ERROR] Failed to connect to remote browser: {e}", flush=True)
+                raise
+        else:
+            # Launch local browser
+            print("[INFO] Starting local browser...", flush=True)
+            self.browser = await self._playwright.chromium.launch(
+                headless=self.headless,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--no-sandbox',
+                    '--disable-dev-shm-usage',
+                ]
+            )
         
         # Create context with realistic viewport and user agent
-        context = await self.browser.new_context(
+        self.context = await self.browser.new_context(
             viewport={'width': 1920, 'height': 1080},
             user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             locale='nl-NL',
             timezone_id='Europe/Amsterdam',
         )
         
-        self.page = await context.new_page()
+        self.page = await self.context.new_page()
         
         # Remove automation detection
         await self.page.add_init_script("""
@@ -64,9 +89,13 @@ class AHAutoScraper:
         
     async def close(self):
         """Clean up browser resources."""
+        if self.context:
+            await self.context.close()
         if self.browser:
             await self.browser.close()
-            print("[INFO] Browser closed", flush=True)
+        if self._playwright:
+            await self._playwright.stop()
+        print("[INFO] Browser closed", flush=True)
     
     async def human_delay(self, min_ms: int = 500, max_ms: int = 1500):
         """Add a random human-like delay."""
@@ -153,8 +182,7 @@ class AHAutoScraper:
                 # Check for CAPTCHA
                 captcha = await self.page.query_selector('[id*="captcha"], [class*="captcha"], iframe[src*="captcha"]')
                 if captcha:
-                    print("[WARNING] CAPTCHA detected - automated solving not supported", flush=True)
-                    print("[INFO] Waiting for manual CAPTCHA solve...", flush=True)
+                    print("[WARNING] CAPTCHA detected - waiting for solve...", flush=True)
                     
                 if (i + 1) % 10 == 0:
                     print(f"[INFO] Still waiting for login... ({i+1}/{max_wait}s)", flush=True)
@@ -370,10 +398,14 @@ async def main():
     parser.add_argument('--output', '-o', default='auto_scrape_results.json', help='Output file')
     parser.add_argument('--headless', action='store_true', default=True, help='Run in headless mode')
     parser.add_argument('--no-headless', dest='headless', action='store_false', help='Show browser window')
+    parser.add_argument('--browserless-url', help='URL to Browserless.io or similar service (e.g., wss://chrome.browserless.io?token=YOUR_TOKEN)')
     
     args = parser.parse_args()
     
-    scraper = AHAutoScraper(headless=args.headless)
+    # Check for browserless URL in environment
+    browserless_url = args.browserless_url or os.environ.get('BROWSERLESS_URL')
+    
+    scraper = AHAutoScraper(headless=args.headless, browserless_url=browserless_url)
     result = await scraper.scrape(args.email, args.password, args.output)
     
     # Output result as JSON for the server to parse

@@ -838,11 +838,12 @@ const AUTO_SCRAPE_SCRIPT = path.join(__dirname, 'auto_scraper.py')
 
 // Start automated scraping with user credentials
 app.post('/api/auto-scrape', async (req, res) => {
-  // Block on hosted environments (Vercel) - cannot run headless browsers
-  if (process.env.VERCEL) {
+  // Block on hosted environments (Vercel) unless Browserless is configured
+  const hasBrowserless = !!process.env.BROWSERLESS_URL
+  if (process.env.VERCEL && !hasBrowserless) {
     return res.status(501).json({ 
       error: 'not_supported_on_hosted',
-      message: 'Automated scraping is not available on hosted environments. Please use the bookmarklet method instead.'
+      message: 'Automated scraping requires BROWSERLESS_URL to be configured on hosted environments. Please use the bookmarklet method instead.'
     })
   }
   
@@ -884,16 +885,26 @@ app.post('/api/auto-scrape', async (req, res) => {
   appendAutoScrapeLog('info', 'Starting automated AH scraper...')
   appendAutoScrapeLog('info', `Email: ${email.substring(0, 3)}***@${email.split('@')[1] || '***'}`)
   
+  // Build command arguments
+  const scriptArgs = [
+    AUTO_SCRAPE_SCRIPT,
+    '--email', email,
+    '--password', password,
+    '--headless'
+  ]
+  
+  // Add Browserless URL if available (for Vercel/serverless)
+  const browserlessUrl = process.env.BROWSERLESS_URL
+  if (browserlessUrl) {
+    scriptArgs.push('--browserless-url', browserlessUrl)
+    appendAutoScrapeLog('info', 'Using remote browser service (Browserless)')
+  }
+  
   let autoScrapeProcess
   try {
-    autoScrapeProcess = spawn(PYTHON_CMD, [
-      AUTO_SCRAPE_SCRIPT,
-      '--email', email,
-      '--password', password,
-      '--headless'
-    ], {
+    autoScrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
       cwd: __dirname,
-      env: { ...process.env, PYTHONUNBUFFERED: '1' }
+      env: { ...process.env, PYTHONUNBUFFERED: '1', BROWSERLESS_URL: browserlessUrl || '' }
     })
   } catch (error) {
     autoScrapeState.running = false
@@ -1014,11 +1025,22 @@ app.get('/api/auto-scrape/status', (req, res) => {
   })
 })
 
-// Check if auto-scrape is available (not on Vercel)
+// Check if auto-scrape is available
+// Available if: (1) not on Vercel, OR (2) Browserless URL is configured
 app.get('/api/auto-scrape/available', (req, res) => {
+  const hasBrowserless = !!process.env.BROWSERLESS_URL
+  const isVercel = !!process.env.VERCEL
+  const available = !isVercel || hasBrowserless
+  
+  let reason = null
+  if (!available) {
+    reason = 'hosted_environment_no_browserless'
+  }
+  
   res.json({
-    available: !process.env.VERCEL,
-    reason: process.env.VERCEL ? 'hosted_environment' : null
+    available,
+    reason,
+    mode: hasBrowserless ? 'remote' : 'local'
   })
 })
 
