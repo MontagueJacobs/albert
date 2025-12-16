@@ -1046,6 +1046,272 @@ app.get('/api/auto-scrape/available', (req, res) => {
   })
 })
 
+// Cookie file path for session persistence
+const COOKIES_FILE = path.join(__dirname, 'ah_cookies.json')
+
+// Check if valid cookies exist
+app.get('/api/auto-scrape/cookies', async (req, res) => {
+  try {
+    const exists = existsSync(COOKIES_FILE)
+    if (!exists) {
+      return res.json({ hasCookies: false })
+    }
+    
+    const content = await fs.readFile(COOKIES_FILE, 'utf8')
+    const cookies = JSON.parse(content)
+    
+    // Check if cookies have expired
+    const now = Date.now() / 1000
+    const validCookies = cookies.filter(c => !c.expires || c.expires > now)
+    
+    res.json({
+      hasCookies: validCookies.length > 0,
+      cookieCount: validCookies.length,
+      totalCookies: cookies.length
+    })
+  } catch (error) {
+    res.json({ hasCookies: false, error: error.message })
+  }
+})
+
+// Delete saved cookies
+app.delete('/api/auto-scrape/cookies', async (req, res) => {
+  try {
+    if (existsSync(COOKIES_FILE)) {
+      await fs.unlink(COOKIES_FILE)
+    }
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Cookie capture state
+const cookieCaptureState = {
+  running: false,
+  startedAt: null,
+  logs: []
+}
+
+// Start cookie capture (manual login in browser)
+app.post('/api/auto-scrape/capture-cookies', async (req, res) => {
+  if (process.env.VERCEL) {
+    return res.status(501).json({
+      error: 'not_supported_on_hosted',
+      message: 'Cookie capture requires a local server with display access.'
+    })
+  }
+  
+  if (cookieCaptureState.running || autoScrapeState.running) {
+    return res.status(409).json({ error: 'operation_in_progress' })
+  }
+  
+  try {
+    await fs.access(AUTO_SCRAPE_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ error: 'script_missing' })
+  }
+  
+  const startedAt = new Date().toISOString()
+  cookieCaptureState.running = true
+  cookieCaptureState.startedAt = startedAt
+  cookieCaptureState.logs = []
+  
+  const captureProcess = spawn(PYTHON_CMD, [
+    AUTO_SCRAPE_SCRIPT,
+    '--capture-cookies',
+    '--save-cookies', COOKIES_FILE,
+    '--no-headless'
+  ], {
+    cwd: __dirname,
+    env: { ...process.env, PYTHONUNBUFFERED: '1' }
+  })
+  
+  captureProcess.stdout.on('data', (data) => {
+    const text = data.toString()
+    cookieCaptureState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream: 'stdout',
+      message: text.trim()
+    })
+  })
+  
+  captureProcess.stderr.on('data', (data) => {
+    cookieCaptureState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream: 'stderr',
+      message: data.toString().trim()
+    })
+  })
+  
+  captureProcess.on('close', (code) => {
+    cookieCaptureState.running = false
+    cookieCaptureState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream: 'info',
+      message: code === 0 ? 'Cookie capture completed successfully' : `Cookie capture exited with code ${code}`
+    })
+  })
+  
+  res.status(202).json({ status: 'started', startedAt })
+})
+
+// Get cookie capture status
+app.get('/api/auto-scrape/capture-cookies/status', (req, res) => {
+  res.json({
+    running: cookieCaptureState.running,
+    startedAt: cookieCaptureState.startedAt,
+    logs: cookieCaptureState.logs.slice(-50)
+  })
+})
+
+// Scrape using saved cookies (no credentials needed)
+app.post('/api/auto-scrape/with-cookies', async (req, res) => {
+  if (process.env.VERCEL && !process.env.BROWSERLESS_URL) {
+    return res.status(501).json({
+      error: 'not_supported_on_hosted',
+      message: 'Auto-scrape requires BROWSERLESS_URL on hosted environments.'
+    })
+  }
+  
+  if (autoScrapeState.running) {
+    return res.status(409).json({ error: 'scrape_in_progress' })
+  }
+  
+  // Check if cookies exist
+  if (!existsSync(COOKIES_FILE)) {
+    return res.status(400).json({
+      error: 'no_cookies',
+      message: 'No saved cookies. Please capture cookies first by logging in manually.'
+    })
+  }
+  
+  const startedAt = new Date().toISOString()
+  autoScrapeState.running = true
+  autoScrapeState.startedAt = startedAt
+  autoScrapeState.lastRun = { status: 'running', startedAt }
+  autoScrapeState.logs = []
+  autoScrapeState.progress = 'Starting scraper with saved cookies...'
+  
+  appendAutoScrapeLog('info', 'Starting AH scraper with saved cookies...')
+  
+  const scriptArgs = [
+    AUTO_SCRAPE_SCRIPT,
+    '--cookies', COOKIES_FILE,
+    '--no-headless'
+  ]
+  
+  const browserlessUrl = process.env.BROWSERLESS_URL
+  if (browserlessUrl) {
+    scriptArgs.push('--browserless-url', browserlessUrl)
+    appendAutoScrapeLog('info', 'Using remote browser service')
+  }
+  
+  let scrapeProcess
+  try {
+    scrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
+      cwd: __dirname,
+      env: { ...process.env, PYTHONUNBUFFERED: '1' }
+    })
+  } catch (error) {
+    autoScrapeState.running = false
+    return res.status(500).json({ error: 'spawn_failed', details: error.message })
+  }
+  
+  let resultData = null
+  
+  scrapeProcess.stdout.on('data', (data) => {
+    const text = data.toString()
+    appendAutoScrapeLog('stdout', text)
+    
+    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
+    if (resultMatch) {
+      try {
+        resultData = JSON.parse(resultMatch[1])
+      } catch (e) {
+        console.error('Failed to parse scrape result:', e)
+      }
+    }
+  })
+  
+  scrapeProcess.stderr.on('data', (data) => {
+    appendAutoScrapeLog('stderr', data)
+  })
+  
+  scrapeProcess.on('close', async (code) => {
+    const completedAt = new Date().toISOString()
+    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    autoScrapeState.running = false
+    autoScrapeState.startedAt = null
+    autoScrapeState.lastRun = {
+      status: code === 0 && resultData?.success ? 'success' : 'error',
+      startedAt,
+      completedAt,
+      durationMs,
+      error: resultData?.error || (code !== 0 ? `Exited with code ${code}` : null),
+      productsFound: resultData?.count || 0,
+      loginMethod: resultData?.login_method || 'unknown'
+    }
+    
+    // If cookies failed, might need to recapture
+    if (resultData?.error === 'no_credentials_and_cookies_invalid') {
+      autoScrapeState.lastRun.needsCookieRefresh = true
+    }
+    
+    appendAutoScrapeLog('info', code === 0 ? 'Scrape completed.' : `Scrape exited with code ${code}`)
+    
+    // Ingest products to Supabase if successful
+    if (resultData?.success && resultData?.products?.length > 0 && supabase) {
+      appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
+      
+      try {
+        const cleaned = resultData.products.map((item) => {
+          const name = (item.name || '').toString().trim()
+          const normalized = normalizeProductName(name)
+          const url = (item.url || '').toString().trim()
+          
+          let id = null
+          if (url) {
+            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
+            if (urlMatch) id = urlMatch[1]
+          }
+          if (!id) {
+            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
+          }
+          
+          return {
+            id,
+            name,
+            normalized_name: normalized,
+            url: url || null,
+            image_url: (item.image || '').toString().trim() || null,
+            price: typeof item.price === 'number' ? item.price : null,
+            source: 'ah_auto_scrape',
+            tags: null,
+            updated_at: new Date().toISOString()
+          }
+        }).filter((item) => item.name && item.id)
+        
+        const { error: upsertError } = await supabase
+          .from(SUPABASE_PRODUCTS_TABLE)
+          .upsert(cleaned, { onConflict: 'id' })
+        
+        if (upsertError) {
+          appendAutoScrapeLog('stderr', `Database upsert failed: ${upsertError.message}`)
+        } else {
+          appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products.`)
+          autoScrapeState.lastRun.productsStored = cleaned.length
+        }
+      } catch (e) {
+        appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
+      }
+    }
+  })
+  
+  res.status(202).json({ status: 'started', startedAt, useCookies: true })
+})
+
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
 if (existsSync(CLIENT_INDEX)) {
   app.use(express.static(CLIENT_DIST))

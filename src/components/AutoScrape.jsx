@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Loader2, Lock, Mail, Eye, EyeOff, CheckCircle, AlertCircle, Info } from 'lucide-react'
+import { Loader2, Lock, Mail, Eye, EyeOff, CheckCircle, AlertCircle, Info, Cookie, RefreshCw, Trash2 } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 
 function AutoScrape({ onScrapeCompleted }) {
@@ -12,6 +12,9 @@ function AutoScrape({ onScrapeCompleted }) {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
   const [available, setAvailable] = useState(true)
+  const [cookieStatus, setCookieStatus] = useState(null)
+  const [capturingCookies, setCapturingCookies] = useState(false)
+  const [mode, setMode] = useState('cookies') // 'cookies' or 'credentials'
   const pollRef = useRef(null)
   const lastCompletedRef = useRef(null)
 
@@ -22,6 +25,23 @@ function AutoScrape({ onScrapeCompleted }) {
       .then(data => setAvailable(data.available))
       .catch(() => setAvailable(false))
   }, [])
+
+  // Check cookie status
+  const fetchCookieStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auto-scrape/cookies')
+      if (res.ok) {
+        const data = await res.json()
+        setCookieStatus(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch cookie status:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCookieStatus()
+  }, [fetchCookieStatus])
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -114,6 +134,89 @@ function AutoScrape({ onScrapeCompleted }) {
     }
   }, [email, password, starting, status, fetchStatus, t])
 
+  // Start scrape with cookies
+  const handleCookieScrape = useCallback(async () => {
+    if (starting || status?.running) return
+    
+    setStarting(true)
+    setError(null)
+    
+    try {
+      const res = await fetch('/api/auto-scrape/with-cookies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (res.status === 400) {
+        const data = await res.json()
+        if (data.error === 'no_cookies') {
+          setError(t('auto_scrape_no_cookies'))
+        } else {
+          setError(data.message || t('auto_scrape_error_generic'))
+        }
+      } else if (res.status === 409) {
+        setError(t('auto_scrape_conflict'))
+      } else if (!res.ok) {
+        throw new Error('failed to start')
+      } else {
+        fetchStatus()
+      }
+    } catch (err) {
+      console.error('Failed to start cookie scrape:', err)
+      setError(t('auto_scrape_error_generic'))
+    } finally {
+      setStarting(false)
+    }
+  }, [starting, status, fetchStatus, t])
+
+  // Start cookie capture (manual login)
+  const handleCaptureCookies = useCallback(async () => {
+    if (capturingCookies || status?.running) return
+    
+    setCapturingCookies(true)
+    setError(null)
+    
+    try {
+      const res = await fetch('/api/auto-scrape/capture-cookies', {
+        method: 'POST'
+      })
+      
+      if (res.status === 501) {
+        setError(t('auto_scrape_capture_not_supported'))
+      } else if (res.status === 409) {
+        setError(t('auto_scrape_conflict'))
+      } else if (!res.ok) {
+        throw new Error('failed to start cookie capture')
+      } else {
+        // Poll for completion
+        const pollCapture = setInterval(async () => {
+          const statusRes = await fetch('/api/auto-scrape/capture-cookies/status')
+          const statusData = await statusRes.json()
+          
+          if (!statusData.running) {
+            clearInterval(pollCapture)
+            setCapturingCookies(false)
+            fetchCookieStatus()
+          }
+        }, 2000)
+      }
+    } catch (err) {
+      console.error('Failed to start cookie capture:', err)
+      setError(t('auto_scrape_error_generic'))
+      setCapturingCookies(false)
+    }
+  }, [capturingCookies, status, fetchCookieStatus, t])
+
+  // Delete cookies
+  const handleDeleteCookies = useCallback(async () => {
+    try {
+      await fetch('/api/auto-scrape/cookies', { method: 'DELETE' })
+      fetchCookieStatus()
+    } catch (err) {
+      console.error('Failed to delete cookies:', err)
+    }
+  }, [fetchCookieStatus])
+
   const formatDateTime = useCallback((value) => {
     if (!value) return null
     try {
@@ -149,6 +252,8 @@ function AutoScrape({ onScrapeCompleted }) {
     )
   }
 
+  const hasCookies = cookieStatus?.hasCookies
+
   return (
     <div style={{ marginTop: '1.5rem' }}>
       <div style={{ 
@@ -165,131 +270,334 @@ function AutoScrape({ onScrapeCompleted }) {
           {t('auto_scrape_description')}
         </p>
 
-        {/* Security notice */}
+        {/* Mode tabs */}
         <div style={{ 
-          padding: '0.75rem 1rem', 
-          background: '#e8f4fd', 
-          borderRadius: '8px', 
+          display: 'flex', 
+          gap: '0.5rem', 
           marginBottom: '1rem',
-          fontSize: '0.85rem',
-          color: '#0369a1'
+          borderBottom: '1px solid #e5e7eb',
+          paddingBottom: '0.5rem'
         }}>
-          <strong>🔒 {t('auto_scrape_security_title')}</strong>
-          <br />
-          {t('auto_scrape_security_desc')}
-        </div>
-
-        {/* Credentials form */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label htmlFor="ah-email" style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 500 }}>
-              <Mail size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.4rem' }} />
-              {t('auto_scrape_email_label')}
-            </label>
-            <input
-              id="ah-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t('auto_scrape_email_placeholder')}
-              disabled={isRunning}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.8rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '1rem'
-              }}
-              autoComplete="email"
-            />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label htmlFor="ah-password" style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 500 }}>
-              <Lock size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.4rem' }} />
-              {t('auto_scrape_password_label')}
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                id="ah-password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('auto_scrape_password_placeholder')}
-                disabled={isRunning}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 2.5rem 0.6rem 0.8rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '1rem'
-                }}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '0.5rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0.25rem',
-                  color: '#666'
-                }}
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div style={{ 
-              padding: '0.75rem', 
-              background: '#fee2e2', 
-              border: '1px solid #fecaca',
-              borderRadius: '8px', 
-              marginBottom: '1rem',
-              color: '#dc2626',
+          <button
+            type="button"
+            onClick={() => setMode('cookies')}
+            style={{
+              padding: '0.5rem 1rem',
+              background: mode === 'cookies' ? '#e0e7ff' : 'transparent',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: mode === 'cookies' ? 600 : 400,
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <AlertCircle size={18} />
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isRunning || !email || !password}
-            style={{ 
-              width: '100%', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: '0.5rem',
-              padding: '0.75rem 1rem'
+              gap: '0.4rem'
             }}
           >
-            {isRunning ? (
-              <>
-                <Loader2 size={18} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
-                {t('auto_scrape_button_running')}
-              </>
-            ) : (
-              <>
-                <Lock size={18} />
-                {t('auto_scrape_button')}
-              </>
-            )}
+            <Cookie size={16} />
+            {t('auto_scrape_mode_cookies')}
+            {hasCookies && <CheckCircle size={14} style={{ color: '#16a34a' }} />}
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setMode('credentials')}
+            style={{
+              padding: '0.5rem 1rem',
+              background: mode === 'credentials' ? '#e0e7ff' : 'transparent',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: mode === 'credentials' ? 600 : 400,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <Lock size={16} />
+            {t('auto_scrape_mode_credentials')}
+          </button>
+        </div>
+
+        {/* Cookie mode */}
+        {mode === 'cookies' && (
+          <div>
+            {/* Cookie status */}
+            <div style={{ 
+              padding: '1rem', 
+              background: hasCookies ? '#dcfce7' : '#fef3c7', 
+              borderRadius: '8px', 
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Cookie size={20} style={{ color: hasCookies ? '#16a34a' : '#d97706' }} />
+                <div>
+                  <div style={{ fontWeight: 500 }}>
+                    {hasCookies ? t('auto_scrape_cookies_valid') : t('auto_scrape_cookies_none')}
+                  </div>
+                  {hasCookies && (
+                    <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                      {cookieStatus.cookieCount} {t('auto_scrape_cookies_count')}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {hasCookies && (
+                <button
+                  type="button"
+                  onClick={handleDeleteCookies}
+                  style={{
+                    padding: '0.4rem',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#dc2626'
+                  }}
+                  title={t('auto_scrape_delete_cookies')}
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* How it works */}
+            <div style={{ 
+              padding: '0.75rem 1rem', 
+              background: '#f0f9ff', 
+              borderRadius: '8px', 
+              marginBottom: '1rem',
+              fontSize: '0.85rem'
+            }}>
+              <strong>ℹ️ {t('auto_scrape_cookie_how_title')}</strong>
+              <ol style={{ margin: '0.5rem 0 0 1.25rem', padding: 0 }}>
+                <li>{t('auto_scrape_cookie_step1')}</li>
+                <li>{t('auto_scrape_cookie_step2')}</li>
+                <li>{t('auto_scrape_cookie_step3')}</li>
+              </ol>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {!hasCookies ? (
+                <button
+                  type="button"
+                  onClick={handleCaptureCookies}
+                  disabled={capturingCookies || isRunning}
+                  className="btn btn-primary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem'
+                  }}
+                >
+                  {capturingCookies ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      {t('auto_scrape_capturing')}
+                    </>
+                  ) : (
+                    <>
+                      <Cookie size={18} />
+                      {t('auto_scrape_capture_button')}
+                    </>
+                  )}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleCookieScrape}
+                    disabled={isRunning}
+                    className="btn btn-primary"
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.25rem'
+                    }}
+                  >
+                    {isRunning ? (
+                      <>
+                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                        {t('auto_scrape_button_running')}
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={18} />
+                        {t('auto_scrape_with_cookies_button')}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCaptureCookies}
+                    disabled={capturingCookies || isRunning}
+                    className="btn"
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.25rem',
+                      background: '#f3f4f6',
+                      border: '1px solid #d1d5db'
+                    }}
+                  >
+                    <Cookie size={18} />
+                    {t('auto_scrape_refresh_cookies')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Credentials mode */}
+        {mode === 'credentials' && (
+          <div>
+            {/* Warning about CAPTCHA */}
+            <div style={{ 
+              padding: '0.75rem 1rem', 
+              background: '#fef3c7', 
+              borderRadius: '8px', 
+              marginBottom: '1rem',
+              fontSize: '0.85rem',
+              color: '#92400e'
+            }}>
+              <strong>⚠️ {t('auto_scrape_captcha_warning_title')}</strong>
+              <br />
+              {t('auto_scrape_captcha_warning_desc')}
+            </div>
+
+            {/* Security notice */}
+            <div style={{ 
+              padding: '0.75rem 1rem', 
+              background: '#e8f4fd', 
+              borderRadius: '8px', 
+              marginBottom: '1rem',
+              fontSize: '0.85rem',
+              color: '#0369a1'
+            }}>
+              <strong>🔒 {t('auto_scrape_security_title')}</strong>
+              <br />
+              {t('auto_scrape_security_desc')}
+            </div>
+
+            {/* Credentials form */}
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label htmlFor="ah-email" style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 500 }}>
+                  <Mail size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.4rem' }} />
+                  {t('auto_scrape_email_label')}
+                </label>
+                <input
+                  id="ah-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t('auto_scrape_email_placeholder')}
+                  disabled={isRunning}
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem 0.8rem',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '1rem'
+                  }}
+                  autoComplete="email"
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label htmlFor="ah-password" style={{ display: 'block', marginBottom: '0.4rem', fontWeight: 500 }}>
+                  <Lock size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.4rem' }} />
+                  {t('auto_scrape_password_label')}
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="ah-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t('auto_scrape_password_placeholder')}
+                    disabled={isRunning}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 2.5rem 0.6rem 0.8rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '1rem'
+                    }}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.5rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      color: '#666'
+                    }}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isRunning || !email || !password}
+                style={{ 
+                  width: '100%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '0.5rem',
+                  padding: '0.75rem 1rem'
+                }}
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                    {t('auto_scrape_button_running')}
+                  </>
+                ) : (
+                  <>
+                    <Lock size={18} />
+                    {t('auto_scrape_button')}
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Error display */}
+        {error && (
+          <div style={{ 
+            padding: '0.75rem', 
+            background: '#fee2e2', 
+            border: '1px solid #fecaca',
+            borderRadius: '8px', 
+            marginTop: '1rem',
+            color: '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <AlertCircle size={18} />
+            {error}
+          </div>
+        )}
 
         {/* Progress indicator */}
         {isRunning && status?.progress && (

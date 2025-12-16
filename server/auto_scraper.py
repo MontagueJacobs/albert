@@ -26,7 +26,7 @@ except ImportError:
 class AHAutoScraper:
     """Automated scraper for Albert Heijn using Playwright."""
     
-    def __init__(self, headless: bool = True, browserless_url: Optional[str] = None):
+    def __init__(self, headless: bool = True, browserless_url: Optional[str] = None, cookies_file: Optional[str] = None):
         """
         Initialize the scraper.
         
@@ -34,9 +34,11 @@ class AHAutoScraper:
             headless: Run browser in headless mode (for local browser)
             browserless_url: URL to connect to Browserless.io or similar service
                              e.g., "wss://chrome.browserless.io?token=YOUR_TOKEN"
+            cookies_file: Path to JSON file with saved session cookies
         """
         self.headless = headless
         self.browserless_url = browserless_url
+        self.cookies_file = cookies_file
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
@@ -89,7 +91,77 @@ class AHAutoScraper:
             Object.defineProperty(navigator, 'languages', { get: () => ['nl-NL', 'nl', 'en-US', 'en'] });
         """)
         
+        # Load cookies if provided
+        if self.cookies_file:
+            await self.load_cookies(self.cookies_file)
+        
         print("[INFO] Browser ready", flush=True)
+    
+    async def load_cookies(self, cookies_file: str) -> bool:
+        """Load session cookies from a JSON file."""
+        try:
+            with open(cookies_file, 'r') as f:
+                cookies = json.load(f)
+            
+            if not cookies:
+                print("[WARNING] Cookie file is empty", flush=True)
+                return False
+            
+            await self.context.add_cookies(cookies)
+            print(f"[INFO] Loaded {len(cookies)} cookies from {cookies_file}", flush=True)
+            return True
+        except FileNotFoundError:
+            print(f"[WARNING] Cookie file not found: {cookies_file}", flush=True)
+            return False
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Invalid cookie file format: {e}", flush=True)
+            return False
+        except Exception as e:
+            print(f"[ERROR] Failed to load cookies: {e}", flush=True)
+            return False
+    
+    async def save_cookies(self, cookies_file: str) -> bool:
+        """Save current session cookies to a JSON file."""
+        try:
+            cookies = await self.context.cookies()
+            
+            # Filter to only AH-related cookies
+            ah_cookies = [c for c in cookies if 'ah.nl' in c.get('domain', '')]
+            
+            with open(cookies_file, 'w') as f:
+                json.dump(ah_cookies, f, indent=2)
+            
+            print(f"[INFO] Saved {len(ah_cookies)} cookies to {cookies_file}", flush=True)
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to save cookies: {e}", flush=True)
+            return False
+    
+    async def check_logged_in(self) -> bool:
+        """Check if we're already logged in (via cookies)."""
+        try:
+            # Navigate to a page that requires login
+            await self.page.goto('https://www.ah.nl/mijn/eerder-gekocht', wait_until='domcontentloaded', timeout=30000)
+            await asyncio.sleep(2)
+            
+            current_url = self.page.url.lower()
+            
+            # If we're redirected to login, we're not logged in
+            if 'login.ah.nl' in current_url:
+                print("[INFO] Not logged in - cookies expired or invalid", flush=True)
+                return False
+            
+            # If we're on the purchases page, we're logged in!
+            if 'eerder-gekocht' in current_url or 'mijn' in current_url:
+                print("[SUCCESS] Already logged in via cookies!", flush=True)
+                return True
+            
+            print(f"[INFO] Unexpected URL: {current_url}", flush=True)
+            return False
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to check login status: {e}", flush=True)
+            return False
         
     async def close(self):
         """Clean up browser resources."""
@@ -351,14 +423,16 @@ class AHAutoScraper:
         print(f"[SUCCESS] Extracted {len(products)} products", flush=True)
         return products
     
-    async def scrape(self, email: str, password: str, output_file: Optional[str] = None) -> Dict[str, Any]:
+    async def scrape(self, email: Optional[str] = None, password: Optional[str] = None, 
+                     output_file: Optional[str] = None, save_cookies_to: Optional[str] = None) -> Dict[str, Any]:
         """
         Full scraping workflow.
         
         Args:
-            email: AH account email
-            password: AH account password
+            email: AH account email (optional if using cookies)
+            password: AH account password (optional if using cookies)
             output_file: Optional file path to save results
+            save_cookies_to: Optional file path to save session cookies after login
             
         Returns:
             Dict with status and scraped products
@@ -367,15 +441,36 @@ class AHAutoScraper:
             'success': False,
             'products': [],
             'error': None,
-            'scraped_at': datetime.now(tz=None).astimezone().isoformat()
+            'scraped_at': datetime.now(tz=None).astimezone().isoformat(),
+            'login_method': None
         }
         
         try:
             await self.setup()
             
-            # Login
-            if not await self.login(email, password):
-                result['error'] = 'login_failed'
+            # Try to use existing cookies first
+            logged_in = False
+            if self.cookies_file:
+                logged_in = await self.check_logged_in()
+                if logged_in:
+                    result['login_method'] = 'cookies'
+            
+            # If not logged in via cookies, try credentials
+            if not logged_in:
+                if not email or not password:
+                    result['error'] = 'no_credentials_and_cookies_invalid'
+                    print("[ERROR] No valid cookies and no credentials provided", flush=True)
+                    return result
+                
+                if not await self.login(email, password):
+                    result['error'] = 'login_failed'
+                    return result
+                
+                result['login_method'] = 'credentials'
+                
+                # Save cookies after successful login if requested
+                if save_cookies_to:
+                    await self.save_cookies(save_cookies_to)
                 return result
             
             # Navigate to products page
@@ -416,25 +511,132 @@ class AHAutoScraper:
 
 async def main():
     parser = argparse.ArgumentParser(description='Automated AH Scraper')
-    parser.add_argument('--email', '-e', required=True, help='AH account email')
-    parser.add_argument('--password', '-p', required=True, help='AH account password')
+    parser.add_argument('--email', '-e', help='AH account email (optional if using cookies)')
+    parser.add_argument('--password', '-p', help='AH account password (optional if using cookies)')
     parser.add_argument('--output', '-o', default='auto_scrape_results.json', help='Output file')
     parser.add_argument('--headless', action='store_true', default=True, help='Run in headless mode')
     parser.add_argument('--no-headless', dest='headless', action='store_false', help='Show browser window')
-    parser.add_argument('--browserless-url', help='URL to Browserless.io or similar service (e.g., wss://chrome.browserless.io?token=YOUR_TOKEN)')
+    parser.add_argument('--browserless-url', help='URL to Browserless.io or similar service')
+    parser.add_argument('--cookies', '-c', help='Path to cookies JSON file to load')
+    parser.add_argument('--save-cookies', help='Path to save cookies after successful login')
+    parser.add_argument('--capture-cookies', action='store_true', help='Interactive mode: open browser for manual login, then save cookies')
     
     args = parser.parse_args()
+    
+    # Special mode: capture cookies interactively
+    if args.capture_cookies:
+        return await capture_cookies_interactive(args.save_cookies or 'ah_cookies.json', args.headless)
     
     # Check for browserless URL in environment
     browserless_url = args.browserless_url or os.environ.get('BROWSERLESS_URL')
     
-    scraper = AHAutoScraper(headless=args.headless, browserless_url=browserless_url)
-    result = await scraper.scrape(args.email, args.password, args.output)
+    # Validate inputs
+    if not args.cookies and (not args.email or not args.password):
+        print("[ERROR] Either --cookies or both --email and --password are required", flush=True)
+        return 1
+    
+    scraper = AHAutoScraper(headless=args.headless, browserless_url=browserless_url, cookies_file=args.cookies)
+    result = await scraper.scrape(args.email, args.password, args.output, args.save_cookies)
     
     # Output result as JSON for the server to parse
     print(f"\n[RESULT] {json.dumps(result)}", flush=True)
     
     return 0 if result['success'] else 1
+
+
+async def capture_cookies_interactive(output_file: str, headless: bool = False) -> int:
+    """
+    Open a browser for manual login, then save the session cookies.
+    This allows bypassing CAPTCHA by letting the user log in manually.
+    """
+    print("[INFO] === Cookie Capture Mode ===", flush=True)
+    print("[INFO] A browser window will open. Please log in to your AH account.", flush=True)
+    print("[INFO] After successful login, cookies will be saved automatically.", flush=True)
+    print("", flush=True)
+    
+    p = await async_playwright().start()
+    
+    try:
+        browser = await p.chromium.launch(
+            headless=headless,  # Usually False for manual login
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+            ]
+        )
+        
+        context = await browser.new_context(
+            viewport={'width': 1280, 'height': 900},
+            locale='nl-NL',
+            timezone_id='Europe/Amsterdam',
+        )
+        
+        page = await context.new_page()
+        
+        # Remove webdriver detection
+        await page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        """)
+        
+        print("[INFO] Opening AH login page...", flush=True)
+        await page.goto('https://www.ah.nl/mijn', wait_until='domcontentloaded')
+        
+        print("[INFO] Please log in manually in the browser window.", flush=True)
+        print("[INFO] Waiting for successful login...", flush=True)
+        
+        # Wait for the user to complete login (max 5 minutes)
+        max_wait = 300
+        for i in range(max_wait):
+            await asyncio.sleep(1)
+            
+            current_url = page.url.lower()
+            
+            # Check if logged in (redirected away from login)
+            if 'login.ah.nl' not in current_url and ('mijn' in current_url or 'ah.nl' in current_url):
+                # Double check by trying to access a protected page
+                await page.goto('https://www.ah.nl/mijn/eerder-gekocht', wait_until='domcontentloaded')
+                await asyncio.sleep(2)
+                
+                if 'login.ah.nl' not in page.url.lower():
+                    print(f"[SUCCESS] Login detected after {i+1} seconds!", flush=True)
+                    break
+            
+            if (i + 1) % 30 == 0:
+                print(f"[INFO] Still waiting for login... ({i+1}/{max_wait}s)", flush=True)
+        else:
+            print("[ERROR] Timeout waiting for login", flush=True)
+            await browser.close()
+            await p.stop()
+            return 1
+        
+        # Save cookies
+        cookies = await context.cookies()
+        ah_cookies = [c for c in cookies if 'ah.nl' in c.get('domain', '')]
+        
+        with open(output_file, 'w') as f:
+            json.dump(ah_cookies, f, indent=2)
+        
+        print(f"[SUCCESS] Saved {len(ah_cookies)} cookies to {output_file}", flush=True)
+        print("[INFO] You can now use these cookies with: --cookies " + output_file, flush=True)
+        
+        # Print result for server parsing
+        result = {
+            'success': True,
+            'cookies_saved': len(ah_cookies),
+            'output_file': output_file
+        }
+        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+        
+        await browser.close()
+        await p.stop()
+        return 0
+        
+    except Exception as e:
+        print(f"[ERROR] Cookie capture failed: {e}", flush=True)
+        result = {'success': False, 'error': str(e)}
+        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+        await p.stop()
+        return 1
 
 
 if __name__ == '__main__':
