@@ -58,7 +58,11 @@ class AHAutoScraper:
                 raise
         else:
             # Launch local browser
-            print("[INFO] Starting local browser...", flush=True)
+            # WARNING: AH blocks headless browsers on their login page
+            if self.headless:
+                print("[WARNING] Running in headless mode - AH may block login attempts!", flush=True)
+                print("[WARNING] If login fails, try with --no-headless flag", flush=True)
+            print(f"[INFO] Starting local browser (headless={self.headless})...", flush=True)
             self.browser = await self._playwright.chromium.launch(
                 headless=self.headless,
                 args=[
@@ -129,38 +133,42 @@ class AHAutoScraper:
         
         try:
             # Go to mijn AH page which will redirect to login
-            await self.page.goto('https://www.ah.nl/mijn', wait_until='networkidle')
-            await self.human_delay(1000, 2000)
+            await self.page.goto('https://www.ah.nl/mijn', wait_until='domcontentloaded', timeout=30000)
+            await self.human_delay(2000, 3000)
             
-            # Check if we need to click login button
-            login_btn = await self.page.query_selector('a[href*="login"], button[data-testid="login-button"]')
-            if login_btn:
-                await login_btn.click()
-                await self.human_delay(1000, 2000)
+            # Check if page loaded or blocked
+            html = await self.page.content()
+            if 'Access Denied' in html:
+                print("[ERROR] Access denied - AH blocks headless browsers. Try with --no-headless", flush=True)
+                return False
             
-            # Wait for login form
-            print("[INFO] Entering email...", flush=True)
-            await self.page.wait_for_selector('#username, input[name="username"], input[type="email"]', timeout=15000)
+            print(f"[INFO] Current URL: {self.page.url}", flush=True)
+            
+            # Wait for login form - AH shows both fields together
+            print("[INFO] Waiting for login form...", flush=True)
+            try:
+                await self.page.wait_for_selector('#username', timeout=15000)
+            except:
+                # Maybe need to click login button first
+                login_btn = await self.page.query_selector('a[href*="login"], button[data-testid="login-button"]')
+                if login_btn:
+                    print("[INFO] Clicking login button...", flush=True)
+                    await login_btn.click()
+                    await self.human_delay(2000, 3000)
+                    await self.page.wait_for_selector('#username', timeout=15000)
             
             # Enter email
-            email_selector = '#username, input[name="username"], input[type="email"]'
-            await self.type_slowly(email_selector, email)
+            print("[INFO] Entering email...", flush=True)
+            await self.type_slowly('#username', email)
             await self.human_delay(500, 1000)
             
-            # Click next/submit for email step
-            submit_btn = await self.page.query_selector('button[type="submit"]')
-            if submit_btn:
-                await submit_btn.click()
-                await self.human_delay(1500, 2500)
-            
-            # Enter password
+            # Enter password (AH shows both fields together)
             print("[INFO] Entering password...", flush=True)
-            password_selector = '#password, input[name="password"], input[type="password"]'
-            await self.page.wait_for_selector(password_selector, timeout=10000)
-            await self.type_slowly(password_selector, password)
+            await self.type_slowly('#password', password)
             await self.human_delay(500, 1000)
             
             # Submit login
+            print("[INFO] Submitting login...", flush=True)
             submit_btn = await self.page.query_selector('button[type="submit"]')
             if submit_btn:
                 await submit_btn.click()
@@ -168,30 +176,45 @@ class AHAutoScraper:
             print("[INFO] Waiting for login to complete...", flush=True)
             
             # Wait for redirect away from login page
-            # This may involve CAPTCHA - we'll wait up to 60 seconds
             max_wait = 60
+            captcha_warned = False
             for i in range(max_wait):
                 await asyncio.sleep(1)
                 current_url = self.page.url.lower()
                 
-                # Check for successful login (redirected to mijn or home)
-                if 'login' not in current_url or 'mijn' in current_url:
+                # Check for successful login (redirected away from login.ah.nl)
+                if 'login.ah.nl' not in current_url:
                     print(f"[SUCCESS] Login successful after {i+1} seconds!", flush=True)
                     return True
                 
-                # Check for CAPTCHA
-                captcha = await self.page.query_selector('[id*="captcha"], [class*="captcha"], iframe[src*="captcha"]')
-                if captcha:
-                    print("[WARNING] CAPTCHA detected - waiting for solve...", flush=True)
+                # Check for error messages
+                error_el = await self.page.query_selector('[class*="error"], [data-testid*="error"]')
+                if error_el:
+                    error_text = await error_el.text_content()
+                    if error_text and 'wachtwoord' in error_text.lower():
+                        print(f"[ERROR] Login error: {error_text.strip()}", flush=True)
+                        return False
+                
+                # Check for CAPTCHA (only warn once)
+                if not captcha_warned:
+                    captcha = await self.page.query_selector('[id*="captcha"], [class*="captcha"], iframe[src*="captcha"], iframe[src*="recaptcha"]')
+                    if captcha:
+                        print("[WARNING] CAPTCHA detected!", flush=True)
+                        print("[WARNING] AH requires CAPTCHA verification. Auto-scrape cannot bypass this.", flush=True)
+                        print("[WARNING] Consider using the manual bookmarklet method instead.", flush=True)
+                        captcha_warned = True
                     
                 if (i + 1) % 10 == 0:
                     print(f"[INFO] Still waiting for login... ({i+1}/{max_wait}s)", flush=True)
             
             # Final check
-            if 'login' not in self.page.url.lower():
+            if 'login.ah.nl' not in self.page.url.lower():
                 return True
             
-            print("[ERROR] Login timeout - possibly blocked by CAPTCHA", flush=True)
+            if captcha_warned:
+                print("[ERROR] Login failed - CAPTCHA could not be solved automatically", flush=True)
+            else:
+                print("[ERROR] Login timeout - possibly incorrect credentials", flush=True)
             return False
             
         except Exception as e:
@@ -344,7 +367,7 @@ class AHAutoScraper:
             'success': False,
             'products': [],
             'error': None,
-            'scraped_at': datetime.utcnow().isoformat() + 'Z'
+            'scraped_at': datetime.now(tz=None).astimezone().isoformat()
         }
         
         try:

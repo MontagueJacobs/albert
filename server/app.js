@@ -886,11 +886,13 @@ app.post('/api/auto-scrape', async (req, res) => {
   appendAutoScrapeLog('info', `Email: ${email.substring(0, 3)}***@${email.split('@')[1] || '***'}`)
   
   // Build command arguments
+  // NOTE: AH blocks headless browsers on login, so we use --no-headless
+  // This requires a display (X11/Xvfb on Linux, or remote browser service)
   const scriptArgs = [
     AUTO_SCRAPE_SCRIPT,
     '--email', email,
     '--password', password,
-    '--headless'
+    '--no-headless'  // AH blocks headless browsers
   ]
   
   // Add Browserless URL if available (for Vercel/serverless)
