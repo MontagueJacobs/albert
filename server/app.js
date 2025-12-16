@@ -798,6 +798,230 @@ app.get('/api/scrape/status', (req, res) => {
   })
 })
 
+// ============================================================================
+// AUTO-SCRAPE: Automated login and scraping with user credentials
+// ============================================================================
+
+const autoScrapeState = {
+  running: false,
+  startedAt: null,
+  lastRun: null,
+  logs: [],
+  progress: null
+}
+
+function appendAutoScrapeLog(stream, chunk) {
+  const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk)
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  for (const line of lines) {
+    autoScrapeState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream,
+      message: line
+    })
+    
+    // Parse progress from log messages
+    if (line.includes('[INFO]')) {
+      autoScrapeState.progress = line.replace(/\[INFO\]\s*/, '')
+    } else if (line.includes('[SUCCESS]')) {
+      autoScrapeState.progress = line.replace(/\[SUCCESS\]\s*/, '')
+    } else if (line.includes('[ERROR]')) {
+      autoScrapeState.progress = line.replace(/\[ERROR\]\s*/, '')
+    }
+  }
+  if (autoScrapeState.logs.length > MAX_LOG_ENTRIES) {
+    autoScrapeState.logs = autoScrapeState.logs.slice(autoScrapeState.logs.length - MAX_LOG_ENTRIES)
+  }
+}
+
+const AUTO_SCRAPE_SCRIPT = path.join(__dirname, 'auto_scraper.py')
+
+// Start automated scraping with user credentials
+app.post('/api/auto-scrape', async (req, res) => {
+  // Block on hosted environments (Vercel) - cannot run headless browsers
+  if (process.env.VERCEL) {
+    return res.status(501).json({ 
+      error: 'not_supported_on_hosted',
+      message: 'Automated scraping is not available on hosted environments. Please use the bookmarklet method instead.'
+    })
+  }
+  
+  if (autoScrapeState.running) {
+    return res.status(409).json({ 
+      error: 'scrape_in_progress', 
+      startedAt: autoScrapeState.startedAt 
+    })
+  }
+  
+  const { email, password } = req.body || {}
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'missing_credentials' })
+  }
+  
+  // Validate email format
+  if (!email.includes('@')) {
+    return res.status(400).json({ error: 'invalid_email' })
+  }
+  
+  // Check if script exists
+  try {
+    await fs.access(AUTO_SCRAPE_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ 
+      error: 'scrape_script_missing', 
+      details: 'auto_scraper.py not found' 
+    })
+  }
+  
+  const startedAt = new Date().toISOString()
+  autoScrapeState.running = true
+  autoScrapeState.startedAt = startedAt
+  autoScrapeState.lastRun = { status: 'running', startedAt }
+  autoScrapeState.logs = []
+  autoScrapeState.progress = 'Starting automated scraper...'
+  
+  appendAutoScrapeLog('info', 'Starting automated AH scraper...')
+  appendAutoScrapeLog('info', `Email: ${email.substring(0, 3)}***@${email.split('@')[1] || '***'}`)
+  
+  let autoScrapeProcess
+  try {
+    autoScrapeProcess = spawn(PYTHON_CMD, [
+      AUTO_SCRAPE_SCRIPT,
+      '--email', email,
+      '--password', password,
+      '--headless'
+    ], {
+      cwd: __dirname,
+      env: { ...process.env, PYTHONUNBUFFERED: '1' }
+    })
+  } catch (error) {
+    autoScrapeState.running = false
+    autoScrapeState.startedAt = null
+    autoScrapeState.lastRun = {
+      status: 'error',
+      startedAt,
+      completedAt: new Date().toISOString(),
+      exitCode: null,
+      durationMs: 0,
+      error: error.message
+    }
+    appendAutoScrapeLog('stderr', `Failed to launch scraper: ${error.message}`)
+    return res.status(500).json({ error: 'spawn_failed', details: error.message })
+  }
+  
+  let resultData = null
+  
+  autoScrapeProcess.stdout.on('data', (data) => {
+    const text = data.toString()
+    appendAutoScrapeLog('stdout', text)
+    
+    // Try to parse result from output
+    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
+    if (resultMatch) {
+      try {
+        resultData = JSON.parse(resultMatch[1])
+      } catch (e) {
+        console.error('Failed to parse scrape result:', e)
+      }
+    }
+  })
+  
+  autoScrapeProcess.stderr.on('data', (data) => {
+    appendAutoScrapeLog('stderr', data)
+  })
+  
+  autoScrapeProcess.on('close', async (code) => {
+    const completedAt = new Date().toISOString()
+    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    autoScrapeState.running = false
+    autoScrapeState.startedAt = null
+    autoScrapeState.lastRun = {
+      status: code === 0 && resultData?.success ? 'success' : 'error',
+      startedAt,
+      completedAt,
+      durationMs,
+      error: code !== 0 ? `Scraper exited with code ${code}` : (resultData?.error || null),
+      productsFound: resultData?.count || 0
+    }
+    
+    appendAutoScrapeLog('info', code === 0 ? 'Auto-scrape process completed.' : `Auto-scrape exited with code ${code}`)
+    
+    // If we got products, ingest them to Supabase
+    if (resultData?.success && resultData?.products?.length > 0 && supabase) {
+      appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
+      
+      try {
+        // Normalize and prepare products for ingestion
+        const cleaned = resultData.products.map((item) => {
+          const name = (item.name || '').toString().trim()
+          const normalized = normalizeProductName(name)
+          const url = (item.url || '').toString().trim()
+          
+          // Generate ID from URL or name
+          let id = null
+          if (url) {
+            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
+            if (urlMatch) id = urlMatch[1]
+          }
+          if (!id) {
+            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
+          }
+          
+          return {
+            id,
+            name,
+            normalized_name: normalized,
+            url: url || null,
+            image_url: (item.image || '').toString().trim() || null,
+            price: typeof item.price === 'number' ? item.price : null,
+            source: 'ah_auto_scrape',
+            tags: null,
+            updated_at: new Date().toISOString()
+          }
+        }).filter((item) => item.name && item.id)
+        
+        // Upsert to Supabase
+        const { error: upsertError } = await supabase
+          .from(SUPABASE_PRODUCTS_TABLE)
+          .upsert(cleaned, { onConflict: 'id' })
+        
+        if (upsertError) {
+          appendAutoScrapeLog('stderr', `Database upsert failed: ${upsertError.message}`)
+        } else {
+          appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in database.`)
+          autoScrapeState.lastRun.productsStored = cleaned.length
+        }
+      } catch (e) {
+        appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
+      }
+    }
+  })
+  
+  return res.status(202).json({ status: 'started', startedAt })
+})
+
+// Get auto-scrape status
+app.get('/api/auto-scrape/status', (req, res) => {
+  res.json({
+    status: autoScrapeState.running ? 'running' : 'idle',
+    running: autoScrapeState.running,
+    startedAt: autoScrapeState.startedAt,
+    lastRun: autoScrapeState.lastRun,
+    progress: autoScrapeState.progress,
+    logs: autoScrapeState.logs.slice(-100)
+  })
+})
+
+// Check if auto-scrape is available (not on Vercel)
+app.get('/api/auto-scrape/available', (req, res) => {
+  res.json({
+    available: !process.env.VERCEL,
+    reason: process.env.VERCEL ? 'hosted_environment' : null
+  })
+})
+
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
 if (existsSync(CLIENT_INDEX)) {
   app.use(express.static(CLIENT_DIST))

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { RefreshCw, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2, BookOpen, Zap } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
+import AutoScrape from './AutoScrape.jsx'
 
 function AccountSync({ onSyncCompleted }) {
   const { t } = useI18n()
@@ -9,6 +10,7 @@ function AccountSync({ onSyncCompleted }) {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
   const [hostedGuide, setHostedGuide] = useState(false)
+  const [scrapeMode, setScrapeMode] = useState('auto') // 'auto' or 'manual'
   const pollRef = useRef(null)
   const lastCompletedRef = useRef(null)
 
@@ -75,8 +77,6 @@ function AccountSync({ onSyncCompleted }) {
     }
   }, [])
 
-  // Server-side scraping is no longer supported (AH blocks it).
-  // Show the bookmarklet guide directly instead.
   const handleStart = useCallback(() => {
     setHostedGuide(true)
   }, [])
@@ -99,10 +99,7 @@ function AccountSync({ onSyncCompleted }) {
   // Hosted-friendly bookmarklet approach (no extension required)
   const BOOKMARKLET_HREF = useMemo(() => {
     const api = 'https://albert-eosin.vercel.app'
-    const code = (
-      `(()=>{try{const API='${api}';function ex(){const links=document.querySelectorAll('a[href^="/producten/product/"], article a[href^="/producten/product/"]');const items=[];const seen=new Set();links.forEach(a=>{const url=new URL(a.href,location.origin).toString();if(seen.has(url))return;seen.add(url);let name=a.getAttribute('aria-label')||a.textContent||'';name=name.replace(/\\s+/g,' ').trim();if(!name){const title=a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');name=(title?.textContent||'').trim()}const card=a.closest('article')||a.closest('[data-testhook="product-card"]')||a.parentElement;let price=null;const priceEl=card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');const raw=priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);if(raw)price=parseFloat(raw[1]);const imgEl=card?.querySelector('img');const image=imgEl?.src||'';if(name){items.push({name,url,price,image,source:'ah_bonus'})}});return items}const items=ex();if(!items.length){alert('No products found yet. Scroll to load more and try again.');return}fetch(API+'/api/ingest/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'ah_bonus',scraped_at:new Date().toISOString()})}).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{if(!ok)throw new Error((data&&data.error)||'ingest_failed');alert('Uploaded '+((data&&data.stored)||items.length)+' items.')}).catch(e=>{console.error('Scrape upload failed:',e);alert('Upload failed: '+e.message)})}catch(e){alert('Error: '+e.message)}})()`
-    )
-      // Strip newlines/spaces to make it compact
+    const code = `(()=>{try{const API='${api}';function ex(){const links=document.querySelectorAll('a[href^="/producten/product/"], article a[href^="/producten/product/"]');const items=[];const seen=new Set();links.forEach(a=>{const url=new URL(a.href,location.origin).toString();if(seen.has(url))return;seen.add(url);let name=a.getAttribute('aria-label')||a.textContent||'';name=name.replace(/\\s+/g,' ').trim();if(!name){const title=a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');name=(title?.textContent||'').trim()}const card=a.closest('article')||a.closest('[data-testhook="product-card"]')||a.parentElement;let price=null;const priceEl=card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');const raw=priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);if(raw)price=parseFloat(raw[1]);const imgEl=card?.querySelector('img');const image=imgEl?.src||'';if(name){items.push({name,url,price,image,source:'ah_bonus'})}});return items}const items=ex();if(!items.length){alert('No products found yet. Scroll to load more and try again.');return}fetch(API+'/api/ingest/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'ah_bonus',scraped_at:new Date().toISOString()})}).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{if(!ok)throw new Error((data&&data.error)||'ingest_failed');alert('Uploaded '+((data&&data.stored)||items.length)+' items.')}).catch(e=>{console.error('Scrape upload failed:',e);alert('Upload failed: '+e.message)})}catch(e){alert('Error: '+e.message)}})()`
       .replace(/\n/g, '')
       .replace(/\s{2,}/g, ' ')
     return `javascript:${code}`
@@ -110,88 +107,153 @@ function AccountSync({ onSyncCompleted }) {
 
   return (
     <section style={{ marginTop: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <div>
-          <h3 style={{ margin: 0 }}>{t('sync_title')}</h3>
-          <p style={{ marginTop: '0.35rem', color: '#555', maxWidth: '640px' }}>{t('sync_description')}</p>
-          <p style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#777' }}>{t('sync_requires_auth')}</p>
-        </div>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 0.5rem 0' }}>{t('sync_title')}</h3>
+        <p style={{ margin: 0, color: '#555', maxWidth: '640px' }}>{t('sync_description')}</p>
+      </div>
+
+      {/* Mode toggle tabs */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '0.5rem', 
+        marginBottom: '1.5rem',
+        borderBottom: '2px solid #e5e7eb',
+        paddingBottom: '0'
+      }}>
         <button
           type="button"
-          className="btn btn-primary"
-          onClick={handleStart}
-          disabled={buttonDisabled}
-          style={{ minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+          onClick={() => setScrapeMode('auto')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            fontWeight: 500,
+            fontSize: '0.95rem',
+            color: scrapeMode === 'auto' ? '#3b82f6' : '#666',
+            borderBottom: scrapeMode === 'auto' ? '2px solid #3b82f6' : '2px solid transparent',
+            marginBottom: '-2px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
         >
-          <RefreshCw size={18} />
-          {hostedGuide ? t('sync_button') : 'Show Scrape Guide'}
+          <Zap size={18} />
+          {t('sync_mode_auto')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setScrapeMode('manual')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            fontWeight: 500,
+            fontSize: '0.95rem',
+            color: scrapeMode === 'manual' ? '#3b82f6' : '#666',
+            borderBottom: scrapeMode === 'manual' ? '2px solid #3b82f6' : '2px solid transparent',
+            marginBottom: '-2px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <BookOpen size={18} />
+          {t('sync_mode_manual')}
         </button>
       </div>
 
-      {error && <div style={{ color: '#c0392b', marginBottom: '0.75rem' }}>{error}</div>}
-      {hostedGuide && (
-        <div style={{ border: '1px dashed #b5c2ff', background: '#f7f9ff', color: '#283a89', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
-          <h4 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Scrape via bookmarklet (no install)</h4>
-          <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
-            <li>
-              Open AH earlier-purchased page: {' '}
-              <a href="https://www.ah.nl/bonus/eerder-gekocht" target="_blank" rel="noreferrer">ah.nl/bonus/eerder-gekocht</a>
-            </li>
-            <li>Make sure you’re logged in and scroll to load products.</li>
-            <li>
-              Drag this button to your bookmarks bar: {' '}
-              <a href={BOOKMARKLET_HREF} style={{ padding: '0.35rem 0.6rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', textDecoration: 'none' }}>AH: Scrape this page</a>
-              <div style={{ fontSize: '0.85rem', color: '#49557a', marginTop: '0.4rem' }}>
-                Tip: If you can’t see the bookmarks bar, press Ctrl+Shift+B (Windows/Linux) or Cmd+Shift+B (macOS).
-              </div>
-            </li>
-            <li>On the AH page, click the bookmarklet you just saved. We’ll upload the items to your account automatically.</li>
-          </ol>
-        </div>
+      {/* Auto-scrape mode */}
+      {scrapeMode === 'auto' && (
+        <AutoScrape onScrapeCompleted={onSyncCompleted} />
       )}
-      {status?.running && <div style={{ color: '#555', marginBottom: '0.75rem' }}>{t('sync_running_hint')}</div>}
 
-      <div style={{ border: '1px solid #e6e6e6', borderRadius: '12px', padding: '1rem', background: '#fff' }}>
-        {loading && !status ? (
-          <div>{t('loading')}</div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+      {/* Manual/Bookmarklet mode */}
+      {scrapeMode === 'manual' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_status_label')}</div>
-              <div style={{ fontWeight: 600 }}>{currentStatus}</div>
+              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#777' }}>{t('sync_requires_auth')}</p>
             </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_last_run_label')}</div>
-              <div style={{ fontWeight: 600 }}>{lastRunSummary}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_started_label')}</div>
-              <div style={{ fontWeight: 600 }}>{formatDateTime(lastRun?.startedAt) || 'N/A'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_completed_label')}</div>
-              <div style={{ fontWeight: 600 }}>{formatDateTime(lastRun?.completedAt) || 'N/A'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_duration_label')}</div>
-              <div style={{ fontWeight: 600 }}>{durationLabel}</div>
-            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleStart}
+              disabled={buttonDisabled}
+              style={{ minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+            >
+              <RefreshCw size={18} />
+              {hostedGuide ? t('sync_button') : t('sync_show_guide')}
+            </button>
           </div>
-        )}
 
-        <div style={{ marginTop: '1.25rem' }}>
-          <h4 style={{ marginBottom: '0.5rem' }}>{t('sync_logs_label')}</h4>
-          <div style={{ border: '1px solid #f0f0f0', background: '#fafafa', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', padding: '0.75rem' }}>
-            {logLines.length === 0 ? (
-              <div style={{ color: '#777', fontSize: '0.9rem' }}>{t('sync_no_logs')}</div>
+          {error && <div style={{ color: '#c0392b', marginBottom: '0.75rem' }}>{error}</div>}
+          {hostedGuide && (
+            <div style={{ border: '1px dashed #b5c2ff', background: '#f7f9ff', color: '#283a89', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('sync_bookmarklet_title')}</h4>
+              <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                <li>
+                  {t('sync_bookmarklet_step1')}{' '}
+                  <a href="https://www.ah.nl/bonus/eerder-gekocht" target="_blank" rel="noreferrer">ah.nl/bonus/eerder-gekocht</a>
+                </li>
+                <li>{t('sync_bookmarklet_step2')}</li>
+                <li>
+                  {t('sync_bookmarklet_step3')}{' '}
+                  <a href={BOOKMARKLET_HREF} style={{ padding: '0.35rem 0.6rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', textDecoration: 'none' }}>AH: Scrape this page</a>
+                  <div style={{ fontSize: '0.85rem', color: '#49557a', marginTop: '0.4rem' }}>
+                    {t('sync_bookmarklet_tip')}
+                  </div>
+                </li>
+                <li>{t('sync_bookmarklet_step4')}</li>
+              </ol>
+            </div>
+          )}
+          {status?.running && <div style={{ color: '#555', marginBottom: '0.75rem' }}>{t('sync_running_hint')}</div>}
+
+          <div style={{ border: '1px solid #e6e6e6', borderRadius: '12px', padding: '1rem', background: '#fff' }}>
+            {loading && !status ? (
+              <div>{t('loading')}</div>
             ) : (
-              <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
-                {logLines.join('\n')}
-              </pre>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_status_label')}</div>
+                  <div style={{ fontWeight: 600 }}>{currentStatus}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_last_run_label')}</div>
+                  <div style={{ fontWeight: 600 }}>{lastRunSummary}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_started_label')}</div>
+                  <div style={{ fontWeight: 600 }}>{formatDateTime(lastRun?.startedAt) || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_completed_label')}</div>
+                  <div style={{ fontWeight: 600 }}>{formatDateTime(lastRun?.completedAt) || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_duration_label')}</div>
+                  <div style={{ fontWeight: 600 }}>{durationLabel}</div>
+                </div>
+              </div>
             )}
+
+            <div style={{ marginTop: '1.25rem' }}>
+              <h4 style={{ marginBottom: '0.5rem' }}>{t('sync_logs_label')}</h4>
+              <div style={{ border: '1px solid #f0f0f0', background: '#fafafa', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', padding: '0.75rem' }}>
+                {logLines.length === 0 ? (
+                  <div style={{ color: '#777', fontSize: '0.9rem' }}>{t('sync_no_logs')}</div>
+                ) : (
+                  <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
+                    {logLines.join('\n')}
+                  </pre>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </section>
   )
 }

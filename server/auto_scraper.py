@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""
+Automated Albert Heijn Scraper using Playwright
+This script logs in with user credentials and scrapes their purchase history
+"""
+
+import asyncio
+import json
+import os
+import sys
+import argparse
+from datetime import datetime
+from typing import Optional, List, Dict, Any
+
+try:
+    from playwright.async_api import async_playwright, Page, Browser
+except ImportError:
+    print("ERROR: Playwright not installed. Run: pip install playwright && playwright install chromium", file=sys.stderr)
+    sys.exit(1)
+
+
+class AHAutoScraper:
+    """Automated scraper for Albert Heijn using Playwright."""
+    
+    def __init__(self, headless: bool = True):
+        self.headless = headless
+        self.browser: Optional[Browser] = None
+        self.page: Optional[Page] = None
+        self.products: List[Dict[str, Any]] = []
+        
+    async def setup(self):
+        """Initialize the browser."""
+        print("[INFO] Starting browser...", flush=True)
+        playwright = await async_playwright().start()
+        
+        # Use Chromium for better compatibility
+        self.browser = await playwright.chromium.launch(
+            headless=self.headless,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+            ]
+        )
+        
+        # Create context with realistic viewport and user agent
+        context = await self.browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            locale='nl-NL',
+            timezone_id='Europe/Amsterdam',
+        )
+        
+        self.page = await context.new_page()
+        
+        # Remove automation detection
+        await self.page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['nl-NL', 'nl', 'en-US', 'en'] });
+        """)
+        
+        print("[INFO] Browser ready", flush=True)
+        
+    async def close(self):
+        """Clean up browser resources."""
+        if self.browser:
+            await self.browser.close()
+            print("[INFO] Browser closed", flush=True)
+    
+    async def human_delay(self, min_ms: int = 500, max_ms: int = 1500):
+        """Add a random human-like delay."""
+        import random
+        delay = random.randint(min_ms, max_ms) / 1000
+        await asyncio.sleep(delay)
+    
+    async def type_slowly(self, selector: str, text: str):
+        """Type text character by character like a human."""
+        import random
+        element = await self.page.wait_for_selector(selector, timeout=10000)
+        await element.click()
+        await self.human_delay(200, 400)
+        
+        for char in text:
+            await self.page.keyboard.type(char)
+            await asyncio.sleep(random.uniform(0.05, 0.15))
+    
+    async def login(self, email: str, password: str) -> bool:
+        """
+        Login to Albert Heijn website.
+        
+        Args:
+            email: AH account email
+            password: AH account password
+            
+        Returns:
+            True if login successful, False otherwise
+        """
+        print("[INFO] Navigating to AH login page...", flush=True)
+        
+        try:
+            # Go to mijn AH page which will redirect to login
+            await self.page.goto('https://www.ah.nl/mijn', wait_until='networkidle')
+            await self.human_delay(1000, 2000)
+            
+            # Check if we need to click login button
+            login_btn = await self.page.query_selector('a[href*="login"], button[data-testid="login-button"]')
+            if login_btn:
+                await login_btn.click()
+                await self.human_delay(1000, 2000)
+            
+            # Wait for login form
+            print("[INFO] Entering email...", flush=True)
+            await self.page.wait_for_selector('#username, input[name="username"], input[type="email"]', timeout=15000)
+            
+            # Enter email
+            email_selector = '#username, input[name="username"], input[type="email"]'
+            await self.type_slowly(email_selector, email)
+            await self.human_delay(500, 1000)
+            
+            # Click next/submit for email step
+            submit_btn = await self.page.query_selector('button[type="submit"]')
+            if submit_btn:
+                await submit_btn.click()
+                await self.human_delay(1500, 2500)
+            
+            # Enter password
+            print("[INFO] Entering password...", flush=True)
+            password_selector = '#password, input[name="password"], input[type="password"]'
+            await self.page.wait_for_selector(password_selector, timeout=10000)
+            await self.type_slowly(password_selector, password)
+            await self.human_delay(500, 1000)
+            
+            # Submit login
+            submit_btn = await self.page.query_selector('button[type="submit"]')
+            if submit_btn:
+                await submit_btn.click()
+            
+            print("[INFO] Waiting for login to complete...", flush=True)
+            
+            # Wait for redirect away from login page
+            # This may involve CAPTCHA - we'll wait up to 60 seconds
+            max_wait = 60
+            for i in range(max_wait):
+                await asyncio.sleep(1)
+                current_url = self.page.url.lower()
+                
+                # Check for successful login (redirected to mijn or home)
+                if 'login' not in current_url or 'mijn' in current_url:
+                    print(f"[SUCCESS] Login successful after {i+1} seconds!", flush=True)
+                    return True
+                
+                # Check for CAPTCHA
+                captcha = await self.page.query_selector('[id*="captcha"], [class*="captcha"], iframe[src*="captcha"]')
+                if captcha:
+                    print("[WARNING] CAPTCHA detected - automated solving not supported", flush=True)
+                    print("[INFO] Waiting for manual CAPTCHA solve...", flush=True)
+                    
+                if (i + 1) % 10 == 0:
+                    print(f"[INFO] Still waiting for login... ({i+1}/{max_wait}s)", flush=True)
+            
+            # Final check
+            if 'login' not in self.page.url.lower():
+                return True
+            
+            print("[ERROR] Login timeout - possibly blocked by CAPTCHA", flush=True)
+            return False
+            
+        except Exception as e:
+            print(f"[ERROR] Login failed: {e}", flush=True)
+            return False
+    
+    async def navigate_to_products(self) -> bool:
+        """Navigate to the previously purchased products page."""
+        print("[INFO] Navigating to previously purchased products...", flush=True)
+        
+        try:
+            # Try the bonus route (less protected)
+            await self.page.goto('https://www.ah.nl/bonus/eerder-gekocht', wait_until='networkidle')
+            await self.human_delay(2000, 3000)
+            
+            # Check if blocked
+            page_content = await self.page.content()
+            if 'access denied' in page_content.lower() or 'permission' in page_content.lower():
+                print("[WARNING] Access denied - trying alternative route...", flush=True)
+                await self.page.goto('https://www.ah.nl/producten/eerder-gekocht', wait_until='networkidle')
+                await self.human_delay(2000, 3000)
+            
+            # Wait for products to load
+            print("[INFO] Waiting for products to load...", flush=True)
+            
+            # Try multiple selectors for product cards
+            product_selectors = [
+                'article a[href*="/producten/product/"]',
+                '[data-testhook="product-card"]',
+                'a[href*="/producten/product/"]',
+            ]
+            
+            for selector in product_selectors:
+                try:
+                    await self.page.wait_for_selector(selector, timeout=10000)
+                    print(f"[INFO] Found products with selector: {selector}", flush=True)
+                    return True
+                except:
+                    continue
+            
+            print("[WARNING] Could not find product selectors, continuing anyway...", flush=True)
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Navigation failed: {e}", flush=True)
+            return False
+    
+    async def scroll_and_load_all(self, max_scrolls: int = 20):
+        """Scroll down to load all lazy-loaded products."""
+        print("[INFO] Scrolling to load all products...", flush=True)
+        
+        previous_height = 0
+        stable_count = 0
+        
+        for i in range(max_scrolls):
+            # Scroll down
+            await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+            await self.human_delay(1000, 2000)
+            
+            # Check if page height increased (new content loaded)
+            current_height = await self.page.evaluate('document.body.scrollHeight')
+            
+            if current_height == previous_height:
+                stable_count += 1
+                if stable_count >= 3:
+                    print(f"[INFO] Finished scrolling after {i+1} scrolls", flush=True)
+                    break
+            else:
+                stable_count = 0
+                previous_height = current_height
+            
+            if (i + 1) % 5 == 0:
+                print(f"[INFO] Scrolled {i+1} times...", flush=True)
+        
+        # Scroll back to top
+        await self.page.evaluate('window.scrollTo(0, 0)')
+        await self.human_delay(500, 1000)
+    
+    async def extract_products(self) -> List[Dict[str, Any]]:
+        """Extract product information from the page."""
+        print("[INFO] Extracting products...", flush=True)
+        
+        products = await self.page.evaluate('''
+            () => {
+                const items = [];
+                const seen = new Set();
+                
+                // Find all product links
+                const links = document.querySelectorAll('a[href*="/producten/product/"], article a[href*="/producten/product/"]');
+                
+                links.forEach(a => {
+                    const url = new URL(a.href, location.origin).toString();
+                    if (seen.has(url)) return;
+                    seen.add(url);
+                    
+                    // Get product name
+                    let name = a.getAttribute('aria-label') || a.textContent || '';
+                    name = name.replace(/\\s+/g, ' ').trim();
+                    
+                    if (!name) {
+                        const title = a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');
+                        name = (title?.textContent || '').trim();
+                    }
+                    
+                    // Get parent card
+                    const card = a.closest('article') || a.closest('[data-testhook="product-card"]') || a.parentElement;
+                    
+                    // Get price
+                    let price = null;
+                    const priceEl = card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');
+                    const raw = priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);
+                    if (raw) price = parseFloat(raw[1]);
+                    
+                    // Get image
+                    const imgEl = card?.querySelector('img');
+                    const image = imgEl?.src || '';
+                    
+                    if (name) {
+                        items.push({
+                            name,
+                            url,
+                            price,
+                            image,
+                            source: 'ah_auto_scrape'
+                        });
+                    }
+                });
+                
+                return items;
+            }
+        ''')
+        
+        self.products = products
+        print(f"[SUCCESS] Extracted {len(products)} products", flush=True)
+        return products
+    
+    async def scrape(self, email: str, password: str, output_file: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Full scraping workflow.
+        
+        Args:
+            email: AH account email
+            password: AH account password
+            output_file: Optional file path to save results
+            
+        Returns:
+            Dict with status and scraped products
+        """
+        result = {
+            'success': False,
+            'products': [],
+            'error': None,
+            'scraped_at': datetime.utcnow().isoformat() + 'Z'
+        }
+        
+        try:
+            await self.setup()
+            
+            # Login
+            if not await self.login(email, password):
+                result['error'] = 'login_failed'
+                return result
+            
+            # Navigate to products page
+            if not await self.navigate_to_products():
+                result['error'] = 'navigation_failed'
+                return result
+            
+            # Scroll to load all products
+            await self.scroll_and_load_all()
+            
+            # Extract products
+            products = await self.extract_products()
+            
+            if not products:
+                result['error'] = 'no_products_found'
+                return result
+            
+            result['success'] = True
+            result['products'] = products
+            result['count'] = len(products)
+            
+            # Save to file if requested
+            if output_file:
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, indent=2, ensure_ascii=False)
+                print(f"[INFO] Saved results to {output_file}", flush=True)
+            
+            return result
+            
+        except Exception as e:
+            result['error'] = str(e)
+            print(f"[ERROR] Scraping failed: {e}", flush=True)
+            return result
+            
+        finally:
+            await self.close()
+
+
+async def main():
+    parser = argparse.ArgumentParser(description='Automated AH Scraper')
+    parser.add_argument('--email', '-e', required=True, help='AH account email')
+    parser.add_argument('--password', '-p', required=True, help='AH account password')
+    parser.add_argument('--output', '-o', default='auto_scrape_results.json', help='Output file')
+    parser.add_argument('--headless', action='store_true', default=True, help='Run in headless mode')
+    parser.add_argument('--no-headless', dest='headless', action='store_false', help='Show browser window')
+    
+    args = parser.parse_args()
+    
+    scraper = AHAutoScraper(headless=args.headless)
+    result = await scraper.scrape(args.email, args.password, args.output)
+    
+    # Output result as JSON for the server to parse
+    print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+    
+    return 0 if result['success'] else 1
+
+
+if __name__ == '__main__':
+    exit_code = asyncio.run(main())
+    sys.exit(exit_code)
