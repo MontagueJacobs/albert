@@ -617,7 +617,7 @@ function AutoScrape({ onScrapeCompleted }) {
           <div style={{ 
             marginTop: '1rem', 
             padding: '0.75rem', 
-            background: lastRun.status === 'success' ? '#dcfce7' : '#fee2e2', 
+            background: lastRun.status === 'success' ? '#dcfce7' : (lastRun.loginRequired ? '#fef3c7' : '#fee2e2'), 
             borderRadius: '8px',
             display: 'flex',
             alignItems: 'flex-start',
@@ -625,22 +625,36 @@ function AutoScrape({ onScrapeCompleted }) {
           }}>
             {lastRun.status === 'success' ? (
               <CheckCircle size={18} style={{ color: '#16a34a', flexShrink: 0, marginTop: '2px' }} />
+            ) : lastRun.loginRequired ? (
+              <Cookie size={18} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
             ) : (
               <AlertCircle size={18} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
             )}
             <div>
-              <div style={{ fontWeight: 500 }}>
-                {lastRun.status === 'success' ? t('auto_scrape_last_success') : t('auto_scrape_last_error')}
+              <div style={{ fontWeight: 500, color: lastRun.loginRequired ? '#92400e' : undefined }}>
+                {lastRun.status === 'success' 
+                  ? t('auto_scrape_last_success') 
+                  : lastRun.loginRequired
+                    ? t('auto_scrape_login_required_title')
+                    : t('auto_scrape_last_error')}
               </div>
-              <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
-                {formatDateTime(lastRun.completedAt)}
-                {lastRun.productsFound > 0 && ` · ${lastRun.productsFound} ${t('auto_scrape_products_found')}`}
-                {lastRun.productsStored > 0 && ` · ${lastRun.productsStored} ${t('auto_scrape_products_stored')}`}
-              </div>
-              {lastRun.error && (
-                <div style={{ fontSize: '0.85rem', color: '#dc2626', marginTop: '0.25rem' }}>
-                  {lastRun.error}
+              {lastRun.loginRequired ? (
+                <div style={{ fontSize: '0.85rem', color: '#92400e', marginTop: '0.25rem' }}>
+                  {t('auto_scrape_login_required_desc')}
                 </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                    {formatDateTime(lastRun.completedAt)}
+                    {lastRun.productsFound > 0 && ` · ${lastRun.productsFound} ${t('auto_scrape_products_found')}`}
+                    {lastRun.productsStored > 0 && ` · ${lastRun.productsStored} ${t('auto_scrape_products_stored')}`}
+                  </div>
+                  {lastRun.error && !lastRun.loginRequired && (
+                    <div style={{ fontSize: '0.85rem', color: '#dc2626', marginTop: '0.25rem' }}>
+                      {lastRun.error}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

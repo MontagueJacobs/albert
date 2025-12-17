@@ -26,7 +26,7 @@ except ImportError:
 class AHAutoScraper:
     """Automated scraper for Albert Heijn using Playwright."""
     
-    def __init__(self, headless: bool = True, browserless_url: Optional[str] = None, cookies_file: Optional[str] = None):
+    def __init__(self, headless: bool = True, browserless_url: Optional[str] = None, cookies_file: Optional[str] = None, stealth_mode: bool = False):
         """
         Initialize the scraper.
         
@@ -35,8 +35,10 @@ class AHAutoScraper:
             browserless_url: URL to connect to Browserless.io or similar service
                              e.g., "wss://chrome.browserless.io?token=YOUR_TOKEN"
             cookies_file: Path to JSON file with saved session cookies
+            stealth_mode: If True, start headless and only show window if login needed
         """
         self.headless = headless
+        self.stealth_mode = stealth_mode
         self.browserless_url = browserless_url
         self.cookies_file = cookies_file
         self.browser: Optional[Browser] = None
@@ -44,6 +46,7 @@ class AHAutoScraper:
         self.page: Optional[Page] = None
         self.products: List[Dict[str, Any]] = []
         self._playwright = None
+        self._is_headless = headless  # Track current state
         
     async def setup(self):
         """Initialize the browser (local or remote)."""
@@ -59,14 +62,18 @@ class AHAutoScraper:
                 print(f"[ERROR] Failed to connect to remote browser: {e}", flush=True)
                 raise
         else:
-            # Launch local browser
-            # WARNING: AH blocks headless browsers on their login page
-            if self.headless:
+            # For stealth mode, always start headless first
+            start_headless = self.headless or self.stealth_mode
+            self._is_headless = start_headless
+            
+            if start_headless and self.stealth_mode:
+                print("[INFO] Starting in stealth mode (headless, will show window if login needed)...", flush=True)
+            elif start_headless:
                 print("[WARNING] Running in headless mode - AH may block login attempts!", flush=True)
-                print("[WARNING] If login fails, try with --no-headless flag", flush=True)
-            print(f"[INFO] Starting local browser (headless={self.headless})...", flush=True)
+            
+            print(f"[INFO] Starting local browser (headless={start_headless})...", flush=True)
             self.browser = await self._playwright.chromium.launch(
-                headless=self.headless,
+                headless=start_headless,
                 args=[
                     '--disable-blink-features=AutomationControlled',
                     '--no-sandbox',
@@ -161,6 +168,58 @@ class AHAutoScraper:
             
         except Exception as e:
             print(f"[ERROR] Failed to check login status: {e}", flush=True)
+            return False
+    
+    async def restart_with_visible_browser(self) -> bool:
+        """
+        Restart the browser in non-headless mode so user can see it.
+        Used in stealth mode when login is required.
+        """
+        if not self._is_headless or self.browserless_url:
+            return True  # Already visible or remote
+        
+        print("[INFO] Cookies expired - restarting browser in visible mode for manual login...", flush=True)
+        
+        try:
+            # Close current browser
+            if self.context:
+                await self.context.close()
+            if self.browser:
+                await self.browser.close()
+            
+            # Relaunch in visible mode
+            self._is_headless = False
+            self.browser = await self._playwright.chromium.launch(
+                headless=False,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--no-sandbox',
+                    '--disable-dev-shm-usage',
+                ]
+            )
+            
+            # Recreate context
+            self.context = await self.browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                locale='nl-NL',
+                timezone_id='Europe/Amsterdam',
+            )
+            
+            self.page = await self.context.new_page()
+            
+            # Remove automation detection
+            await self.page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                Object.defineProperty(navigator, 'languages', { get: () => ['nl-NL', 'nl', 'en-US', 'en'] });
+            """)
+            
+            print("[INFO] Browser restarted in visible mode", flush=True)
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to restart browser: {e}", flush=True)
             return False
         
     async def close(self):
@@ -593,7 +652,8 @@ class AHAutoScraper:
             'products': [],
             'error': None,
             'scraped_at': datetime.now(tz=None).astimezone().isoformat(),
-            'login_method': None
+            'login_method': None,
+            'login_required': False  # Flag to indicate if manual login is needed
         }
         
         try:
@@ -606,12 +666,25 @@ class AHAutoScraper:
                 if logged_in:
                     result['login_method'] = 'cookies'
             
-            # If not logged in via cookies, try credentials
+            # If not logged in via cookies and in stealth mode, signal that login is required
+            if not logged_in and self.stealth_mode:
+                # In stealth mode, don't try to login - just signal that it's needed
+                result['error'] = 'login_required'
+                result['login_required'] = True
+                print("[INFO] Cookies expired or invalid - manual login required", flush=True)
+                print("[INFO] Please use the cookie capture feature to log in", flush=True)
+                return result
+            
+            # If not logged in via cookies, try credentials (non-stealth mode)
             if not logged_in:
                 if not email or not password:
                     result['error'] = 'no_credentials_and_cookies_invalid'
                     print("[ERROR] No valid cookies and no credentials provided", flush=True)
                     return result
+                
+                # Restart browser in visible mode if needed
+                if self._is_headless:
+                    await self.restart_with_visible_browser()
                 
                 if not await self.login(email, password):
                     result['error'] = 'login_failed'
@@ -658,6 +731,7 @@ async def main():
     parser.add_argument('--output', '-o', default='auto_scrape_results.json', help='Output file')
     parser.add_argument('--headless', action='store_true', default=True, help='Run in headless mode')
     parser.add_argument('--no-headless', dest='headless', action='store_false', help='Show browser window')
+    parser.add_argument('--stealth', action='store_true', help='Stealth mode: start headless, signal if login needed')
     parser.add_argument('--browserless-url', help='URL to Browserless.io or similar service')
     parser.add_argument('--cookies', '-c', help='Path to cookies JSON file to load')
     parser.add_argument('--save-cookies', help='Path to save cookies after successful login')
@@ -672,12 +746,19 @@ async def main():
     # Check for browserless URL in environment
     browserless_url = args.browserless_url or os.environ.get('BROWSERLESS_URL')
     
-    # Validate inputs
-    if not args.cookies and (not args.email or not args.password):
+    # In stealth mode with cookies, credentials are optional
+    if args.stealth and args.cookies:
+        pass  # OK - will use cookies and signal if login needed
+    elif not args.cookies and (not args.email or not args.password):
         print("[ERROR] Either --cookies or both --email and --password are required", flush=True)
         return 1
     
-    scraper = AHAutoScraper(headless=args.headless, browserless_url=browserless_url, cookies_file=args.cookies)
+    scraper = AHAutoScraper(
+        headless=args.headless, 
+        browserless_url=browserless_url, 
+        cookies_file=args.cookies,
+        stealth_mode=args.stealth
+    )
     result = await scraper.scrape(args.email, args.password, args.output, args.save_cookies)
     
     # Output result as JSON for the server to parse

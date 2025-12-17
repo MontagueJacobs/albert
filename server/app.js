@@ -1166,6 +1166,7 @@ app.get('/api/auto-scrape/capture-cookies/status', (req, res) => {
 })
 
 // Scrape using saved cookies (no credentials needed)
+// Uses stealth mode: runs headless in background, signals if login needed
 app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   if (process.env.VERCEL && !process.env.BROWSERLESS_URL) {
     return res.status(501).json({
@@ -1191,14 +1192,16 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   autoScrapeState.startedAt = startedAt
   autoScrapeState.lastRun = { status: 'running', startedAt }
   autoScrapeState.logs = []
-  autoScrapeState.progress = 'Starting scraper with saved cookies...'
+  autoScrapeState.progress = 'Starting scraper in background...'
   
-  appendAutoScrapeLog('info', 'Starting AH scraper with saved cookies...')
+  appendAutoScrapeLog('info', 'Starting AH scraper in stealth mode (background)...')
   
+  // Use stealth mode: headless + cookies, will signal if login needed
   const scriptArgs = [
     AUTO_SCRAPE_SCRIPT,
     '--cookies', COOKIES_FILE,
-    '--no-headless'
+    '--stealth',  // Stealth mode: headless, signals if login needed
+    '--headless'  // Start headless (stealth will keep it headless)
   ]
   
   const browserlessUrl = process.env.BROWSERLESS_URL
@@ -1251,11 +1254,12 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
       durationMs,
       error: resultData?.error || (code !== 0 ? `Exited with code ${code}` : null),
       productsFound: resultData?.count || 0,
-      loginMethod: resultData?.login_method || 'unknown'
+      loginMethod: resultData?.login_method || 'unknown',
+      loginRequired: resultData?.login_required || false
     }
     
-    // If cookies failed, might need to recapture
-    if (resultData?.error === 'no_credentials_and_cookies_invalid') {
+    // If cookies failed or login is required, need to recapture
+    if (resultData?.error === 'no_credentials_and_cookies_invalid' || resultData?.login_required) {
       autoScrapeState.lastRun.needsCookieRefresh = true
     }
     
