@@ -62,40 +62,126 @@ class AHAutoScraper:
                 print(f"[ERROR] Failed to connect to remote browser: {e}", flush=True)
                 raise
         else:
-            # For stealth mode, always start headless first
+            # For stealth mode, we run non-headless but the window may be offscreen
+            # This is because AH heavily blocks headless browsers
             start_headless = self.headless or self.stealth_mode
             self._is_headless = start_headless
             
-            if start_headless and self.stealth_mode:
-                print("[INFO] Starting in stealth mode (headless, will show window if login needed)...", flush=True)
+            if self.stealth_mode:
+                # In stealth mode, we run NON-headless because AH blocks headless
+                # The browser window will appear but user interaction is minimal
+                print("[INFO] Starting in stealth mode (visible browser for better compatibility)...", flush=True)
+                start_headless = False
+                self._is_headless = False
             elif start_headless:
-                print("[WARNING] Running in headless mode - AH may block login attempts!", flush=True)
+                print("[WARNING] Running in headless mode - AH may block some pages!", flush=True)
             
             print(f"[INFO] Starting local browser (headless={start_headless})...", flush=True)
+            
             self.browser = await self._playwright.chromium.launch(
                 headless=start_headless,
                 args=[
                     '--disable-blink-features=AutomationControlled',
                     '--no-sandbox',
                     '--disable-dev-shm-usage',
+                    '--disable-web-security',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-site-isolation-trials',
+                    '--disable-features=BlockInsecurePrivateNetworkRequests',
+                    # Additional anti-detection args
+                    '--disable-infobars',
+                    '--window-size=1920,1080',
+                    '--start-maximized',
+                    '--disable-extensions',
+                    '--disable-popup-blocking',
+                    '--ignore-certificate-errors',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
                 ]
             )
         
-        # Create context with realistic viewport and user agent
+        # Create context with realistic viewport and user agent - use a common real browser UA
         self.context = await self.browser.new_context(
             viewport={'width': 1920, 'height': 1080},
-            user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             locale='nl-NL',
             timezone_id='Europe/Amsterdam',
+            # Add extra headers to look more like a real browser
+            extra_http_headers={
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Upgrade-Insecure-Requests': '1',
+            }
         )
         
         self.page = await self.context.new_page()
         
-        # Remove automation detection
+        # Comprehensive anti-detection script
         await self.page.add_init_script("""
+            // Remove webdriver flag
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+            
+            // Fake plugins array
+            Object.defineProperty(navigator, 'plugins', { 
+                get: () => {
+                    const plugins = [
+                        { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                        { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                        { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                    ];
+                    plugins.refresh = () => {};
+                    return plugins;
+                }
+            });
+            
+            // Fake languages
             Object.defineProperty(navigator, 'languages', { get: () => ['nl-NL', 'nl', 'en-US', 'en'] });
+            
+            // Fake platform
+            Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+            
+            // Fake hardware concurrency
+            Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+            
+            // Fake device memory
+            Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+            
+            // Override permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+            
+            // Chrome-specific properties
+            window.chrome = {
+                runtime: {},
+                loadTimes: function() {},
+                csi: function() {},
+                app: {}
+            };
+            
+            // Prevent detection via toString
+            const oldCall = Function.prototype.call;
+            function hook(func, fake) {
+                return function() {
+                    if (this === window.navigator) {
+                        return fake;
+                    }
+                    return oldCall.apply(this, arguments);
+                };
+            }
         """)
         
         # Load cookies if provided
@@ -398,10 +484,12 @@ class AHAutoScraper:
         all_products = []
         seen_urls = set()
         
-        # Pages to scrape
+        # Pages to scrape - bonus route works best, others are heavily protected
         pages_to_scrape = [
-            ('https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date&page=0', 'Purchase History'),
+            # Bonus route - this one works reliably
             ('https://www.ah.nl/bonus/eerder-gekocht', 'Bonus Products'),
+            # My account route - sometimes works
+            ('https://www.ah.nl/mijn/eerder-gekocht', 'My Purchase History'),
         ]
         
         for page_url, page_name in pages_to_scrape:
@@ -412,29 +500,84 @@ class AHAutoScraper:
                 await self.page.goto(page_url, wait_until='load', timeout=60000)
                 await self.human_delay(3000, 4000)
                 
-                # Wait for page to stabilize
+                # Wait for page to stabilize and JS to run
                 try:
-                    await self.page.wait_for_load_state('networkidle', timeout=10000)
+                    await self.page.wait_for_load_state('networkidle', timeout=15000)
                 except:
                     pass  # Continue even if networkidle times out
                 
+                # Extra wait for SPA content to render
+                await self.human_delay(3000, 5000)
+                
+                # Scroll down a bit to trigger lazy loading
+                await self.page.evaluate('window.scrollTo(0, 500)')
                 await self.human_delay(2000, 3000)
                 
-                # Check if we have access
+                # Check if we have access - look for various block indicators
                 try:
                     page_content = await self.page.content()
-                    if 'access denied' in page_content.lower():
-                        print(f"[WARNING] Access denied to {page_name}, skipping...", flush=True)
+                    page_lower = page_content.lower()
+                    current_url = self.page.url.lower()
+                    
+                    # Check for various access denial indicators
+                    is_blocked = False
+                    block_reason = None
+                    
+                    # Hard block: Akamai/CDN access denied page
+                    if '<title>access denied</title>' in page_lower:
+                        is_blocked = True
+                        block_reason = 'Akamai access denied'
+                    # Check for explicit access denied in body (not just anywhere)
+                    elif '<h1>access denied</h1>' in page_lower:
+                        is_blocked = True
+                        block_reason = 'access denied page'
+                    # Redirected to login when we should be logged in
+                    elif 'login.ah.nl' in current_url:
+                        is_blocked = True
+                        block_reason = 'redirected to login'
+                    # CAPTCHA challenge page
+                    elif '<title>' in page_lower and 'captcha' in page_lower.split('<title>')[1].split('</title>')[0]:
+                        is_blocked = True
+                        block_reason = 'captcha challenge'
+                    
+                    if is_blocked:
+                        print(f"[WARNING] Access denied to {page_name} ({block_reason}), skipping...", flush=True)
+                        print(f"[DEBUG] Current URL: {self.page.url}", flush=True)
+                        # Save page for debugging (only first 500 chars)
+                        snippet = page_content[:500].replace('\n', ' ')
+                        print(f"[DEBUG] Page snippet: {snippet}...", flush=True)
                         continue
-                except:
-                    print(f"[WARNING] Could not read page content for {page_name}", flush=True)
+                except Exception as e:
+                    print(f"[WARNING] Could not read page content for {page_name}: {e}", flush=True)
                     continue
                 
-                # Wait for products
-                try:
-                    await self.page.wait_for_selector('article a[href*="/producten/product/"]', timeout=15000)
-                except:
+                # Wait for products - try multiple selectors
+                product_found = False
+                product_selectors = [
+                    'article a[href*="/producten/product/"]',
+                    '[data-testhook="product-card"]',
+                    'a[href*="/producten/product/"]',
+                    '[class*="product"]',
+                ]
+                
+                for selector in product_selectors:
+                    try:
+                        await self.page.wait_for_selector(selector, timeout=5000)
+                        print(f"[DEBUG] Found elements with selector: {selector}", flush=True)
+                        product_found = True
+                        break
+                    except:
+                        continue
+                
+                if not product_found:
+                    # Debug: show what's on the page
                     print(f"[WARNING] No products found on {page_name}", flush=True)
+                    print(f"[DEBUG] Current URL: {self.page.url}", flush=True)
+                    title = await self.page.title()
+                    print(f"[DEBUG] Page title: {title}", flush=True)
+                    # Check if there's any content suggesting we need to scroll or wait
+                    page_text = await self.page.evaluate('document.body.innerText.substring(0, 1000)')
+                    print(f"[DEBUG] Page text: {page_text[:500]}...", flush=True)
                     continue
                 
                 # Scroll to load all products on this page
