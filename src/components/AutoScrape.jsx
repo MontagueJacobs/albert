@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, Lock, Mail, Eye, EyeOff, CheckCircle, AlertCircle, Info, Cookie, RefreshCw, Trash2 } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
+import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
 
 function AutoScrape({ onScrapeCompleted }) {
   const { t } = useI18n()
+  const { user, isAuthenticated } = useAuth()
+  const authFetch = useAuthenticatedFetch()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -142,7 +145,8 @@ function AutoScrape({ onScrapeCompleted }) {
     setError(null)
     
     try {
-      const res = await fetch('/api/auto-scrape/with-cookies', {
+      // Use authenticated fetch to associate purchases with user
+      const res = await authFetch('/api/auto-scrape/with-cookies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -167,7 +171,7 @@ function AutoScrape({ onScrapeCompleted }) {
     } finally {
       setStarting(false)
     }
-  }, [starting, status, fetchStatus, t])
+  }, [starting, status, fetchStatus, t, authFetch])
 
   // Start cookie capture (manual login)
   const handleCaptureCookies = useCallback(async () => {

@@ -479,17 +479,22 @@ class AHAutoScraper:
             print(f"[ERROR] Navigation failed: {e}", flush=True)
             return False
     
-    async def scrape_all_pages(self) -> List[Dict[str, Any]]:
-        """Scrape products from multiple pages to get complete purchase history."""
+    async def scrape_all_pages(self) -> tuple[List[Dict[str, Any]], bool]:
+        """Scrape products from multiple pages to get complete purchase history.
+        
+        Returns:
+            Tuple of (products list, login_required bool)
+        """
         all_products = []
         seen_urls = set()
+        login_required = False
         
-        # Pages to scrape - bonus route works best, others are heavily protected
+        # Pages to scrape - try the producten route which is the main purchase history page
         pages_to_scrape = [
-            # Bonus route - this one works reliably
+            # Main purchase history page - this is the one the user sees
+            ('https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date&page=0', 'Purchase History'),
+            # Bonus route - works reliably but has fewer products
             ('https://www.ah.nl/bonus/eerder-gekocht', 'Bonus Products'),
-            # My account route - sometimes works
-            ('https://www.ah.nl/mijn/eerder-gekocht', 'My Purchase History'),
         ]
         
         for page_url, page_name in pages_to_scrape:
@@ -522,6 +527,7 @@ class AHAutoScraper:
                     # Check for various access denial indicators
                     is_blocked = False
                     block_reason = None
+                    needs_login = False
                     
                     # Hard block: Akamai/CDN access denied page
                     if '<title>access denied</title>' in page_lower:
@@ -534,11 +540,17 @@ class AHAutoScraper:
                     # Redirected to login when we should be logged in
                     elif 'login.ah.nl' in current_url:
                         is_blocked = True
-                        block_reason = 'redirected to login'
+                        block_reason = 'session expired - login required'
+                        needs_login = True
                     # CAPTCHA challenge page
                     elif '<title>' in page_lower and 'captcha' in page_lower.split('<title>')[1].split('</title>')[0]:
                         is_blocked = True
                         block_reason = 'captcha challenge'
+                    # "Even controleren" re-authentication page
+                    elif 'even controleren' in page_lower:
+                        is_blocked = True
+                        block_reason = 'session expired - re-authentication required'
+                        needs_login = True
                     
                     if is_blocked:
                         print(f"[WARNING] Access denied to {page_name} ({block_reason}), skipping...", flush=True)
@@ -546,6 +558,8 @@ class AHAutoScraper:
                         # Save page for debugging (only first 500 chars)
                         snippet = page_content[:500].replace('\n', ' ')
                         print(f"[DEBUG] Page snippet: {snippet}...", flush=True)
+                        if needs_login:
+                            login_required = True
                         continue
                 except Exception as e:
                     print(f"[WARNING] Could not read page content for {page_name}: {e}", flush=True)
@@ -603,7 +617,7 @@ class AHAutoScraper:
                 print(f"[WARNING] Error scraping {page_name}: {e}", flush=True)
                 continue
         
-        return all_products
+        return all_products, login_required
     
     async def load_all_pagination_pages(self, max_pages: int = 10):
         """Load additional pages via pagination if available."""
@@ -840,7 +854,15 @@ class AHAutoScraper:
                     await self.save_cookies(save_cookies_to)
             
             # Scrape all pages (purchase history + bonus products)
-            products = await self.scrape_all_pages()
+            products, needs_relogin = await self.scrape_all_pages()
+            
+            # Check if session expired during scraping
+            if needs_relogin:
+                result['error'] = 'login_required'
+                result['login_required'] = True
+                print("[INFO] Session expired during scraping - manual login required", flush=True)
+                print("[INFO] Please use the cookie capture feature to log in again", flush=True)
+                return result
             
             if not products:
                 result['error'] = 'no_products_found'

@@ -90,6 +90,42 @@ function appendScrapeLog(stream, chunk) {
 app.use(cors())
 app.use(bodyParser.json({ limit: '2mb' }))
 
+// ============================================================================
+// USER AUTHENTICATION HELPER
+// Extract user from Supabase JWT token in Authorization header
+// ============================================================================
+async function getUserFromRequest(req) {
+  const authHeader = req.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null
+  }
+  
+  const token = authHeader.substring(7)
+  if (!supabase) return null
+  
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token)
+    if (error || !user) return null
+    return user
+  } catch (err) {
+    console.error('Auth error:', err.message)
+    return null
+  }
+}
+
+// Middleware to require authentication
+function requireAuth(req, res, next) {
+  getUserFromRequest(req).then(user => {
+    if (!user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Please log in to access this resource' })
+    }
+    req.user = user
+    next()
+  }).catch(err => {
+    res.status(500).json({ error: 'auth_error', message: err.message })
+  })
+}
+
 // Data file path
 const DATA_FILE = path.join(__dirname, 'purchases.json')
 
@@ -445,6 +481,194 @@ function getRating(avgScore) {
 function minutes(ms) {
   return Math.round(ms / 60000)
 }
+
+// ============================================================================
+// USER API ROUTES
+// ============================================================================
+
+// Get current user profile
+app.get('/api/user/profile', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', req.user.id)
+      .single()
+    
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Update user profile
+app.patch('/api/user/profile', requireAuth, async (req, res) => {
+  try {
+    const { display_name } = req.body
+    const { data, error } = await supabase
+      .from('users')
+      .update({ display_name })
+      .eq('id', req.user.id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: 'update_failed', message: err.message })
+  }
+})
+
+// Get user's AH credentials status (not the actual credentials)
+app.get('/api/user/ah-credentials', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status, created_at')
+      .eq('user_id', req.user.id)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error  // PGRST116 = no rows
+    res.json(data || { configured: false })
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Save user's AH credentials
+app.post('/api/user/ah-credentials', requireAuth, async (req, res) => {
+  try {
+    const { ah_email, cookies } = req.body
+    
+    // Encrypt cookies before storing (simple encryption, consider Supabase Vault for production)
+    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+    const iv = crypto.randomBytes(16)
+    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+    let encrypted = cipher.update(JSON.stringify(cookies), 'utf8', 'hex')
+    encrypted += cipher.final('hex')
+    const cookies_encrypted = iv.toString('hex') + ':' + encrypted
+    
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .upsert({
+        user_id: req.user.id,
+        ah_email,
+        cookies_encrypted,
+        cookies_updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' })
+      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status')
+      .single()
+    
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: 'save_failed', message: err.message })
+  }
+})
+
+// Get user's purchase history
+app.get('/api/user/purchases', requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500)
+    const offset = parseInt(req.query.offset) || 0
+    
+    const { data, error, count } = await supabase
+      .from('user_purchases')
+      .select('*', { count: 'exact' })
+      .eq('user_id', req.user.id)
+      .order('scraped_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+    
+    if (error) throw error
+    res.json({ purchases: data, total: count, limit, offset })
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get user's purchase summary/stats
+app.get('/api/user/purchases/summary', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_purchase_summary')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    res.json(data || { total_purchases: 0, unique_products: 0, total_spent: 0 })
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Delete a specific purchase
+app.delete('/api/user/purchases/:id', requireAuth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('user_purchases')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id)
+    
+    if (error) throw error
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: 'delete_failed', message: err.message })
+  }
+})
+
+// ============================================================================
+// GLOBAL PRODUCT CATALOG API (public, read-only)
+// ============================================================================
+
+// Get popular products (aggregated from all users)
+app.get('/api/products/popular', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'database_unavailable' })
+    }
+    
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200)
+    
+    const { data, error } = await supabase
+      .from('ah_products')
+      .select('id, name, normalized_name, url, image_url, price, seen_count, first_seen_at, last_seen_at')
+      .order('seen_count', { ascending: false })
+      .limit(limit)
+    
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Search global product catalog
+app.get('/api/products/search', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'database_unavailable' })
+    }
+    
+    const query = req.query.q?.trim()
+    if (!query) {
+      return res.status(400).json({ error: 'missing_query' })
+    }
+    
+    const { data, error } = await supabase
+      .from('ah_products')
+      .select('id, name, normalized_name, url, image_url, price')
+      .ilike('normalized_name', `%${query.toLowerCase()}%`)
+      .limit(50)
+    
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
 
 // API Routes
 app.get('/api/purchases', async (req, res) => {
@@ -1167,6 +1391,7 @@ app.get('/api/auto-scrape/capture-cookies/status', (req, res) => {
 
 // Scrape using saved cookies (no credentials needed)
 // Uses stealth mode: runs headless in background, signals if login needed
+// Accepts optional user_id to record purchases for a specific user
 app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   if (process.env.VERCEL && !process.env.BROWSERLESS_URL) {
     return res.status(501).json({
@@ -1179,6 +1404,10 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     return res.status(409).json({ error: 'scrape_in_progress' })
   }
   
+  // Get user from auth header if provided
+  const user = await getUserFromRequest(req)
+  const userId = user?.id || req.body?.user_id || null
+  
   // Check if cookies exist
   if (!existsSync(COOKIES_FILE)) {
     return res.status(400).json({
@@ -1190,11 +1419,14 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   const startedAt = new Date().toISOString()
   autoScrapeState.running = true
   autoScrapeState.startedAt = startedAt
-  autoScrapeState.lastRun = { status: 'running', startedAt }
+  autoScrapeState.lastRun = { status: 'running', startedAt, userId }
   autoScrapeState.logs = []
   autoScrapeState.progress = 'Starting scraper in background...'
   
   appendAutoScrapeLog('info', 'Starting AH scraper in stealth mode (background)...')
+  if (userId) {
+    appendAutoScrapeLog('info', `Recording purchases for user: ${userId}`)
+  }
   
   // Use stealth mode: headless + cookies, will signal if login needed
   const scriptArgs = [
@@ -1203,6 +1435,9 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     '--stealth',  // Stealth mode: headless, signals if login needed
     '--headless'  // Start headless (stealth will keep it headless)
   ]
+  
+  // Store userId in state for use in the close handler
+  autoScrapeState.currentUserId = userId
   
   const browserlessUrl = process.env.BROWSERLESS_URL
   if (browserlessUrl) {
@@ -1269,7 +1504,11 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     if (resultData?.success && resultData?.products?.length > 0 && supabase) {
       appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
       
+      // Get userId from state
+      const userId = autoScrapeState.currentUserId
+      
       try {
+        const seenIds = new Set()
         const cleaned = resultData.products.map((item) => {
           const name = (item.name || '').toString().trim()
           const normalized = normalizeProductName(name)
@@ -1295,8 +1534,15 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
             tags: null,
             updated_at: new Date().toISOString()
           }
-        }).filter((item) => item.name && item.id)
+        }).filter((item) => {
+          // Filter out items without name/id and deduplicate by id
+          if (!item.name || !item.id) return false
+          if (seenIds.has(item.id)) return false
+          seenIds.add(item.id)
+          return true
+        })
         
+        // 1. Upsert to global product catalog (ah_products)
         const { error: upsertError } = await supabase
           .from(SUPABASE_PRODUCTS_TABLE)
           .upsert(cleaned, { onConflict: 'id' })
@@ -1304,13 +1550,50 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
         if (upsertError) {
           appendAutoScrapeLog('stderr', `Database upsert failed: ${upsertError.message}`)
         } else {
-          appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products.`)
+          appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in global catalog.`)
           autoScrapeState.lastRun.productsStored = cleaned.length
+        }
+        
+        // 2. If user is authenticated, also record as user purchases
+        if (userId) {
+          const userPurchases = cleaned.map(item => ({
+            user_id: userId,
+            product_id: item.id,
+            product_name: item.name,
+            product_url: item.url,
+            product_image_url: item.image_url,
+            price: item.price,
+            source: 'ah_auto_scrape',
+            scraped_at: new Date().toISOString()
+          }))
+          
+          const { error: purchaseError } = await supabase
+            .from('user_purchases')
+            .insert(userPurchases)
+          
+          if (purchaseError) {
+            appendAutoScrapeLog('stderr', `User purchases insert failed: ${purchaseError.message}`)
+          } else {
+            appendAutoScrapeLog('info', `Recorded ${userPurchases.length} purchases for user.`)
+            autoScrapeState.lastRun.userPurchasesRecorded = userPurchases.length
+          }
+          
+          // Update user's sync status
+          await supabase
+            .from('user_ah_credentials')
+            .update({ 
+              sync_status: 'success', 
+              last_sync_at: new Date().toISOString() 
+            })
+            .eq('user_id', userId)
         }
       } catch (e) {
         appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
       }
     }
+    
+    // Clear current user ID
+    autoScrapeState.currentUserId = null
   })
   
   res.status(202).json({ status: 'started', startedAt, useCookies: true })
