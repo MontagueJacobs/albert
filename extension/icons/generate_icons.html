@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Icon Generator</title>
+</head>
+<body>
+  <h3>Right-click and save each canvas as PNG:</h3>
+  <p>icon16.png:</p>
+  <canvas id="c16" width="16" height="16"></canvas>
+  <p>icon48.png:</p>
+  <canvas id="c48" width="48" height="48"></canvas>
+  <p>icon128.png:</p>
+  <canvas id="c128" width="128" height="128"></canvas>
+  
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      
+      // Gradient background
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#22c55e');
+      gradient.addColorStop(1, '#667eea');
+      
+      // Circle
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size/2 - 1, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      // Leaf emoji
+      ctx.font = `${size * 0.6}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🌱', size/2, size/2 + size * 0.05);
+    }
+    
+    drawIcon(document.getElementById('c16'));
+    drawIcon(document.getElementById('c48'));
+    drawIcon(document.getElementById('c128'));
+  </script>
+</body>
+</html>

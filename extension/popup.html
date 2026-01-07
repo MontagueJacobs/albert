@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      color: #f3f4f6;
+    }
+    
+    .header {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #334155;
+    }
+    
+    .logo {
+      font-size: 28px;
+    }
+    
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    
+    .content {
+      padding: 16px;
+    }
+    
+    .status-card {
+      background: #334155;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .status-label {
+      font-size: 11px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    
+    .status-value {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .status-value.success { color: #22c55e; }
+    .status-value.warning { color: #f59e0b; }
+    .status-value.error { color: #ef4444; }
+    
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+    
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #334155;
+      color: #f3f4f6;
+    }
+    
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #334155;
+      color: #9ca3af;
+    }
+    
+    .instructions {
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    
+    .instructions h4 {
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: #22c55e;
+    }
+    
+    .instructions ol {
+      font-size: 12px;
+      color: #9ca3af;
+      padding-left: 16px;
+      line-height: 1.6;
+    }
+    
+    .instructions a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    
+    .instructions a:hover {
+      text-decoration: underline;
+    }
+    
+    .settings {
+      padding: 12px 16px;
+      border-top: 1px solid #334155;
+    }
+    
+    .settings-title {
+      font-size: 11px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    
+    .input-group {
+      margin-bottom: 8px;
+    }
+    
+    .input-group label {
+      display: block;
+      font-size: 11px;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+    
+    .input-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #f3f4f6;
+      font-size: 12px;
+    }
+    
+    .input-group input:focus {
+      outline: none;
+      border-color: #22c55e;
+    }
+    
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">🌱</span>
+    <div>
+      <div class="title">Sustainable Shop</div>
+      <div class="subtitle">AH Purchase Sync</div>
+    </div>
+  </div>
+  
+  <div class="content">
+    <div class="status-card">
+      <div class="status-label">Current Page</div>
+      <div class="status-value" id="page-status">Checking...</div>
+    </div>
+    
+    <div id="ah-page-actions" class="hidden">
+      <div class="status-card">
+        <div class="status-label">Products Found</div>
+        <div class="status-value success" id="product-count">0</div>
+      </div>
+      
+      <button class="btn btn-secondary" id="scroll-btn">
+        📜 Auto-scroll to load all
+      </button>
+      
+      <button class="btn btn-primary" id="sync-btn">
+        🔄 Sync Products
+      </button>
+    </div>
+    
+    <div id="not-ah-page" class="hidden">
+      <button class="btn btn-primary" id="open-ah-btn">
+        🛒 Go to AH Purchases
+      </button>
+      
+      <div class="instructions">
+        <h4>How to use:</h4>
+        <ol>
+          <li>Click the button above to open AH</li>
+          <li>Log in to your Albert Heijn account</li>
+          <li>Wait for products to load</li>
+          <li>Click the 🌱 button on the page to sync</li>
+        </ol>
+      </div>
+    </div>
+    
+    <div id="sync-result" class="status-card hidden">
+      <div class="status-label">Last Sync</div>
+      <div class="status-value" id="sync-message">-</div>
+    </div>
+  </div>
+  
+  <div class="settings">
+    <div class="settings-title">Settings</div>
+    <div class="input-group">
+      <label>API Server</label>
+      <select id="api-select" style="width: 100%; padding: 8px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; color: #f3f4f6; font-size: 12px;">
+        <option value="https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app">Vercel (Production)</option>
+        <option value="http://localhost:3001">Localhost (Development)</option>
+        <option value="custom">Custom URL...</option>
+      </select>
+    </div>
+    <div class="input-group hidden" id="custom-url-group">
+      <label>Custom API URL</label>
+      <input type="text" id="custom-url" placeholder="https://your-server.com">
+    </div>
+    <button class="btn btn-outline" id="save-settings">Save Settings</button>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
