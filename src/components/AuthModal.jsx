@@ -1,6 +1,118 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/authContext'
 
+const modalStyles = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    backgroundColor: '#1e293b',
+    borderRadius: '16px',
+    padding: '2rem',
+    width: '100%',
+    maxWidth: '400px',
+    margin: '1rem',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1.5rem',
+  },
+  title: {
+    fontSize: '1.5rem',
+    fontWeight: 700,
+    color: '#f3f4f6',
+    margin: 0,
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '1.5rem',
+    color: '#9ca3af',
+    cursor: 'pointer',
+    padding: '0.25rem',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+  },
+  label: {
+    display: 'block',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+    color: '#f3f4f6',
+    marginBottom: '0.5rem',
+  },
+  input: {
+    width: '100%',
+    padding: '0.75rem',
+    border: '2px solid #334155',
+    borderRadius: '8px',
+    fontSize: '1rem',
+    backgroundColor: '#0f172a',
+    color: '#f3f4f6',
+    boxSizing: 'border-box',
+  },
+  error: {
+    padding: '0.75rem',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    border: '1px solid #ef4444',
+    borderRadius: '8px',
+    color: '#fca5a5',
+    fontSize: '0.875rem',
+  },
+  success: {
+    padding: '0.75rem',
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    border: '1px solid #22c55e',
+    borderRadius: '8px',
+    color: '#86efac',
+    fontSize: '0.875rem',
+  },
+  submitBtn: {
+    width: '100%',
+    padding: '0.75rem 1.5rem',
+    background: 'linear-gradient(135deg, #22c55e 0%, #667eea 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '1rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+  },
+  submitBtnDisabled: {
+    background: '#4b5563',
+    cursor: 'not-allowed',
+  },
+  switchText: {
+    marginTop: '1rem',
+    textAlign: 'center',
+    fontSize: '0.875rem',
+    color: '#9ca3af',
+  },
+  switchBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#22c55e',
+    cursor: 'pointer',
+    fontWeight: 500,
+    textDecoration: 'underline',
+  },
+}
+
 export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
   const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
@@ -40,94 +152,85 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
     }
   }
 
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose()
+    }
+  }
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800">
+    <div style={modalStyles.overlay} onClick={handleOverlayClick}>
+      <div style={modalStyles.modal}>
+        <div style={modalStyles.header}>
+          <h2 style={modalStyles.title}>
             {mode === 'login' ? 'Sign In' : 'Create Account'}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl"
-          >
+          <button onClick={onClose} style={modalStyles.closeBtn}>
             ×
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} style={modalStyles.form}>
           {mode === 'signup' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Display Name
-              </label>
+              <label style={modalStyles.label}>Display Name</label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                style={modalStyles.input}
                 placeholder="Your name"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
+            <label style={modalStyles.label}>Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              style={modalStyles.input}
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+            <label style={modalStyles.label}>Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              style={modalStyles.input}
               placeholder="••••••••"
             />
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
-              {success}
-            </div>
-          )}
+          {error && <div style={modalStyles.error}>{error}</div>}
+          {success && <div style={modalStyles.success}>{success}</div>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium rounded-md transition-colors"
+            style={{
+              ...modalStyles.submitBtn,
+              ...(loading ? modalStyles.submitBtnDisabled : {}),
+            }}
           >
             {loading ? 'Please wait...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
           </button>
         </form>
 
-        <div className="mt-4 text-center text-sm text-gray-600">
+        <div style={modalStyles.switchText}>
           {mode === 'login' ? (
             <>
               Don't have an account?{' '}
               <button
                 onClick={() => { setMode('signup'); setError(null); setSuccess(null) }}
-                className="text-green-600 hover:underline font-medium"
+                style={modalStyles.switchBtn}
               >
                 Sign up
               </button>
@@ -137,7 +240,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
               Already have an account?{' '}
               <button
                 onClick={() => { setMode('login'); setError(null); setSuccess(null) }}
-                className="text-green-600 hover:underline font-medium"
+                style={modalStyles.switchBtn}
               >
                 Sign in
               </button>
