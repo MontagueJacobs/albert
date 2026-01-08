@@ -6,12 +6,12 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "ah-sync@sustainable-shop.app",
-      "strict_min_version": "109.0"
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["technicalAndInteraction", "analyticsAndResearch"],
+        "optional": []
+      }
     }
-  },
-  "data_collection_permissions": {
-    "required": ["product_names", "product_prices", "product_urls", "authentication_email"],
-    "optional": []
   },
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
