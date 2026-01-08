@@ -2,15 +2,11 @@
   "manifest_version": 3,
   "name": "Sustainable Shop - AH Sync",
   "version": "1.0.0",
-  "description": "Sync your Albert Heijn purchase history to Sustainable Shop and track your sustainability scores. See the environmental impact of your grocery choices.",
+  "description": "Sync your Albert Heijn purchase history to Sustainable Shop and track your sustainability scores.",
   "browser_specific_settings": {
     "gecko": {
       "id": "ah-sync@sustainable-shop.app",
-      "strict_min_version": "109.0",
-      "data_collection_permissions": {
-        "required": ["technicalAndInteraction", "analyticsAndResearch"],
-        "optional": []
-      }
+      "strict_min_version": "109.0"
     }
   },
   "permissions": ["storage", "activeTab"],
