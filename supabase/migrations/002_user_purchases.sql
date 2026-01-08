@@ -1,5 +1,6 @@
 -- User purchases table for per-user purchase history
 -- Run this in your Supabase SQL editor
+-- This script is idempotent - safe to run multiple times
 
 -- Create user_purchases table
 CREATE TABLE IF NOT EXISTS user_purchases (
@@ -20,6 +21,12 @@ CREATE INDEX IF NOT EXISTS idx_user_purchases_purchased_at ON user_purchases(pur
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE user_purchases ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist, then recreate
+DROP POLICY IF EXISTS "Users can view own purchases" ON user_purchases;
+DROP POLICY IF EXISTS "Users can insert own purchases" ON user_purchases;
+DROP POLICY IF EXISTS "Service role can insert any purchases" ON user_purchases;
+DROP POLICY IF EXISTS "Service role can select any purchases" ON user_purchases;
 
 -- Policy: Users can only see their own purchases
 CREATE POLICY "Users can view own purchases" ON user_purchases
@@ -65,6 +72,13 @@ CREATE TABLE IF NOT EXISTS user_ah_credentials (
 
 -- Enable RLS
 ALTER TABLE user_ah_credentials ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist, then recreate
+DROP POLICY IF EXISTS "Users can view own credentials" ON user_ah_credentials;
+DROP POLICY IF EXISTS "Users can insert own credentials" ON user_ah_credentials;
+DROP POLICY IF EXISTS "Users can update own credentials" ON user_ah_credentials;
+DROP POLICY IF EXISTS "Users can delete own credentials" ON user_ah_credentials;
+DROP POLICY IF EXISTS "Service role full access on credentials" ON user_ah_credentials;
 
 -- Policy: Users can only see/manage their own credentials
 CREATE POLICY "Users can view own credentials" ON user_ah_credentials

@@ -1,4 +1,8 @@
 // Popup script for Sustainable Shop extension
+// Compatible with Chrome and Firefox
+
+// Browser API compatibility (Firefox uses 'browser', Chrome uses 'chrome')
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 const AH_PURCHASE_URL = 'https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date';
 
@@ -31,7 +35,7 @@ const saveSettingsBtn = document.getElementById('save-settings');
 
 // Check auth status on load
 async function checkAuthStatus() {
-  const settings = await chrome.storage.sync.get(['userToken', 'userEmail']);
+  const settings = await browserAPI.storage.sync.get(['userToken', 'userEmail']);
   
   if (settings.userToken && settings.userEmail) {
     // Verify token is still valid
@@ -52,7 +56,7 @@ async function checkAuthStatus() {
     }
     
     // Token invalid, clear it
-    await chrome.storage.sync.remove(['userToken', 'userEmail']);
+    await browserAPI.storage.sync.remove(['userToken', 'userEmail']);
   }
   
   showSignedOut();
@@ -106,7 +110,7 @@ signInBtn.addEventListener('click', async () => {
     }
     
     // Save token
-    await chrome.storage.sync.set({
+    await browserAPI.storage.sync.set({
       userToken: data.access_token,
       userEmail: email
     });
@@ -123,7 +127,7 @@ signInBtn.addEventListener('click', async () => {
 
 // Sign out
 signOutBtn.addEventListener('click', async () => {
-  await chrome.storage.sync.remove(['userToken', 'userEmail']);
+  await browserAPI.storage.sync.remove(['userToken', 'userEmail']);
   showSignedOut();
   authEmail.value = '';
   authPassword.value = '';
@@ -133,7 +137,7 @@ signOutBtn.addEventListener('click', async () => {
 checkAuthStatus();
 
 // Load saved settings
-chrome.storage.sync.get(['apiBase', 'customUrl'], (result) => {
+browserAPI.storage.sync.get(['apiBase', 'customUrl'], (result) => {
   if (result.apiBase) {
     if (result.apiBase === result.customUrl) {
       apiSelect.value = 'custom';
@@ -146,7 +150,7 @@ chrome.storage.sync.get(['apiBase', 'customUrl'], (result) => {
 });
 
 // Check current tab
-chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+browserAPI.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
   const tab = tabs[0];
   const url = tab?.url || '';
   
@@ -161,7 +165,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     
     // Get product count from content script
     try {
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'getProductCount' });
+      const response = await browserAPI.tabs.sendMessage(tab.id, { action: 'getProductCount' });
       productCount.textContent = response?.count || 0;
     } catch (e) {
       productCount.textContent = 'Reload page to scan';
@@ -178,7 +182,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
 
 // Open AH purchases page
 openAhBtn.addEventListener('click', () => {
-  chrome.tabs.create({ url: AH_PURCHASE_URL });
+  browserAPI.tabs.create({ url: AH_PURCHASE_URL });
   window.close();
 });
 
@@ -187,10 +191,10 @@ scrollBtn.addEventListener('click', async () => {
   scrollBtn.disabled = true;
   scrollBtn.textContent = '⏳ Scrolling...';
   
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
   
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'autoScroll' });
+    const response = await browserAPI.tabs.sendMessage(tab.id, { action: 'autoScroll' });
     if (response?.success) {
       productCount.textContent = response.total || '?';
       syncMessage.textContent = `Loaded ${response.total} products`;
@@ -205,7 +209,7 @@ scrollBtn.addEventListener('click', async () => {
   
   // Refresh product count
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'getProductCount' });
+    const response = await browserAPI.tabs.sendMessage(tab.id, { action: 'getProductCount' });
     productCount.textContent = response?.count || 0;
   } catch (e) {}
 });
@@ -215,13 +219,13 @@ syncBtn.addEventListener('click', async () => {
   syncBtn.disabled = true;
   syncBtn.textContent = '⏳ Syncing...';
   
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
   
   // Get current API base
-  const settings = await chrome.storage.sync.get(['apiBase', 'userToken']);
+  const settings = await browserAPI.storage.sync.get(['apiBase', 'userToken']);
   
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, { 
+    const response = await browserAPI.tabs.sendMessage(tab.id, { 
       action: 'scrape',
       apiBase: settings.apiBase,
       token: settings.userToken
@@ -272,7 +276,7 @@ saveSettingsBtn.addEventListener('click', () => {
     apiBase = customUrl;
   }
   
-  chrome.storage.sync.set({ apiBase, customUrl }, () => {
+  browserAPI.storage.sync.set({ apiBase, customUrl }, () => {
     saveSettingsBtn.textContent = '✓ Saved!';
     setTimeout(() => {
       saveSettingsBtn.textContent = 'Save Settings';

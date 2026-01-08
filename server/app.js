@@ -91,6 +91,24 @@ app.use(cors())
 app.use(bodyParser.json({ limit: '2mb' }))
 
 // ============================================================================
+// BOOKMARKLET SCRIPT ROUTE
+// Serve the bookmarklet.js with CORS for cross-origin loading from ah.nl
+// ============================================================================
+app.get('/bookmarklet.js', async (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cache-Control', 'no-cache')
+  
+  try {
+    const bookmarkletPath = path.join(__dirname, '..', 'public', 'bookmarklet.js')
+    const content = await fs.readFile(bookmarkletPath, 'utf-8')
+    res.send(content)
+  } catch (err) {
+    res.status(404).send('// Bookmarklet not found')
+  }
+})
+
+// ============================================================================
 // USER AUTHENTICATION HELPER
 // Extract user from Supabase JWT token in Authorization header
 // ============================================================================

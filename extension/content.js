@@ -1,16 +1,19 @@
 (function () {
+  // Browser API compatibility (Firefox uses 'browser', Chrome uses 'chrome')
+  const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
   // Configuration - will be updated from storage
   let API_BASE = 'https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app';
   let userToken = null;
 
   // Load settings from storage
-  chrome.storage.sync.get(['apiBase', 'userToken'], (result) => {
+  browserAPI.storage.sync.get(['apiBase', 'userToken'], (result) => {
     if (result.apiBase) API_BASE = result.apiBase;
     if (result.userToken) userToken = result.userToken;
   });
 
   // Listen for messages from popup
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  browserAPI.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'scrape') {
       userToken = request.token || null;
       if (request.apiBase) API_BASE = request.apiBase;
