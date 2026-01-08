@@ -2,7 +2,19 @@
 
 const AH_PURCHASE_URL = 'https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date';
 
+// Supabase config (same as the webapp)
+const SUPABASE_URL = 'https://gfxawraapyjqtmlemskl.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GByhVPFERsx_DD2gTB2y-w_5okCNIyM';
+
 // Elements
+const authStatus = document.getElementById('auth-status');
+const authSection = document.getElementById('auth-section');
+const signedInSection = document.getElementById('signed-in-section');
+const authEmail = document.getElementById('auth-email');
+const authPassword = document.getElementById('auth-password');
+const signInBtn = document.getElementById('sign-in-btn');
+const signOutBtn = document.getElementById('sign-out-btn');
+const authError = document.getElementById('auth-error');
 const pageStatus = document.getElementById('page-status');
 const productCount = document.getElementById('product-count');
 const ahPageActions = document.getElementById('ah-page-actions');
@@ -16,6 +28,109 @@ const apiSelect = document.getElementById('api-select');
 const customUrlGroup = document.getElementById('custom-url-group');
 const customUrlInput = document.getElementById('custom-url');
 const saveSettingsBtn = document.getElementById('save-settings');
+
+// Check auth status on load
+async function checkAuthStatus() {
+  const settings = await chrome.storage.sync.get(['userToken', 'userEmail']);
+  
+  if (settings.userToken && settings.userEmail) {
+    // Verify token is still valid
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: {
+          'Authorization': `Bearer ${settings.userToken}`,
+          'apikey': SUPABASE_ANON_KEY
+        }
+      });
+      
+      if (res.ok) {
+        showSignedIn(settings.userEmail);
+        return;
+      }
+    } catch (e) {
+      console.error('Token validation failed:', e);
+    }
+    
+    // Token invalid, clear it
+    await chrome.storage.sync.remove(['userToken', 'userEmail']);
+  }
+  
+  showSignedOut();
+}
+
+function showSignedIn(email) {
+  authStatus.textContent = `✅ ${email}`;
+  authStatus.classList.add('success');
+  authStatus.classList.remove('warning');
+  authSection.classList.add('hidden');
+  signedInSection.classList.remove('hidden');
+}
+
+function showSignedOut() {
+  authStatus.textContent = '⚠️ Not signed in';
+  authStatus.classList.remove('success');
+  authStatus.classList.add('warning');
+  authSection.classList.remove('hidden');
+  signedInSection.classList.add('hidden');
+}
+
+// Sign in
+signInBtn.addEventListener('click', async () => {
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  
+  if (!email || !password) {
+    authError.textContent = 'Please enter email and password';
+    authError.style.display = 'block';
+    return;
+  }
+  
+  signInBtn.disabled = true;
+  signInBtn.textContent = 'Signing in...';
+  authError.style.display = 'none';
+  
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ email, password })
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data.error_description || data.msg || 'Sign in failed');
+    }
+    
+    // Save token
+    await chrome.storage.sync.set({
+      userToken: data.access_token,
+      userEmail: email
+    });
+    
+    showSignedIn(email);
+  } catch (e) {
+    authError.textContent = e.message;
+    authError.style.display = 'block';
+  } finally {
+    signInBtn.disabled = false;
+    signInBtn.textContent = 'Sign In';
+  }
+});
+
+// Sign out
+signOutBtn.addEventListener('click', async () => {
+  await chrome.storage.sync.remove(['userToken', 'userEmail']);
+  showSignedOut();
+  authEmail.value = '';
+  authPassword.value = '';
+});
+
+// Initialize auth check
+checkAuthStatus();
 
 // Load saved settings
 chrome.storage.sync.get(['apiBase', 'customUrl'], (result) => {

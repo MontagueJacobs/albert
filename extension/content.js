@@ -276,9 +276,15 @@
       }
 
       const stored = data.stored || items.length;
-      if (status) status.textContent = `✅ Synced ${stored} products!`;
+      const purchasesMsg = data.purchasesRecorded 
+        ? ` (${data.purchasesRecorded} added to your account)` 
+        : data.userId === 'anonymous' 
+          ? ' (sign in to save to your account)' 
+          : '';
       
-      return { success: true, stored, total: items.length };
+      if (status) status.textContent = `✅ Synced ${stored} products!${purchasesMsg}`;
+      
+      return { success: true, stored, total: items.length, purchasesRecorded: data.purchasesRecorded };
     } catch (e) {
       console.error('Sustainable Shop sync failed:', e);
       if (status) status.textContent = `❌ Error: ${e.message}`;

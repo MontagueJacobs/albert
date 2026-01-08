@@ -779,10 +779,16 @@ app.get('/api/catalog/meta', async (req, res) => {
 })
 
 // Ingest scraped items from the user's browser (extension/bookmarklet)
+// Products go to shared ah_products table
+// Purchases are recorded per-user in user_purchases table
 app.post('/api/ingest/scrape', async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : []
     if (!items.length) return res.status(400).json({ error: 'no_items' })
+
+    // Get authenticated user (optional - if not logged in, just store products)
+    const user = await getUserFromRequest(req)
+    const userId = user?.id || null
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
   const seen = new Set()
@@ -843,15 +849,52 @@ app.post('/api/ingest/scrape', async (req, res) => {
     if (!cleaned.length) return res.status(400).json({ error: 'no_valid_items' })
 
     let stored = 0
+    let purchasesRecorded = 0
+    
     if (supabase) {
-      const { error } = await supabase
+      // 1. Upsert products to shared ah_products table
+      const { error: productError } = await supabase
         .from(SUPABASE_PRODUCTS_TABLE)
         .upsert(cleaned, { onConflict: 'id' })
-      if (error) return res.status(500).json({ error: 'supabase_insert_failed', detail: error.message })
+      if (productError) {
+        console.error('Product upsert error:', productError)
+        return res.status(500).json({ error: 'supabase_insert_failed', detail: productError.message })
+      }
       stored = cleaned.length
+
+      // 2. If user is authenticated, record purchases in user_purchases table
+      if (userId) {
+        const purchaseRecords = cleaned.map(p => ({
+          user_id: userId,
+          product_id: p.id,
+          product_name: p.name,
+          price: p.price,
+          quantity: 1,
+          source: req.body?.source || 'browser_extension',
+          purchased_at: new Date().toISOString()
+        }))
+
+        // Use upsert to avoid duplicates (same user + product + day)
+        const { error: purchaseError } = await supabase
+          .from('user_purchases')
+          .insert(purchaseRecords)
+        
+        if (purchaseError) {
+          // Log but don't fail - products were already stored
+          console.error('Purchase record error:', purchaseError.message)
+        } else {
+          purchasesRecorded = purchaseRecords.length
+        }
+      }
     }
 
-    return res.json({ ok: true, received: items.length, stored })
+    return res.json({ 
+      ok: true, 
+      received: items.length, 
+      stored,
+      purchasesRecorded,
+      userId: userId ? 'authenticated' : 'anonymous'
+    })
   } catch (e) {
     return res.status(500).json({ error: 'ingest_failed', detail: e.message })
   }
