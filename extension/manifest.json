@@ -6,12 +6,12 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "ah-sync@sustainable-shop.app",
-      "strict_min_version": "109.0",
-      "data_collection_permissions": {
-        "required": true,
-        "purpose": "This extension collects product names, prices, and URLs from your Albert Heijn purchase history page when you click the Sync button. This data is sent to our server to calculate sustainability scores. We also store your email for authentication. No data is collected without your explicit action."
-      }
+      "strict_min_version": "109.0"
     }
+  },
+  "data_collection_permissions": {
+    "required": ["product_names", "product_prices", "product_urls", "authentication_email"],
+    "optional": []
   },
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
