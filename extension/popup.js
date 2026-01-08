@@ -5,6 +5,7 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 const AH_PURCHASE_URL = 'https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date';
+const API_BASE = 'https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app';
 
 // Supabase config (same as the webapp)
 const SUPABASE_URL = 'https://gfxawraapyjqtmlemskl.supabase.co';
@@ -28,10 +29,6 @@ const syncMessage = document.getElementById('sync-message');
 const scrollBtn = document.getElementById('scroll-btn');
 const syncBtn = document.getElementById('sync-btn');
 const openAhBtn = document.getElementById('open-ah-btn');
-const apiSelect = document.getElementById('api-select');
-const customUrlGroup = document.getElementById('custom-url-group');
-const customUrlInput = document.getElementById('custom-url');
-const saveSettingsBtn = document.getElementById('save-settings');
 
 // Check auth status on load
 async function checkAuthStatus() {
@@ -136,19 +133,6 @@ signOutBtn.addEventListener('click', async () => {
 // Initialize auth check
 checkAuthStatus();
 
-// Load saved settings
-browserAPI.storage.sync.get(['apiBase', 'customUrl'], (result) => {
-  if (result.apiBase) {
-    if (result.apiBase === result.customUrl) {
-      apiSelect.value = 'custom';
-      customUrlGroup.classList.remove('hidden');
-      customUrlInput.value = result.customUrl;
-    } else {
-      apiSelect.value = result.apiBase;
-    }
-  }
-});
-
 // Check current tab
 browserAPI.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
   const tab = tabs[0];
@@ -221,13 +205,13 @@ syncBtn.addEventListener('click', async () => {
   
   const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
   
-  // Get current API base
-  const settings = await browserAPI.storage.sync.get(['apiBase', 'userToken']);
+  // Get user token from storage
+  const settings = await browserAPI.storage.sync.get(['userToken']);
   
   try {
     const response = await browserAPI.tabs.sendMessage(tab.id, { 
       action: 'scrape',
-      apiBase: settings.apiBase,
+      apiBase: API_BASE,
       token: settings.userToken
     });
     
@@ -251,35 +235,4 @@ syncBtn.addEventListener('click', async () => {
   
   syncBtn.disabled = false;
   syncBtn.textContent = '🔄 Sync Products';
-});
-
-// API select change
-apiSelect.addEventListener('change', () => {
-  if (apiSelect.value === 'custom') {
-    customUrlGroup.classList.remove('hidden');
-  } else {
-    customUrlGroup.classList.add('hidden');
-  }
-});
-
-// Save settings
-saveSettingsBtn.addEventListener('click', () => {
-  let apiBase = apiSelect.value;
-  let customUrl = null;
-  
-  if (apiBase === 'custom') {
-    customUrl = customUrlInput.value.trim();
-    if (!customUrl) {
-      alert('Please enter a custom URL');
-      return;
-    }
-    apiBase = customUrl;
-  }
-  
-  browserAPI.storage.sync.set({ apiBase, customUrl }, () => {
-    saveSettingsBtn.textContent = '✓ Saved!';
-    setTimeout(() => {
-      saveSettingsBtn.textContent = 'Save Settings';
-    }, 1500);
-  });
 });

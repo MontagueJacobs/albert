@@ -1,19 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Sustainable Shop - AH Sync",
-  "version": "1.2.0",
-  "description": "Sync your Albert Heijn purchase history to track sustainability scores",
+  "version": "1.0.0",
+  "description": "Sync your Albert Heijn purchase history to Sustainable Shop and track your sustainability scores. See the environmental impact of your grocery choices.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "sustainable-shop@example.com",
+      "id": "ah-sync@sustainable-shop.app",
       "strict_min_version": "109.0"
     }
   },
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://www.ah.nl/*",
-    "https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app/*",
-    "http://localhost:3001/*"
+    "https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup.html",
