@@ -35,7 +35,7 @@ const CLIENT_INDEX = path.join(CLIENT_DIST, 'index.html')
 // Supabase client (server-side) for ingesting scraped items
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-const SUPABASE_PRODUCTS_TABLE = process.env.SUPABASE_PRODUCTS_TABLE || 'ah_products'
+const SUPABASE_PRODUCTS_TABLE = process.env.SUPABASE_PRODUCTS_TABLE || 'products'  // Unified products table
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null
@@ -144,8 +144,8 @@ function requireAuth(req, res, next) {
   })
 }
 
-// Data file path
-const DATA_FILE = path.join(__dirname, 'purchases.json')
+// Data file path - DEPRECATED: Now using Supabase for all purchases
+// const DATA_FILE = path.join(__dirname, 'purchases.json')
 
 // Sustainability database
 const SUSTAINABILITY_DB = {
@@ -201,19 +201,292 @@ const KEYWORD_RULES = [
   { code: 'keyword_plastic', delta: -1, match: (name) => name.includes('plastic') || name.includes('verpakt') }
 ]
 
-// Helper functions
-async function loadPurchases() {
-  try {
-    const data = await fs.readFile(DATA_FILE, 'utf8')
-    return JSON.parse(data)
-  } catch (error) {
-    return []
+// ============================================================================
+// ENRICHED FIELD SCORING RULES
+// These use scraped product detail data for more accurate scoring
+// ============================================================================
+
+const ENRICHED_SCORING = {
+  // Dietary preferences
+  is_vegan: { delta: 3, icon: '🌱', label: 'Vegan' },
+  is_vegetarian: { delta: 1, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
+  is_organic: { delta: 2, icon: '🌿', label: 'Organic/Bio' },
+  
+  // Nutri-Score impact
+  nutri_score: {
+    'A': { delta: 2, label: 'Nutri-Score A' },
+    'B': { delta: 1, label: 'Nutri-Score B' },
+    'C': { delta: 0, label: 'Nutri-Score C' },
+    'D': { delta: -1, label: 'Nutri-Score D' },
+    'E': { delta: -2, label: 'Nutri-Score E' }
+  },
+  
+  // Origin scoring (local = better, far = worse)
+  origin_country: {
+    // Local/nearby countries (best)
+    'Netherlands': { delta: 2, region: 'local' },
+    'Belgium': { delta: 1, region: 'nearby' },
+    'Germany': { delta: 1, region: 'nearby' },
+    'France': { delta: 0, region: 'europe' },
+    'Spain': { delta: 0, region: 'europe' },
+    'Italy': { delta: 0, region: 'europe' },
+    'Poland': { delta: 0, region: 'europe' },
+    'Greece': { delta: 0, region: 'europe' },
+    'Portugal': { delta: 0, region: 'europe' },
+    // Further away (neutral to slight negative)
+    'Morocco': { delta: -1, region: 'mediterranean' },
+    'Turkey': { delta: -1, region: 'mediterranean' },
+    'Egypt': { delta: -1, region: 'africa' },
+    'South Africa': { delta: -1, region: 'africa' },
+    'Kenya': { delta: -1, region: 'africa' },
+    // Long distance (negative)
+    'United States': { delta: -2, region: 'americas' },
+    'Brazil': { delta: -2, region: 'americas' },
+    'Argentina': { delta: -2, region: 'americas' },
+    'Chile': { delta: -2, region: 'americas' },
+    'Costa Rica': { delta: -2, region: 'americas' },
+    'Ecuador': { delta: -2, region: 'americas' },
+    'Colombia': { delta: -2, region: 'americas' },
+    'Peru': { delta: -2, region: 'americas' },
+    'Mexico': { delta: -2, region: 'americas' },
+    'China': { delta: -2, region: 'asia' },
+    'India': { delta: -2, region: 'asia' },
+    'Thailand': { delta: -2, region: 'asia' },
+    'Vietnam': { delta: -2, region: 'asia' },
+    'Indonesia': { delta: -2, region: 'asia' },
+    'Australia': { delta: -2, region: 'oceania' },
+    'New Zealand': { delta: -2, region: 'oceania' }
   }
 }
 
-async function savePurchases(purchases) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(purchases, null, 2))
+// ============================================================================
+// USER PROFILING SYSTEM
+// Analyzes purchase patterns to understand user preferences
+// ============================================================================
+
+const USER_PROFILE_TYPES = {
+  'plant_forward': { 
+    label: '🌱 Plant-Forward Shopper', 
+    description: 'You prioritize plant-based foods. Great for sustainability!',
+    tips: ['Keep exploring new plant proteins', 'Try seasonal local vegetables']
+  },
+  'balanced': { 
+    label: '⚖️ Balanced Shopper', 
+    description: 'You have a varied diet with room for sustainable swaps.',
+    tips: ['Consider swapping 1-2 meat meals per week', 'Try organic versions of your favorites']
+  },
+  'meat_heavy': { 
+    label: '🥩 Protein-Focused Shopper', 
+    description: 'Your cart is protein-heavy. Small swaps can make a big difference!',
+    tips: ['Try chicken instead of beef (4x less CO2)', 'Explore legumes as protein sources']
+  },
+  'convenience': { 
+    label: '📦 Convenience Shopper', 
+    description: 'You favor processed/ready foods. Fresh alternatives can boost your score.',
+    tips: ['Try batch cooking on weekends', 'Fresh produce has higher sustainability scores']
+  },
+  'eco_champion': {
+    label: '🏆 Eco Champion',
+    description: 'Amazing! You\'re already making excellent sustainable choices.',
+    tips: ['Share your habits with friends', 'Try reducing packaging waste next']
+  }
 }
+
+// Product category detection for profiling
+const PRODUCT_CATEGORIES_PROFILE = {
+  meat: {
+    keywords: ['vlees', 'beef', 'rund', 'kip', 'varken', 'ham', 'spek', 'worst', 'gehakt', 'biefstuk', 'chicken', 'meat', 'pork', 'bacon'],
+    weight: -2
+  },
+  plant_protein: {
+    keywords: ['tofu', 'tempeh', 'seitan', 'vega', 'plantaardi', 'beyond', 'impossible', 'linzen', 'kikkererwt', 'bonen'],
+    weight: 2
+  },
+  dairy: {
+    keywords: ['melk', 'kaas', 'yoghurt', 'boter', 'room', 'cheese', 'milk', 'butter'],
+    weight: 0
+  },
+  plant_dairy: {
+    keywords: ['havermelk', 'sojamelk', 'amandelmelk', 'kokosmelk', 'oat milk', 'soy milk', 'plantaardig'],
+    weight: 2
+  },
+  organic: {
+    keywords: ['bio', 'biologisch', 'organic', 'eko'],
+    weight: 2
+  },
+  processed: {
+    keywords: ['kant-en-klaar', 'diepvries', 'pizza', 'lasagne', 'nuggets', 'kroket', 'snack', 'chips'],
+    weight: -1
+  },
+  fresh_produce: {
+    keywords: ['appel', 'peer', 'banaan', 'tomaat', 'komkommer', 'sla', 'spinazie', 'wortel', 'groente', 'fruit'],
+    weight: 1
+  }
+}
+
+/**
+ * Analyze user's purchase history to build a profile
+ */
+function analyzeUserProfile(purchases) {
+  const profile = {
+    totalProducts: purchases.length,
+    categoryBreakdown: {},
+    scoreDistribution: { low: 0, medium: 0, high: 0 },
+    avgScore: 0,
+    profileType: 'balanced',
+    improvements: [],
+    strengths: []
+  }
+
+  if (!purchases || purchases.length === 0) {
+    return profile
+  }
+
+  let totalScore = 0
+  const categoryCounts = {}
+  const lowScoreProducts = []
+  const highScoreProducts = []
+
+  for (const purchase of purchases) {
+    const name = (purchase.product_name || '').toLowerCase()
+    const evaluation = evaluateProduct(purchase.product_name)
+    const score = evaluation.score
+    totalScore += score
+
+    if (score <= 4) {
+      profile.scoreDistribution.low++
+      lowScoreProducts.push({ name: purchase.product_name, score, evaluation })
+    } else if (score <= 6) {
+      profile.scoreDistribution.medium++
+    } else {
+      profile.scoreDistribution.high++
+      highScoreProducts.push({ name: purchase.product_name, score })
+    }
+
+    for (const [category, data] of Object.entries(PRODUCT_CATEGORIES_PROFILE)) {
+      if (data.keywords.some(kw => name.includes(kw))) {
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1
+      }
+    }
+  }
+
+  profile.avgScore = totalScore / purchases.length
+  profile.categoryBreakdown = categoryCounts
+
+  const meatCount = categoryCounts.meat || 0
+  const plantProteinCount = categoryCounts.plant_protein || 0
+  const organicCount = categoryCounts.organic || 0
+  const processedCount = categoryCounts.processed || 0
+  const totalCount = purchases.length
+
+  const meatRatio = meatCount / totalCount
+  const plantRatio = plantProteinCount / totalCount
+  const processedRatio = processedCount / totalCount
+
+  if (profile.avgScore >= 7.5) {
+    profile.profileType = 'eco_champion'
+  } else if (meatRatio > 0.25) {
+    profile.profileType = 'meat_heavy'
+  } else if (plantRatio > 0.15 || organicCount > totalCount * 0.2) {
+    profile.profileType = 'plant_forward'
+  } else if (processedRatio > 0.3) {
+    profile.profileType = 'convenience'
+  } else {
+    profile.profileType = 'balanced'
+  }
+
+  profile.improvements = lowScoreProducts.sort((a, b) => a.score - b.score).slice(0, 5)
+  profile.strengths = highScoreProducts.sort((a, b) => b.score - a.score).slice(0, 3)
+
+  return profile
+}
+
+/**
+ * Find sustainable replacement suggestions from the product catalog
+ */
+function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
+  const suggestions = []
+
+  for (const product of lowScoreProducts) {
+    const name = (product.name || '').toLowerCase()
+    let alternatives = []
+
+    // Meat → Plant protein replacements
+    if (PRODUCT_CATEGORIES_PROFILE.meat.keywords.some(kw => name.includes(kw))) {
+      alternatives = catalogProducts.filter(p => {
+        const pName = (p.name || '').toLowerCase()
+        return PRODUCT_CATEGORIES_PROFILE.plant_protein.keywords.some(kw => pName.includes(kw))
+      }).slice(0, 3)
+    }
+    // Dairy → Plant dairy replacements
+    else if (PRODUCT_CATEGORIES_PROFILE.dairy.keywords.some(kw => name.includes(kw))) {
+      alternatives = catalogProducts.filter(p => {
+        const pName = (p.name || '').toLowerCase()
+        return PRODUCT_CATEGORIES_PROFILE.plant_dairy.keywords.some(kw => pName.includes(kw))
+      }).slice(0, 3)
+    }
+    // Non-organic → Organic version
+    else if (!PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => name.includes(kw))) {
+      const baseTokens = name.split(/\s+/).filter(t => t.length > 2)
+      alternatives = catalogProducts.filter(p => {
+        const pName = (p.name || '').toLowerCase()
+        const isBio = PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => pName.includes(kw))
+        const hasSimilarTokens = baseTokens.some(t => pName.includes(t))
+        return isBio && hasSimilarTokens
+      }).slice(0, 2)
+    }
+
+    if (alternatives.length > 0) {
+      const bestAlt = alternatives[0]
+      const altScore = evaluateProduct(bestAlt.name).score
+      const improvement = altScore - product.score
+
+      if (improvement > 0) {
+        suggestions.push({
+          original: { name: product.name, score: product.score },
+          replacement: {
+            name: bestAlt.name,
+            score: altScore,
+            url: bestAlt.url || '#',
+            image_url: bestAlt.image_url,
+            price: bestAlt.price
+          },
+          improvement,
+          reason: getReplacementReason(product.name, bestAlt.name)
+        })
+      }
+    }
+  }
+
+  return suggestions.sort((a, b) => b.improvement - a.improvement).slice(0, 6)
+}
+
+/**
+ * Generate a human-readable reason for a replacement suggestion
+ */
+function getReplacementReason(originalName, replacementName) {
+  const orig = originalName.toLowerCase()
+  const repl = replacementName.toLowerCase()
+
+  if (PRODUCT_CATEGORIES_PROFILE.meat.keywords.some(kw => orig.includes(kw)) &&
+      PRODUCT_CATEGORIES_PROFILE.plant_protein.keywords.some(kw => repl.includes(kw))) {
+    return '🌱 Plant-based alternative - up to 90% less CO2'
+  }
+  if (PRODUCT_CATEGORIES_PROFILE.dairy.keywords.some(kw => orig.includes(kw)) &&
+      PRODUCT_CATEGORIES_PROFILE.plant_dairy.keywords.some(kw => repl.includes(kw))) {
+    return '🥛 Plant-based dairy - 75% less emissions'
+  }
+  if (!PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => orig.includes(kw)) &&
+      PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => repl.includes(kw))) {
+    return '🌱 Organic version - better for soil & biodiversity'
+  }
+  return '✨ More sustainable choice'
+}
+
+// Helper functions (DEPRECATED: These were for local file storage, now using Supabase)
+// Kept for reference but no longer used
+// async function loadPurchases() { ... }
+// async function savePurchases(purchases) { ... }
 
 function roundClamp(value) {
   return Math.max(0, Math.min(10, Math.round(value)))
@@ -269,7 +542,7 @@ function findCatalogMatch(productName = '') {
   }
 }
 
-function evaluateProduct(productName = '') {
+function evaluateProduct(productName = '', enrichedData = null) {
   const input = typeof productName === 'string' ? productName : ''
   const normalized = normalizeProductName(input)
   const lowerProduct = input.toLowerCase()
@@ -277,6 +550,7 @@ function evaluateProduct(productName = '') {
   const adjustments = []
   const matchedCategories = []
   const matchedKeywords = []
+  const matchedEnriched = []  // Track enriched field matches
   const categorySet = new Set()
   let suggestions = getSuggestions(input)
   let notes = null
@@ -369,6 +643,72 @@ function evaluateProduct(productName = '') {
     }
   }
 
+  // Apply enriched data scoring (from scraped product details)
+  if (enrichedData && typeof enrichedData === 'object') {
+    // Vegan scoring (highest plant-based bonus)
+    if (enrichedData.is_vegan === true) {
+      const scoring = ENRICHED_SCORING.is_vegan
+      applyDelta('enriched', 'enriched_vegan', scoring.delta)
+      matchedEnriched.push({ code: 'vegan', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    } 
+    // Vegetarian scoring (only if not vegan to avoid double counting)
+    else if (enrichedData.is_vegetarian === true) {
+      const scoring = ENRICHED_SCORING.is_vegetarian
+      applyDelta('enriched', 'enriched_vegetarian', scoring.delta)
+      matchedEnriched.push({ code: 'vegetarian', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    }
+
+    // Organic/Bio scoring
+    if (enrichedData.is_organic === true) {
+      const scoring = ENRICHED_SCORING.is_organic
+      applyDelta('enriched', 'enriched_organic', scoring.delta)
+      matchedEnriched.push({ code: 'organic', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    }
+
+    // Nutri-Score scoring (A-E)
+    if (enrichedData.nutri_score && ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]) {
+      const scoring = ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]
+      if (scoring.delta !== 0) {
+        applyDelta('enriched', `enriched_nutriscore_${enrichedData.nutri_score}`, scoring.delta)
+        matchedEnriched.push({ 
+          code: `nutriscore_${enrichedData.nutri_score}`, 
+          icon: '🅰️', 
+          label: scoring.label, 
+          delta: scoring.delta,
+          grade: enrichedData.nutri_score
+        })
+      }
+    }
+
+    // Origin country scoring (local vs imported)
+    if (enrichedData.origin_country) {
+      const originScoring = ENRICHED_SCORING.origin_country[enrichedData.origin_country]
+      if (originScoring) {
+        if (originScoring.delta !== 0) {
+          applyDelta('enriched', `enriched_origin_${originScoring.region}`, originScoring.delta)
+          matchedEnriched.push({ 
+            code: `origin_${originScoring.region}`, 
+            icon: originScoring.delta > 0 ? '📍' : '✈️', 
+            label: `Origin: ${enrichedData.origin_country}`, 
+            delta: originScoring.delta,
+            country: enrichedData.origin_country,
+            region: originScoring.region
+          })
+        }
+      } else {
+        // Unknown country - apply slight negative for uncertainty
+        applyDelta('enriched', 'enriched_origin_unknown', -0.5)
+        matchedEnriched.push({ 
+          code: 'origin_unknown', 
+          icon: '🌍', 
+          label: `Origin: ${enrichedData.origin_country} (unknown region)`, 
+          delta: -0.5,
+          country: enrichedData.origin_country
+        })
+      }
+    }
+  }
+
   const rawScore = clamp(workingScore)
   const finalScore = roundClamp(workingScore)
 
@@ -381,15 +721,58 @@ function evaluateProduct(productName = '') {
     adjustments,
     categories: matchedCategories,
     keywords: matchedKeywords,
+    enriched: matchedEnriched,  // Include enriched data matches
     suggestions,
     rating: getRating(finalScore),
     notes,
-    matched: matchedProduct
+    matched: matchedProduct,
+    hasEnrichedData: enrichedData !== null && matchedEnriched.length > 0
   }
 }
 
 function calculateScore(productName) {
   return evaluateProduct(productName).score
+}
+
+/**
+ * Extract enriched data from a product database record for use in evaluateProduct
+ * @param {Object} product - Product record from database
+ * @returns {Object|null} - Enriched data object or null if no enriched data available
+ */
+function getEnrichedData(product) {
+  if (!product) return null
+  
+  // Check if product has any enriched fields
+  const hasEnrichedData = 
+    product.is_vegan !== null || 
+    product.is_vegetarian !== null || 
+    product.is_organic !== null || 
+    product.nutri_score !== null || 
+    product.origin_country !== null
+  
+  if (!hasEnrichedData) return null
+  
+  return {
+    is_vegan: product.is_vegan,
+    is_vegetarian: product.is_vegetarian,
+    is_organic: product.is_organic,
+    nutri_score: product.nutri_score,
+    origin_country: product.origin_country,
+    brand: product.brand,
+    allergens: product.allergens,
+    details_scraped_at: product.details_scraped_at
+  }
+}
+
+/**
+ * Evaluate a product with automatic enriched data extraction
+ * @param {string} productName - Product name
+ * @param {Object} productRecord - Optional database record with enriched fields
+ * @returns {Object} - Evaluation result
+ */
+function evaluateProductWithRecord(productName, productRecord = null) {
+  const enrichedData = getEnrichedData(productRecord)
+  return evaluateProduct(productName, enrichedData)
 }
 
 function searchProducts(query = '') {
@@ -637,6 +1020,172 @@ app.delete('/api/user/purchases/:id', requireAuth, async (req, res) => {
   }
 })
 
+// Add a manual purchase for authenticated user
+app.post('/api/user/purchases', requireAuth, async (req, res) => {
+  try {
+    const { product, quantity, price } = req.body
+    
+    if (!product || typeof product !== 'string' || product.trim().length === 0) {
+      return res.status(400).json({ error: 'missing_product', message: 'Product name is required' })
+    }
+    
+    const evaluation = evaluateProduct(product)
+    
+    const purchase = {
+      user_id: req.user.id,
+      product_name: product.trim(),
+      quantity: parseInt(quantity) || 1,
+      price: parseFloat(price) || 0,
+      scraped_at: new Date().toISOString(),
+      source: 'manual'
+    }
+    
+    const { data, error } = await supabase
+      .from('user_purchases')
+      .insert([purchase])
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    res.json({ 
+      success: true, 
+      purchase: {
+        ...data,
+        product: data.product_name, // for backward compatibility with frontend
+        sustainability_score: evaluation.score // Calculate on the fly for response
+      }
+    })
+  } catch (err) {
+    console.error('Error adding user purchase:', err)
+    res.status(500).json({ error: 'add_failed', message: err.message })
+  }
+})
+
+// Get user's purchase insights/dashboard data
+app.get('/api/user/insights', requireAuth, async (req, res) => {
+  try {
+    const { data: purchases, error } = await supabase
+      .from('user_purchases')
+      .select('product_name, quantity, price')
+      .eq('user_id', req.user.id)
+    
+    if (error) throw error
+    
+    if (!purchases || purchases.length === 0) {
+      return res.json({ message: 'No purchases yet!' })
+    }
+    
+    // Calculate sustainability scores on the fly
+    const purchasesWithScores = purchases.map(p => ({
+      ...p,
+      sustainability_score: evaluateProduct(p.product_name).score
+    }))
+    
+    const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
+    const avgScore = totalScore / purchasesWithScores.length
+    
+    const best = purchasesWithScores.reduce((max, p) => 
+      ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
+    const worst = purchasesWithScores.reduce((min, p) => 
+      ((p.sustainability_score || 0) < (min.sustainability_score || 0) ? p : min), purchasesWithScores[0])
+    
+    res.json({
+      total_purchases: purchasesWithScores.length,
+      average_score: avgScore,
+      rating: getRating(avgScore),
+      best_purchase: best.product_name,
+      worst_purchase: worst.product_name,
+      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0)
+    })
+  } catch (err) {
+    console.error('Error fetching user insights:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get personalized suggestions based on user's purchase history
+app.get('/api/user/suggestions', requireAuth, async (req, res) => {
+  try {
+    // Get user's purchases to analyze their profile
+    const { data: purchases, error: purchasesError } = await supabase
+      .from('user_purchases')
+      .select('product_name, quantity, price')
+      .eq('user_id', req.user.id)
+    
+    if (purchasesError) throw purchasesError
+    
+    // If user has no purchases, return empty suggestions
+    if (!purchases || purchases.length === 0) {
+      return res.json({
+        profile: {
+          total_products: 0,
+          avg_sustainability_score: 0,
+          profile_type: 'balanced',
+          profile_info: USER_PROFILE_TYPES['balanced']
+        },
+        replacements: [],
+        suggestions: []
+      })
+    }
+    
+    // Analyze user profile
+    const userProfile = analyzeUserProfile(purchases)
+    const profileInfo = USER_PROFILE_TYPES[userProfile.profileType] || USER_PROFILE_TYPES['balanced']
+    
+    // Get products from catalog for replacement suggestions (include enriched fields)
+    const { data: catalogProducts, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
+      .order('seen_count', { ascending: false })
+      .limit(200)
+    
+    if (productsError) {
+      console.error('Error fetching product catalog:', productsError)
+    }
+    
+    // Find replacement suggestions for low-score products
+    const replacements = findReplacementSuggestions(
+      userProfile.improvements, 
+      catalogProducts || []
+    )
+    
+    // Also include generic high-score suggestions (use enriched data for more accurate scores)
+    const highScoreSuggestions = (catalogProducts || [])
+      .map(p => ({
+        name: p.name,
+        url: p.url || '#',
+        image_url: p.image_url,
+        price: p.price,
+        sustainability_score: evaluateProductWithRecord(p.name, p).score,
+        is_vegan: p.is_vegan,
+        is_organic: p.is_organic,
+        nutri_score: p.nutri_score,
+        origin_country: p.origin_country
+      }))
+      .filter(s => s.sustainability_score >= 7)
+      .sort((a, b) => b.sustainability_score - a.sustainability_score)
+      .slice(0, 6)
+    
+    res.json({
+      profile: {
+        total_products: userProfile.totalProducts,
+        avg_sustainability_score: userProfile.avgScore,
+        profile_type: userProfile.profileType,
+        profile_info: profileInfo,
+        score_distribution: userProfile.scoreDistribution,
+        category_breakdown: userProfile.categoryBreakdown,
+        strengths: userProfile.strengths
+      },
+      replacements,  // "Replace X with Y" suggestions
+      suggestions: highScoreSuggestions  // General high-score products
+    })
+  } catch (err) {
+    console.error('Error fetching user suggestions:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
 // ============================================================================
 // GLOBAL PRODUCT CATALOG API (public, read-only)
 // ============================================================================
@@ -651,13 +1200,20 @@ app.get('/api/products/popular', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200)
     
     const { data, error } = await supabase
-      .from('ah_products')
-      .select('id, name, normalized_name, url, image_url, price, seen_count, first_seen_at, last_seen_at')
+      .from('products')
+      .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, details_scraped_at')
       .order('seen_count', { ascending: false })
       .limit(limit)
     
     if (error) throw error
-    res.json(data)
+    
+    // Add sustainability scores using enriched data
+    const withScores = data.map(p => ({
+      ...p,
+      sustainability_score: evaluateProductWithRecord(p.name, p).score
+    }))
+    
+    res.json(withScores)
   } catch (err) {
     res.status(500).json({ error: 'fetch_failed', message: err.message })
   }
@@ -676,41 +1232,364 @@ app.get('/api/products/search', async (req, res) => {
     }
     
     const { data, error } = await supabase
-      .from('ah_products')
-      .select('id, name, normalized_name, url, image_url, price')
+      .from('products')
+      .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
       .ilike('normalized_name', `%${query.toLowerCase()}%`)
       .limit(50)
     
     if (error) throw error
-    res.json(data)
+    
+    // Add sustainability scores using enriched data
+    const withScores = data.map(p => ({
+      ...p,
+      sustainability_score: evaluateProductWithRecord(p.name, p).score
+    }))
+    
+    res.json(withScores)
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// ============================================================================
+// PRODUCT DETAIL ENRICHMENT API
+// Scrapes detailed info from individual AH product pages
+// ============================================================================
+
+// Get products that need detail enrichment
+app.get('/api/products/pending-enrichment', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'database_unavailable' })
+    }
+    
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200)
+    
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, url, details_scrape_status, details_scraped_at')
+      .not('url', 'is', null)
+      .or('details_scrape_status.eq.pending,details_scraped_at.is.null')
+      .order('seen_count', { ascending: false })
+      .limit(limit)
+    
+    if (error) throw error
+    res.json({ count: data?.length || 0, products: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get enrichment status
+app.get('/api/products/enrichment/status', (req, res) => {
+  res.json({
+    running: productEnrichState.running,
+    startedAt: productEnrichState.startedAt,
+    progress: productEnrichState.progress,
+    processed: productEnrichState.processed,
+    total: productEnrichState.total,
+    lastRun: productEnrichState.lastRun,
+    logs: productEnrichState.logs.slice(-20)
+  })
+})
+
+// Enrich a single product by ID
+app.post('/api/products/:productId/enrich', async (req, res) => {
+  if (process.env.VERCEL) {
+    return res.status(501).json({
+      error: 'not_supported_on_hosted',
+      message: 'Product enrichment requires local server.'
+    })
+  }
+  
+  const { productId } = req.params
+  
+  try {
+    // Get product URL from database
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('id, name, url')
+      .eq('id', productId)
+      .single()
+    
+    if (fetchError || !product) {
+      return res.status(404).json({ error: 'product_not_found' })
+    }
+    
+    if (!product.url) {
+      return res.status(400).json({ error: 'no_url', message: 'Product has no URL to scrape' })
+    }
+    
+    // Check if script exists
+    try {
+      await fs.access(PRODUCT_DETAIL_SCRIPT)
+    } catch {
+      return res.status(500).json({ error: 'script_missing' })
+    }
+    
+    // Run scraper for this single product
+    const scrapeProcess = spawn(PYTHON_CMD, [
+      PRODUCT_DETAIL_SCRIPT,
+      '--url', product.url,
+      '--headless'
+    ], {
+      cwd: __dirname,
+      env: { ...process.env, PYTHONUNBUFFERED: '1' }
+    })
+    
+    let resultData = null
+    let stdout = ''
+    
+    scrapeProcess.stdout.on('data', (data) => {
+      stdout += data.toString()
+      const resultMatch = stdout.match(/\[RESULT\]\s*(\{.*\})/s)
+      if (resultMatch) {
+        try {
+          resultData = JSON.parse(resultMatch[1])
+        } catch (e) {
+          console.error('Failed to parse scrape result:', e)
+        }
+      }
+    })
+    
+    scrapeProcess.on('close', async (code) => {
+      if (code === 0 && resultData?.success && resultData.results?.[0]) {
+        const details = resultData.results[0]
+        
+        // Update product in database
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({
+            is_vegan: details.is_vegan,
+            is_vegetarian: details.is_vegetarian,
+            is_organic: details.is_organic,
+            nutri_score: details.nutri_score,
+            origin_country: details.origin_country,
+            brand: details.brand,
+            unit_size: details.unit_size,
+            allergens: details.allergens || [],
+            ingredients: details.ingredients,
+            details_scraped_at: new Date().toISOString(),
+            details_scrape_status: 'success',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', productId)
+        
+        if (updateError) {
+          console.error('Failed to update product:', updateError)
+        }
+      } else {
+        // Mark as failed
+        await supabase
+          .from('products')
+          .update({
+            details_scrape_status: 'failed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', productId)
+      }
+    })
+    
+    res.json({ status: 'started', productId, url: product.url })
+    
+  } catch (err) {
+    console.error('Enrichment error:', err)
+    res.status(500).json({ error: 'enrichment_failed', message: err.message })
+  }
+})
+
+// Batch enrich products (runs in background)
+app.post('/api/products/enrich-batch', async (req, res) => {
+  if (process.env.VERCEL) {
+    return res.status(501).json({
+      error: 'not_supported_on_hosted',
+      message: 'Batch enrichment requires local server.'
+    })
+  }
+  
+  if (productEnrichState.running) {
+    return res.status(409).json({ error: 'enrichment_in_progress' })
+  }
+  
+  const limit = Math.min(parseInt(req.body.limit) || 20, 100)
+  
+  try {
+    // Get products that need enrichment
+    const { data: products, error: fetchError } = await supabase
+      .from('products')
+      .select('id, name, url')
+      .not('url', 'is', null)
+      .or('details_scrape_status.eq.pending,details_scraped_at.is.null')
+      .order('seen_count', { ascending: false })
+      .limit(limit)
+    
+    if (fetchError) throw fetchError
+    
+    if (!products || products.length === 0) {
+      return res.json({ status: 'no_products', message: 'No products need enrichment' })
+    }
+    
+    // Start batch enrichment in background
+    productEnrichState.running = true
+    productEnrichState.startedAt = new Date().toISOString()
+    productEnrichState.processed = 0
+    productEnrichState.total = products.length
+    productEnrichState.progress = 'Starting batch enrichment...'
+    productEnrichState.logs = []
+    
+    // Run async
+    ;(async () => {
+      for (let i = 0; i < products.length; i++) {
+        const product = products[i]
+        productEnrichState.progress = `Processing ${i + 1}/${products.length}: ${product.name}`
+        productEnrichState.logs.push({
+          timestamp: new Date().toISOString(),
+          message: `Enriching: ${product.name}`
+        })
+        
+        try {
+          // Run scraper for this product
+          const result = await new Promise((resolve) => {
+            const proc = spawn(PYTHON_CMD, [
+              PRODUCT_DETAIL_SCRIPT,
+              '--url', product.url,
+              '--headless'
+            ], {
+              cwd: __dirname,
+              env: { ...process.env, PYTHONUNBUFFERED: '1' }
+            })
+            
+            let stdout = ''
+            proc.stdout.on('data', (data) => { stdout += data.toString() })
+            proc.on('close', (code) => {
+              const match = stdout.match(/\[RESULT\]\s*(\{.*\})/s)
+              if (match) {
+                try {
+                  resolve(JSON.parse(match[1]))
+                } catch {
+                  resolve(null)
+                }
+              } else {
+                resolve(null)
+              }
+            })
+          })
+          
+          if (result?.success && result.results?.[0]) {
+            const details = result.results[0]
+            await supabase
+              .from('products')
+              .update({
+                is_vegan: details.is_vegan,
+                is_vegetarian: details.is_vegetarian,
+                is_organic: details.is_organic,
+                nutri_score: details.nutri_score,
+                origin_country: details.origin_country,
+                brand: details.brand,
+                unit_size: details.unit_size,
+                allergens: details.allergens || [],
+                ingredients: details.ingredients,
+                details_scraped_at: new Date().toISOString(),
+                details_scrape_status: 'success',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', product.id)
+            
+            productEnrichState.logs.push({
+              timestamp: new Date().toISOString(),
+              message: `✅ ${product.name}: vegan=${details.is_vegan}, organic=${details.is_organic}, nutri=${details.nutri_score}`
+            })
+          } else {
+            await supabase
+              .from('products')
+              .update({ details_scrape_status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', product.id)
+            
+            productEnrichState.logs.push({
+              timestamp: new Date().toISOString(),
+              message: `❌ ${product.name}: failed`
+            })
+          }
+        } catch (err) {
+          productEnrichState.logs.push({
+            timestamp: new Date().toISOString(),
+            message: `❌ ${product.name}: ${err.message}`
+          })
+        }
+        
+        productEnrichState.processed = i + 1
+        
+        // Delay between requests
+        if (i < products.length - 1) {
+          await new Promise(r => setTimeout(r, 2000))
+        }
+      }
+      
+      productEnrichState.running = false
+      productEnrichState.lastRun = {
+        completedAt: new Date().toISOString(),
+        processed: productEnrichState.processed,
+        total: productEnrichState.total
+      }
+      productEnrichState.progress = 'Completed'
+    })()
+    
+    res.json({ status: 'started', total: products.length })
+    
+  } catch (err) {
+    productEnrichState.running = false
+    console.error('Batch enrichment error:', err)
+    res.status(500).json({ error: 'batch_failed', message: err.message })
+  }
+})
+
+// Get product details including enriched fields
+app.get('/api/products/:productId', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'database_unavailable' })
+    }
+    
+    const { productId } = req.params
+    
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single()
+    
+    if (error) throw error
+    if (!data) return res.status(404).json({ error: 'not_found' })
+    
+    // Add computed sustainability score
+    const evaluation = evaluateProduct(data.name)
+    
+    res.json({
+      ...data,
+      computed_score: evaluation.score,
+      score_details: evaluation
+    })
   } catch (err) {
     res.status(500).json({ error: 'fetch_failed', message: err.message })
   }
 })
 
 // API Routes
-app.get('/api/purchases', async (req, res) => {
-  const purchases = await loadPurchases()
-  res.json(purchases)
+
+// DEPRECATED: Legacy purchase endpoints - now require authentication
+// These are kept as stubs for backward compatibility but redirect to auth
+app.get('/api/purchases', (req, res) => {
+  res.status(401).json({ 
+    error: 'auth_required', 
+    message: 'This endpoint is deprecated. Please log in and use /api/user/purchases instead.' 
+  })
 })
 
-app.post('/api/purchases', async (req, res) => {
-  const { product, quantity, price } = req.body
-  const evaluation = evaluateProduct(product)
-
-  const purchase = {
-    date: new Date().toISOString(),
-    product: product,
-    quantity: parseInt(quantity) || 1,
-    price: parseFloat(price) || 0,
-    sustainability_score: evaluation.score
-  }
-
-  const purchases = await loadPurchases()
-  purchases.push(purchase)
-  await savePurchases(purchases)
-
-  res.json({ success: true, purchase })
+app.post('/api/purchases', (req, res) => {
+  res.status(401).json({ 
+    error: 'auth_required', 
+    message: 'This endpoint is deprecated. Please log in and use /api/user/purchases instead.' 
+  })
 })
 
 // Support both GET and POST for score lookup
@@ -755,38 +1634,20 @@ app.get('/api/suggestions', (req, res) => {
   res.json({ suggestions })
 })
 
-app.get('/api/insights', async (req, res) => {
-  const purchases = await loadPurchases()
-
-  if (purchases.length === 0) {
-    return res.json({ message: 'No purchases yet!' })
-  }
-
-  const totalScore = purchases.reduce((sum, p) => sum + p.sustainability_score, 0)
-  const avgScore = totalScore / purchases.length
-
-  const best = purchases.reduce((max, p) => (p.sustainability_score > max.sustainability_score ? p : max))
-  const worst = purchases.reduce((min, p) => (p.sustainability_score < min.sustainability_score ? p : min))
-
-  res.json({
-    total_purchases: purchases.length,
-    average_score: avgScore,
-    rating: getRating(avgScore),
-    best_purchase: best.product,
-    worst_purchase: worst.product,
-    total_spent: purchases.reduce((sum, p) => sum + p.price, 0)
+// DEPRECATED: Legacy insights endpoint - now requires authentication
+app.get('/api/insights', (req, res) => {
+  res.status(401).json({ 
+    error: 'auth_required', 
+    message: 'This endpoint is deprecated. Please log in and use /api/user/insights instead.' 
   })
 })
 
-app.get('/api/profile_suggestions', async (req, res) => {
-  try {
-    const dataPath = path.join(__dirname, '..', '..', 'predictions.json')
-    const content = await fs.readFile(dataPath, 'utf8')
-    const parsed = JSON.parse(content)
-    res.json(parsed)
-  } catch (err) {
-    res.status(500).json({ error: 'predictions not available', details: err.message })
-  }
+// DEPRECATED: Legacy profile suggestions - now requires authentication
+app.get('/api/profile_suggestions', (req, res) => {
+  res.status(401).json({ 
+    error: 'auth_required', 
+    message: 'This endpoint is deprecated. Please log in and use /api/user/suggestions instead.' 
+  })
 })
 
 app.get('/api/catalog/meta', async (req, res) => {
@@ -797,7 +1658,7 @@ app.get('/api/catalog/meta', async (req, res) => {
 })
 
 // Ingest scraped items from the user's browser (extension/bookmarklet)
-// Products go to shared ah_products table
+// Products go to shared 'products' table (unified catalog)
 // Purchases are recorded per-user in user_purchases table
 app.post('/api/ingest/scrape', async (req, res) => {
   try {
@@ -870,7 +1731,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
     let purchasesRecorded = 0
     
     if (supabase) {
-      // 1. Upsert products to shared ah_products table
+      // 1. Upsert products to shared 'products' table (unified catalog)
       const { error: productError } = await supabase
         .from(SUPABASE_PRODUCTS_TABLE)
         .upsert(cleaned, { onConflict: 'id' })
@@ -882,6 +1743,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
 
       // 2. If user is authenticated, record purchases in user_purchases table
       if (userId) {
+        const now = new Date().toISOString()
         const purchaseRecords = cleaned.map(p => ({
           user_id: userId,
           product_id: p.id,
@@ -889,7 +1751,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
           price: p.price,
           quantity: 1,
           source: req.body?.source || 'browser_extension',
-          purchased_at: new Date().toISOString()
+          scraped_at: now
         }))
 
         // Use upsert to avoid duplicates (same user + product + day)
@@ -1120,6 +1982,18 @@ function appendAutoScrapeLog(stream, chunk) {
 }
 
 const AUTO_SCRAPE_SCRIPT = path.join(__dirname, 'auto_scraper.py')
+const PRODUCT_DETAIL_SCRIPT = path.join(__dirname, 'product_detail_scraper.py')
+
+// State for product detail enrichment
+const productEnrichState = {
+  running: false,
+  startedAt: null,
+  progress: '',
+  processed: 0,
+  total: 0,
+  lastRun: null,
+  logs: []
+}
 
 // Start automated scraping with user credentials
 app.post('/api/auto-scrape', async (req, res) => {
@@ -1139,7 +2013,22 @@ app.post('/api/auto-scrape', async (req, res) => {
     })
   }
   
-  const { email, password } = req.body || {}
+  const { email, password, save_credentials } = req.body || {}
+  
+  // Get user from auth header if provided (optional - allows saving credentials)
+  let userId = null
+  const authHeader = req.headers.authorization
+  if (authHeader && authHeader.startsWith('Bearer ') && supabase) {
+    const token = authHeader.slice(7)
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(token)
+      if (!error && user) {
+        userId = user.id
+      }
+    } catch (e) {
+      // Auth is optional for this endpoint
+    }
+  }
   
   if (!email || !password) {
     return res.status(400).json({ error: 'missing_credentials' })
@@ -1163,9 +2052,14 @@ app.post('/api/auto-scrape', async (req, res) => {
   const startedAt = new Date().toISOString()
   autoScrapeState.running = true
   autoScrapeState.startedAt = startedAt
-  autoScrapeState.lastRun = { status: 'running', startedAt }
+  autoScrapeState.lastRun = { status: 'running', startedAt, userId }
   autoScrapeState.logs = []
   autoScrapeState.progress = 'Starting automated scraper...'
+  
+  // Store credentials to save on success (encrypted in memory temporarily)
+  if (save_credentials && userId) {
+    autoScrapeState.pendingCredentials = { userId, email, password }
+  }
   
   appendAutoScrapeLog('info', 'Starting automated AH scraper...')
   appendAutoScrapeLog('info', `Email: ${email.substring(0, 3)}***@${email.split('@')[1] || '***'}`)
@@ -1235,12 +2129,31 @@ app.post('/api/auto-scrape', async (req, res) => {
     
     autoScrapeState.running = false
     autoScrapeState.startedAt = null
+    
+    // Determine specific error message for credential-based scraping
+    let errorMessage = null
+    if (code !== 0) {
+      if (resultData?.error === 'login_failed') {
+        // Check logs for CAPTCHA indication
+        const logText = autoScrapeState.logs.map(l => l.message).join(' ')
+        if (logText.includes('CAPTCHA') || logText.includes('captcha')) {
+          errorMessage = 'CAPTCHA required - Albert Heijn requires manual verification. Please use the "Easy Connect" feature instead, which opens a browser window for you to log in manually.'
+        } else {
+          errorMessage = 'Login failed - please check your email and password'
+        }
+      } else if (resultData?.error) {
+        errorMessage = resultData.error
+      } else {
+        errorMessage = `Scraper exited with code ${code}`
+      }
+    }
+    
     autoScrapeState.lastRun = {
       status: code === 0 && resultData?.success ? 'success' : 'error',
       startedAt,
       completedAt,
       durationMs,
-      error: code !== 0 ? `Scraper exited with code ${code}` : (resultData?.error || null),
+      error: errorMessage,
       productsFound: resultData?.count || 0
     }
     
@@ -1290,6 +2203,237 @@ app.post('/api/auto-scrape', async (req, res) => {
         } else {
           appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in database.`)
           autoScrapeState.lastRun.productsStored = cleaned.length
+          
+          // Save credentials on successful scrape (if requested)
+          if (autoScrapeState.pendingCredentials && supabase) {
+            const { userId, email, password } = autoScrapeState.pendingCredentials
+            try {
+              // Encrypt password before storing
+              const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+              const iv = crypto.randomBytes(16)
+              const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+              let encrypted = cipher.update(password, 'utf8', 'hex')
+              encrypted += cipher.final('hex')
+              const password_encrypted = iv.toString('hex') + ':' + encrypted
+              
+              await supabase
+                .from('user_ah_credentials')
+                .upsert({
+                  user_id: userId,
+                  ah_email: email,
+                  ah_password_encrypted: password_encrypted,
+                  cookies_updated_at: new Date().toISOString(),
+                  last_sync_at: new Date().toISOString(),
+                  sync_status: 'success'
+                }, { onConflict: 'user_id' })
+              
+              appendAutoScrapeLog('info', 'AH credentials saved for future automatic scraping.')
+              autoScrapeState.lastRun.credentialsSaved = true
+            } catch (e) {
+              appendAutoScrapeLog('stderr', `Failed to save credentials: ${e.message}`)
+            }
+            autoScrapeState.pendingCredentials = null
+          }
+        }
+      } catch (e) {
+        appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
+      }
+    }
+    
+    // Clear pending credentials on failure too
+    autoScrapeState.pendingCredentials = null
+  })
+  
+  return res.status(202).json({ status: 'started', startedAt })
+})
+
+// Re-scrape using saved credentials (requires authentication)
+app.post('/api/auto-scrape/resync', requireAuth, async (req, res) => {
+  // Block on hosted environments unless Browserless is configured
+  const hasBrowserless = !!process.env.BROWSERLESS_URL
+  if (process.env.VERCEL && !hasBrowserless) {
+    return res.status(501).json({ 
+      error: 'not_supported_on_hosted',
+      message: 'Automated scraping requires BROWSERLESS_URL. Please use the bookmarklet method instead.'
+    })
+  }
+  
+  if (autoScrapeState.running) {
+    return res.status(409).json({ 
+      error: 'scrape_in_progress', 
+      startedAt: autoScrapeState.startedAt 
+    })
+  }
+  
+  // Get user's saved credentials
+  const { data: credentials, error: fetchError } = await supabase
+    .from('user_ah_credentials')
+    .select('ah_email, ah_password_encrypted')
+    .eq('user_id', req.user.id)
+    .single()
+  
+  if (fetchError || !credentials?.ah_email || !credentials?.ah_password_encrypted) {
+    return res.status(404).json({ 
+      error: 'no_saved_credentials',
+      message: 'No saved AH credentials found. Please log in with your AH account first.'
+    })
+  }
+  
+  // Decrypt password
+  let password
+  try {
+    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+    const [ivHex, encrypted] = credentials.ah_password_encrypted.split(':')
+    const iv = Buffer.from(ivHex, 'hex')
+    const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+    password = decipher.update(encrypted, 'hex', 'utf8') + decipher.final('utf8')
+  } catch (e) {
+    return res.status(500).json({ error: 'decryption_failed', message: 'Failed to decrypt saved credentials.' })
+  }
+  
+  // Check if script exists
+  try {
+    await fs.access(AUTO_SCRAPE_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ 
+      error: 'scrape_script_missing', 
+      details: 'auto_scraper.py not found' 
+    })
+  }
+  
+  const email = credentials.ah_email
+  const startedAt = new Date().toISOString()
+  autoScrapeState.running = true
+  autoScrapeState.startedAt = startedAt
+  autoScrapeState.lastRun = { status: 'running', startedAt, userId: req.user.id }
+  autoScrapeState.logs = []
+  autoScrapeState.progress = 'Starting automated scraper with saved credentials...'
+  
+  appendAutoScrapeLog('info', 'Starting automated AH scraper (using saved credentials)...')
+  appendAutoScrapeLog('info', `Email: ${email.substring(0, 3)}***@${email.split('@')[1] || '***'}`)
+  
+  // Build command arguments
+  const scriptArgs = [
+    AUTO_SCRAPE_SCRIPT,
+    '--email', email,
+    '--password', password,
+    '--no-headless'
+  ]
+  
+  const browserlessUrl = process.env.BROWSERLESS_URL
+  if (browserlessUrl) {
+    scriptArgs.push('--browserless-url', browserlessUrl)
+    appendAutoScrapeLog('info', 'Using remote browser service (Browserless)')
+  }
+  
+  let autoScrapeProcess
+  try {
+    autoScrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
+      cwd: __dirname,
+      env: { ...process.env, PYTHONUNBUFFERED: '1', BROWSERLESS_URL: browserlessUrl || '' }
+    })
+  } catch (error) {
+    autoScrapeState.running = false
+    autoScrapeState.startedAt = null
+    autoScrapeState.lastRun = {
+      status: 'error',
+      startedAt,
+      completedAt: new Date().toISOString(),
+      exitCode: null,
+      durationMs: 0,
+      error: error.message
+    }
+    appendAutoScrapeLog('stderr', `Failed to launch scraper: ${error.message}`)
+    return res.status(500).json({ error: 'spawn_failed', details: error.message })
+  }
+  
+  let resultData = null
+  
+  autoScrapeProcess.stdout.on('data', (data) => {
+    const text = data.toString()
+    appendAutoScrapeLog('stdout', text)
+    
+    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
+    if (resultMatch) {
+      try {
+        resultData = JSON.parse(resultMatch[1])
+      } catch (e) {
+        console.error('Failed to parse scrape result:', e)
+      }
+    }
+  })
+  
+  autoScrapeProcess.stderr.on('data', (data) => {
+    appendAutoScrapeLog('stderr', data)
+  })
+  
+  autoScrapeProcess.on('close', async (code) => {
+    const completedAt = new Date().toISOString()
+    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    autoScrapeState.running = false
+    autoScrapeState.startedAt = null
+    autoScrapeState.lastRun = {
+      status: code === 0 && resultData?.success ? 'success' : 'error',
+      startedAt,
+      completedAt,
+      durationMs,
+      error: code !== 0 ? `Scraper exited with code ${code}` : (resultData?.error || null),
+      productsFound: resultData?.count || 0
+    }
+    
+    appendAutoScrapeLog('info', code === 0 ? 'Auto-scrape process completed.' : `Auto-scrape exited with code ${code}`)
+    
+    // Update last_sync_at on success/failure
+    await supabase
+      .from('user_ah_credentials')
+      .update({ 
+        last_sync_at: new Date().toISOString(),
+        sync_status: code === 0 && resultData?.success ? 'success' : 'error'
+      })
+      .eq('user_id', req.user.id)
+    
+    // If we got products, ingest them to Supabase
+    if (resultData?.success && resultData?.products?.length > 0 && supabase) {
+      appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
+      
+      try {
+        const cleaned = resultData.products.map((item) => {
+          const name = (item.name || '').toString().trim()
+          const normalized = normalizeProductName(name)
+          const url = (item.url || '').toString().trim()
+          
+          let id = null
+          if (url) {
+            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
+            if (urlMatch) id = urlMatch[1]
+          }
+          if (!id) {
+            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
+          }
+          
+          return {
+            id,
+            name,
+            normalized_name: normalized,
+            url: url || null,
+            image_url: (item.image || '').toString().trim() || null,
+            price: typeof item.price === 'number' ? item.price : null,
+            source: 'ah_auto_scrape',
+            tags: null,
+            updated_at: new Date().toISOString()
+          }
+        }).filter((item) => item.name && item.id)
+        
+        const { error: upsertError } = await supabase
+          .from(SUPABASE_PRODUCTS_TABLE)
+          .upsert(cleaned, { onConflict: 'id' })
+        
+        if (upsertError) {
+          appendAutoScrapeLog('stderr', `Database upsert failed: ${upsertError.message}`)
+        } else {
+          appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in database.`)
+          autoScrapeState.lastRun.productsStored = cleaned.length
         }
       } catch (e) {
         appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
@@ -1297,7 +2441,7 @@ app.post('/api/auto-scrape', async (req, res) => {
     }
   })
   
-  return res.status(202).json({ status: 'started', startedAt })
+  return res.status(202).json({ status: 'started', startedAt, usingSavedCredentials: true })
 })
 
 // Get auto-scrape status
@@ -1448,6 +2592,196 @@ app.get('/api/auto-scrape/capture-cookies/status', (req, res) => {
     startedAt: cookieCaptureState.startedAt,
     logs: cookieCaptureState.logs.slice(-50)
   })
+})
+
+// ============================================================================
+// VISUAL LOGIN: One-click connect with visible browser window
+// Opens a browser window where user can log in, then automatically scrapes
+// ============================================================================
+
+app.post('/api/auto-scrape/visual-login', async (req, res) => {
+  // Only available on local servers (not Vercel)
+  if (process.env.VERCEL) {
+    return res.status(501).json({
+      error: 'not_supported_on_hosted',
+      message: 'Visual login is only available when running the app locally.'
+    })
+  }
+  
+  if (autoScrapeState.running || cookieCaptureState.running) {
+    return res.status(409).json({ error: 'operation_in_progress' })
+  }
+  
+  try {
+    await fs.access(AUTO_SCRAPE_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ error: 'script_missing', details: 'auto_scraper.py not found' })
+  }
+  
+  // Get user from auth header if provided (for recording purchases)
+  const user = await getUserFromRequest(req)
+  const userId = user?.id || null
+  
+  const startedAt = new Date().toISOString()
+  autoScrapeState.running = true
+  autoScrapeState.startedAt = startedAt
+  autoScrapeState.lastRun = { status: 'running', startedAt, userId }
+  autoScrapeState.logs = []
+  autoScrapeState.progress = 'Opening browser window...'
+  autoScrapeState.currentUserId = userId
+  
+  appendAutoScrapeLog('info', '🖥️ Opening browser window for Albert Heijn login...')
+  appendAutoScrapeLog('info', 'Please log in to your AH account in the browser window.')
+  
+  // Visual login: opens browser window for user to log in, then scrapes
+  // Uses --visual-login mode: non-headless, waits for login, saves cookies, scrapes
+  const scriptArgs = [
+    AUTO_SCRAPE_SCRIPT,
+    '--visual-login',           // Special mode: open browser, wait for login
+    '--save-cookies', COOKIES_FILE,
+    '--no-headless'             // Ensure browser is visible
+  ]
+  
+  let scrapeProcess
+  try {
+    scrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
+      cwd: __dirname,
+      env: { ...process.env, PYTHONUNBUFFERED: '1', DISPLAY: process.env.DISPLAY || ':0' }
+    })
+  } catch (error) {
+    autoScrapeState.running = false
+    autoScrapeState.startedAt = null
+    return res.status(500).json({ error: 'spawn_failed', details: error.message })
+  }
+  
+  let resultData = null
+  
+  scrapeProcess.stdout.on('data', (data) => {
+    const text = data.toString()
+    appendAutoScrapeLog('stdout', text)
+    
+    // Update progress based on log messages
+    if (text.includes('[INFO]')) {
+      const msg = text.replace(/.*\[INFO\]\s*/, '').trim()
+      if (msg) autoScrapeState.progress = msg
+    } else if (text.includes('[SUCCESS]')) {
+      const msg = text.replace(/.*\[SUCCESS\]\s*/, '').trim()
+      if (msg) autoScrapeState.progress = msg
+    }
+    
+    // Parse result
+    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
+    if (resultMatch) {
+      try {
+        resultData = JSON.parse(resultMatch[1])
+      } catch (e) {
+        console.error('Failed to parse scrape result:', e)
+      }
+    }
+  })
+  
+  scrapeProcess.stderr.on('data', (data) => {
+    appendAutoScrapeLog('stderr', data)
+  })
+  
+  scrapeProcess.on('close', async (code) => {
+    const completedAt = new Date().toISOString()
+    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    autoScrapeState.running = false
+    autoScrapeState.startedAt = null
+    autoScrapeState.lastRun = {
+      status: code === 0 && resultData?.success ? 'success' : 'error',
+      startedAt,
+      completedAt,
+      durationMs,
+      error: code !== 0 ? `Process exited with code ${code}` : (resultData?.error || null),
+      productsFound: resultData?.count || 0
+    }
+    
+    appendAutoScrapeLog('info', code === 0 ? '✅ Visual login completed.' : `❌ Process exited with code ${code}`)
+    
+    // Ingest products to database if successful
+    if (resultData?.success && resultData?.products?.length > 0 && supabase) {
+      appendAutoScrapeLog('info', `📦 Storing ${resultData.products.length} products...`)
+      
+      try {
+        const cleaned = resultData.products.map((item) => {
+          const name = (item.name || '').toString().trim()
+          const normalized = normalizeProductName(name)
+          const url = (item.url || '').toString().trim()
+          
+          let id = null
+          if (url) {
+            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
+            if (urlMatch) id = urlMatch[1]
+          }
+          if (!id) {
+            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
+          }
+          
+          return {
+            id,
+            name,
+            normalized_name: normalized,
+            url: url || null,
+            image_url: (item.image || '').toString().trim() || null,
+            price: typeof item.price === 'number' ? item.price : null,
+            source: 'ah_visual_login',
+            tags: null,
+            updated_at: new Date().toISOString()
+          }
+        }).filter((item) => item.name && item.id)
+        
+        const { error: upsertError } = await supabase
+          .from(SUPABASE_PRODUCTS_TABLE)
+          .upsert(cleaned, { onConflict: 'id' })
+        
+        if (upsertError) {
+          appendAutoScrapeLog('stderr', `Database error: ${upsertError.message}`)
+        } else {
+          appendAutoScrapeLog('info', `✅ Stored ${cleaned.length} products to product catalog`)
+          autoScrapeState.lastRun.productsStored = cleaned.length
+          
+          // Also save to user_purchases if we have a userId
+          if (userId) {
+            appendAutoScrapeLog('info', `👤 Saving purchases for user: ${userId}`)
+            const now = new Date().toISOString()
+            const purchases = cleaned.map(p => ({
+              user_id: userId,
+              product_id: p.id,
+              product_name: p.name,
+              price: p.price,
+              quantity: 1,
+              source: 'ah_visual_login',
+              scraped_at: now
+            }))
+            
+            console.log(`[DEBUG] Inserting ${purchases.length} purchases for user ${userId}`)
+            console.log('[DEBUG] Sample purchase:', JSON.stringify(purchases[0], null, 2))
+            
+            const { data: insertedData, error: purchaseError } = await supabase.from('user_purchases').insert(purchases).select()
+            if (purchaseError) {
+              appendAutoScrapeLog('stderr', `Failed to record purchases: ${purchaseError.message}`)
+              console.error('user_purchases insert error:', purchaseError)
+              console.error('user_purchases insert error code:', purchaseError.code)
+              console.error('user_purchases insert error details:', purchaseError.details)
+            } else {
+              appendAutoScrapeLog('info', `✅ Recorded ${purchases.length} purchases for user`)
+              console.log(`[SUCCESS] Inserted ${insertedData?.length || purchases.length} rows to user_purchases`)
+            }
+          } else {
+            appendAutoScrapeLog('info', `⚠️ No user authenticated - purchases not saved to user account`)
+            console.log('[WARNING] userId is null - products scraped but not saved to user_purchases')
+          }
+        }
+      } catch (e) {
+        appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
+      }
+    }
+  })
+  
+  res.status(202).json({ status: 'started', startedAt, mode: 'visual_login' })
 })
 
 // Scrape using saved cookies (no credentials needed)
@@ -1603,7 +2937,7 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
           return true
         })
         
-        // 1. Upsert to global product catalog (ah_products)
+        // 1. Upsert to unified 'products' table
         const { error: upsertError } = await supabase
           .from(SUPABASE_PRODUCTS_TABLE)
           .upsert(cleaned, { onConflict: 'id' })
