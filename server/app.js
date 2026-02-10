@@ -1293,6 +1293,65 @@ app.get('/api/products/enrichment/status', (req, res) => {
   })
 })
 
+// Get auto-enrichment status and configuration
+app.get('/api/products/auto-enrich/status', (req, res) => {
+  res.json({
+    enabled: autoEnrichConfig.enabled,
+    config: {
+      batchSize: autoEnrichConfig.batchSize,
+      delayBetweenProducts: autoEnrichConfig.delayBetweenProducts,
+      checkInterval: autoEnrichConfig.checkInterval,
+      maxQueueSize: autoEnrichConfig.maxQueueSize
+    },
+    queue: {
+      size: autoEnrichQueue.productIds.size,
+      processing: autoEnrichQueue.processing,
+      lastCheck: autoEnrichQueue.lastCheck
+    },
+    stats: autoEnrichQueue.stats
+  })
+})
+
+// Toggle auto-enrichment on/off
+app.post('/api/products/auto-enrich/toggle', (req, res) => {
+  const { enabled } = req.body
+  
+  if (typeof enabled === 'boolean') {
+    autoEnrichConfig.enabled = enabled
+    
+    if (enabled && !autoEnrichInterval && !process.env.VERCEL) {
+      // Start interval if enabling
+      autoEnrichInterval = setInterval(checkForUnenrichedProducts, autoEnrichConfig.checkInterval)
+      console.log('[Auto-Enrich] Enabled')
+    } else if (!enabled && autoEnrichInterval) {
+      // Stop interval if disabling
+      clearInterval(autoEnrichInterval)
+      autoEnrichInterval = null
+      console.log('[Auto-Enrich] Disabled')
+    }
+  }
+  
+  res.json({ 
+    enabled: autoEnrichConfig.enabled,
+    message: autoEnrichConfig.enabled ? 'Auto-enrichment enabled' : 'Auto-enrichment disabled'
+  })
+})
+
+// Manually trigger queue check
+app.post('/api/products/auto-enrich/check', async (req, res) => {
+  if (process.env.VERCEL) {
+    return res.status(501).json({ error: 'not_supported_on_hosted' })
+  }
+  
+  await checkForUnenrichedProducts()
+  
+  res.json({
+    queueSize: autoEnrichQueue.productIds.size,
+    processing: autoEnrichQueue.processing,
+    lastCheck: autoEnrichQueue.lastCheck
+  })
+})
+
 // Enrich a single product by ID
 app.post('/api/products/:productId/enrich', async (req, res) => {
   if (process.env.VERCEL) {
@@ -1729,6 +1788,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
 
     let stored = 0
     let purchasesRecorded = 0
+    let queuedForEnrichment = 0
     
     if (supabase) {
       // 1. Upsert products to shared 'products' table (unified catalog)
@@ -1740,6 +1800,27 @@ app.post('/api/ingest/scrape', async (req, res) => {
         return res.status(500).json({ error: 'supabase_insert_failed', detail: productError.message })
       }
       stored = cleaned.length
+
+      // 3. Queue new products for auto-enrichment (if enabled)
+      if (autoEnrichConfig.enabled && cleaned.length > 0) {
+        try {
+          // Find which of the upserted products don't have enrichment data yet
+          const productIds = cleaned.map(p => p.id)
+          const { data: unenriched } = await supabase
+            .from('products')
+            .select('id')
+            .in('id', productIds)
+            .is('details_scraped_at', null)
+          
+          if (unenriched?.length > 0) {
+            queueProductsForEnrichment(unenriched.map(p => p.id))
+            queuedForEnrichment = unenriched.length
+            console.log(`[Auto-Enrich] Queued ${unenriched.length} new products for enrichment`)
+          }
+        } catch (e) {
+          console.error('[Auto-Enrich] Failed to queue products:', e.message)
+        }
+      }
 
       // 2. If user is authenticated, record purchases in user_purchases table
       if (userId) {
@@ -1773,6 +1854,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
       received: items.length, 
       stored,
       purchasesRecorded,
+      queuedForEnrichment,
       userId: userId ? 'authenticated' : 'anonymous'
     })
   } catch (e) {
@@ -1993,6 +2075,267 @@ const productEnrichState = {
   total: 0,
   lastRun: null,
   logs: []
+}
+
+// ============================================================================
+// AUTO-ENRICHMENT SYSTEM
+// Automatically enriches new products when added to the global catalog
+// ============================================================================
+
+const autoEnrichConfig = {
+  enabled: process.env.AUTO_ENRICH_ENABLED !== 'false', // Enabled by default
+  batchSize: parseInt(process.env.AUTO_ENRICH_BATCH_SIZE) || 5, // Products per batch
+  delayBetweenProducts: parseInt(process.env.AUTO_ENRICH_DELAY) || 3000, // ms between products
+  checkInterval: parseInt(process.env.AUTO_ENRICH_INTERVAL) || 60000, // Check every 60s
+  maxQueueSize: 100 // Don't queue more than this many products
+}
+
+const autoEnrichQueue = {
+  productIds: new Set(), // Queue of product IDs to enrich
+  processing: false,
+  lastCheck: null,
+  stats: {
+    totalQueued: 0,
+    totalProcessed: 0,
+    totalFailed: 0
+  }
+}
+
+/**
+ * Queue products for auto-enrichment
+ * @param {string[]} productIds - Array of product IDs to enrich
+ */
+function queueProductsForEnrichment(productIds) {
+  if (!autoEnrichConfig.enabled || !productIds?.length) return
+  
+  for (const id of productIds) {
+    if (autoEnrichQueue.productIds.size < autoEnrichConfig.maxQueueSize) {
+      autoEnrichQueue.productIds.add(id)
+      autoEnrichQueue.stats.totalQueued++
+    }
+  }
+  
+  // Trigger processing if not already running
+  if (!autoEnrichQueue.processing && autoEnrichQueue.productIds.size > 0) {
+    processEnrichmentQueue()
+  }
+}
+
+/**
+ * Check for new products that need enrichment and queue them
+ */
+async function checkForUnenrichedProducts() {
+  if (!supabase || !autoEnrichConfig.enabled) return
+  
+  try {
+    autoEnrichQueue.lastCheck = new Date().toISOString()
+    
+    // Find products that haven't been enriched yet
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id')
+      .is('details_scraped_at', null)
+      .is('details_scrape_status', null)
+      .order('created_at', { ascending: false })
+      .limit(autoEnrichConfig.batchSize)
+    
+    if (error) {
+      console.error('[Auto-Enrich] Error checking for unenriched products:', error.message)
+      return
+    }
+    
+    if (products?.length > 0) {
+      const newIds = products
+        .map(p => p.id)
+        .filter(id => !autoEnrichQueue.productIds.has(id))
+      
+      if (newIds.length > 0) {
+        console.log(`[Auto-Enrich] Found ${newIds.length} new products to enrich`)
+        queueProductsForEnrichment(newIds)
+      }
+    }
+  } catch (err) {
+    console.error('[Auto-Enrich] Check error:', err.message)
+  }
+}
+
+/**
+ * Process the enrichment queue in the background
+ */
+async function processEnrichmentQueue() {
+  if (autoEnrichQueue.processing || autoEnrichQueue.productIds.size === 0) return
+  if (!supabase || productEnrichState.running) return // Don't run if manual batch is running
+  
+  autoEnrichQueue.processing = true
+  console.log(`[Auto-Enrich] Starting to process ${autoEnrichQueue.productIds.size} queued products`)
+  
+  try {
+    // Get batch of products to process
+    const idsToProcess = Array.from(autoEnrichQueue.productIds).slice(0, autoEnrichConfig.batchSize)
+    
+    for (const productId of idsToProcess) {
+      // Remove from queue before processing
+      autoEnrichQueue.productIds.delete(productId)
+      
+      try {
+        // Get product details
+        const { data: product, error: fetchError } = await supabase
+          .from('products')
+          .select('id, name, url')
+          .eq('id', productId)
+          .single()
+        
+        if (fetchError || !product) {
+          console.log(`[Auto-Enrich] Product ${productId} not found, skipping`)
+          continue
+        }
+        
+        // Skip if no URL
+        if (!product.url) {
+          console.log(`[Auto-Enrich] Product ${productId} has no URL, marking as skipped`)
+          await supabase
+            .from('products')
+            .update({ details_scrape_status: 'no_url' })
+            .eq('id', productId)
+          continue
+        }
+        
+        console.log(`[Auto-Enrich] Enriching: ${product.name}`)
+        
+        // Mark as pending
+        await supabase
+          .from('products')
+          .update({ details_scrape_status: 'pending' })
+          .eq('id', productId)
+        
+        // Run the scraper
+        const result = await runProductDetailScraper(product.url)
+        
+        if (result.success) {
+          // Update product with enriched data
+          const updateData = {
+            is_vegan: result.data.is_vegan ?? null,
+            is_vegetarian: result.data.is_vegetarian ?? null,
+            is_organic: result.data.is_organic ?? null,
+            nutri_score: result.data.nutri_score ?? null,
+            origin_country: result.data.origin_country ?? null,
+            brand: result.data.brand ?? null,
+            unit_size: result.data.unit_size ?? null,
+            allergens: result.data.allergens ?? null,
+            ingredients: result.data.ingredients ?? null,
+            details_scraped_at: new Date().toISOString(),
+            details_scrape_status: 'success'
+          }
+          
+          await supabase
+            .from('products')
+            .update(updateData)
+            .eq('id', productId)
+          
+          autoEnrichQueue.stats.totalProcessed++
+          console.log(`[Auto-Enrich] Successfully enriched: ${product.name}`)
+        } else {
+          // Mark as failed
+          await supabase
+            .from('products')
+            .update({ 
+              details_scrape_status: 'failed',
+              details_scraped_at: new Date().toISOString()
+            })
+            .eq('id', productId)
+          
+          autoEnrichQueue.stats.totalFailed++
+          console.log(`[Auto-Enrich] Failed to enrich ${product.name}: ${result.error}`)
+        }
+        
+        // Delay between products
+        if (autoEnrichQueue.productIds.size > 0) {
+          await new Promise(r => setTimeout(r, autoEnrichConfig.delayBetweenProducts))
+        }
+        
+      } catch (err) {
+        console.error(`[Auto-Enrich] Error processing ${productId}:`, err.message)
+        autoEnrichQueue.stats.totalFailed++
+      }
+    }
+  } catch (err) {
+    console.error('[Auto-Enrich] Queue processing error:', err.message)
+  } finally {
+    autoEnrichQueue.processing = false
+    
+    // Continue processing if more items in queue
+    if (autoEnrichQueue.productIds.size > 0) {
+      setTimeout(processEnrichmentQueue, 1000)
+    }
+  }
+}
+
+/**
+ * Run the product detail scraper for a single URL
+ * @param {string} url - Product URL to scrape
+ * @returns {Promise<{success: boolean, data?: object, error?: string}>}
+ */
+async function runProductDetailScraper(url) {
+  return new Promise((resolve) => {
+    const scriptPath = PRODUCT_DETAIL_SCRIPT
+    
+    // Check if script exists
+    if (!existsSync(scriptPath)) {
+      resolve({ success: false, error: 'Scraper script not found' })
+      return
+    }
+    
+    const pythonProcess = spawn('python', [scriptPath, url], {
+      cwd: path.dirname(scriptPath),
+      env: { ...process.env }
+    })
+    
+    let stdout = ''
+    let stderr = ''
+    
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+    
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        resolve({ success: false, error: stderr || `Script exited with code ${code}` })
+        return
+      }
+      
+      try {
+        // Extract JSON from stdout (last line should be the JSON result)
+        const lines = stdout.trim().split('\n')
+        const jsonLine = lines.find(line => line.startsWith('{') && line.endsWith('}'))
+        
+        if (jsonLine) {
+          const data = JSON.parse(jsonLine)
+          resolve({ success: true, data })
+        } else {
+          resolve({ success: false, error: 'No JSON output from scraper' })
+        }
+      } catch (err) {
+        resolve({ success: false, error: `Parse error: ${err.message}` })
+      }
+    })
+    
+    // Timeout after 60 seconds
+    setTimeout(() => {
+      pythonProcess.kill()
+      resolve({ success: false, error: 'Scraper timeout' })
+    }, 60000)
+  })
+}
+
+// Start auto-enrichment interval check (only on non-Vercel environments)
+let autoEnrichInterval = null
+if (!process.env.VERCEL && autoEnrichConfig.enabled) {
+  autoEnrichInterval = setInterval(checkForUnenrichedProducts, autoEnrichConfig.checkInterval)
+  console.log(`[Auto-Enrich] Enabled - checking every ${autoEnrichConfig.checkInterval / 1000}s`)
 }
 
 // Start automated scraping with user credentials
@@ -2947,6 +3290,25 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
         } else {
           appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in global catalog.`)
           autoScrapeState.lastRun.productsStored = cleaned.length
+          
+          // 1b. Queue new products for auto-enrichment
+          if (autoEnrichConfig.enabled && cleaned.length > 0) {
+            try {
+              const productIds = cleaned.map(p => p.id)
+              const { data: unenriched } = await supabase
+                .from('products')
+                .select('id')
+                .in('id', productIds)
+                .is('details_scraped_at', null)
+              
+              if (unenriched?.length > 0) {
+                queueProductsForEnrichment(unenriched.map(p => p.id))
+                appendAutoScrapeLog('info', `Queued ${unenriched.length} products for auto-enrichment`)
+              }
+            } catch (e) {
+              appendAutoScrapeLog('stderr', `Auto-enrich queue failed: ${e.message}`)
+            }
+          }
         }
         
         // 2. If user is authenticated, also record as user purchases
