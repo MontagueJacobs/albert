@@ -1,6 +1,6 @@
 -- Multi-user schema for Sustainable Shop
 -- Adds user accounts, their AH credentials, and purchase history
--- Keeps ah_products as a global product catalog fed by all users
+-- Keeps products as a global product catalog fed by all users
 
 begin;
 
@@ -20,9 +20,11 @@ create table if not exists public.users (
 alter table public.users enable row level security;
 
 -- Users can only see and update their own record
+drop policy if exists "Users can view own profile" on public.users;
 create policy "Users can view own profile" on public.users
   for select using (auth.uid() = id);
 
+drop policy if exists "Users can update own profile" on public.users;
 create policy "Users can update own profile" on public.users
   for update using (auth.uid() = id);
 
@@ -51,15 +53,19 @@ create index if not exists user_ah_credentials_user_id_idx on public.user_ah_cre
 alter table public.user_ah_credentials enable row level security;
 
 -- Users can only access their own credentials
+drop policy if exists "Users can view own AH credentials" on public.user_ah_credentials;
 create policy "Users can view own AH credentials" on public.user_ah_credentials
   for select using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own AH credentials" on public.user_ah_credentials;
 create policy "Users can insert own AH credentials" on public.user_ah_credentials
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own AH credentials" on public.user_ah_credentials;
 create policy "Users can update own AH credentials" on public.user_ah_credentials
   for update using (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own AH credentials" on public.user_ah_credentials;
 create policy "Users can delete own AH credentials" on public.user_ah_credentials
   for delete using (auth.uid() = user_id);
 
@@ -70,7 +76,7 @@ create policy "Users can delete own AH credentials" on public.user_ah_credential
 create table if not exists public.user_purchases (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
-  product_id text not null,  -- References ah_products.id (the global catalog)
+  product_id text not null,  -- References products.id (the global catalog)
   product_name text not null,  -- Denormalized for quick display
   product_url text,
   product_image_url text,
@@ -92,20 +98,23 @@ create index if not exists user_purchases_user_product_idx on public.user_purcha
 alter table public.user_purchases enable row level security;
 
 -- Users can only access their own purchases
+drop policy if exists "Users can view own purchases" on public.user_purchases;
 create policy "Users can view own purchases" on public.user_purchases
   for select using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own purchases" on public.user_purchases;
 create policy "Users can insert own purchases" on public.user_purchases
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own purchases" on public.user_purchases;
 create policy "Users can delete own purchases" on public.user_purchases
   for delete using (auth.uid() = user_id);
 
 -- ============================================================================
--- UPDATE ah_products TABLE
+-- UPDATE products TABLE
 -- Add price column and contributor tracking
 -- ============================================================================
-alter table public.ah_products 
+alter table public.products 
   add column if not exists price numeric(10, 2),
   add column if not exists first_seen_at timestamptz default now(),
   add column if not exists last_seen_at timestamptz default now(),
@@ -113,13 +122,14 @@ alter table public.ah_products
   add column if not exists contributed_by uuid[];  -- Array of user IDs who contributed this product
 
 -- Index for analytics
-create index if not exists ah_products_last_seen_idx on public.ah_products(last_seen_at desc);
+create index if not exists products_last_seen_idx on public.products(last_seen_at desc);
 
 -- ============================================================================
 -- AGGREGATE VIEWS FOR ANALYTICS
 -- ============================================================================
 
 -- View: Product popularity across all users
+drop view if exists public.product_popularity;
 create or replace view public.product_popularity as
 select 
   p.id,
@@ -132,10 +142,11 @@ select
   coalesce(array_length(p.contributed_by, 1), 0) as unique_buyers,
   p.first_seen_at,
   p.last_seen_at
-from public.ah_products p
+from public.products p
 order by p.seen_count desc;
 
 -- View: User purchase summary (respects RLS)
+drop view if exists public.user_purchase_summary;
 create or replace view public.user_purchase_summary as
 select 
   user_id,
@@ -167,19 +178,19 @@ declare
   v_purchase_id uuid;
 begin
   -- Upsert to global product catalog
-  insert into public.ah_products (id, name, normalized_name, url, image_url, price, source, seen_count, contributed_by, last_seen_at)
+  insert into public.products (id, name, normalized_name, url, image_url, price, source, seen_count, contributed_by, last_seen_at)
   values (p_product_id, p_product_name, p_normalized_name, p_product_url, p_product_image_url, p_price, p_source, 1, array[p_user_id], now())
   on conflict (id) do update set
-    name = coalesce(excluded.name, ah_products.name),
-    normalized_name = coalesce(excluded.normalized_name, ah_products.normalized_name),
-    url = coalesce(excluded.url, ah_products.url),
-    image_url = coalesce(excluded.image_url, ah_products.image_url),
-    price = coalesce(excluded.price, ah_products.price),
-    seen_count = ah_products.seen_count + 1,
+    name = coalesce(excluded.name, products.name),
+    normalized_name = coalesce(excluded.normalized_name, products.normalized_name),
+    url = coalesce(excluded.url, products.url),
+    image_url = coalesce(excluded.image_url, products.image_url),
+    price = coalesce(excluded.price, products.price),
+    seen_count = products.seen_count + 1,
     last_seen_at = now(),
     contributed_by = (
       select array_agg(distinct u) 
-      from unnest(array_cat(ah_products.contributed_by, array[p_user_id])) as u
+      from unnest(array_cat(products.contributed_by, array[p_user_id])) as u
     ),
     updated_at = now();
 
@@ -221,10 +232,12 @@ begin
 end;
 $$ language plpgsql;
 
+drop trigger if exists users_updated_at on public.users;
 create trigger users_updated_at
   before update on public.users
   for each row execute function public.update_updated_at();
 
+drop trigger if exists user_ah_credentials_updated_at on public.user_ah_credentials;
 create trigger user_ah_credentials_updated_at
   before update on public.user_ah_credentials
   for each row execute function public.update_updated_at();

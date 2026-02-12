@@ -33,10 +33,10 @@ SELECT
   p.price,
   p.base_score,
   up.quantity,
-  up.last_purchased_at,
-  up.purchase_count
+  up.purchased_at,
+  1 AS purchase_count
 FROM public.user_purchases up
-LEFT JOIN public.products p ON up.product_id = p.id;
+LEFT JOIN public.products p ON up.product_id::text = p.id::text;
 
 -- Grant access to views
 GRANT SELECT ON public.product_popularity TO anon;
