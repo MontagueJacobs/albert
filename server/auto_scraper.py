@@ -889,6 +889,319 @@ class AHAutoScraper:
             await self.close()
 
 
+async def visual_login_and_scrape(cookies_file: str, output_file: str = None) -> int:
+    """
+    Visual login mode: Opens a visible browser window for user to log in,
+    then automatically scrapes their purchase history.
+    
+    This is the easiest flow for users:
+    1. Browser opens to AH login page
+    2. User logs in (handles CAPTCHA themselves)
+    3. We detect successful login
+    4. Automatically navigate to purchases and scrape
+    5. Save cookies for future quick syncs
+    """
+    print("[INFO] === Visual Login Mode ===", flush=True)
+    print("[INFO] Opening browser window for Albert Heijn login...", flush=True)
+    print("[INFO] Please log in to your AH account. We'll detect when you're done.", flush=True)
+    print("", flush=True)
+    
+    p = await async_playwright().start()
+    result = {'success': False, 'products': [], 'count': 0}
+    
+    try:
+        # Launch visible browser using Chromium (same as capture_cookies which works well)
+        browser = await p.chromium.launch(
+            headless=False,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+            ]
+        )
+        
+        context = await browser.new_context(
+            viewport={'width': 1280, 'height': 900},
+            locale='nl-NL',
+            timezone_id='Europe/Amsterdam',
+        )
+        
+        page = await context.new_page()
+        
+        # Remove webdriver detection (same as capture_cookies)
+        await page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        """)
+        
+        # Navigate to AH login page directly
+        print("[INFO] Opening Albert Heijn login page...", flush=True)
+        await page.goto('https://www.ah.nl/mijn/inloggen', wait_until='domcontentloaded')
+        await asyncio.sleep(2)
+        
+        # Print current URL for debugging
+        print(f"[DEBUG] Current URL: {page.url}", flush=True)
+        
+        # Check if user is already logged in (not on login page)
+        async def is_logged_in():
+            url = page.url.lower()
+            # If we're NOT on any login/auth page, we're logged in
+            if 'login.ah.nl' in url or 'inloggen' in url or '/auth' in url:
+                return False
+            return True
+        
+        if await is_logged_in():
+            print("[SUCCESS] Already logged in!", flush=True)
+        else:
+            print("[INFO] ==========================================", flush=True)
+            print("[INFO] Please log in to your Albert Heijn account.", flush=True)
+            print("[INFO] Complete the login including any CAPTCHA.", flush=True) 
+            print("[INFO] Take your time - we'll wait up to 5 minutes.", flush=True)
+            print("[INFO] ==========================================", flush=True)
+            
+            # Wait for user to complete login (leave the login page)
+            max_wait = 300
+            login_success = False
+            
+            for i in range(max_wait):
+                await asyncio.sleep(1)
+                
+                # Debug: print URL every 15 seconds
+                if (i + 1) % 15 == 0:
+                    print(f"[DEBUG] Current URL: {page.url}", flush=True)
+                
+                # Check if user has left the login page (= logged in successfully)
+                if await is_logged_in():
+                    print(f"[SUCCESS] Login complete after {i+1} seconds!", flush=True)
+                    login_success = True
+                    break
+                
+                if (i + 1) % 30 == 0:
+                    print(f"[INFO] Still waiting for login... take your time ({i+1}/{max_wait}s)", flush=True)
+            
+            if not login_success:
+                print("[ERROR] Login timeout - please try again", flush=True)
+                result['error'] = 'login_timeout'
+                await browser.close()
+                await p.stop()
+                print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                return 1
+        
+        # Save cookies for future use
+        cookies = await context.cookies()
+        ah_cookies = [c for c in cookies if 'ah.nl' in c.get('domain', '')]
+        
+        with open(cookies_file, 'w') as f:
+            json.dump(ah_cookies, f, indent=2)
+        print(f"[INFO] Saved {len(ah_cookies)} cookies for future syncs", flush=True)
+        
+        # NOW navigate to the purchase history page - the MAIN one with all purchases
+        target_url = 'https://www.ah.nl/producten/eerder-gekocht'
+        print(f"[INFO] Navigating to your purchase history...", flush=True)
+        print(f"[INFO] Target: {target_url}", flush=True)
+        
+        # Navigate and wait for page to fully load
+        await page.goto(target_url, wait_until='networkidle', timeout=30000)
+        await asyncio.sleep(3)
+        
+        actual_url = page.url
+        print(f"[INFO] Actual URL: {actual_url}", flush=True)
+        
+        # If we got redirected to bonus page, let the user manually navigate
+        # Give them plenty of time and don't close the browser!
+        if 'producten/eerder-gekocht' not in actual_url.lower():
+            print(f"", flush=True)
+            print(f"[ACTION REQUIRED] ========================================", flush=True)
+            print(f"[ACTION REQUIRED] ", flush=True)
+            print(f"[ACTION REQUIRED] You were redirected to: {actual_url}", flush=True)
+            print(f"[ACTION REQUIRED] ", flush=True)
+            print(f"[ACTION REQUIRED] Please MANUALLY navigate to your purchase history:", flush=True)
+            print(f"[ACTION REQUIRED] ", flush=True)
+            print(f"[ACTION REQUIRED]   https://www.ah.nl/producten/eerder-gekocht", flush=True)
+            print(f"[ACTION REQUIRED] ", flush=True)
+            print(f"[ACTION REQUIRED] Steps:", flush=True)
+            print(f"[ACTION REQUIRED]   1. Click on the address bar", flush=True)
+            print(f"[ACTION REQUIRED]   2. Type or paste the URL above", flush=True)
+            print(f"[ACTION REQUIRED]   3. Press Enter", flush=True)
+            print(f"[ACTION REQUIRED] ", flush=True)
+            print(f"[ACTION REQUIRED] You have 2 MINUTES. Take your time!", flush=True)
+            print(f"[ACTION REQUIRED] ========================================", flush=True)
+            print(f"", flush=True)
+            
+            # Wait for user to manually navigate - give them 2 full minutes
+            found_page = False
+            for i in range(120):
+                await asyncio.sleep(1)
+                
+                try:
+                    current = page.url.lower()
+                    
+                    # Check if user navigated to the right page (any eerder-gekocht page)
+                    if 'eerder-gekocht' in current and 'bonus' not in current:
+                        print(f"[SUCCESS] You're on the main purchase history page!", flush=True)
+                        print(f"[INFO] Waiting for page to fully load...", flush=True)
+                        await asyncio.sleep(5)  # Wait for page to load
+                        actual_url = page.url
+                        found_page = True
+                        break
+                    
+                    # Also accept if they're on producten/eerder-gekocht even with bonus in path
+                    if 'producten/eerder-gekocht' in current:
+                        print(f"[SUCCESS] You're on the purchase history page!", flush=True)
+                        print(f"[INFO] Waiting for page to fully load...", flush=True)
+                        await asyncio.sleep(5)  # Wait for page to load
+                        actual_url = page.url
+                        found_page = True
+                        break
+                        
+                except Exception as e:
+                    # Page might be navigating, just wait
+                    pass
+                
+                if (i + 1) % 20 == 0:
+                    print(f"[INFO] Still waiting for you to navigate... ({i+1}/120s)", flush=True)
+                    print(f"[INFO] Current URL: {page.url}", flush=True)
+            
+            if not found_page:
+                print(f"[INFO] Timeout waiting for navigation. Will scrape current page anyway.", flush=True)
+                actual_url = page.url
+        
+        # Report final page - DON'T check for login page, just scrape whatever we have
+        print(f"[INFO] ========================================", flush=True)
+        print(f"[INFO] You're on: {actual_url}", flush=True)
+        print(f"[INFO] ========================================", flush=True)
+        
+        # Give the page time to fully load before scraping
+        print("[INFO] Waiting for page to fully load...", flush=True)
+        await asyncio.sleep(5)
+        
+        # Now scrape the purchase history
+        print("[INFO] Starting to scrape your purchases...", flush=True)
+        print("[INFO] (This may take a minute - scrolling through the page)", flush=True)
+        
+        products = []
+        seen_urls = set()
+        
+        # Helper function to scrape products from current page
+        async def scrape_current_page():
+            """Scrape products from the current page by scrolling and extracting."""
+            local_products = []
+            last_count = 0
+            scroll_attempts = 0
+            max_scrolls = 30  # More scrolls to get more products
+            
+            # Wait for products to load
+            try:
+                await page.wait_for_selector('a[href*="/producten/product/"]', timeout=10000)
+                print("[DEBUG] Product elements found on page", flush=True)
+            except:
+                print("[DEBUG] No product elements found immediately, will try scrolling...", flush=True)
+            
+            while scroll_attempts < max_scrolls:
+                await asyncio.sleep(1)
+                
+                try:
+                    page_products = await page.evaluate("""
+                    () => {
+                        const items = [];
+                        const links = document.querySelectorAll('a[href*="/producten/product/"]');
+                        
+                        links.forEach(a => {
+                            const url = a.href;
+                            let name = a.getAttribute('aria-label') || '';
+                            if (!name) {
+                                const title = a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');
+                                name = title?.textContent?.trim() || '';
+                            }
+                            
+                            const card = a.closest('article') || a.parentElement;
+                            let price = null;
+                            const priceEl = card?.querySelector('[data-testhook="product-price"], [class*="price"]');
+                            if (priceEl) {
+                                const match = priceEl.textContent?.replace(',', '.').match(/(\\d+\\.?\\d*)/);
+                                if (match) price = parseFloat(match[1]);
+                            }
+                            
+                            const img = card?.querySelector('img');
+                            const image = img?.src || '';
+                            
+                            if (name && url) {
+                                items.push({ name: name.trim(), url, price, image });
+                            }
+                        });
+                        
+                        return items;
+                    }
+                """)
+                except Exception as eval_error:
+                    print(f"[DEBUG] Page evaluation error (retrying): {eval_error}", flush=True)
+                    await asyncio.sleep(2)
+                    scroll_attempts += 1
+                    continue
+                
+                # Add new products
+                for p in page_products:
+                    if p['url'] not in seen_urls:
+                        seen_urls.add(p['url'])
+                        local_products.append(p)
+                
+                current_count = len(local_products)
+                if current_count > last_count:
+                    print(f"[INFO] Found {current_count} new products on this page...", flush=True)
+                    last_count = current_count
+                
+                # Scroll down
+                try:
+                    await page.evaluate('window.scrollBy(0, window.innerHeight)')
+                except:
+                    pass
+                await asyncio.sleep(1.5)
+                
+                scroll_attempts += 1
+                if current_count == last_count and scroll_attempts > 5:
+                    break
+            
+            return local_products
+        
+        # Scrape the current page (we already navigated above)
+        try:
+            page_products = await scrape_current_page()
+            products.extend(page_products)
+            print(f"[SUCCESS] Scraped {len(page_products)} products", flush=True)
+        except Exception as e:
+            print(f"[ERROR] Error scraping: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+        
+        print(f"[INFO] ========================================", flush=True)
+        print(f"[SUCCESS] Total scraped: {len(products)} unique products!", flush=True)
+        
+        result['success'] = True
+        result['products'] = products
+        result['count'] = len(products)
+        result['cookies_saved'] = len(ah_cookies)
+        
+        # Save to file if specified
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
+            print(f"[INFO] Saved results to {output_file}", flush=True)
+        
+        await browser.close()
+        await p.stop()
+        
+        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+        return 0
+        
+    except Exception as e:
+        print(f"[ERROR] Visual login failed: {e}", flush=True)
+        result['error'] = str(e)
+        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+        try:
+            await p.stop()
+        except:
+            pass
+        return 1
+
+
 async def main():
     parser = argparse.ArgumentParser(description='Automated AH Scraper')
     parser.add_argument('--email', '-e', help='AH account email (optional if using cookies)')
@@ -901,8 +1214,13 @@ async def main():
     parser.add_argument('--cookies', '-c', help='Path to cookies JSON file to load')
     parser.add_argument('--save-cookies', help='Path to save cookies after successful login')
     parser.add_argument('--capture-cookies', action='store_true', help='Interactive mode: open browser for manual login, then save cookies')
+    parser.add_argument('--visual-login', action='store_true', help='Visual login mode: open browser, user logs in, then automatically scrape')
     
     args = parser.parse_args()
+    
+    # Special mode: visual login - opens browser, user logs in, then scrapes
+    if args.visual_login:
+        return await visual_login_and_scrape(args.save_cookies or 'ah_cookies.json', args.output)
     
     # Special mode: capture cookies interactively
     if args.capture_cookies:

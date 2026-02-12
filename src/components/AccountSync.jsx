@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { RefreshCw, Loader2, BookOpen, Zap } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
+import EasyConnect from './EasyConnect.jsx'
 import AutoScrape from './AutoScrape.jsx'
 
 function AccountSync({ onSyncCompleted }) {
@@ -10,7 +11,7 @@ function AccountSync({ onSyncCompleted }) {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
   const [hostedGuide, setHostedGuide] = useState(false)
-  const [scrapeMode, setScrapeMode] = useState('auto') // 'auto' or 'manual'
+  const [scrapeMode, setScrapeMode] = useState('easy') // 'easy', 'auto' or 'manual'
   const pollRef = useRef(null)
   const lastCompletedRef = useRef(null)
 
@@ -109,7 +110,7 @@ function AccountSync({ onSyncCompleted }) {
     <section style={{ marginTop: '1.5rem' }}>
       <div style={{ marginBottom: '1.5rem' }}>
         <h3 style={{ margin: '0 0 0.5rem 0' }}>{t('sync_title')}</h3>
-        <p style={{ margin: 0, color: '#555', maxWidth: '640px' }}>{t('sync_description')}</p>
+        <p style={{ margin: 0, color: '#aaa', maxWidth: '640px' }}>{t('sync_description')}</p>
       </div>
 
       {/* Mode toggle tabs */}
@@ -117,9 +118,30 @@ function AccountSync({ onSyncCompleted }) {
         display: 'flex', 
         gap: '0.5rem', 
         marginBottom: '1.5rem',
-        borderBottom: '2px solid #e5e7eb',
+        borderBottom: '2px solid #333',
         paddingBottom: '0'
       }}>
+        <button
+          type="button"
+          onClick={() => setScrapeMode('easy')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            fontWeight: 500,
+            fontSize: '0.95rem',
+            color: scrapeMode === 'easy' ? '#3b82f6' : '#888',
+            borderBottom: scrapeMode === 'easy' ? '2px solid #3b82f6' : '2px solid transparent',
+            marginBottom: '-2px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Zap size={18} />
+          Easy Connect
+        </button>
         <button
           type="button"
           onClick={() => setScrapeMode('auto')}
@@ -130,7 +152,7 @@ function AccountSync({ onSyncCompleted }) {
             cursor: 'pointer',
             fontWeight: 500,
             fontSize: '0.95rem',
-            color: scrapeMode === 'auto' ? '#3b82f6' : '#666',
+            color: scrapeMode === 'auto' ? '#3b82f6' : '#888',
             borderBottom: scrapeMode === 'auto' ? '2px solid #3b82f6' : '2px solid transparent',
             marginBottom: '-2px',
             display: 'flex',
@@ -138,7 +160,7 @@ function AccountSync({ onSyncCompleted }) {
             gap: '0.5rem'
           }}
         >
-          <Zap size={18} />
+          <RefreshCw size={18} />
           {t('sync_mode_auto')}
         </button>
         <button
@@ -151,7 +173,7 @@ function AccountSync({ onSyncCompleted }) {
             cursor: 'pointer',
             fontWeight: 500,
             fontSize: '0.95rem',
-            color: scrapeMode === 'manual' ? '#3b82f6' : '#666',
+            color: scrapeMode === 'manual' ? '#3b82f6' : '#888',
             borderBottom: scrapeMode === 'manual' ? '2px solid #3b82f6' : '2px solid transparent',
             marginBottom: '-2px',
             display: 'flex',
@@ -164,7 +186,12 @@ function AccountSync({ onSyncCompleted }) {
         </button>
       </div>
 
-      {/* Auto-scrape mode */}
+      {/* Easy Connect mode - recommended */}
+      {scrapeMode === 'easy' && (
+        <EasyConnect onSyncCompleted={onSyncCompleted} />
+      )}
+
+      {/* Auto-scrape mode (advanced) */}
       {scrapeMode === 'auto' && (
         <AutoScrape onScrapeCompleted={onSyncCompleted} />
       )}
@@ -174,7 +201,7 @@ function AccountSync({ onSyncCompleted }) {
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <div>
-              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#777' }}>{t('sync_requires_auth')}</p>
+              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_requires_auth')}</p>
             </div>
             <button
               type="button"
@@ -188,20 +215,20 @@ function AccountSync({ onSyncCompleted }) {
             </button>
           </div>
 
-          {error && <div style={{ color: '#c0392b', marginBottom: '0.75rem' }}>{error}</div>}
+          {error && <div style={{ color: '#ef4444', marginBottom: '0.75rem' }}>{error}</div>}
           {hostedGuide && (
-            <div style={{ border: '1px dashed #b5c2ff', background: '#f7f9ff', color: '#283a89', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
-              <h4 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('sync_bookmarklet_title')}</h4>
-              <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            <div style={{ border: '1px dashed rgba(99, 102, 241, 0.5)', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--text, #f3f4f6)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--text, #f3f4f6)' }}>{t('sync_bookmarklet_title')}</h4>
+              <ol style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-muted, #9ca3af)' }}>
                 <li>
                   {t('sync_bookmarklet_step1')}{' '}
-                  <a href="https://www.ah.nl/bonus/eerder-gekocht" target="_blank" rel="noreferrer">ah.nl/bonus/eerder-gekocht</a>
+                  <a href="https://www.ah.nl/bonus/eerder-gekocht" target="_blank" rel="noreferrer" style={{ color: '#60a5fa' }}>ah.nl/bonus/eerder-gekocht</a>
                 </li>
                 <li>{t('sync_bookmarklet_step2')}</li>
                 <li>
                   {t('sync_bookmarklet_step3')}{' '}
                   <a href={BOOKMARKLET_HREF} style={{ padding: '0.35rem 0.6rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', textDecoration: 'none' }}>AH: Scrape this page</a>
-                  <div style={{ fontSize: '0.85rem', color: '#49557a', marginTop: '0.4rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #9ca3af)', marginTop: '0.4rem' }}>
                     {t('sync_bookmarklet_tip')}
                   </div>
                 </li>
@@ -209,43 +236,43 @@ function AccountSync({ onSyncCompleted }) {
               </ol>
             </div>
           )}
-          {status?.running && <div style={{ color: '#555', marginBottom: '0.75rem' }}>{t('sync_running_hint')}</div>}
+          {status?.running && <div style={{ color: 'var(--text-muted, #9ca3af)', marginBottom: '0.75rem' }}>{t('sync_running_hint')}</div>}
 
-          <div style={{ border: '1px solid #e6e6e6', borderRadius: '12px', padding: '1rem', background: '#fff' }}>
+          <div style={{ border: '1px solid var(--border, #334155)', borderRadius: '12px', padding: '1rem', background: 'var(--bg-card, #1e293b)' }}>
             {loading && !status ? (
-              <div>{t('loading')}</div>
+              <div style={{ color: 'var(--text, #f3f4f6)' }}>{t('loading')}</div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_status_label')}</div>
-                  <div style={{ fontWeight: 600 }}>{currentStatus}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_status_label')}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{currentStatus}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_last_run_label')}</div>
-                  <div style={{ fontWeight: 600 }}>{lastRunSummary}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_last_run_label')}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{lastRunSummary}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_started_label')}</div>
-                  <div style={{ fontWeight: 600 }}>{formatDateTime(lastRun?.startedAt) || 'N/A'}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_started_label')}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{formatDateTime(lastRun?.startedAt) || 'N/A'}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_completed_label')}</div>
-                  <div style={{ fontWeight: 600 }}>{formatDateTime(lastRun?.completedAt) || 'N/A'}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_completed_label')}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{formatDateTime(lastRun?.completedAt) || 'N/A'}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{t('sync_duration_label')}</div>
-                  <div style={{ fontWeight: 600 }}>{durationLabel}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_duration_label')}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{durationLabel}</div>
                 </div>
               </div>
             )}
 
             <div style={{ marginTop: '1.25rem' }}>
-              <h4 style={{ marginBottom: '0.5rem' }}>{t('sync_logs_label')}</h4>
-              <div style={{ border: '1px solid #f0f0f0', background: '#fafafa', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', padding: '0.75rem' }}>
+              <h4 style={{ marginBottom: '0.5rem', color: 'var(--text, #f3f4f6)' }}>{t('sync_logs_label')}</h4>
+              <div style={{ border: '1px solid var(--border, #334155)', background: 'var(--bg-hover, #334155)', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', padding: '0.75rem' }}>
                 {logLines.length === 0 ? (
-                  <div style={{ color: '#777', fontSize: '0.9rem' }}>{t('sync_no_logs')}</div>
+                  <div style={{ color: 'var(--text-muted, #9ca3af)', fontSize: '0.9rem' }}>{t('sync_no_logs')}</div>
                 ) : (
-                  <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
+                  <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap', color: 'var(--text, #f3f4f6)' }}>
                     {logLines.join('\n')}
                   </pre>
                 )}

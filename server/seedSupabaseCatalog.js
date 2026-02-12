@@ -6,7 +6,8 @@ dotenv.config()
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-const tableName = process.env.SUPABASE_CATALOG_TABLE || 'product_catalog'
+// Use unified 'products' table
+const tableName = process.env.SUPABASE_PRODUCTS_TABLE || 'products'
 const schema = process.env.SUPABASE_SCHEMA || 'public'
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -34,14 +35,18 @@ function toTextArray(value) {
 async function seed() {
   console.log(`🚀 Seeding ${PRODUCT_CATALOG.length} catalog entries into Supabase table ${schema}.${tableName}`)
 
+  // Map curated catalog entries to unified products table schema
   const payload = PRODUCT_CATALOG.map((entry) => ({
     id: entry.id,
-    names: toTextArray(entry.names),
+    name: toTextArray(entry.names)[0] || entry.id, // Use first name as primary name
+    normalized_name: (toTextArray(entry.names)[0] || entry.id).toLowerCase().trim(),
     base_score: entry.baseScore ?? 5,
     categories: toTextArray(entry.categories),
     adjustments: entry.adjustments ?? [],
     suggestions: toTextArray(entry.suggestions),
-    notes: entry.notes ?? null
+    notes: entry.notes ?? null,
+    source: 'curated',
+    tags: toTextArray(entry.names) // Store all name variants as tags for matching
   }))
 
   const { error } = await supabase.from(tableName).upsert(payload, {

@@ -508,17 +508,6 @@ function PurchaseItem({ purchase }) {
               <MapPin size={12} /> {purchase.origin_country}
             </span>
           )}
-          
-          {!purchase.has_enriched_data && (
-            <span style={{ 
-              ...styles.badge, 
-              background: 'rgba(107, 114, 128, 0.2)', 
-              color: '#9ca3af',
-              fontSize: '0.7rem'
-            }}>
-              Pending enrichment
-            </span>
-          )}
         </div>
       </div>
       

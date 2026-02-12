@@ -2322,14 +2322,35 @@ async function checkForUnenrichedProducts() {
   try {
     autoEnrichQueue.lastCheck = new Date().toISOString()
     
-    // Find products that haven't been enriched yet
-    const { data: products, error } = await supabase
-      .from('products')
-      .select('id')
-      .is('details_scraped_at', null)
-      .is('details_scrape_status', null)
-      .order('created_at', { ascending: false })
-      .limit(autoEnrichConfig.batchSize)
+    let products = []
+    let error = null
+    
+    // Try with enriched columns first (if migration has been run)
+    if (enrichedColumnsAvailable) {
+      const result = await supabase
+        .from('products')
+        .select('id')
+        .is('details_scraped_at', null)
+        .is('details_scrape_status', null)
+        .not('url', 'is', null)  // Only products with URLs can be enriched
+        .order('created_at', { ascending: false })
+        .limit(autoEnrichConfig.batchSize)
+      
+      if (result.error?.message?.includes('does not exist')) {
+        enrichedColumnsAvailable = false
+        console.log('[Auto-Enrich] Enriched columns not available - migration needed')
+      } else {
+        products = result.data || []
+        error = result.error
+      }
+    }
+    
+    // If enriched columns not available, we can't track what's been enriched
+    // Just log a message once
+    if (!enrichedColumnsAvailable) {
+      // Can't do enrichment without the migration - the columns to store results don't exist
+      return
+    }
     
     if (error) {
       console.error('[Auto-Enrich] Error checking for unenriched products:', error.message)

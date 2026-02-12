@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, LogIn } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
+import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
 
-function AddPurchase({ onPurchaseAdded }) {
+function AddPurchase({ onPurchaseAdded, onLoginClick }) {
   const [product, setProduct] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [price, setPrice] = useState('')
@@ -11,13 +12,36 @@ function AddPurchase({ onPurchaseAdded }) {
   const [suggestions, setSuggestions] = useState([])
 
   const { t } = useI18n()
+  const { user, isAuthenticated } = useAuth()
+  const authFetch = useAuthenticatedFetch()
+
+  // If not authenticated, show login prompt
+  if (!isAuthenticated) {
+    return (
+      <div style={{textAlign: 'center', padding: '3rem 1rem'}}>
+        <LogIn size={48} style={{color: 'var(--text-muted)', marginBottom: '1rem'}} />
+        <h3 style={{color: 'var(--text)', marginBottom: '0.5rem'}}>{t('login_required') || 'Login Required'}</h3>
+        <p style={{color: 'var(--text-muted)', marginBottom: '1.5rem'}}>
+          {t('login_to_add_purchases') || 'Please log in to add purchases to your account.'}
+        </p>
+        {onLoginClick && (
+          <button 
+            className="btn btn-primary"
+            onClick={onLoginClick}
+          >
+            {t('sign_in') || 'Sign In'}
+          </button>
+        )}
+      </div>
+    )
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      const response = await fetch('/api/purchases', {
+      const response = await authFetch('/api/user/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -41,7 +65,9 @@ function AddPurchase({ onPurchaseAdded }) {
       setPrice('')
 
       // Notify parent
-      onPurchaseAdded()
+      if (onPurchaseAdded) {
+        onPurchaseAdded()
+      }
 
       // Clear result after 5 seconds
       setTimeout(() => {
@@ -108,15 +134,15 @@ function AddPurchase({ onPurchaseAdded }) {
       </form>
 
       {result && (
-        <div style={{marginTop: '2rem', padding: '1.5rem', background: '#f0fdf4', borderRadius: '12px'}}>
-          <h3 style={{color: '#16a34a', marginBottom: '1rem'}}>
+        <div style={{marginTop: '2rem', padding: '1.5rem', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '12px'}}>
+          <h3 style={{color: '#22c55e', marginBottom: '1rem'}}>
             <Sparkles size={20} style={{display: 'inline', verticalAlign: 'middle', marginRight: '5px'}} />
             {t('added_title')}
           </h3>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <div>
-              <p style={{fontSize: '1.2rem', fontWeight: '600'}}>{result.product}</p>
-              <p style={{color: '#666'}}>{t('added_quantity')}: {result.quantity}</p>
+              <p style={{fontSize: '1.2rem', fontWeight: '600', color: 'var(--text, #f3f4f6)'}}>{result.product}</p>
+              <p style={{color: 'var(--text-muted, #9ca3af)'}}>{t('added_quantity')}: {result.quantity}</p>
             </div>
             <div className={`score-badge ${getScoreClass(result.sustainability_score)}`}>
               {t('score_label')}: {result.sustainability_score}{t('score_suffix')}
@@ -125,8 +151,8 @@ function AddPurchase({ onPurchaseAdded }) {
 
           {suggestions.length > 0 && (
             <div className="suggestions">
-              <h4>{t('suggestions_heading')}</h4>
-              <ul>
+              <h4 style={{color: 'var(--text, #f3f4f6)'}}>{t('suggestions_heading')}</h4>
+              <ul style={{color: 'var(--text-muted, #9ca3af)'}}>
                 {suggestions.map((suggestion, idx) => (
                   <li key={idx}>{suggestion}</li>
                 ))}

@@ -58,11 +58,15 @@ const features = [
   }
 ]
 
-function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, purchases, insights, syncVersion }) {
+function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion }) {
   const { t, lang, setLang } = useI18n()
   const { user } = useAuth()
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  
+  const handleLoginClick = useCallback(() => {
+    setShowAuthModal(true)
+  }, [])
 
   const handleToggleLanguage = useCallback(() => {
     const nextLang = lang === 'nl' ? 'en' : 'nl'
@@ -248,12 +252,12 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, p
         </div>
         
         <div className="content-card">
-          {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} />}
-          {activeTab === 'dashboard' && <Dashboard insights={insights} />}
-          {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} />}
+          {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} onLoginClick={handleLoginClick} />}
+          {activeTab === 'dashboard' && <Dashboard onLoginClick={handleLoginClick} />}
+          {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} onLoginClick={handleLoginClick} />}
           {activeTab === 'lookup' && <ScoreLookup />}
           {activeTab === 'sync' && <AccountSync onSyncCompleted={onSyncCompleted} />}
-          {activeTab === 'history' && <PurchaseList purchases={purchases} />}
+          {activeTab === 'history' && <PurchaseList onLoginClick={handleLoginClick} />}
           {activeTab === 'how' && <HowItWorks />}
         </div>
       </main>
@@ -268,51 +272,25 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, p
 
 function App() {
   const [activeTab, setActiveTab] = useState('home')
-  const [purchases, setPurchases] = useState([])
-  const [insights, setInsights] = useState(null)
   const [lang, setLang] = useState(() => getSavedLang())
   const [syncVersion, setSyncVersion] = useState(0)
-
-  const fetchPurchases = useCallback(async () => {
-    try {
-      const response = await fetch('/api/purchases')
-      const data = await response.json()
-      setPurchases(data)
-    } catch (error) {
-      console.error('Error fetching purchases:', error)
-    }
-  }, [])
-
-  const fetchInsights = useCallback(async () => {
-    try {
-      const response = await fetch('/api/insights')
-      const data = await response.json()
-      setInsights(data)
-    } catch (error) {
-      console.error('Error fetching insights:', error)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchPurchases()
-    fetchInsights()
-  }, [fetchPurchases, fetchInsights])
-
-  const handlePurchaseAdded = useCallback(() => {
-    fetchPurchases()
-    fetchInsights()
-  }, [fetchPurchases, fetchInsights])
-
-  const handleSyncCompleted = useCallback(() => {
-    fetchPurchases()
-    fetchInsights()
-    setSyncVersion((prev) => prev + 1)
-  }, [fetchPurchases, fetchInsights])
 
   const handleSetLang = useCallback((value) => {
     const next = value === 'en' ? 'en' : 'nl'
     saveLang(next)
     setLang(next)
+  }, [])
+
+  // Purchases and insights are now fetched at the component level
+  // (Dashboard, PurchaseList) using authenticated endpoints
+  // This keeps the App component simpler
+
+  const handlePurchaseAdded = useCallback(() => {
+    setSyncVersion((prev) => prev + 1)
+  }, [])
+
+  const handleSyncCompleted = useCallback(() => {
+    setSyncVersion((prev) => prev + 1)
   }, [])
 
   return (
@@ -323,8 +301,6 @@ function App() {
           onSyncCompleted={handleSyncCompleted}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          purchases={purchases}
-          insights={insights}
           syncVersion={syncVersion}
         />
       </I18nProvider>

@@ -88,21 +88,30 @@ Products are scored based on:
 ## Supabase Catalog Setup
 
 1. **Create a Supabase project** and grab the project URL, anon key, and service-role key.
-2. **Create the catalog table** (adjust the schema name if needed):
+2. **Create the unified products table** by running the `003_consolidate_products.sql` migration, or create manually:
 
    ```sql
-   create table if not exists public.product_catalog (
+   create table if not exists public.products (
      id text primary key,
-     names text[] not null,
+     name text not null,
+     normalized_name text not null,
+     url text,
+     image_url text,
+     price numeric,
      base_score numeric default 5,
      categories text[] default '{}',
      adjustments jsonb default '[]'::jsonb,
      suggestions text[] default '{}',
-     notes text
+     notes text,
+     source text default 'unknown',
+     tags jsonb,
+     seen_count integer default 1,
+     first_seen_at timestamp with time zone default now(),
+     last_seen_at timestamp with time zone default now()
    );
    ```
 
-3. *(Recommended)* Enable Row Level Security and add a policy so the anon key can only `select` from `product_catalog`.
+3. *(Recommended)* Enable Row Level Security and add a policy so the anon key can only `select` from `products`.
 4. **Seed the table** from the curated local catalog:
 
    ```bash
@@ -111,30 +120,13 @@ Products are scored based on:
 
    The script uses `SUPABASE_SERVICE_ROLE_KEY` to upsert data.
 5. **Verify** by calling `GET /api/catalog/meta` (or opening `http://localhost:3001/api/catalog/meta`) to confirm the server is reading from Supabase.
-6. *(Optional)* Store the full AH assortment in Supabase for long-term reference:
-   1. Create a table for raw products:
+6. *(Optional)* Upload scraped AH products:
 
-      ```sql
-      create table if not exists public.ah_products (
-        id text primary key,
-        name text not null,
-        normalized_name text not null,
-        url text,
-        image_url text,
-         price numeric,
-        source text,
-        tags jsonb,
-        updated_at timestamp with time zone default now()
-      );
-      ```
+   ```bash
+   npm run supabase:upload-products
+   ```
 
-   2. Upload the cleaned scraper output with
-
-      ```bash
-      npm run supabase:upload-products
-      ```
-
-      Pass a different file with `npm run supabase:upload-products -- --file path/to/file.json` if needed.
+   Pass a different file with `npm run supabase:upload-products -- --file path/to/file.json` if needed.
 
 ## Deploying to Vercel
 
@@ -144,8 +136,7 @@ Products are scored based on:
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` *(mark as server-side only)*
-   - `SUPABASE_CATALOG_TABLE` (optional, defaults to `product_catalog`)
-   - `SUPABASE_PRODUCTS_TABLE` (optional, defaults to `ah_products`)
+   - `SUPABASE_PRODUCTS_TABLE` (optional, defaults to `products`)
    - `SUPABASE_SCHEMA` (optional, defaults to `public`)
    - `CATALOG_REFRESH_INTERVAL_MS` (optional)
 4. Push the code to GitHub (or another git host) and connect the repo, or run `vercel --prod` locally to deploy.
@@ -166,7 +157,7 @@ Deployment domain: https://albert-eosin.vercel.app/
    - Already configured in this repo to: `https://albert-eosin.vercel.app`.
 2) Chrome → Extensions → Enable Developer Mode → Load Unpacked → select `sustainable-shop-webapp/extension`.
 3) Visit https://www.ah.nl/bonus/eerder-gekocht, log in, scroll to load products, click “Scrape this page”.
-4) Items are sent to `/api/ingest/scrape` and stored in Supabase table `ah_products` (server uses your `SUPABASE_SERVICE_ROLE_KEY`).
+4) Items are sent to `/api/ingest/scrape` and stored in Supabase table `products` (server uses your `SUPABASE_SERVICE_ROLE_KEY`).
 
 Notes:
 - This uses the user’s real browser and IP, which typically passes Akamai.
@@ -186,7 +177,7 @@ Notes:
 
 The app stores data in `server/purchases.json`. This file is created automatically on first purchase.
 
-To tweak the on-the-fly heuristics, edit `SUSTAINABILITY_DB` in `server/app.js`. For canonical product data, update the Supabase `product_catalog` table (or the fallback entries in `server/productCatalog.js`).
+To tweak the on-the-fly heuristics, edit `SUSTAINABILITY_DB` in `server/app.js`. For canonical product data, update the Supabase `products` table (or the fallback entries in `server/productCatalog.js`).
 
 ## License
 

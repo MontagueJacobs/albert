@@ -16,7 +16,8 @@ function parseArgs() {
   const args = process.argv.slice(2)
   const result = {
     file: null,
-    table: process.env.SUPABASE_PRODUCTS_TABLE || 'ah_products'
+    // Use unified 'products' table
+    table: process.env.SUPABASE_PRODUCTS_TABLE || 'products'
   }
 
   for (const arg of args) {

@@ -11,7 +11,8 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') })
 
 const DEFAULT_REFRESH_INTERVAL_MS = 15 * 60 * 1000
 const REFRESH_INTERVAL_MS = Number.parseInt(process.env.CATALOG_REFRESH_INTERVAL_MS ?? `${DEFAULT_REFRESH_INTERVAL_MS}`, 10) || DEFAULT_REFRESH_INTERVAL_MS
-const SUPABASE_TABLE = process.env.SUPABASE_CATALOG_TABLE || 'product_catalog'
+// Use unified 'products' table, fallback to product_catalog for backward compatibility
+const SUPABASE_TABLE = process.env.SUPABASE_CATALOG_TABLE || 'products'
 const SUPABASE_SCHEMA = process.env.SUPABASE_SCHEMA || 'public'
 
 const supabaseUrl = process.env.SUPABASE_URL
@@ -88,13 +89,51 @@ function buildIndex(entries) {
 
 async function fetchSupabaseCatalog() {
   if (!supabase) return null
+  
+  // Try fetching from unified 'products' table first
+  // The new schema has: id, name, alt_names, base_score, categories, adjustments, suggestions, notes
   const { data, error } = await supabase
     .from(SUPABASE_TABLE)
-    .select('id, names, base_score, categories, adjustments, suggestions, notes')
+    .select('id, name, alt_names, base_score, categories, adjustments, suggestions, notes')
+    .not('base_score', 'is', null)  // Only get products with sustainability scores
     .order('id', { ascending: true })
     .limit(2000)
 
   if (error) {
+    // If 'products' table doesn't exist yet, try legacy 'product_catalog'
+    if (error.message.includes('does not exist') || error.code === '42P01') {
+      console.log('Products table not found, trying legacy product_catalog...')
+      const { data: legacyData, error: legacyError } = await supabase
+        .from('product_catalog')
+        .select('id, names, base_score, categories, adjustments, suggestions, notes')
+        .order('id', { ascending: true })
+        .limit(2000)
+      
+      if (legacyError) {
+        throw new Error(`Supabase fetch error: ${legacyError.message}`)
+      }
+      
+      if (!legacyData || legacyData.length === 0) return []
+      
+      // Transform legacy format
+      return legacyData
+        .map((row) => {
+          const names = toStringArray(row.names)
+          const id = row.id?.trim() || names[0] || null
+          if (!id || names.length === 0) return null
+          
+          return {
+            id,
+            names,
+            baseScore: row.base_score ?? 5,
+            categories: toStringArray(row.categories),
+            adjustments: normalizeAdjustments(row.adjustments),
+            suggestions: toStringArray(row.suggestions),
+            notes: row.notes || null
+          }
+        })
+        .filter(Boolean)
+    }
     throw new Error(`Supabase fetch error: ${error.message}`)
   }
 
@@ -102,9 +141,14 @@ async function fetchSupabaseCatalog() {
     return []
   }
 
+  // Transform new unified products format
   return data
     .map((row) => {
-      const names = toStringArray(row.names)
+      // alt_names contains alternative names, name is the primary name
+      const names = row.alt_names?.length > 0 
+        ? toStringArray(row.alt_names) 
+        : [row.name].filter(Boolean)
+      
       const id = typeof row.id === 'string' && row.id.trim().length > 0
         ? row.id.trim()
         : names[0] || null
