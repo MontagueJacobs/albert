@@ -277,11 +277,19 @@ const CATEGORY_KEYS = new Set(Object.keys(SUSTAINABILITY_DB.categories))
 const KEYWORD_RULES = [
   { code: 'keyword_bio', delta: 2, match: (name) => name.includes('bio') || name.includes('organic') },
   { code: 'keyword_fair', delta: 2, match: (name) => name.includes('fair trade') },
-  { code: 'keyword_local', delta: 1, match: (name) => name.includes('lokaal') || name.includes('local') },
-  { code: 'keyword_plant', delta: 2, match: (name) => name.includes('plant') || name.includes('vega') || name.includes('soja') || name.includes('tofu') || name.includes('havermelk') },
-  { code: 'keyword_meat', delta: -3, match: (name) => name.includes('vlees') || name.includes('beef') || name.includes('rund') || name.includes('kip') || name.includes('meat') },
+  { code: 'keyword_local', delta: 1, match: (name) => name.includes('lokaal') || name.includes('local') || name.includes('nederland') || name.includes('hollands') },
+  { code: 'keyword_plant', delta: 2, match: (name) => name.includes('plantaardig') || name.includes('vegan') || name.includes('vega ') || name.includes('soja') || name.includes('tofu') || name.includes('havermelk') || name.includes('terra ') },
+  // NOTE: Meat keyword penalties are applied ONLY when enriched data is NOT available AND the name doesn't indicate plant-based
+  { code: 'keyword_meat', delta: -3, match: (name) => name.includes('vlees') || name.includes('beef') || name.includes('rund') || name.includes('kip') || name.includes('meat'), excludeIf: (name) => name.includes('plantaardig') || name.includes('vegan') || name.includes('terra') || name.includes('vega') },
   { code: 'keyword_plastic', delta: -1, match: (name) => name.includes('plastic') || name.includes('verpakt') }
 ]
+
+// Helper to check if a product name indicates plant-based despite having meat-like words
+function isLikelyPlantBased(name) {
+  const lower = (name || '').toLowerCase()
+  const plantIndicators = ['plantaardig', 'vegan', 'veganist', 'terra', 'beyond', 'impossible', 'vega ']
+  return plantIndicators.some(indicator => lower.includes(indicator))
+}
 
 // ============================================================================
 // ENRICHED FIELD SCORING RULES
@@ -447,6 +455,11 @@ function analyzeUserProfile(purchases) {
 
     for (const [category, data] of Object.entries(PRODUCT_CATEGORIES_PROFILE)) {
       if (data.keywords.some(kw => name.includes(kw))) {
+        // Don't count as meat if it's a plant-based product
+        if (category === 'meat' && isLikelyPlantBased(name)) {
+          categoryCounts['plant_protein'] = (categoryCounts['plant_protein'] || 0) + 1
+          continue
+        }
         categoryCounts[category] = (categoryCounts[category] || 0) + 1
       }
     }
@@ -692,13 +705,25 @@ function evaluateProduct(productName = '', enrichedData = null) {
       suggestions = entry.suggestions
     }
 
+    // Only apply catalog-based scoring if the product is NOT plant-based
+    // (Avoid penalizing "plantaardige gehakt" as meat)
+    const skipMeatScoring = (enrichedData?.is_vegan === true) ||
+                            (enrichedData?.is_vegetarian === true) ||
+                            isLikelyPlantBased(input)
+
+    // Apply base score delta only if it's not a meat penalty for plant-based products
     const baseDelta = (entry.baseScore ?? 5) - 5
-    if (baseDelta) {
+    const isMeatCatalog = Array.isArray(entry.categories) && entry.categories.includes('meat')
+    if (baseDelta && !(skipMeatScoring && isMeatCatalog)) {
       applyDelta('catalog', 'catalog_base', baseDelta)
     }
 
     if (Array.isArray(entry.categories)) {
       for (const category of entry.categories) {
+        // Skip meat category if product is known/likely plant-based
+        if (category === 'meat' && skipMeatScoring) {
+          continue
+        }
         applyCategory(category)
       }
     }
@@ -714,12 +739,32 @@ function evaluateProduct(productName = '', enrichedData = null) {
   const productData = SUSTAINABILITY_DB.products[normalized] || SUSTAINABILITY_DB.products[lowerProduct]
   if (productData && Array.isArray(productData.categories)) {
     for (const category of productData.categories) {
+      // Skip meat category if product is known/likely plant-based
+      if (category === 'meat' && (
+        (enrichedData?.is_vegan === true) ||
+        (enrichedData?.is_vegetarian === true) ||
+        isLikelyPlantBased(input)
+      )) {
+        continue  // Skip meat penalty for plant-based products
+      }
       applyCategory(category)
     }
   }
 
+  // Apply keyword rules (with plant-based exclusion logic)
   for (const rule of KEYWORD_RULES) {
     if (rule.match(lowerProduct)) {
+      // Check if this rule should be excluded for plant-based products
+      if (rule.excludeIf && rule.excludeIf(lowerProduct)) {
+        continue  // Skip this rule
+      }
+      // Also skip meat keywords if we have enriched data showing vegan/vegetarian
+      if (rule.code === 'keyword_meat' && (
+        enrichedData?.is_vegan === true ||
+        enrichedData?.is_vegetarian === true
+      )) {
+        continue
+      }
       applyDelta('keyword', rule.code, rule.delta)
       matchedKeywords.push(rule.code)
     }
