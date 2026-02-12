@@ -145,10 +145,15 @@ function Dashboard({ syncVersion, onLoginClick }) {
       const res = await authFetch(`/api/user/purchases/history?page=${page}&limit=20`)
       if (res.ok) {
         const data = await res.json()
+        console.log('[Dashboard] Purchase history response:', data)
         setPurchases(data.purchases || [])
         setPurchaseTotal(data.total || 0)
         setPurchaseTotalPages(data.totalPages || 0)
         setPurchasePage(data.page || 1)
+      } else {
+        console.error('[Dashboard] Purchase history fetch failed:', res.status, res.statusText)
+        const errData = await res.json().catch(() => ({}))
+        console.error('[Dashboard] Error details:', errData)
       }
     } catch (err) {
       console.error('Failed to fetch purchase history:', err)
@@ -161,11 +166,12 @@ function Dashboard({ syncVersion, onLoginClick }) {
     fetchInsights()
   }, [fetchInsights, syncVersion])
   
+  // Fetch purchase history when expanding the section
   useEffect(() => {
-    if (showHistory && purchases.length === 0) {
+    if (showHistory) {
       fetchPurchaseHistory(1)
     }
-  }, [showHistory, fetchPurchaseHistory, purchases.length])
+  }, [showHistory, fetchPurchaseHistory])
 
   // Not logged in - show login prompt
   if (!isAuthenticated) {

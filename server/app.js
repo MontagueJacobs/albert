@@ -1110,18 +1110,23 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
     const page = parseInt(req.query.page) || 1
     const limit = Math.min(parseInt(req.query.limit) || 50, 100)
     const offset = (page - 1) * limit
-    const sortBy = req.query.sortBy || 'purchased_at'
+    const sortBy = req.query.sortBy || 'scraped_at'  // Use scraped_at as default
     const sortOrder = req.query.sortOrder === 'asc' ? true : false
     
-    // Get user purchases
+    // Get user purchases - use * to get all columns
     const { data: purchases, error, count } = await supabase
       .from('user_purchases')
-      .select('id, product_id, product_name, price, quantity, source, purchased_at, created_at', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('user_id', req.user.id)
       .order(sortBy, { ascending: sortOrder })
       .range(offset, offset + limit - 1)
     
-    if (error) throw error
+    if (error) {
+      console.error('Purchase history fetch error:', error)
+      throw error
+    }
+    
+    console.log(`[History] Fetched ${purchases?.length || 0} purchases for user ${req.user.id}`)
     
     if (!purchases || purchases.length === 0) {
       return res.json({ 
@@ -1136,12 +1141,33 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
     // Get product IDs to fetch enriched data
     const productIds = [...new Set(purchases.map(p => p.product_id).filter(Boolean))]
     
-    // Fetch enriched product data
+    // Fetch enriched product data (if enriched columns are available)
     let enrichedProducts = {}
-    if (productIds.length > 0) {
-      const { data: products } = await supabase
+    let hasEnrichedData = false
+    
+    if (productIds.length > 0 && enrichedColumnsAvailable) {
+      const { data: products, error: enrichError } = await supabase
         .from('products')
         .select('id, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, image_url, url')
+        .in('id', productIds)
+      
+      if (enrichError?.message?.includes('does not exist')) {
+        enrichedColumnsAvailable = false
+        console.log('[History] Enriched columns not available')
+      } else if (products) {
+        hasEnrichedData = true
+        enrichedProducts = products.reduce((acc, p) => {
+          acc[p.id] = p
+          return acc
+        }, {})
+      }
+    }
+    
+    // If enriched columns not available, at least get basic product info (image_url, url)
+    if (productIds.length > 0 && !hasEnrichedData) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, image_url, url')
         .in('id', productIds)
       
       if (products) {
@@ -1155,7 +1181,12 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
     // Combine purchase data with enriched product data and sustainability scores
     const purchasesWithDetails = purchases.map(purchase => {
       const enriched = enrichedProducts[purchase.product_id] || {}
-      const evaluation = evaluateProductWithRecord(purchase.product_name, enriched)
+      const evaluation = hasEnrichedData 
+        ? evaluateProductWithRecord(purchase.product_name, enriched)
+        : evaluateProduct(purchase.product_name)
+      
+      // Support both scraped_at and purchased_at column names
+      const purchaseDate = purchase.scraped_at || purchase.purchased_at || purchase.created_at
       
       return {
         id: purchase.id,
@@ -1164,9 +1195,9 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
         price: purchase.price,
         quantity: purchase.quantity,
         source: purchase.source,
-        purchased_at: purchase.purchased_at,
+        purchased_at: purchaseDate,  // Normalize to purchased_at for frontend
         created_at: purchase.created_at,
-        // Enriched fields
+        // Enriched fields (will be null if not available)
         is_vegan: enriched.is_vegan ?? null,
         is_vegetarian: enriched.is_vegetarian ?? null,
         is_organic: enriched.is_organic ?? null,
@@ -1225,31 +1256,49 @@ app.get('/api/user/suggestions', requireAuth, async (req, res) => {
     const userProfile = analyzeUserProfile(purchases)
     const profileInfo = USER_PROFILE_TYPES[userProfile.profileType] || USER_PROFILE_TYPES['balanced']
     
-    // Get products from catalog for replacement suggestions (include enriched fields)
-    const { data: catalogProducts, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
-      .order('seen_count', { ascending: false })
-      .limit(200)
+    // Get products from catalog for replacement suggestions
+    let catalogProducts = []
     
-    if (productsError) {
-      console.error('Error fetching product catalog:', productsError)
+    if (enrichedColumnsAvailable) {
+      const { data, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
+        .order('seen_count', { ascending: false })
+        .limit(200)
+      
+      if (productsError?.message?.includes('does not exist')) {
+        enrichedColumnsAvailable = false
+      } else if (!productsError) {
+        catalogProducts = data || []
+      }
+    }
+    
+    if (!enrichedColumnsAvailable || catalogProducts.length === 0) {
+      const { data, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, url, image_url, price')
+        .order('seen_count', { ascending: false })
+        .limit(200)
+      
+      if (!productsError) {
+        catalogProducts = data || []
+      }
     }
     
     // Find replacement suggestions for low-score products
     const replacements = findReplacementSuggestions(
       userProfile.improvements, 
-      catalogProducts || []
+      catalogProducts
     )
     
-    // Also include generic high-score suggestions (use enriched data for more accurate scores)
-    const highScoreSuggestions = (catalogProducts || [])
+    // Also include generic high-score suggestions
+    const highScoreSuggestions = catalogProducts
       .map(p => ({
         name: p.name,
         url: p.url || '#',
         image_url: p.image_url,
         price: p.price,
-        sustainability_score: evaluateProductWithRecord(p.name, p).score,
+        sustainability_score: enrichedColumnsAvailable ? evaluateProductWithRecord(p.name, p).score : evaluateProduct(p.name).score,
         is_vegan: p.is_vegan,
         is_organic: p.is_organic,
         nutri_score: p.nutri_score,
@@ -1282,6 +1331,9 @@ app.get('/api/user/suggestions', requireAuth, async (req, res) => {
 // GLOBAL PRODUCT CATALOG API (public, read-only)
 // ============================================================================
 
+// Flag to track if enriched columns are available (avoid repeated failures)
+let enrichedColumnsAvailable = true
+
 // Get popular products (aggregated from all users)
 app.get('/api/products/popular', async (req, res) => {
   try {
@@ -1291,18 +1343,43 @@ app.get('/api/products/popular', async (req, res) => {
     
     const limit = Math.min(parseInt(req.query.limit) || 50, 200)
     
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, details_scraped_at')
-      .order('seen_count', { ascending: false })
-      .limit(limit)
+    let data, error
+    
+    // Try with enriched fields if we believe they're available
+    if (enrichedColumnsAvailable) {
+      const result = await supabase
+        .from('products')
+        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, details_scraped_at')
+        .order('seen_count', { ascending: false })
+        .limit(limit)
+      
+      if (result.error?.message?.includes('does not exist')) {
+        // Enriched columns not available, fall back to basic query
+        enrichedColumnsAvailable = false
+        console.log('[Products] Enriched columns not found, disabling enriched queries')
+      } else {
+        data = result.data
+        error = result.error
+      }
+    }
+    
+    // Fall back to basic query if enriched columns not available
+    if (!enrichedColumnsAvailable || !data) {
+      const result = await supabase
+        .from('products')
+        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at')
+        .order('seen_count', { ascending: false })
+        .limit(limit)
+      data = result.data
+      error = result.error
+    }
     
     if (error) throw error
     
-    // Add sustainability scores using enriched data
+    // Add sustainability scores
     const withScores = data.map(p => ({
       ...p,
-      sustainability_score: evaluateProductWithRecord(p.name, p).score
+      sustainability_score: enrichedColumnsAvailable ? evaluateProductWithRecord(p.name, p).score : evaluateProduct(p.name).score
     }))
     
     res.json(withScores)
@@ -1323,18 +1400,41 @@ app.get('/api/products/search', async (req, res) => {
       return res.status(400).json({ error: 'missing_query' })
     }
     
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
-      .ilike('normalized_name', `%${query.toLowerCase()}%`)
-      .limit(50)
+    let data, error
+    
+    // Try with enriched fields if available
+    if (enrichedColumnsAvailable) {
+      const result = await supabase
+        .from('products')
+        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
+        .ilike('normalized_name', `%${query.toLowerCase()}%`)
+        .limit(50)
+      
+      if (result.error?.message?.includes('does not exist')) {
+        enrichedColumnsAvailable = false
+      } else {
+        data = result.data
+        error = result.error
+      }
+    }
+    
+    // Fall back to basic query
+    if (!enrichedColumnsAvailable || !data) {
+      const result = await supabase
+        .from('products')
+        .select('id, name, normalized_name, url, image_url, price')
+        .ilike('normalized_name', `%${query.toLowerCase()}%`)
+        .limit(50)
+      data = result.data
+      error = result.error
+    }
     
     if (error) throw error
     
-    // Add sustainability scores using enriched data
+    // Add sustainability scores
     const withScores = data.map(p => ({
       ...p,
-      sustainability_score: evaluateProductWithRecord(p.name, p).score
+      sustainability_score: enrichedColumnsAvailable ? evaluateProductWithRecord(p.name, p).score : evaluateProduct(p.name).score
     }))
     
     res.json(withScores)
