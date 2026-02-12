@@ -2090,13 +2090,26 @@ app.post('/api/ingest/scrape', async (req, res) => {
       const isPlantBased = isLikelyPlantBased(extracted.name)
       const isOrganic = isLikelyOrganic(extracted.name)
 
+      // Parse price - handle both number and string formats (e.g., "€2.99", "2,99")
+      let parsedPrice = null
+      if (typeof raw?.price === 'number' && !Number.isNaN(raw.price)) {
+        parsedPrice = raw.price
+      } else if (typeof raw?.price === 'string') {
+        // Remove currency symbols and convert comma to dot
+        const priceStr = raw.price.replace(/[€$£\s]/g, '').replace(',', '.')
+        const num = parseFloat(priceStr)
+        if (!Number.isNaN(num) && num > 0) {
+          parsedPrice = num
+        }
+      }
+
       cleaned.push({
         id: extracted.id,
         name: extracted.name,
         normalized_name: extracted.normalized,
         url: url || null,
         image_url: (raw?.image || '').toString().trim() || null,
-        price: (typeof raw?.price === 'number' && !Number.isNaN(raw.price)) ? raw.price : null,
+        price: parsedPrice,
         source,
         // Auto-detected properties (only set if true, preserve existing data otherwise)
         ...(isPlantBased ? { is_vegan: true, is_vegetarian: true } : {}),

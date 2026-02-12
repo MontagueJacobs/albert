@@ -153,6 +153,7 @@ class AHProductDetailScraper:
             'origin_country': None,
             'brand': None,
             'unit_size': None,
+            'price': None,
             'allergens': [],
             'ingredients': None,
             'error': None,
@@ -457,6 +458,49 @@ class AHProductDetailScraper:
                         if len(ingredients_raw) > 10:
                             result['ingredients'] = ingredients_raw[:2000]  # Limit length
                         break
+            
+            # ================================================================
+            # Extract Price
+            # ================================================================
+            try:
+                # Look for price elements (AH uses various price selectors)
+                price_selectors = [
+                    '[class*="price-amount"]',
+                    '[class*="product-price"]',
+                    '[data-testhook="price-amount"]',
+                    '[itemprop="price"]',
+                    '.price',
+                ]
+                
+                for selector in price_selectors:
+                    price_elem = await self.page.query_selector(selector)
+                    if price_elem:
+                        price_text = await price_elem.inner_text()
+                        # Parse price from text like "€2,99" or "2.99"
+                        price_match = re.search(r'[\d]+[.,][\d]{2}', price_text)
+                        if price_match:
+                            price_str = price_match.group().replace(',', '.')
+                            result['price'] = float(price_str)
+                            break
+                
+                # Also try JSON-LD structured data for price
+                if not result['price']:
+                    scripts = await self.page.query_selector_all('script[type="application/ld+json"]')
+                    for script in scripts:
+                        script_content = await script.inner_text()
+                        try:
+                            data = json.loads(script_content)
+                            if isinstance(data, dict):
+                                offers = data.get('offers', {})
+                                if isinstance(offers, dict):
+                                    price = offers.get('price')
+                                    if price:
+                                        result['price'] = float(price)
+                                        break
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+            except Exception as e:
+                print(f"[WARN] Price extraction failed: {e}", flush=True)
                         
             result['success'] = True
             print(f"[SUCCESS] Scraped: vegan={result['is_vegan']}, organic={result['is_organic']}, nutri={result['nutri_score']}, origin={result['origin_country']}", flush=True)
