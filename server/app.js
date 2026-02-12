@@ -144,6 +144,88 @@ function requireAuth(req, res, next) {
   })
 }
 
+// ============================================================================
+// PRODUCT NAME EXTRACTION HELPER
+// Consistently extract product ID and name from AH URLs
+// ============================================================================
+const GENERIC_PRODUCT_NAMES = new Set([
+  'premium', 'biologisch', 'bio', 'nederlands', 'holland', 'fresh',
+  'nieuw', 'new', 'sale', 'aanbieding', 'bonus', 'actie'
+])
+
+/**
+ * Extract product ID and display name from an AH product URL.
+ * Falls back to original name if URL parsing fails.
+ * 
+ * @param {string} url - The product URL
+ * @param {string} originalName - The original product name from scraper
+ * @returns {{ id: string | null, name: string, normalized: string }}
+ */
+function extractProductFromUrl(url, originalName) {
+  const name = (originalName || '').toString().trim()
+  const normalized = normalizeProductName(name)
+  
+  if (!url) {
+    return {
+      id: normalized ? `ah-${normalized.replace(/\s+/g, '-')}` : null,
+      name,
+      normalized
+    }
+  }
+  
+  try {
+    const u = new URL(url)
+    // Expected format: /producten/product/<wi...>/<slug>
+    const match = u.pathname.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
+    if (match && match[1]) {
+      const slug = match[1].toLowerCase()
+      // Validate slug (only lowercase letters, numbers, hyphens)
+      if (/^[a-z0-9-]+$/.test(slug) && slug.length > 2) {
+        // Create display name from slug
+        let displayName = slug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        
+        return {
+          id: slug,
+          name: displayName,
+          normalized: normalizeProductName(slug.replace(/-/g, ' '))
+        }
+      }
+    }
+  } catch (_) {
+    // URL parsing failed, fall back to original name
+  }
+  
+  // Check if original name looks like a generic/bad name
+  const normalizedLower = normalized.toLowerCase()
+  if (GENERIC_PRODUCT_NAMES.has(normalizedLower) || normalized.length < 3) {
+    // Don't use generic names, try to extract something from URL path
+    try {
+      const u = new URL(url)
+      const parts = u.pathname.split('/').filter(p => p.length > 2)
+      const lastPart = parts[parts.length - 1]
+      if (lastPart && lastPart.length > 3) {
+        const cleanSlug = lastPart.toLowerCase().replace(/[^a-z0-9-]/g, '')
+        if (cleanSlug.length > 3) {
+          let displayName = cleanSlug.replace(/-/g, ' ')
+          displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+          return {
+            id: cleanSlug,
+            name: displayName,
+            normalized: normalizeProductName(cleanSlug.replace(/-/g, ' '))
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  
+  return {
+    id: normalized ? `ah-${normalized.replace(/\s+/g, '-')}` : null,
+    name,
+    normalized
+  }
+}
+
 // Data file path - DEPRECATED: Now using Supabase for all purchases
 // const DATA_FILE = path.join(__dirname, 'purchases.json')
 
@@ -1921,53 +2003,33 @@ app.post('/api/ingest/scrape', async (req, res) => {
     const userId = user?.id || null
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
-  const seen = new Set()
-  const cleaned = []
-  const seenIds = new Set()
+    const seen = new Set()
+    const cleaned = []
+    const seenIds = new Set()
     for (const raw of items) {
-      const name = (raw?.name || '').toString().trim()
-      if (!name) continue
+      const rawName = (raw?.name || '').toString().trim()
+      if (!rawName) continue
       const url = (raw?.url || '').toString().trim()
       const source = (raw?.source || 'ah_bonus').toString().trim()
-  const normalized_name = normalizeProductName(name)
-  const key = url || `${normalized_name}::${source}`
-  if (seen.has(key)) continue
-  seen.add(key)
-      // Human-readable ID: try to extract AH slug from URL, else prefix normalized_name
-      let id = null
-      let slugName = null
-      if (url) {
-        try {
-          const u = new URL(url)
-          // Expected: /producten/product/<wi...>/<slug>
-          const parts = u.pathname.split('/').filter(Boolean)
-          const slug = parts[parts.length - 1]
-          if (slug && /^[a-z0-9\-]+$/.test(slug)) {
-            id = slug
-            // Create display name from slug
-            slugName = slug.replace(/-/g, ' ')
-            slugName = slugName.replace(/\b[a-z]/g, (c) => c.toUpperCase())
-          }
-        } catch (_) {
-          // ignore URL parsing errors
-        }
-      }
-      if (!id) {
-        id = `ah-${normalized_name.replace(/\s+/g, '-')}`
-      }
+      
+      // Use helper to extract ID and name from URL
+      const extracted = extractProductFromUrl(url, rawName)
+      if (!extracted.id) continue
+      
+      const key = url || `${extracted.normalized}::${source}`
+      if (seen.has(key)) continue
+      seen.add(key)
 
       // De-duplicate by final id to avoid ON CONFLICT multiple-affect error
-      if (seenIds.has(id)) {
+      if (seenIds.has(extracted.id)) {
         continue
       }
-      seenIds.add(id)
-      const finalName = slugName || name
-      const finalNormalized = id ? normalizeProductName((slugName || '').toLowerCase()) : normalizeProductName(finalName)
+      seenIds.add(extracted.id)
 
       cleaned.push({
-        id,
-        name: finalName,
-        normalized_name: finalNormalized,
+        id: extracted.id,
+        name: extracted.name,
+        normalized_name: extracted.normalized,
         url: url || null,
         image_url: (raw?.image || '').toString().trim() || null,
         price: (typeof raw?.price === 'number' && !Number.isNaN(raw.price)) ? raw.price : null,
@@ -2720,26 +2782,19 @@ app.post('/api/auto-scrape', async (req, res) => {
       appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
       
       try {
-        // Normalize and prepare products for ingestion
+        // Normalize and prepare products for ingestion using helper
         const cleaned = resultData.products.map((item) => {
-          const name = (item.name || '').toString().trim()
-          const normalized = normalizeProductName(name)
+          const rawName = (item.name || '').toString().trim()
           const url = (item.url || '').toString().trim()
           
-          // Generate ID from URL or name
-          let id = null
-          if (url) {
-            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
-            if (urlMatch) id = urlMatch[1]
-          }
-          if (!id) {
-            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
-          }
+          // Use helper to extract ID and name from URL
+          const extracted = extractProductFromUrl(url, rawName)
+          if (!extracted.id) return null
           
           return {
-            id,
-            name,
-            normalized_name: normalized,
+            id: extracted.id,
+            name: extracted.name,
+            normalized_name: extracted.normalized,
             url: url || null,
             image_url: (item.image || '').toString().trim() || null,
             price: typeof item.price === 'number' ? item.price : null,
@@ -2747,7 +2802,7 @@ app.post('/api/auto-scrape', async (req, res) => {
             tags: null,
             updated_at: new Date().toISOString()
           }
-        }).filter((item) => item.name && item.id)
+        }).filter((item) => item && item.name && item.id)
         
         // Upsert to Supabase
         const { error: upsertError } = await supabase
@@ -2955,23 +3010,17 @@ app.post('/api/auto-scrape/resync', requireAuth, async (req, res) => {
       
       try {
         const cleaned = resultData.products.map((item) => {
-          const name = (item.name || '').toString().trim()
-          const normalized = normalizeProductName(name)
+          const rawName = (item.name || '').toString().trim()
           const url = (item.url || '').toString().trim()
           
-          let id = null
-          if (url) {
-            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
-            if (urlMatch) id = urlMatch[1]
-          }
-          if (!id) {
-            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
-          }
+          // Use helper to extract ID and name from URL
+          const extracted = extractProductFromUrl(url, rawName)
+          if (!extracted.id) return null
           
           return {
-            id,
-            name,
-            normalized_name: normalized,
+            id: extracted.id,
+            name: extracted.name,
+            normalized_name: extracted.normalized,
             url: url || null,
             image_url: (item.image || '').toString().trim() || null,
             price: typeof item.price === 'number' ? item.price : null,
@@ -2979,7 +3028,7 @@ app.post('/api/auto-scrape/resync', requireAuth, async (req, res) => {
             tags: null,
             updated_at: new Date().toISOString()
           }
-        }).filter((item) => item.name && item.id)
+        }).filter((item) => item && item.name && item.id)
         
         const { error: upsertError } = await supabase
           .from(SUPABASE_PRODUCTS_TABLE)
@@ -3263,23 +3312,17 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
       
       try {
         const cleaned = resultData.products.map((item) => {
-          const name = (item.name || '').toString().trim()
-          const normalized = normalizeProductName(name)
+          const rawName = (item.name || '').toString().trim()
           const url = (item.url || '').toString().trim()
           
-          let id = null
-          if (url) {
-            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
-            if (urlMatch) id = urlMatch[1]
-          }
-          if (!id) {
-            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
-          }
+          // Use helper to extract ID and name from URL
+          const extracted = extractProductFromUrl(url, rawName)
+          if (!extracted.id) return null
           
           return {
-            id,
-            name,
-            normalized_name: normalized,
+            id: extracted.id,
+            name: extracted.name,
+            normalized_name: extracted.normalized,
             url: url || null,
             image_url: (item.image || '').toString().trim() || null,
             price: typeof item.price === 'number' ? item.price : null,
@@ -3287,7 +3330,7 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
             tags: null,
             updated_at: new Date().toISOString()
           }
-        }).filter((item) => item.name && item.id)
+        }).filter((item) => item && item.name && item.id)
         
         const { error: upsertError } = await supabase
           .from(SUPABASE_PRODUCTS_TABLE)
@@ -3461,23 +3504,17 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
       try {
         const seenIds = new Set()
         const cleaned = resultData.products.map((item) => {
-          const name = (item.name || '').toString().trim()
-          const normalized = normalizeProductName(name)
+          const rawName = (item.name || '').toString().trim()
           const url = (item.url || '').toString().trim()
           
-          let id = null
-          if (url) {
-            const urlMatch = url.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
-            if (urlMatch) id = urlMatch[1]
-          }
-          if (!id) {
-            id = `auto_${normalized.replace(/[^a-z0-9]/g, '_').substring(0, 50)}`
-          }
+          // Use helper to extract ID and name from URL
+          const extracted = extractProductFromUrl(url, rawName)
+          if (!extracted.id) return null
           
           return {
-            id,
-            name,
-            normalized_name: normalized,
+            id: extracted.id,
+            name: extracted.name,
+            normalized_name: extracted.normalized,
             url: url || null,
             image_url: (item.image || '').toString().trim() || null,
             price: typeof item.price === 'number' ? item.price : null,
@@ -3487,7 +3524,7 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
           }
         }).filter((item) => {
           // Filter out items without name/id and deduplicate by id
-          if (!item.name || !item.id) return false
+          if (!item || !item.name || !item.id) return false
           if (seenIds.has(item.id)) return false
           seenIds.add(item.id)
           return true
