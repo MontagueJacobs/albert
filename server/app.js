@@ -1104,6 +1104,98 @@ app.get('/api/user/insights', requireAuth, async (req, res) => {
   }
 })
 
+// Get user's full purchase history with enriched product data
+app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100)
+    const offset = (page - 1) * limit
+    const sortBy = req.query.sortBy || 'purchased_at'
+    const sortOrder = req.query.sortOrder === 'asc' ? true : false
+    
+    // Get user purchases
+    const { data: purchases, error, count } = await supabase
+      .from('user_purchases')
+      .select('id, product_id, product_name, price, quantity, source, purchased_at, created_at', { count: 'exact' })
+      .eq('user_id', req.user.id)
+      .order(sortBy, { ascending: sortOrder })
+      .range(offset, offset + limit - 1)
+    
+    if (error) throw error
+    
+    if (!purchases || purchases.length === 0) {
+      return res.json({ 
+        purchases: [], 
+        total: 0,
+        page,
+        limit,
+        totalPages: 0
+      })
+    }
+    
+    // Get product IDs to fetch enriched data
+    const productIds = [...new Set(purchases.map(p => p.product_id).filter(Boolean))]
+    
+    // Fetch enriched product data
+    let enrichedProducts = {}
+    if (productIds.length > 0) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, image_url, url')
+        .in('id', productIds)
+      
+      if (products) {
+        enrichedProducts = products.reduce((acc, p) => {
+          acc[p.id] = p
+          return acc
+        }, {})
+      }
+    }
+    
+    // Combine purchase data with enriched product data and sustainability scores
+    const purchasesWithDetails = purchases.map(purchase => {
+      const enriched = enrichedProducts[purchase.product_id] || {}
+      const evaluation = evaluateProductWithRecord(purchase.product_name, enriched)
+      
+      return {
+        id: purchase.id,
+        product_id: purchase.product_id,
+        product_name: purchase.product_name,
+        price: purchase.price,
+        quantity: purchase.quantity,
+        source: purchase.source,
+        purchased_at: purchase.purchased_at,
+        created_at: purchase.created_at,
+        // Enriched fields
+        is_vegan: enriched.is_vegan ?? null,
+        is_vegetarian: enriched.is_vegetarian ?? null,
+        is_organic: enriched.is_organic ?? null,
+        nutri_score: enriched.nutri_score ?? null,
+        origin_country: enriched.origin_country ?? null,
+        brand: enriched.brand ?? null,
+        image_url: enriched.image_url ?? null,
+        product_url: enriched.url ?? null,
+        // Sustainability scoring
+        sustainability_score: evaluation.score,
+        sustainability_rating: evaluation.rating,
+        has_enriched_data: evaluation.hasEnrichedData || false,
+        enriched_factors: evaluation.enriched || []
+      }
+    })
+    
+    res.json({
+      purchases: purchasesWithDetails,
+      total: count || purchases.length,
+      page,
+      limit,
+      totalPages: Math.ceil((count || purchases.length) / limit)
+    })
+  } catch (err) {
+    console.error('Error fetching purchase history:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
 // Get personalized suggestions based on user's purchase history
 app.get('/api/user/suggestions', requireAuth, async (req, res) => {
   try {
