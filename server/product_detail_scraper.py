@@ -228,6 +228,10 @@ class AHProductDetailScraper:
                 'eko-keurmerk',
                 'skal',
                 'organic',
+                'eu bio',
+                'eu-bio',
+                'demeter',  # Biodynamic certification
+                'beter leven',  # Better Life mark (animal welfare but often organic)
             ]
             
             for indicator in organic_indicators:
@@ -242,6 +246,42 @@ class AHProductDetailScraper:
                     title = (await title_elem.inner_text()).lower()
                     if 'bio ' in title or 'biologisch' in title or title.startswith('bio'):
                         result['is_organic'] = True
+            except:
+                pass
+            
+            # Check for organic certification badges/icons
+            try:
+                # Look for EKO logo, EU Organic leaf logo, or Skal certification
+                organic_badges = await self.page.query_selector_all(
+                    '[class*="organic"], [class*="bio"], [class*="eko"], '
+                    '[alt*="biologisch"], [alt*="organic"], [alt*="eko"], '
+                    'img[src*="bio"], img[src*="organic"], img[src*="eko"], '
+                    '[data-testid*="organic"], [data-testid*="bio"]'
+                )
+                if organic_badges and len(organic_badges) > 0:
+                    for badge in organic_badges:
+                        alt = await badge.get_attribute('alt') or ''
+                        src = await badge.get_attribute('src') or ''
+                        text = ''
+                        try:
+                            text = await badge.inner_text()
+                        except:
+                            pass
+                        combined = (alt + src + text).lower()
+                        if any(ind in combined for ind in ['bio', 'organic', 'eko', 'skal']):
+                            result['is_organic'] = True
+                            break
+            except:
+                pass
+            
+            # Check product badges section specifically (AH often shows keurmerken/certification marks)
+            try:
+                badge_sections = await self.page.query_selector_all('[class*="keurmerk"], [class*="badge"], [class*="certification"]')
+                for section in badge_sections:
+                    text = (await section.inner_text()).lower()
+                    if any(ind in text for ind in ['bio', 'biologisch', 'organic', 'eko', 'skal']):
+                        result['is_organic'] = True
+                        break
             except:
                 pass
                 

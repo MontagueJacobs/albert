@@ -291,6 +291,15 @@ function isLikelyPlantBased(name) {
   return plantIndicators.some(indicator => lower.includes(indicator))
 }
 
+// Helper to check if a product name indicates organic/bio certification
+function isLikelyOrganic(name) {
+  const lower = (name || '').toLowerCase()
+  const organicIndicators = ['biologisch', 'biologische', ' bio ', 'bio-', 'eko-', 'organic']
+  // Also check if name starts with 'bio ' or ends with ' bio'
+  return organicIndicators.some(indicator => lower.includes(indicator)) ||
+         lower.startsWith('bio ') || lower.endsWith(' bio')
+}
+
 // ============================================================================
 // ENRICHED FIELD SCORING RULES
 // These use scraped product detail data for more accurate scoring
@@ -731,6 +740,12 @@ function evaluateProduct(productName = '', enrichedData = null) {
     if (Array.isArray(entry.adjustments)) {
       for (const adj of entry.adjustments) {
         if (!adj || typeof adj.delta !== 'number') continue
+        // Skip meat-related trait adjustments for plant-based products
+        // These traits are only relevant for actual animal products
+        const meatRelatedTraits = ['trait_high_methane', 'trait_high_emissions', 'trait_animal_welfare', 'trait_meat']
+        if (skipMeatScoring && isMeatCatalog && meatRelatedTraits.includes(adj.code)) {
+          continue
+        }
         applyDelta('catalog', adj.code, adj.delta)
       }
     }
@@ -2071,6 +2086,10 @@ app.post('/api/ingest/scrape', async (req, res) => {
       }
       seenIds.add(extracted.id)
 
+      // Auto-detect dietary and organic properties from product name
+      const isPlantBased = isLikelyPlantBased(extracted.name)
+      const isOrganic = isLikelyOrganic(extracted.name)
+
       cleaned.push({
         id: extracted.id,
         name: extracted.name,
@@ -2079,6 +2098,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
         image_url: (raw?.image || '').toString().trim() || null,
         price: (typeof raw?.price === 'number' && !Number.isNaN(raw.price)) ? raw.price : null,
         source,
+        // Auto-detected properties (only set if true, preserve existing data otherwise)
+        ...(isPlantBased ? { is_vegan: true, is_vegetarian: true } : {}),
+        ...(isOrganic ? { is_organic: true } : {}),
         updated_at: new Date().toISOString()
       })
     }
