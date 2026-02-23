@@ -105,25 +105,31 @@ class AHReceiptScraper:
     async def is_logged_in(self) -> bool:
         """Check if currently logged in to AH."""
         try:
-            # Navigate to a protected page
-            await self.page.goto(self.LOGIN_URL, wait_until='domcontentloaded', timeout=15000)
-            await asyncio.sleep(2)
-            
-            # Check if we're on login page or redirected
             current_url = self.page.url
+            
+            # If we're on a blank page, navigate to mijn first
+            if not current_url or current_url == 'about:blank':
+                await self.page.goto(self.LOGIN_URL, wait_until='domcontentloaded', timeout=15000)
+                await asyncio.sleep(2)
+                current_url = self.page.url
+            
+            # If we're on login page, not logged in
             if 'login' in current_url.lower():
                 return False
                 
-            # Look for logged-in indicators
-            content = await self.page.content()
-            logged_in_indicators = ['uitloggen', 'logout', 'mijn account', 'welkom']
-            return any(ind in content.lower() for ind in logged_in_indicators)
+            # If we're on a mijn/* page, we're logged in
+            if '/mijn' in current_url and 'login' not in current_url:
+                content = await self.page.content()
+                logged_in_indicators = ['uitloggen', 'logout', 'mijn account', 'welkom', 'eerder gekocht']
+                return any(ind in content.lower() for ind in logged_in_indicators)
+            
+            return False
             
         except Exception as e:
             print(f"[WARN] Login check failed: {e}", flush=True)
             return False
             
-    async def manual_login(self, timeout_seconds: int = 120):
+    async def manual_login(self, timeout_seconds: int = 300):
         """
         Open browser for manual login.
         
@@ -131,19 +137,25 @@ class AHReceiptScraper:
             timeout_seconds: Max time to wait for login
         """
         print("[INFO] Opening AH login page for manual authentication...", flush=True)
-        print(f"[INFO] You have {timeout_seconds} seconds to log in.", flush=True)
+        print(f"[INFO] You have {timeout_seconds // 60} minutes to log in.", flush=True)
+        print("[INFO] Take your time - the page will NOT refresh while you type.", flush=True)
         
         await self.page.goto(self.LOGIN_URL, wait_until='domcontentloaded')
         
-        # Wait for user to complete login
+        # Wait for user to complete login - check every 5 seconds
+        # Don't navigate, just check the current URL
         start_time = datetime.now()
         while (datetime.now() - start_time).seconds < timeout_seconds:
-            if await self.is_logged_in():
+            await asyncio.sleep(5)  # Check every 5 seconds, not 2
+            
+            # Just check URL without navigating
+            current_url = self.page.url
+            if '/mijn/' in current_url and 'login' not in current_url.lower():
+                # User navigated to a protected page - they're logged in
                 print("[SUCCESS] Login detected!", flush=True)
                 await self.save_session()
                 return True
-            await asyncio.sleep(2)
-            
+                
         print("[ERROR] Login timeout - please try again", flush=True)
         return False
         

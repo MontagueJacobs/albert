@@ -2157,6 +2157,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
       }
 
       // 2. If user is authenticated, record purchases in user_purchases table
+      // Uses upsert to prevent duplicates when scanning same products again
       if (userId) {
         const now = new Date().toISOString()
         const purchaseRecords = cleaned.map(p => ({
@@ -2166,13 +2167,17 @@ app.post('/api/ingest/scrape', async (req, res) => {
           price: p.price,
           quantity: 1,
           source: req.body?.source || 'browser_extension',
-          scraped_at: now
+          purchased_at: now,  // Will be kept on conflict (original purchase date)
+          last_seen_at: now   // Always updated on re-import
         }))
 
-        // Use upsert to avoid duplicates (same user + product + day)
+        // Use upsert to avoid duplicates (same user + product)
         const { error: purchaseError } = await supabase
           .from('user_purchases')
-          .insert(purchaseRecords)
+          .upsert(purchaseRecords, {
+            onConflict: 'user_id,product_id',
+            ignoreDuplicates: false  // Update last_seen_at on conflict
+          })
         
         if (purchaseError) {
           // Log but don't fail - products were already stored
@@ -3423,6 +3428,7 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
           autoScrapeState.lastRun.productsStored = cleaned.length
           
           // Also save to user_purchases if we have a userId
+          // Uses upsert to prevent duplicates when re-scraping
           if (userId) {
             appendAutoScrapeLog('info', `👤 Saving purchases for user: ${userId}`)
             const now = new Date().toISOString()
@@ -3433,21 +3439,30 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
               price: p.price,
               quantity: 1,
               source: 'ah_visual_login',
-              scraped_at: now
+              purchased_at: now,  // Will be ignored on conflict (keeps original)
+              last_seen_at: now   // Always updated on re-scrape
             }))
             
-            console.log(`[DEBUG] Inserting ${purchases.length} purchases for user ${userId}`)
+            console.log(`[DEBUG] Upserting ${purchases.length} purchases for user ${userId}`)
             console.log('[DEBUG] Sample purchase:', JSON.stringify(purchases[0], null, 2))
             
-            const { data: insertedData, error: purchaseError } = await supabase.from('user_purchases').insert(purchases).select()
+            // Use upsert with ON CONFLICT to handle re-scrapes
+            // On conflict: update last_seen_at, keep original purchased_at
+            const { data: upsertedData, error: purchaseError } = await supabase
+              .from('user_purchases')
+              .upsert(purchases, { 
+                onConflict: 'user_id,product_id',
+                ignoreDuplicates: false  // We want to update last_seen_at
+              })
+              .select()
             if (purchaseError) {
               appendAutoScrapeLog('stderr', `Failed to record purchases: ${purchaseError.message}`)
-              console.error('user_purchases insert error:', purchaseError)
-              console.error('user_purchases insert error code:', purchaseError.code)
-              console.error('user_purchases insert error details:', purchaseError.details)
+              console.error('user_purchases upsert error:', purchaseError)
+              console.error('user_purchases upsert error code:', purchaseError.code)
+              console.error('user_purchases upsert error details:', purchaseError.details)
             } else {
-              appendAutoScrapeLog('info', `✅ Recorded ${purchases.length} purchases for user`)
-              console.log(`[SUCCESS] Inserted ${insertedData?.length || purchases.length} rows to user_purchases`)
+              appendAutoScrapeLog('info', `✅ Upserted ${purchases.length} purchases for user (no duplicates on re-scrape)`)
+              console.log(`[SUCCESS] Upserted ${upsertedData?.length || purchases.length} rows to user_purchases`)
             }
           } else {
             appendAutoScrapeLog('info', `⚠️ No user authenticated - purchases not saved to user account`)
@@ -3642,7 +3657,9 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
         }
         
         // 2. If user is authenticated, also record as user purchases
+        // Uses upsert to prevent duplicates on re-scrape
         if (userId) {
+          const now = new Date().toISOString()
           const userPurchases = cleaned.map(item => ({
             user_id: userId,
             product_id: item.id,
@@ -3651,17 +3668,21 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
             product_image_url: item.image_url,
             price: item.price,
             source: 'ah_auto_scrape',
-            scraped_at: new Date().toISOString()
+            purchased_at: now,  // Kept on conflict (original purchase date)
+            last_seen_at: now   // Always updated
           }))
           
           const { error: purchaseError } = await supabase
             .from('user_purchases')
-            .insert(userPurchases)
+            .upsert(userPurchases, {
+              onConflict: 'user_id,product_id',
+              ignoreDuplicates: false
+            })
           
           if (purchaseError) {
-            appendAutoScrapeLog('stderr', `User purchases insert failed: ${purchaseError.message}`)
+            appendAutoScrapeLog('stderr', `User purchases upsert failed: ${purchaseError.message}`)
           } else {
-            appendAutoScrapeLog('info', `Recorded ${userPurchases.length} purchases for user.`)
+            appendAutoScrapeLog('info', `Upserted ${userPurchases.length} purchases for user (no duplicates on re-scrape).`)
             autoScrapeState.lastRun.userPurchasesRecorded = userPurchases.length
           }
           
