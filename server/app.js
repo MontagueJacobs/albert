@@ -147,7 +147,7 @@ app.get('/api/ah-user/check', async (req, res) => {
   } catch (err) {
     console.error('Error checking AH user:', err)
     res.status(500).json({ error: 'check_failed', message: err.message })
-  })
+  }
 })
 
 // ============================================================================
