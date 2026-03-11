@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Mail, ShoppingCart, Leaf, ArrowRight } from 'lucide-react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { Mail, ShoppingCart, Leaf, ArrowRight, Loader2, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react'
 import { useAHUser } from '../lib/ahUserContext'
 import { useI18n } from '../i18n.jsx'
 
@@ -7,7 +7,7 @@ import { useI18n } from '../i18n.jsx'
  * Landing page for non-identified users
  * Options:
  * 1. Enter AH email to view saved data (returning user)
- * 2. Connect AH account for the first time (new user)
+ * 2. Connect AH account for the first time (new user) - triggers visual login flow
  */
 export default function AHLanding({ onConnectNew }) {
   const { setAHEmail } = useAHUser()
@@ -15,9 +15,13 @@ export default function AHLanding({ onConnectNew }) {
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
-  const [showRegister, setShowRegister] = useState(false)
-  const [registerEmail, setRegisterEmail] = useState('')
-  const [registering, setRegistering] = useState(false)
+  
+  // Connect flow state
+  const [connectStep, setConnectStep] = useState('idle') // 'idle', 'email', 'connecting', 'syncing', 'success', 'error'
+  const [connectEmail, setConnectEmail] = useState('')
+  const [connectProgress, setConnectProgress] = useState('')
+  const [productsCount, setProductsCount] = useState(0)
+  const pollRef = useRef(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -44,40 +48,113 @@ export default function AHLanding({ onConnectNew }) {
     }
   }
 
-  const handleRegister = async (e) => {
-    e.preventDefault()
-    if (!registerEmail.trim()) return
-    
-    setRegistering(true)
-    setError('')
-    
-    try {
-      // Register/create the user with their AH email
-      const res = await fetch('/api/ah-user/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: registerEmail.trim() })
-      })
-      const data = await res.json()
-      
-      if (res.ok) {
-        // Registration successful, log them in
-        setAHEmail(registerEmail.trim())
-      } else {
-        setError(data.message || t('landing_error_generic'))
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
       }
-    } catch (err) {
-      setError(t('landing_error_generic'))
-    } finally {
-      setRegistering(false)
     }
-  }
+  }, [])
 
+  // Poll for sync status while connecting/syncing
+  useEffect(() => {
+    if (connectStep === 'connecting' || connectStep === 'syncing') {
+      pollRef.current = setInterval(async () => {
+        try {
+          const res = await fetch('/api/auto-scrape/status')
+          const data = await res.json()
+          
+          if (data.progress) {
+            setConnectProgress(data.progress)
+          }
+          
+          if (!data.running) {
+            clearInterval(pollRef.current)
+            pollRef.current = null
+            
+            if (data.lastRun?.status === 'success') {
+              setConnectStep('success')
+              setProductsCount(data.lastRun.productsStored || data.lastRun.productsFound || 0)
+              // Wait a moment then log user in
+              setTimeout(() => {
+                setAHEmail(connectEmail.trim())
+              }, 2000)
+            } else {
+              setConnectStep('error')
+              setError(data.lastRun?.error || t('landing_error_generic'))
+            }
+          }
+        } catch (e) {
+          console.error('Poll error:', e)
+        }
+      }, 2000)
+    }
+    
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
+  }, [connectStep, connectEmail, setAHEmail, t])
+
+  // Start the connect flow - first ask for email
   const handleConnectClick = () => {
     if (onConnectNew) {
       onConnectNew()
     } else {
-      setShowRegister(true)
+      setConnectStep('email')
+    }
+  }
+
+  // After email entered, start visual login
+  const handleStartVisualLogin = async (e) => {
+    e.preventDefault()
+    if (!connectEmail.trim()) return
+    
+    setConnectStep('connecting')
+    setConnectProgress(t('landing_opening_browser'))
+    setError('')
+    
+    try {
+      // First register the user
+      await fetch('/api/ah-user/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: connectEmail.trim() })
+      })
+      
+      // Start visual login with email header so data is tied to this user
+      const res = await fetch('/api/auto-scrape/visual-login', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-AH-Email': connectEmail.trim()
+        }
+      })
+      
+      if (res.status === 501) {
+        // Not supported on hosted version - fall back to simple registration
+        setError(t('landing_visual_not_supported'))
+        setConnectStep('error')
+        return
+      }
+      
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to start')
+      }
+      
+      setConnectProgress(t('landing_please_login'))
+      setConnectStep('syncing')
+      // Polling will take over from here
+      
+    } catch (err) {
+      console.error('Connect failed:', err)
+      setError(err.message)
+      setConnectStep('error')
     }
   }
 
@@ -141,19 +218,28 @@ export default function AHLanding({ onConnectNew }) {
           </button>
         </form>
 
-        {/* New user option */}
+        {/* New user / Connect option */}
         <div style={styles.newUser}>
           <p style={styles.newUserText}>{t('landing_not_connected')}</p>
           
-          {showRegister ? (
-            <form onSubmit={handleRegister} style={styles.registerForm}>
+          {connectStep === 'idle' && (
+            <button 
+              onClick={handleConnectClick}
+              style={styles.connectBtn}
+            >
+              {t('landing_connect_account')}
+            </button>
+          )}
+          
+          {connectStep === 'email' && (
+            <form onSubmit={handleStartVisualLogin} style={styles.registerForm}>
               <p style={styles.registerHint}>{t('landing_enter_ah_email')}</p>
               <div style={styles.inputGroup}>
                 <Mail size={20} style={styles.inputIcon} />
                 <input
                   type="email"
-                  value={registerEmail}
-                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  value={connectEmail}
+                  onChange={(e) => setConnectEmail(e.target.value)}
                   placeholder={t('landing_email_placeholder')}
                   style={styles.input}
                   required
@@ -162,30 +248,57 @@ export default function AHLanding({ onConnectNew }) {
               </div>
               <button 
                 type="submit" 
-                disabled={registering || !registerEmail.trim()}
+                disabled={!connectEmail.trim()}
                 style={{
                   ...styles.submitBtn,
-                  opacity: registering || !registerEmail.trim() ? 0.7 : 1,
+                  background: 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
+                  opacity: !connectEmail.trim() ? 0.7 : 1,
                 }}
               >
-                {registering ? t('landing_registering') : t('landing_start_tracking')}
-                <ArrowRight size={18} />
+                <ExternalLink size={18} />
+                {t('landing_open_ah_login')}
               </button>
               <button 
                 type="button"
-                onClick={() => setShowRegister(false)}
+                onClick={() => setConnectStep('idle')}
                 style={styles.cancelBtn}
               >
                 {t('landing_cancel')}
               </button>
             </form>
-          ) : (
-            <button 
-              onClick={handleConnectClick}
-              style={styles.connectBtn}
-            >
-              {t('landing_connect_account')}
-            </button>
+          )}
+          
+          {(connectStep === 'connecting' || connectStep === 'syncing') && (
+            <div style={styles.connectingBox}>
+              <div style={styles.spinnerContainer}>
+                <Loader2 size={32} style={{ color: '#00ADE6', animation: 'spin 1s linear infinite' }} />
+              </div>
+              <p style={styles.connectingText}>{connectProgress}</p>
+              <p style={styles.connectingHint}>
+                {t('landing_login_hint')}
+              </p>
+            </div>
+          )}
+          
+          {connectStep === 'success' && (
+            <div style={styles.successBox}>
+              <CheckCircle size={48} style={{ color: '#22c55e' }} />
+              <p style={styles.successText}>{t('landing_sync_success')}</p>
+              <p style={styles.successCount}>{productsCount} {t('landing_products_synced')}</p>
+            </div>
+          )}
+          
+          {connectStep === 'error' && (
+            <div style={styles.errorBox}>
+              <AlertCircle size={32} style={{ color: '#ef4444' }} />
+              <p style={styles.errorText}>{error}</p>
+              <button 
+                onClick={() => { setConnectStep('idle'); setError(''); }}
+                style={styles.connectBtn}
+              >
+                {t('landing_try_again')}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -350,6 +463,52 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     width: '100%',
+  },
+  connectingBox: {
+    padding: '1.5rem',
+    textAlign: 'center',
+  },
+  spinnerContainer: {
+    marginBottom: '1rem',
+  },
+  connectingText: {
+    fontSize: '1rem',
+    fontWeight: 600,
+    color: '#333',
+    marginBottom: '0.5rem',
+  },
+  connectingHint: {
+    fontSize: '0.85rem',
+    color: '#666',
+  },
+  successBox: {
+    padding: '1.5rem',
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  successText: {
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    color: '#22c55e',
+  },
+  successCount: {
+    fontSize: '0.9rem',
+    color: '#666',
+  },
+  errorBox: {
+    padding: '1.5rem',
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  errorText: {
+    fontSize: '0.9rem',
+    color: '#ef4444',
   },
   footer: {
     marginTop: '1.5rem',

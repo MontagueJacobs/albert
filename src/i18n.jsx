@@ -266,7 +266,15 @@ const TRANSLATIONS = {
     landing_enter_ah_email: 'Voer je Albert Heijn e-mailadres in om te beginnen met het bijhouden van je duurzaamheid.',
     landing_registering: 'Registreren...',
     landing_start_tracking: 'Start met bijhouden',
-    landing_cancel: 'Annuleren'
+    landing_cancel: 'Annuleren',
+    landing_open_ah_login: 'Open AH login',
+    landing_opening_browser: 'Browser openen...',
+    landing_please_login: 'Log in op je Albert Heijn account in het browservenster...',
+    landing_login_hint: 'Sluit het browservenster na het inloggen niet. We synchroniseren automatisch je aankopen.',
+    landing_sync_success: 'Synchronisatie gelukt!',
+    landing_products_synced: 'producten gesynchroniseerd',
+    landing_try_again: 'Opnieuw proberen',
+    landing_visual_not_supported: 'Deze functie is alleen beschikbaar als je de app lokaal draait. Gebruik de bookmarklet methode in de Sync tab.'
   },
   en: {
     app_title: 'Sustainable Shopping',
@@ -533,7 +541,15 @@ const TRANSLATIONS = {
     landing_enter_ah_email: 'Enter your Albert Heijn email address to start tracking your sustainability.',
     landing_registering: 'Registering...',
     landing_start_tracking: 'Start tracking',
-    landing_cancel: 'Cancel'
+    landing_cancel: 'Cancel',
+    landing_open_ah_login: 'Open AH login',
+    landing_opening_browser: 'Opening browser...',
+    landing_please_login: 'Please log in to your Albert Heijn account in the browser window...',
+    landing_login_hint: 'Do not close the browser window after logging in. We will automatically sync your purchases.',
+    landing_sync_success: 'Sync successful!',
+    landing_products_synced: 'products synced',
+    landing_try_again: 'Try again',
+    landing_visual_not_supported: 'This feature is only available when running the app locally. Use the bookmarklet method in the Sync tab.'
   }
 }
 
