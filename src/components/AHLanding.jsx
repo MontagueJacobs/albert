@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Mail, ShoppingCart, Leaf, ArrowRight } from 'lucide-react'
 import { useAHUser } from '../lib/ahUserContext'
+import { useI18n } from '../i18n.jsx'
 
 /**
  * Landing page for non-identified users
@@ -10,9 +11,13 @@ import { useAHUser } from '../lib/ahUserContext'
  */
 export default function AHLanding({ onConnectNew }) {
   const { setAHEmail } = useAHUser()
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
+  const [registerEmail, setRegisterEmail] = useState('')
+  const [registering, setRegistering] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,12 +35,49 @@ export default function AHLanding({ onConnectNew }) {
         // User has data, log them in
         setAHEmail(email.trim())
       } else {
-        setError('Geen gegevens gevonden voor dit e-mailadres. Koppel eerst je AH-account.')
+        setError(t('landing_error_no_data'))
       }
     } catch (err) {
-      setError('Er ging iets mis. Probeer het opnieuw.')
+      setError(t('landing_error_generic'))
     } finally {
       setChecking(false)
+    }
+  }
+
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    if (!registerEmail.trim()) return
+    
+    setRegistering(true)
+    setError('')
+    
+    try {
+      // Register/create the user with their AH email
+      const res = await fetch('/api/ah-user/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: registerEmail.trim() })
+      })
+      const data = await res.json()
+      
+      if (res.ok) {
+        // Registration successful, log them in
+        setAHEmail(registerEmail.trim())
+      } else {
+        setError(data.message || t('landing_error_generic'))
+      }
+    } catch (err) {
+      setError(t('landing_error_generic'))
+    } finally {
+      setRegistering(false)
+    }
+  }
+
+  const handleConnectClick = () => {
+    if (onConnectNew) {
+      onConnectNew()
+    } else {
+      setShowRegister(true)
     }
   }
 
@@ -47,9 +89,9 @@ export default function AHLanding({ onConnectNew }) {
           <div style={styles.logoContainer}>
             <Leaf size={32} style={{ color: '#00ADE6' }} />
           </div>
-          <h1 style={styles.title}>Duurzaam Boodschappen</h1>
+          <h1 style={styles.title}>{t('landing_title')}</h1>
           <p style={styles.subtitle}>
-            Ontdek de duurzaamheid van je Albert Heijn aankopen
+            {t('landing_subtitle')}
           </p>
         </div>
 
@@ -57,17 +99,17 @@ export default function AHLanding({ onConnectNew }) {
         <div style={styles.features}>
           <div style={styles.feature}>
             <ShoppingCart size={20} style={{ color: '#00ADE6' }} />
-            <span>Bekijk je aankoopgeschiedenis</span>
+            <span>{t('landing_feature_history')}</span>
           </div>
           <div style={styles.feature}>
             <Leaf size={20} style={{ color: '#22c55e' }} />
-            <span>Krijg duurzaamheidsscores</span>
+            <span>{t('landing_feature_scores')}</span>
           </div>
         </div>
 
         {/* Divider */}
         <div style={styles.divider}>
-          <span style={styles.dividerText}>Al eerder gekoppeld?</span>
+          <span style={styles.dividerText}>{t('landing_already_connected')}</span>
         </div>
 
         {/* Email lookup form */}
@@ -78,7 +120,7 @@ export default function AHLanding({ onConnectNew }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Je AH e-mailadres"
+              placeholder={t('landing_email_placeholder')}
               style={styles.input}
               required
             />
@@ -94,26 +136,63 @@ export default function AHLanding({ onConnectNew }) {
               opacity: checking || !email.trim() ? 0.7 : 1,
             }}
           >
-            {checking ? 'Controleren...' : 'Bekijk mijn gegevens'}
+            {checking ? t('landing_checking') : t('landing_view_data')}
             <ArrowRight size={18} />
           </button>
         </form>
 
         {/* New user option */}
         <div style={styles.newUser}>
-          <p style={styles.newUserText}>Nog niet gekoppeld?</p>
-          <button 
-            onClick={onConnectNew}
-            style={styles.connectBtn}
-          >
-            Koppel je AH-account
-          </button>
+          <p style={styles.newUserText}>{t('landing_not_connected')}</p>
+          
+          {showRegister ? (
+            <form onSubmit={handleRegister} style={styles.registerForm}>
+              <p style={styles.registerHint}>{t('landing_enter_ah_email')}</p>
+              <div style={styles.inputGroup}>
+                <Mail size={20} style={styles.inputIcon} />
+                <input
+                  type="email"
+                  value={registerEmail}
+                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  placeholder={t('landing_email_placeholder')}
+                  style={styles.input}
+                  required
+                  autoFocus
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={registering || !registerEmail.trim()}
+                style={{
+                  ...styles.submitBtn,
+                  opacity: registering || !registerEmail.trim() ? 0.7 : 1,
+                }}
+              >
+                {registering ? t('landing_registering') : t('landing_start_tracking')}
+                <ArrowRight size={18} />
+              </button>
+              <button 
+                type="button"
+                onClick={() => setShowRegister(false)}
+                style={styles.cancelBtn}
+              >
+                {t('landing_cancel')}
+              </button>
+            </form>
+          ) : (
+            <button 
+              onClick={handleConnectClick}
+              style={styles.connectBtn}
+            >
+              {t('landing_connect_account')}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Footer */}
       <p style={styles.footer}>
-        Je gegevens worden veilig opgeslagen en alleen gebruikt om je duurzaamheidsinzichten te tonen.
+        {t('landing_privacy_notice')}
       </p>
     </div>
   )
@@ -252,6 +331,25 @@ const styles = {
     borderRadius: '10px',
     cursor: 'pointer',
     transition: 'all 0.2s',
+  },
+  registerForm: {
+    width: '100%',
+  },
+  registerHint: {
+    fontSize: '0.9rem',
+    color: '#666',
+    marginBottom: '1rem',
+    textAlign: 'center',
+  },
+  cancelBtn: {
+    marginTop: '0.75rem',
+    padding: '0.5rem 1rem',
+    fontSize: '0.9rem',
+    color: '#888',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    width: '100%',
   },
   footer: {
     marginTop: '1.5rem',

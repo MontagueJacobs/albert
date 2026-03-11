@@ -248,7 +248,25 @@ const TRANSLATIONS = {
       beverage: 'Drank',
       egg: 'Eieren',
       seafood: 'Vis & zeevruchten'
-    }
+    },
+    // Landing page translations
+    landing_title: 'Duurzaam Boodschappen',
+    landing_subtitle: 'Ontdek de duurzaamheid van je Albert Heijn aankopen',
+    landing_feature_history: 'Bekijk je aankoopgeschiedenis',
+    landing_feature_scores: 'Krijg duurzaamheidsscores',
+    landing_already_connected: 'Al eerder gekoppeld?',
+    landing_email_placeholder: 'Je AH e-mailadres',
+    landing_checking: 'Controleren...',
+    landing_view_data: 'Bekijk mijn gegevens',
+    landing_error_no_data: 'Geen gegevens gevonden voor dit e-mailadres. Koppel eerst je AH-account.',
+    landing_error_generic: 'Er ging iets mis. Probeer het opnieuw.',
+    landing_not_connected: 'Nog niet gekoppeld?',
+    landing_connect_account: 'Koppel je AH-account',
+    landing_privacy_notice: 'Je gegevens worden veilig opgeslagen en alleen gebruikt om je duurzaamheidsinzichten te tonen.',
+    landing_enter_ah_email: 'Voer je Albert Heijn e-mailadres in om te beginnen met het bijhouden van je duurzaamheid.',
+    landing_registering: 'Registreren...',
+    landing_start_tracking: 'Start met bijhouden',
+    landing_cancel: 'Annuleren'
   },
   en: {
     app_title: 'Sustainable Shopping',
@@ -497,7 +515,25 @@ const TRANSLATIONS = {
       beverage: 'Beverage',
       egg: 'Eggs',
       seafood: 'Seafood'
-    }
+    },
+    // Landing page translations
+    landing_title: 'Sustainable Shopping',
+    landing_subtitle: 'Discover the sustainability of your Albert Heijn purchases',
+    landing_feature_history: 'View your purchase history',
+    landing_feature_scores: 'Get sustainability scores',
+    landing_already_connected: 'Already connected?',
+    landing_email_placeholder: 'Your AH email address',
+    landing_checking: 'Checking...',
+    landing_view_data: 'View my data',
+    landing_error_no_data: 'No data found for this email address. Connect your AH account first.',
+    landing_error_generic: 'Something went wrong. Please try again.',
+    landing_not_connected: 'Not connected yet?',
+    landing_connect_account: 'Connect your AH account',
+    landing_privacy_notice: 'Your data is securely stored and only used to show your sustainability insights.',
+    landing_enter_ah_email: 'Enter your Albert Heijn email address to start tracking your sustainability.',
+    landing_registering: 'Registering...',
+    landing_start_tracking: 'Start tracking',
+    landing_cancel: 'Cancel'
   }
 }
 

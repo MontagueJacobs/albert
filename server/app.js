@@ -151,6 +151,67 @@ app.get('/api/ah-user/check', async (req, res) => {
 })
 
 // ============================================================================
+// AH USER REGISTER ENDPOINT (Create new user with AH email)
+// For new users who want to start tracking their sustainability
+// ============================================================================
+app.post('/api/ah-user/register', async (req, res) => {
+  try {
+    const { email } = req.body
+    
+    if (!email) {
+      return res.status(400).json({ error: 'missing_email', message: 'Email is required' })
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim()
+    
+    if (!supabase) {
+      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
+    }
+    
+    // Check if user already exists
+    const { data: existing } = await supabase
+      .from('user_ah_credentials')
+      .select('id, ah_email')
+      .eq('ah_email', normalizedEmail)
+      .single()
+    
+    if (existing) {
+      // User already exists, that's fine
+      return res.json({ 
+        success: true, 
+        email: existing.ah_email,
+        message: 'Account found. Welcome back!' 
+      })
+    }
+    
+    // Create new user
+    const { data: newUser, error: insertError } = await supabase
+      .from('user_ah_credentials')
+      .insert([{
+        ah_email: normalizedEmail,
+        sync_status: 'pending',
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single()
+    
+    if (insertError) {
+      console.error('Error creating AH user:', insertError)
+      return res.status(500).json({ error: 'create_failed', message: 'Could not create account' })
+    }
+    
+    res.json({ 
+      success: true, 
+      email: newUser.ah_email,
+      message: 'Account created! You can now sync your Albert Heijn purchases.' 
+    })
+  } catch (err) {
+    console.error('Error registering AH user:', err)
+    res.status(500).json({ error: 'register_failed', message: err.message })
+  }
+})
+
+// ============================================================================
 // BOOKMARKLET SCRIPT ROUTE
 // Serve the bookmarklet.js with CORS for cross-origin loading from ah.nl
 // ============================================================================
