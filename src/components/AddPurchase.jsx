@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Sparkles, LogIn } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
-import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser, useAHFetch } from '../lib/ahUserContext'
 
-function AddPurchase({ onPurchaseAdded, onLoginClick }) {
+function AddPurchase({ onPurchaseAdded }) {
   const [product, setProduct] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [price, setPrice] = useState('')
@@ -12,26 +12,18 @@ function AddPurchase({ onPurchaseAdded, onLoginClick }) {
   const [suggestions, setSuggestions] = useState([])
 
   const { t } = useI18n()
-  const { user, isAuthenticated } = useAuth()
-  const authFetch = useAuthenticatedFetch()
+  const { ahEmail } = useAHUser()
+  const ahFetch = useAHFetch()
 
-  // If not authenticated, show login prompt
-  if (!isAuthenticated) {
+  // If not connected, show message
+  if (!ahEmail) {
     return (
       <div style={{textAlign: 'center', padding: '3rem 1rem'}}>
         <LogIn size={48} style={{color: 'var(--text-muted)', marginBottom: '1rem'}} />
-        <h3 style={{color: 'var(--text)', marginBottom: '0.5rem'}}>{t('login_required') || 'Login Required'}</h3>
+        <h3 style={{color: 'var(--text)', marginBottom: '0.5rem'}}>{t('login_required') || 'Connection Required'}</h3>
         <p style={{color: 'var(--text-muted)', marginBottom: '1.5rem'}}>
-          {t('login_to_add_purchases') || 'Please log in to add purchases to your account.'}
+          {t('login_to_add_purchases') || 'Connect your AH account to add purchases.'}
         </p>
-        {onLoginClick && (
-          <button 
-            className="btn btn-primary"
-            onClick={onLoginClick}
-          >
-            {t('sign_in') || 'Sign In'}
-          </button>
-        )}
       </div>
     )
   }
@@ -41,7 +33,7 @@ function AddPurchase({ onPurchaseAdded, onLoginClick }) {
     setLoading(true)
 
     try {
-      const response = await authFetch('/api/user/purchases', {
+      const response = await ahFetch('/api/user/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

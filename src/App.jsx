@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Leaf, TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle } from 'lucide-react'
+import { Leaf, TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle, LogOut } from 'lucide-react'
 import AddPurchase from './components/AddPurchase'
 import Dashboard from './components/Dashboard'
 import PurchaseList from './components/PurchaseList'
@@ -7,9 +7,8 @@ import ProfileSuggestions from './components/ProfileSuggestions'
 import HowItWorks from './components/HowItWorks'
 import AccountSync from './components/AccountSync'
 import ScoreLookup from './components/ScoreLookup'
-import UserMenu from './components/UserMenu'
-import AuthModal from './components/AuthModal'
-import { AuthProvider, useAuth } from './lib/authContext'
+import AHLanding from './components/AHLanding'
+import { AHUserProvider, useAHUser } from './lib/ahUserContext'
 import { I18nProvider, useI18n, getSavedLang, saveLang } from './i18n.jsx'
 
 // Feature cards for the homepage
@@ -60,13 +59,8 @@ const features = [
 
 function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion }) {
   const { t, lang, setLang } = useI18n()
-  const { user } = useAuth()
-  const [showAuthModal, setShowAuthModal] = useState(false)
+  const { ahEmail, clearEmail } = useAHUser()
   const [menuOpen, setMenuOpen] = useState(false)
-  
-  const handleLoginClick = useCallback(() => {
-    setShowAuthModal(true)
-  }, [])
 
   const handleToggleLanguage = useCallback(() => {
     const nextLang = lang === 'nl' ? 'en' : 'nl'
@@ -76,6 +70,28 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
   const navigateTo = (tab) => {
     setActiveTab(tab)
     setMenuOpen(false)
+  }
+
+  // Show landing page if no AH email is set
+  if (!ahEmail) {
+    return (
+      <div className="app-wrapper">
+        <header className="app-header">
+          <div className="header-logo">
+            <Leaf size={28} className="logo-icon" />
+            <span className="logo-text">Sustainable Shop</span>
+          </div>
+          
+          <div className="header-actions">
+            <button className="lang-btn" onClick={handleToggleLanguage}>
+              {lang === 'nl' ? 'EN' : 'NL'}
+            </button>
+          </div>
+        </header>
+        
+        <AHLanding />
+      </div>
+    )
   }
 
   // Homepage / Landing view
@@ -98,13 +114,12 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
-            {user ? (
-              <UserMenu onLoginClick={() => setShowAuthModal(true)} />
-            ) : (
-              <button className="auth-btn" onClick={() => setShowAuthModal(true)}>
-                {t('sign_in')} / {t('register')}
+            <div className="user-email-display">
+              <span className="user-email">{ahEmail}</span>
+              <button className="logout-btn" onClick={clearEmail} title="Log out">
+                <LogOut size={16} />
               </button>
-            )}
+            </div>
           </div>
         </header>
 
@@ -174,11 +189,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             ))}
           </div>
         </section>
-
-        <AuthModal 
-          isOpen={showAuthModal} 
-          onClose={() => setShowAuthModal(false)} 
-        />
       </div>
     )
   }
@@ -202,13 +212,12 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           <button className="lang-btn" onClick={handleToggleLanguage}>
             {lang === 'nl' ? 'EN' : 'NL'}
           </button>
-          {user ? (
-            <UserMenu onLoginClick={() => setShowAuthModal(true)} />
-          ) : (
-            <button className="auth-btn" onClick={() => setShowAuthModal(true)}>
-              {t('sign_in')} / {t('register')}
+          <div className="user-email-display">
+            <span className="user-email">{ahEmail}</span>
+            <button className="logout-btn" onClick={clearEmail} title="Log out">
+              <LogOut size={16} />
             </button>
-          )}
+          </div>
         </div>
       </header>
 
@@ -252,28 +261,39 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </div>
         
         <div className="content-card">
-          {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} onLoginClick={handleLoginClick} />}
-          {activeTab === 'dashboard' && <Dashboard onLoginClick={handleLoginClick} />}
-          {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} onLoginClick={handleLoginClick} />}
+          {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} />}
+          {activeTab === 'dashboard' && <Dashboard />}
+          {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} />}
           {activeTab === 'lookup' && <ScoreLookup />}
           {activeTab === 'sync' && <AccountSync onSyncCompleted={onSyncCompleted} />}
-          {activeTab === 'history' && <PurchaseList onLoginClick={handleLoginClick} />}
+          {activeTab === 'history' && <PurchaseList />}
           {activeTab === 'how' && <HowItWorks />}
         </div>
       </main>
-
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
-      />
     </div>
   )
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState('home')
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem('activeTab') || 'home'
+    } catch {
+      return 'home'
+    }
+  })
   const [lang, setLang] = useState(() => getSavedLang())
   const [syncVersion, setSyncVersion] = useState(0)
+
+  // Persist active tab to localStorage
+  const handleSetActiveTab = useCallback((tab) => {
+    setActiveTab(tab)
+    try {
+      localStorage.setItem('activeTab', tab)
+    } catch {
+      // Ignore storage errors
+    }
+  }, [])
 
   const handleSetLang = useCallback((value) => {
     const next = value === 'en' ? 'en' : 'nl'
@@ -294,17 +314,17 @@ function App() {
   }, [])
 
   return (
-    <AuthProvider>
+    <AHUserProvider>
       <I18nProvider lang={lang} setLang={handleSetLang}>
         <AppShell
           onPurchaseAdded={handlePurchaseAdded}
           onSyncCompleted={handleSyncCompleted}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleSetActiveTab}
           syncVersion={syncVersion}
         />
       </I18nProvider>
-    </AuthProvider>
+    </AHUserProvider>
   )
 }
 

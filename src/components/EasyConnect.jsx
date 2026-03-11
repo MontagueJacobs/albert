@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, ExternalLink, User } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
-import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser, useAHFetch } from '../lib/ahUserContext'
 
 // Helper function to format error messages for users
 const formatError = (error) => {
@@ -28,8 +28,8 @@ const formatError = (error) => {
  */
 function EasyConnect({ onSyncCompleted }) {
   const { t } = useI18n()
-  const { user, isAuthenticated } = useAuth()
-  const authFetch = useAuthenticatedFetch()
+  const { ahEmail } = useAHUser()
+  const ahFetch = useAHFetch()
   
   const [status, setStatus] = useState('idle') // 'idle', 'connecting', 'syncing', 'success', 'error'
   const [progress, setProgress] = useState('')
@@ -46,11 +46,11 @@ function EasyConnect({ onSyncCompleted }) {
       const cookieRes = await fetch('/api/auto-scrape/cookies')
       const cookieData = await cookieRes.json()
       
-      // Check saved credentials (if authenticated)
+      // Check saved credentials (if have ahEmail)
       let savedCreds = null
-      if (isAuthenticated) {
+      if (ahEmail) {
         try {
-          const credRes = await authFetch('/api/user/ah-credentials')
+          const credRes = await ahFetch('/api/user/ah-credentials')
           if (credRes.ok) {
             savedCreds = await credRes.json()
           }
@@ -84,7 +84,7 @@ function EasyConnect({ onSyncCompleted }) {
     } catch (err) {
       console.error('Failed to fetch connection status:', err)
     }
-  }, [isAuthenticated, authFetch])
+  }, [ahEmail, ahFetch])
 
   useEffect(() => {
     fetchConnectionStatus()
@@ -138,8 +138,8 @@ function EasyConnect({ onSyncCompleted }) {
     setProgress('Opening browser window...')
     
     try {
-      // Use authFetch to send user token so purchases are saved to their account
-      const res = await authFetch('/api/auto-scrape/visual-login', {
+      // Use ahFetch to send email header so purchases are saved to their account
+      const res = await ahFetch('/api/auto-scrape/visual-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -163,7 +163,7 @@ function EasyConnect({ onSyncCompleted }) {
       setError(err.message)
       setStatus('error')
     }
-  }, [authFetch])
+  }, [ahFetch])
 
   // Quick resync using saved cookies
   const handleResync = useCallback(async () => {
@@ -172,8 +172,8 @@ function EasyConnect({ onSyncCompleted }) {
     setProgress('Starting sync...')
     
     try {
-      // Use authFetch to send user token so purchases are saved to their account
-      const res = await authFetch('/api/auto-scrape/with-cookies', {
+      // Use ahFetch to send email header so purchases are saved to their account
+      const res = await ahFetch('/api/auto-scrape/with-cookies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -199,7 +199,7 @@ function EasyConnect({ onSyncCompleted }) {
       setError(err.message)
       setStatus('error')
     }
-  }, [authFetch])
+  }, [ahFetch])
 
   // Disconnect (clear cookies)
   const handleDisconnect = useCallback(async () => {

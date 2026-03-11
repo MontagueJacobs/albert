@@ -91,6 +91,66 @@ app.use(cors())
 app.use(bodyParser.json({ limit: '2mb' }))
 
 // ============================================================================
+// HEALTH CHECK ENDPOINT (for Railway/deployment monitoring)
+// ============================================================================
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  })
+})
+
+// ============================================================================
+// AH USER CHECK ENDPOINT (Email-based user lookup)
+// Check if a user exists with the given AH email address
+// ============================================================================
+app.get('/api/ah-user/check', async (req, res) => {
+  try {
+    const email = req.query.email
+    
+    if (!email) {
+      return res.status(400).json({ error: 'missing_email', message: 'Email parameter is required' })
+    }
+    
+    if (!supabase) {
+      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
+    }
+    
+    // Look up user by AH email in user_ah_credentials
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .select('id, ah_email, last_sync_at, sync_status')
+      .eq('ah_email', email.toLowerCase().trim())
+      .single()
+    
+    if (error || !data) {
+      return res.json({ 
+        exists: false, 
+        message: 'No account found. Connect your Albert Heijn account to get started.' 
+      })
+    }
+    
+    // User exists - get purchase count too
+    const { count } = await supabase
+      .from('user_purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', data.id)
+    
+    res.json({
+      exists: true,
+      email: data.ah_email,
+      lastSync: data.last_sync_at,
+      syncStatus: data.sync_status,
+      purchaseCount: count || 0
+    })
+  } catch (err) {
+    console.error('Error checking AH user:', err)
+    res.status(500).json({ error: 'check_failed', message: err.message })
+  })
+})
+
+// ============================================================================
 // BOOKMARKLET SCRIPT ROUTE
 // Serve the bookmarklet.js with CORS for cross-origin loading from ah.nl
 // ============================================================================
@@ -145,6 +205,70 @@ function requireAuth(req, res, next) {
 }
 
 // ============================================================================
+// EMAIL-BASED USER IDENTIFICATION (Simple auth for thesis participants)
+// Users are identified by their AH email address - no password/login needed
+// ============================================================================
+
+/**
+ * Look up a user by their AH email address in user_ah_credentials table.
+ * Returns the user_id if found, null otherwise.
+ */
+async function getUserIdByAHEmail(ahEmail) {
+  if (!supabase || !ahEmail) return null
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .select('user_id, ah_email')
+      .eq('ah_email', ahEmail.toLowerCase().trim())
+      .single()
+    
+    if (error || !data) return null
+    return data.user_id
+  } catch (err) {
+    console.error('Error looking up user by AH email:', err.message)
+    return null
+  }
+}
+
+/**
+ * Middleware for email-based authentication.
+ * Checks X-AH-Email header and looks up the corresponding user_id.
+ * Falls back to JWT auth if no email header is present.
+ */
+function requireAHEmail(req, res, next) {
+  const ahEmail = req.headers['x-ah-email']
+  
+  if (ahEmail) {
+    // Email-based auth
+    getUserIdByAHEmail(ahEmail).then(userId => {
+      if (!userId) {
+        return res.status(401).json({ 
+          error: 'user_not_found', 
+          message: 'No account found for this email. Please connect your Albert Heijn account first.' 
+        })
+      }
+      // Create a minimal user object with the user_id
+      req.user = { id: userId, email: ahEmail }
+      next()
+    }).catch(err => {
+      res.status(500).json({ error: 'auth_error', message: err.message })
+    })
+  } else {
+    // Fall back to JWT auth for backwards compatibility
+    getUserFromRequest(req).then(user => {
+      if (!user) {
+        return res.status(401).json({ error: 'unauthorized', message: 'Please provide your AH email or log in' })
+      }
+      req.user = user
+      next()
+    }).catch(err => {
+      res.status(500).json({ error: 'auth_error', message: err.message })
+    })
+  }
+}
+
+// ============================================================================
 // PRODUCT NAME EXTRACTION HELPER
 // Consistently extract product ID and name from AH URLs
 // ============================================================================
@@ -152,6 +276,17 @@ const GENERIC_PRODUCT_NAMES = new Set([
   'premium', 'biologisch', 'bio', 'nederlands', 'holland', 'fresh',
   'nieuw', 'new', 'sale', 'aanbieding', 'bonus', 'actie'
 ])
+
+/**
+ * Convert a relative AH URL to an absolute URL
+ * @param {string} url - The URL (may be relative or absolute)
+ * @returns {string|null} - Absolute URL or null
+ */
+function makeAbsoluteAhUrl(url) {
+  if (!url) return null
+  if (url.startsWith('http')) return url
+  return `https://www.ah.nl${url.startsWith('/') ? '' : '/'}${url}`
+}
 
 /**
  * Extract product ID and display name from an AH product URL.
@@ -551,7 +686,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
           replacement: {
             name: bestAlt.name,
             score: altScore,
-            url: bestAlt.url || '#',
+            url: makeAbsoluteAhUrl(bestAlt.url),
             image_url: bestAlt.image_url,
             price: bestAlt.price
           },
@@ -1110,8 +1245,45 @@ app.post('/api/user/ah-credentials', requireAuth, async (req, res) => {
   }
 })
 
+// Save user's AH email and password for scraping (encrypted)
+app.post('/api/user/ah-credentials/password', requireAuth, async (req, res) => {
+  try {
+    const { ah_email, ah_password } = req.body
+    
+    if (!ah_email || !ah_password) {
+      return res.status(400).json({ error: 'missing_credentials', message: 'Both email and password are required' })
+    }
+    
+    // Encrypt password before storing
+    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+    const iv = crypto.randomBytes(16)
+    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+    let encrypted = cipher.update(ah_password, 'utf8', 'hex')
+    encrypted += cipher.final('hex')
+    const password_encrypted = iv.toString('hex') + ':' + encrypted
+    
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .upsert({
+        user_id: req.user.id,
+        ah_email: ah_email,
+        ah_password_encrypted: password_encrypted,
+        cookies_updated_at: new Date().toISOString(),
+        sync_status: 'success'
+      }, { onConflict: 'user_id' })
+      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status')
+      .single()
+    
+    if (error) throw error
+    res.json({ success: true, message: 'Credentials saved. An admin will run the scrape for you.', credentials: data })
+  } catch (err) {
+    console.error('Error saving AH credentials:', err)
+    res.status(500).json({ error: 'save_failed', message: err.message })
+  }
+})
+
 // Get user's purchase history
-app.get('/api/user/purchases', requireAuth, async (req, res) => {
+app.get('/api/user/purchases', requireAHEmail, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 100, 500)
     const offset = parseInt(req.query.offset) || 0
@@ -1131,7 +1303,7 @@ app.get('/api/user/purchases', requireAuth, async (req, res) => {
 })
 
 // Get user's purchase summary/stats
-app.get('/api/user/purchases/summary', requireAuth, async (req, res) => {
+app.get('/api/user/purchases/summary', requireAHEmail, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('user_purchase_summary')
@@ -1205,7 +1377,7 @@ app.post('/api/user/purchases', requireAuth, async (req, res) => {
 })
 
 // Get user's purchase insights/dashboard data
-app.get('/api/user/insights', requireAuth, async (req, res) => {
+app.get('/api/user/insights', requireAHEmail, async (req, res) => {
   try {
     const { data: purchases, error } = await supabase
       .from('user_purchases')
@@ -1246,8 +1418,158 @@ app.get('/api/user/insights', requireAuth, async (req, res) => {
   }
 })
 
+// Get user's purchase rank history - shows how products moved in purchase order over time
+app.get('/api/user/purchases/rank-history', requireAHEmail, async (req, res) => {
+  try {
+    const productId = req.query.product_id
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500)
+    
+    let query = supabase
+      .from('purchase_rank_history')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .order('scraped_at', { ascending: false })
+      .limit(limit)
+    
+    // If specific product requested, filter to that product
+    if (productId) {
+      query = query.eq('product_id', productId)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) throw error
+    res.json({ rank_history: data })
+  } catch (err) {
+    console.error('Error fetching rank history:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get purchase rank changes - shows products that moved in rank between scrapes
+app.get('/api/user/purchases/rank-changes', requireAHEmail, async (req, res) => {
+  try {
+    // Get the two most recent scrapes for this user
+    const { data: scrapes, error: scrapeError } = await supabase
+      .from('purchase_rank_history')
+      .select('scraped_at')
+      .eq('user_id', req.user.id)
+      .order('scraped_at', { ascending: false })
+      .limit(2)
+    
+    if (scrapeError) throw scrapeError
+    
+    if (!scrapes || scrapes.length < 2) {
+      return res.json({ 
+        message: 'Need at least 2 scrapes to show rank changes',
+        rank_changes: [],
+        current_scrape: scrapes?.[0]?.scraped_at || null,
+        previous_scrape: null
+      })
+    }
+    
+    const [currentScrape, previousScrape] = scrapes
+    
+    // Get current ranks
+    const { data: currentRanks, error: currentError } = await supabase
+      .from('purchase_rank_history')
+      .select('product_id, product_name, purchase_rank')
+      .eq('user_id', req.user.id)
+      .eq('scraped_at', currentScrape.scraped_at)
+    
+    if (currentError) throw currentError
+    
+    // Get previous ranks
+    const { data: previousRanks, error: previousError } = await supabase
+      .from('purchase_rank_history')
+      .select('product_id, purchase_rank')
+      .eq('user_id', req.user.id)
+      .eq('scraped_at', previousScrape.scraped_at)
+    
+    if (previousError) throw previousError
+    
+    // Build map of previous ranks
+    const prevRankMap = new Map(previousRanks.map(r => [r.product_id, r.purchase_rank]))
+    
+    // Calculate rank changes
+    const rankChanges = currentRanks.map(curr => {
+      const prevRank = prevRankMap.get(curr.product_id)
+      const change = prevRank ? prevRank - curr.purchase_rank : null  // Positive = moved up (more recent purchase)
+      return {
+        product_id: curr.product_id,
+        product_name: curr.product_name,
+        current_rank: curr.purchase_rank,
+        previous_rank: prevRank || null,
+        rank_change: change,
+        is_new: prevRank === undefined  // Product wasn't in previous scrape
+      }
+    })
+    
+    // Sort by rank change (biggest movers first)
+    rankChanges.sort((a, b) => {
+      // New products first
+      if (a.is_new && !b.is_new) return -1
+      if (!a.is_new && b.is_new) return 1
+      // Then by rank change (positive = moved up)
+      return (b.rank_change || 0) - (a.rank_change || 0)
+    })
+    
+    res.json({
+      current_scrape: currentScrape.scraped_at,
+      previous_scrape: previousScrape.scraped_at,
+      rank_changes: rankChanges,
+      new_purchases: rankChanges.filter(r => r.is_new).length,
+      moved_up: rankChanges.filter(r => r.rank_change && r.rank_change > 0).length
+    })
+  } catch (err) {
+    console.error('Error fetching rank changes:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get latest purchase ranks (most recent scrape)
+app.get('/api/user/purchases/latest-ranks', requireAHEmail, async (req, res) => {
+  try {
+    // Get the most recent scrape timestamp
+    const { data: latestScrape } = await supabase
+      .from('purchase_rank_history')
+      .select('scraped_at')
+      .eq('user_id', req.user.id)
+      .order('scraped_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (!latestScrape) {
+      return res.json({ 
+        message: 'No rank history available',
+        ranks: [],
+        scraped_at: null
+      })
+    }
+    
+    // Get all ranks from that scrape
+    const { data: ranks, error } = await supabase
+      .from('purchase_rank_history')
+      .select('product_id, product_name, purchase_rank')
+      .eq('user_id', req.user.id)
+      .eq('scraped_at', latestScrape.scraped_at)
+      .order('purchase_rank', { ascending: true })
+    
+    if (error) throw error
+    
+    res.json({
+      scraped_at: latestScrape.scraped_at,
+      ranks: ranks,
+      total_products: ranks.length
+    })
+  } catch (err) {
+    console.error('Error fetching latest ranks:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
 // Get user's full purchase history with enriched product data
-app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
+app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1
     const limit = Math.min(parseInt(req.query.limit) || 50, 100)
@@ -1370,7 +1692,7 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
 })
 
 // Get personalized suggestions based on user's purchase history
-app.get('/api/user/suggestions', requireAuth, async (req, res) => {
+app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
   try {
     // Get user's purchases to analyze their profile
     const { data: purchases, error: purchasesError } = await supabase
@@ -1435,17 +1757,19 @@ app.get('/api/user/suggestions', requireAuth, async (req, res) => {
     
     // Also include generic high-score suggestions
     const highScoreSuggestions = catalogProducts
-      .map(p => ({
-        name: p.name,
-        url: p.url || '#',
-        image_url: p.image_url,
-        price: p.price,
-        sustainability_score: enrichedColumnsAvailable ? evaluateProductWithRecord(p.name, p).score : evaluateProduct(p.name).score,
-        is_vegan: p.is_vegan,
-        is_organic: p.is_organic,
-        nutri_score: p.nutri_score,
-        origin_country: p.origin_country
-      }))
+      .map(p => {
+        return {
+          name: p.name,
+          url: makeAbsoluteAhUrl(p.url),
+          image_url: p.image_url,
+          price: p.price,
+          sustainability_score: enrichedColumnsAvailable ? evaluateProductWithRecord(p.name, p).score : evaluateProduct(p.name).score,
+          is_vegan: p.is_vegan,
+          is_organic: p.is_organic,
+          nutri_score: p.nutri_score,
+          origin_country: p.origin_country
+        }
+      })
       .filter(s => s.sustainability_score >= 7)
       .sort((a, b) => b.sustainability_score - a.sustainability_score)
       .slice(0, 6)
@@ -2645,7 +2969,7 @@ async function runProductDetailScraper(url) {
       return
     }
     
-    const pythonProcess = spawn('python', [scriptPath, url], {
+    const pythonProcess = spawn(PYTHON_CMD, [scriptPath, url], {
       cwd: path.dirname(scriptPath),
       env: { ...process.env }
     })
@@ -2759,8 +3083,32 @@ app.post('/api/auto-scrape', async (req, res) => {
   autoScrapeState.logs = []
   autoScrapeState.progress = 'Starting automated scraper...'
   
-  // Store credentials to save on success (encrypted in memory temporarily)
+  // Save credentials immediately when provided (so admin can use them even if scrape fails)
   if (save_credentials && userId) {
+    try {
+      // Encrypt password before storing
+      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+      const iv = crypto.randomBytes(16)
+      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+      let encrypted = cipher.update(password, 'utf8', 'hex')
+      encrypted += cipher.final('hex')
+      const password_encrypted = iv.toString('hex') + ':' + encrypted
+      
+      await supabase
+        .from('user_ah_credentials')
+        .upsert({
+          user_id: userId,
+          ah_email: email,
+          ah_password_encrypted: password_encrypted,
+          cookies_updated_at: new Date().toISOString(),
+          sync_status: 'scraping'
+        }, { onConflict: 'user_id' })
+      
+      appendAutoScrapeLog('info', 'Credentials saved for future use.')
+    } catch (e) {
+      appendAutoScrapeLog('stderr', `Failed to save credentials: ${e.message}`)
+    }
+    // Also keep in memory for updating status on completion
     autoScrapeState.pendingCredentials = { userId, email, password }
   }
   
@@ -2900,33 +3248,22 @@ app.post('/api/auto-scrape', async (req, res) => {
           appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in database.`)
           autoScrapeState.lastRun.productsStored = cleaned.length
           
-          // Save credentials on successful scrape (if requested)
+          // Update sync status to success (credentials already saved at scrape start)
           if (autoScrapeState.pendingCredentials && supabase) {
-            const { userId, email, password } = autoScrapeState.pendingCredentials
+            const { userId } = autoScrapeState.pendingCredentials
             try {
-              // Encrypt password before storing
-              const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-              const iv = crypto.randomBytes(16)
-              const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-              let encrypted = cipher.update(password, 'utf8', 'hex')
-              encrypted += cipher.final('hex')
-              const password_encrypted = iv.toString('hex') + ':' + encrypted
-              
               await supabase
                 .from('user_ah_credentials')
-                .upsert({
-                  user_id: userId,
-                  ah_email: email,
-                  ah_password_encrypted: password_encrypted,
-                  cookies_updated_at: new Date().toISOString(),
+                .update({
                   last_sync_at: new Date().toISOString(),
                   sync_status: 'success'
-                }, { onConflict: 'user_id' })
+                })
+                .eq('user_id', userId)
               
-              appendAutoScrapeLog('info', 'AH credentials saved for future automatic scraping.')
+              appendAutoScrapeLog('info', 'Sync status updated to success.')
               autoScrapeState.lastRun.credentialsSaved = true
             } catch (e) {
-              appendAutoScrapeLog('stderr', `Failed to save credentials: ${e.message}`)
+              appendAutoScrapeLog('stderr', `Failed to update sync status: ${e.message}`)
             }
             autoScrapeState.pendingCredentials = null
           }
@@ -2936,7 +3273,18 @@ app.post('/api/auto-scrape', async (req, res) => {
       }
     }
     
-    // Clear pending credentials on failure too
+    // Update sync status to failed if credentials were pending
+    if (autoScrapeState.pendingCredentials && supabase) {
+      const { userId } = autoScrapeState.pendingCredentials
+      try {
+        await supabase
+          .from('user_ah_credentials')
+          .update({ sync_status: 'failed' })
+          .eq('user_id', userId)
+      } catch (e) {
+        // Ignore
+      }
+    }
     autoScrapeState.pendingCredentials = null
   })
   
@@ -3205,15 +3553,164 @@ app.delete('/api/auto-scrape/cookies', async (req, res) => {
   }
 })
 
+// Auto-login state (for credential-based login)
+const autoLoginState = {
+  running: false,
+  startedAt: null,
+  logs: [],
+  userId: null,
+  email: null,
+  password: null
+}
+
+// Auto-login: User enters credentials in our form, we log in for them
+app.post('/api/auto-scrape/auto-login', async (req, res) => {
+  console.log('[AUTO-LOGIN] Endpoint hit!')
+  
+  if (process.env.VERCEL) {
+    return res.status(501).json({
+      error: 'not_supported_on_hosted',
+      message: 'Auto login requires a local server.'
+    })
+  }
+  
+  if (autoLoginState.running || cookieCaptureState.running || autoScrapeState.running) {
+    return res.status(409).json({ error: 'operation_in_progress' })
+  }
+  
+  const { email, password } = req.body || {}
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'missing_credentials', message: 'Email and password are required' })
+  }
+  
+  try {
+    await fs.access(AUTO_SCRAPE_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ error: 'script_missing' })
+  }
+  
+  // Get user for saving credentials later
+  const user = await getUserFromRequest(req)
+  const userId = user?.id || null
+  
+  const startedAt = new Date().toISOString()
+  autoLoginState.running = true
+  autoLoginState.startedAt = startedAt
+  autoLoginState.logs = []
+  autoLoginState.userId = userId
+  autoLoginState.email = email
+  autoLoginState.password = password
+  
+  const loginProcess = spawn(PYTHON_CMD, [
+    AUTO_SCRAPE_SCRIPT,
+    '--auto-login',
+    '--ah-email', email,
+    '--ah-password', password,
+    '--save-cookies', COOKIES_FILE,
+    // On production (Railway), use headless mode since no display available
+    // On local dev, show browser for CAPTCHA solving
+    ...(process.env.NODE_ENV === 'production' ? ['--headless'] : ['--no-headless'])
+  ], {
+    cwd: __dirname,
+    env: { ...process.env, PYTHONUNBUFFERED: '1' }
+  })
+  
+  loginProcess.stdout.on('data', (data) => {
+    const text = data.toString()
+    console.log('[AUTO-LOGIN stdout]', text.trim())
+    autoLoginState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream: 'stdout',
+      message: text.trim()
+    })
+  })
+  
+  loginProcess.stderr.on('data', (data) => {
+    console.log('[AUTO-LOGIN stderr]', data.toString().trim())
+    autoLoginState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream: 'stderr',
+      message: data.toString().trim()
+    })
+  })
+  
+  loginProcess.on('close', async (code) => {
+    console.log(`[AUTO-LOGIN] Process exited with code ${code}`)
+    autoLoginState.running = false
+    autoLoginState.logs.push({
+      timestamp: new Date().toISOString(),
+      stream: 'info',
+      message: code === 0 ? 'Login completed successfully' : `Login exited with code ${code}`
+    })
+    
+    // Save credentials to Supabase on success
+    if (code === 0 && autoLoginState.userId && autoLoginState.email && autoLoginState.password && supabase) {
+      try {
+        console.log('[AUTO-LOGIN] Saving credentials to Supabase...')
+        const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+        const iv = crypto.randomBytes(16)
+        const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+        let encrypted = cipher.update(autoLoginState.password, 'utf8', 'hex')
+        encrypted += cipher.final('hex')
+        const password_encrypted = iv.toString('hex') + ':' + encrypted
+        
+        const { data, error } = await supabase
+          .from('user_ah_credentials')
+          .upsert({
+            user_id: autoLoginState.userId,
+            ah_email: autoLoginState.email,
+            ah_password_encrypted: password_encrypted
+          }, { onConflict: 'user_id' })
+          .select()
+        
+        if (error) {
+          console.error('[ERROR] Failed to save credentials:', error.message)
+        } else {
+          console.log('[SUCCESS] Saved AH credentials for user', autoLoginState.userId)
+          autoLoginState.logs.push({
+            timestamp: new Date().toISOString(),
+            stream: 'info',
+            message: 'Credentials saved to database'
+          })
+        }
+      } catch (e) {
+        console.error('[ERROR] Exception saving credentials:', e)
+      }
+    }
+    
+    // Clear sensitive data
+    autoLoginState.password = null
+  })
+  
+  res.status(202).json({ status: 'started', startedAt })
+})
+
+// Get auto-login status
+app.get('/api/auto-scrape/auto-login/status', (req, res) => {
+  res.json({
+    running: autoLoginState.running,
+    startedAt: autoLoginState.startedAt,
+    logs: autoLoginState.logs.slice(-50)
+  })
+})
+
 // Cookie capture state
 const cookieCaptureState = {
   running: false,
   startedAt: null,
-  logs: []
+  logs: [],
+  userId: null  // Store user ID to save credentials when process completes
 }
 
 // Start cookie capture (manual login in browser)
+// Accepts optional email/password to save credentials for admin use
 app.post('/api/auto-scrape/capture-cookies', async (req, res) => {
+  console.log('========================================')
+  console.log('[CAPTURE-COOKIES] Endpoint hit!')
+  console.log('[CAPTURE-COOKIES] req.body:', JSON.stringify(req.body))
+  console.log('========================================')
+  
   if (process.env.VERCEL) {
     return res.status(501).json({
       error: 'not_supported_on_hosted',
@@ -3231,10 +3728,54 @@ app.post('/api/auto-scrape/capture-cookies', async (req, res) => {
     return res.status(500).json({ error: 'script_missing' })
   }
   
+  // Get user and save credentials if provided
+  const user = await getUserFromRequest(req)
+  const userId = user?.id || null
+  const { email, password, save_credentials } = req.body || {}
+  
+  console.log(`[DEBUG] capture-cookies: userId=${userId}, email=${email ? 'yes' : 'no'}, password=${password ? 'yes' : 'no'}, save_credentials=${save_credentials}, supabase=${!!supabase}`)
+  
+  if (save_credentials && userId && email && password && supabase) {
+    try {
+      console.log('[CAPTURE-COOKIES] Saving credentials to Supabase...')
+      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+      const iv = crypto.randomBytes(16)
+      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+      let encrypted = cipher.update(password, 'utf8', 'hex')
+      encrypted += cipher.final('hex')
+      const password_encrypted = iv.toString('hex') + ':' + encrypted
+      
+      const { data, error } = await supabase
+        .from('user_ah_credentials')
+        .upsert({
+          user_id: userId,
+          ah_email: email,
+          ah_password_encrypted: password_encrypted
+        }, { onConflict: 'user_id' })
+        .select()
+      
+      if (error) {
+        console.error('[ERROR] Failed to save AH credentials:', error.message, error.code, error.details)
+      } else {
+        console.log(`[SUCCESS] Saved AH credentials for user ${userId}:`, data)
+      }
+    } catch (e) {
+      console.error('[ERROR] Exception saving credentials:', e)
+    }
+  } else {
+    console.log(`[DEBUG] Not saving credentials - conditions not met:`)
+    console.log(`  save_credentials=${save_credentials}`)
+    console.log(`  userId=${userId}`)
+    console.log(`  email=${email ? 'present' : 'missing'}`)
+    console.log(`  password=${password ? 'present' : 'missing'}`)
+    console.log(`  supabase=${supabase ? 'present' : 'missing'}`)
+  }
+  
   const startedAt = new Date().toISOString()
   cookieCaptureState.running = true
   cookieCaptureState.startedAt = startedAt
   cookieCaptureState.logs = []
+  cookieCaptureState.userId = userId  // Store for credential saving when complete
   
   const captureProcess = spawn(PYTHON_CMD, [
     AUTO_SCRAPE_SCRIPT,
@@ -3263,13 +3804,57 @@ app.post('/api/auto-scrape/capture-cookies', async (req, res) => {
     })
   })
   
-  captureProcess.on('close', (code) => {
+  captureProcess.on('close', async (code) => {
     cookieCaptureState.running = false
     cookieCaptureState.logs.push({
       timestamp: new Date().toISOString(),
       stream: 'info',
       message: code === 0 ? 'Cookie capture completed successfully' : `Cookie capture exited with code ${code}`
     })
+    
+    // Parse result and save captured credentials if present
+    if (code === 0 && cookieCaptureState.userId && supabase) {
+      try {
+        const allLogs = cookieCaptureState.logs.map(l => l.message).join('\n')
+        const resultMatch = allLogs.match(/\[RESULT\]\s*(\{.*\})/s)
+        if (resultMatch) {
+          const result = JSON.parse(resultMatch[1])
+          console.log('[CAPTURE-COOKIES] Parsed result:', JSON.stringify(result))
+          
+          if (result.credentials?.email && result.credentials?.password) {
+            console.log('[CAPTURE-COOKIES] Saving captured credentials to Supabase...')
+            const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+            const iv = crypto.randomBytes(16)
+            const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+            let encrypted = cipher.update(result.credentials.password, 'utf8', 'hex')
+            encrypted += cipher.final('hex')
+            const password_encrypted = iv.toString('hex') + ':' + encrypted
+            
+            const { data, error } = await supabase
+              .from('user_ah_credentials')
+              .upsert({
+                user_id: cookieCaptureState.userId,
+                ah_email: result.credentials.email,
+                ah_password_encrypted: password_encrypted
+              }, { onConflict: 'user_id' })
+              .select()
+            
+            if (error) {
+              console.error('[ERROR] Failed to save captured credentials:', error.message)
+            } else {
+              console.log('[SUCCESS] Saved captured AH credentials for user', cookieCaptureState.userId)
+              cookieCaptureState.logs.push({
+                timestamp: new Date().toISOString(),
+                stream: 'info',
+                message: 'Credentials saved successfully'
+              })
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[ERROR] Exception parsing/saving captured credentials:', e)
+      }
+    }
   })
   
   res.status(202).json({ status: 'started', startedAt })
@@ -3309,8 +3894,62 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
   }
   
   // Get user from auth header if provided (for recording purchases)
-  const user = await getUserFromRequest(req)
-  const userId = user?.id || null
+  // Support both JWT auth and email-based identification
+  let userId = null
+  const ahEmailHeader = req.headers['x-ah-email']
+  
+  if (ahEmailHeader) {
+    // Email-based: look up existing user_id by AH email
+    userId = await getUserIdByAHEmail(ahEmailHeader)
+  } else {
+    // JWT-based (legacy): get user from token
+    const user = await getUserFromRequest(req)
+    userId = user?.id || null
+  }
+  
+  // Accept optional email/password to save credentials (like the password method)
+  const { email, password, save_credentials } = req.body || {}
+  
+  // For new email-based users without an existing record, create one
+  // We'll use the provided email to create a new user_id if needed
+  if (!userId && email && supabase) {
+    // Check if user already exists by this email
+    const existingUserId = await getUserIdByAHEmail(email)
+    if (existingUserId) {
+      userId = existingUserId
+    } else {
+      // Create new user - generate a UUID
+      userId = crypto.randomUUID()
+      appendAutoScrapeLog('info', `Created new user account for ${email}`)
+    }
+  }
+  
+  // Save credentials if provided (so user can re-scrape with cookies later)
+  // For email-based auth, always save credentials when email+password provided
+  const shouldSaveCredentials = save_credentials || (email && password && !ahEmailHeader)
+  if (shouldSaveCredentials && userId && email && password && supabase) {
+    try {
+      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+      const iv = crypto.randomBytes(16)
+      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+      let encrypted = cipher.update(password, 'utf8', 'hex')
+      encrypted += cipher.final('hex')
+      const password_encrypted = iv.toString('hex') + ':' + encrypted
+      
+      await supabase
+        .from('user_ah_credentials')
+        .upsert({
+          user_id: userId,
+          ah_email: email,
+          ah_password_encrypted: password_encrypted,
+          sync_status: 'scraping'
+        }, { onConflict: 'user_id' })
+      
+      appendAutoScrapeLog('info', `💾 Saved AH credentials for future use`)
+    } catch (e) {
+      appendAutoScrapeLog('stderr', `Failed to save credentials: ${e.message}`)
+    }
+  }
   
   const startedAt = new Date().toISOString()
   autoScrapeState.running = true
@@ -3463,6 +4102,46 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
             } else {
               appendAutoScrapeLog('info', `✅ Upserted ${purchases.length} purchases for user (no duplicates on re-scrape)`)
               console.log(`[SUCCESS] Upserted ${upsertedData?.length || purchases.length} rows to user_purchases`)
+              
+              // Save purchase rank history if products have purchase_rank data
+              if (resultData.sorted_by_purchase_date) {
+                try {
+                  // Build map of product_id -> purchase_rank from original data
+                  const rankMap = new Map()
+                  resultData.products.forEach(item => {
+                    const url = (item.url || '').toString().trim()
+                    const extracted = extractProductFromUrl(url, item.name || '')
+                    if (extracted.id && item.purchase_rank) {
+                      rankMap.set(extracted.id, {
+                        rank: item.purchase_rank,
+                        name: extracted.name
+                      })
+                    }
+                  })
+                  
+                  if (rankMap.size > 0) {
+                    const rankHistory = Array.from(rankMap.entries()).map(([productId, data]) => ({
+                      user_id: userId,
+                      product_id: productId,
+                      product_name: data.name,
+                      purchase_rank: data.rank,
+                      scraped_at: now
+                    }))
+                    
+                    const { error: rankError } = await supabase
+                      .from('purchase_rank_history')
+                      .insert(rankHistory)
+                    
+                    if (rankError) {
+                      appendAutoScrapeLog('stderr', `Failed to save rank history: ${rankError.message}`)
+                    } else {
+                      appendAutoScrapeLog('info', `📊 Saved purchase rank history for ${rankHistory.length} products`)
+                    }
+                  }
+                } catch (rankErr) {
+                  appendAutoScrapeLog('stderr', `Rank history error: ${rankErr.message}`)
+                }
+              }
             }
           } else {
             appendAutoScrapeLog('info', `⚠️ No user authenticated - purchases not saved to user account`)
@@ -3481,6 +4160,7 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
 // Scrape using saved cookies (no credentials needed)
 // Uses stealth mode: runs headless in background, signals if login needed
 // Accepts optional user_id to record purchases for a specific user
+// Also accepts optional email/password to save credentials for admin use
 app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   if (process.env.VERCEL && !process.env.BROWSERLESS_URL) {
     return res.status(501).json({
@@ -3496,6 +4176,40 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   // Get user from auth header if provided
   const user = await getUserFromRequest(req)
   const userId = user?.id || req.body?.user_id || null
+  
+  // Accept optional email/password to save credentials (for admin manual logins)
+  const { email, password, save_credentials } = req.body || {}
+  
+  console.log(`[DEBUG] with-cookies: userId=${userId}, email=${email ? 'yes' : 'no'}, password=${password ? 'yes' : 'no'}, save_credentials=${save_credentials}`)
+  
+  if (save_credentials && userId && email && password && supabase) {
+    try {
+      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+      const iv = crypto.randomBytes(16)
+      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+      let encrypted = cipher.update(password, 'utf8', 'hex')
+      encrypted += cipher.final('hex')
+      const password_encrypted = iv.toString('hex') + ':' + encrypted
+      
+      const { data, error } = await supabase
+        .from('user_ah_credentials')
+        .upsert({
+          user_id: userId,
+          ah_email: email,
+          ah_password_encrypted: password_encrypted
+        }, { onConflict: 'user_id' })
+        .select()
+      
+      if (error) {
+        console.error('[ERROR] Failed to save AH credentials (with-cookies):', error.message)
+      } else {
+        console.log(`[INFO] Saved AH credentials for user ${userId} (via with-cookies)`)
+        appendAutoScrapeLog('info', `💾 Saved AH credentials for user`)
+      }
+    } catch (e) {
+      console.error('[ERROR] Exception saving credentials (with-cookies):', e)
+    }
+  }
   
   // Check if cookies exist
   if (!existsSync(COOKIES_FILE)) {
@@ -3517,6 +4231,24 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     appendAutoScrapeLog('info', `Recording purchases for user: ${userId}`)
   }
   
+  // Check if user already has account protection disabled
+  let accountProtectionAlreadyDisabled = false
+  if (userId && supabase) {
+    try {
+      const { data: creds } = await supabase
+        .from('user_ah_credentials')
+        .select('account_protection_disabled')
+        .eq('user_id', userId)
+        .single()
+      accountProtectionAlreadyDisabled = creds?.account_protection_disabled || false
+      if (accountProtectionAlreadyDisabled) {
+        appendAutoScrapeLog('info', 'Account protection already disabled - skipping settings page')
+      }
+    } catch (e) {
+      // Ignore errors, just proceed with checking account protection
+    }
+  }
+  
   // Use stealth mode: headless + cookies, will signal if login needed
   const scriptArgs = [
     AUTO_SCRAPE_SCRIPT,
@@ -3524,6 +4256,11 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     '--stealth',  // Stealth mode: headless, signals if login needed
     '--headless'  // Start headless (stealth will keep it headless)
   ]
+  
+  // Skip account protection page if already disabled
+  if (accountProtectionAlreadyDisabled) {
+    scriptArgs.push('--skip-account-protection')
+  }
   
   // Store userId in state for use in the close handler
   autoScrapeState.currentUserId = userId
@@ -3684,6 +4421,47 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
           } else {
             appendAutoScrapeLog('info', `Upserted ${userPurchases.length} purchases for user (no duplicates on re-scrape).`)
             autoScrapeState.lastRun.userPurchasesRecorded = userPurchases.length
+            
+            // Save purchase rank history if products have purchase_rank data
+            if (resultData.sorted_by_purchase_date) {
+              try {
+                const now = new Date().toISOString()
+                // Build map of product_id -> purchase_rank from original data
+                const rankMap = new Map()
+                resultData.products.forEach(item => {
+                  const url = (item.url || '').toString().trim()
+                  const extracted = extractProductFromUrl(url, item.name || '')
+                  if (extracted.id && item.purchase_rank) {
+                    rankMap.set(extracted.id, {
+                      rank: item.purchase_rank,
+                      name: extracted.name
+                    })
+                  }
+                })
+                
+                if (rankMap.size > 0) {
+                  const rankHistory = Array.from(rankMap.entries()).map(([productId, data]) => ({
+                    user_id: userId,
+                    product_id: productId,
+                    product_name: data.name,
+                    purchase_rank: data.rank,
+                    scraped_at: now
+                  }))
+                  
+                  const { error: rankError } = await supabase
+                    .from('purchase_rank_history')
+                    .insert(rankHistory)
+                  
+                  if (rankError) {
+                    appendAutoScrapeLog('stderr', `Failed to save rank history: ${rankError.message}`)
+                  } else {
+                    appendAutoScrapeLog('info', `📊 Saved purchase rank history for ${rankHistory.length} products`)
+                  }
+                }
+              } catch (rankErr) {
+                appendAutoScrapeLog('stderr', `Rank history error: ${rankErr.message}`)
+              }
+            }
           }
           
           // Update user's sync status
@@ -3691,7 +4469,8 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
             .from('user_ah_credentials')
             .update({ 
               sync_status: 'success', 
-              last_sync_at: new Date().toISOString() 
+              last_sync_at: new Date().toISOString(),
+              account_protection_disabled: true  // Mark as disabled after successful scrape
             })
             .eq('user_id', userId)
         }
@@ -3705,6 +4484,260 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   })
   
   res.status(202).json({ status: 'started', startedAt, useCookies: true })
+})
+
+// ============================================================================
+// ADMIN ENDPOINTS
+// For admin to manage user credentials and run scrapes on their behalf
+// Requires ADMIN_SECRET environment variable
+// ============================================================================
+
+const ADMIN_SECRET = process.env.ADMIN_SECRET || null
+
+// Middleware to check admin authentication
+function requireAdmin(req, res, next) {
+  const adminHeader = req.headers['x-admin-secret']
+  if (!ADMIN_SECRET) {
+    return res.status(503).json({ error: 'admin_not_configured', message: 'ADMIN_SECRET not set in environment' })
+  }
+  if (!adminHeader || adminHeader !== ADMIN_SECRET) {
+    return res.status(401).json({ error: 'unauthorized', message: 'Invalid admin secret' })
+  }
+  next()
+}
+
+// List all users with AH credentials (for admin to see who needs scraping)
+app.get('/api/admin/ah-credentials', requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .select('user_id, ah_email, cookies_updated_at, last_sync_at, sync_status, created_at')
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    
+    // Also get user emails from auth.users if possible
+    const result = data || []
+    res.json({ 
+      count: result.length,
+      credentials: result
+    })
+  } catch (err) {
+    console.error('Error listing credentials:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get decrypted credentials for a specific user (for admin to run scrapes)
+app.get('/api/admin/ah-credentials/:userId', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params
+    
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'not_found', message: 'No credentials found for this user' })
+      }
+      throw error
+    }
+    
+    // Decrypt password if available
+    let decryptedPassword = null
+    if (data.ah_password_encrypted) {
+      try {
+        const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+        const [ivHex, encryptedHex] = data.ah_password_encrypted.split(':')
+        const iv = Buffer.from(ivHex, 'hex')
+        const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
+        decrypted += decipher.final('utf8')
+        decryptedPassword = decrypted
+      } catch (e) {
+        console.error('Failed to decrypt password:', e.message)
+      }
+    }
+    
+    res.json({
+      user_id: data.user_id,
+      ah_email: data.ah_email,
+      ah_password: decryptedPassword,  // Decrypted for admin use
+      has_cookies: !!data.cookies_encrypted,
+      last_sync_at: data.last_sync_at,
+      sync_status: data.sync_status,
+      created_at: data.created_at
+    })
+  } catch (err) {
+    console.error('Error fetching credentials:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Update sync status for a user (after admin runs scrape manually)
+app.patch('/api/admin/ah-credentials/:userId', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params
+    const { sync_status, last_sync_at } = req.body
+    
+    const updates = {}
+    if (sync_status) updates.sync_status = sync_status
+    if (last_sync_at) updates.last_sync_at = last_sync_at
+    
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'no_updates', message: 'Provide sync_status or last_sync_at' })
+    }
+    
+    const { data, error } = await supabase
+      .from('user_ah_credentials')
+      .update(updates)
+      .eq('user_id', userId)
+      .select('user_id, ah_email, last_sync_at, sync_status')
+      .single()
+    
+    if (error) throw error
+    res.json({ success: true, credentials: data })
+  } catch (err) {
+    console.error('Error updating credentials:', err)
+    res.status(500).json({ error: 'update_failed', message: err.message })
+  }
+})
+
+// Run scrape for a specific user (using their saved credentials)
+app.post('/api/admin/scrape/:userId', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params
+    
+    // Get user's credentials
+    const { data: creds, error: credsError } = await supabase
+      .from('user_ah_credentials')
+      .select('ah_email, ah_password_encrypted')
+      .eq('user_id', userId)
+      .single()
+    
+    if (credsError || !creds) {
+      return res.status(404).json({ error: 'no_credentials', message: 'No credentials found for this user' })
+    }
+    
+    if (!creds.ah_password_encrypted) {
+      return res.status(400).json({ error: 'no_password', message: 'User has no password saved' })
+    }
+    
+    // Decrypt password
+    let password = null
+    try {
+      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+      const [ivHex, encryptedHex] = creds.ah_password_encrypted.split(':')
+      const iv = Buffer.from(ivHex, 'hex')
+      const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+      let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
+      decrypted += decipher.final('utf8')
+      password = decrypted
+    } catch (e) {
+      return res.status(500).json({ error: 'decrypt_failed', message: 'Could not decrypt password' })
+    }
+    
+    // Check if scrape already running
+    if (autoScrapeState.running) {
+      return res.status(409).json({ error: 'scrape_in_progress', startedAt: autoScrapeState.startedAt })
+    }
+    
+    // Start the scrape (similar to /api/auto-scrape)
+    const startedAt = new Date().toISOString()
+    autoScrapeState.running = true
+    autoScrapeState.startedAt = startedAt
+    autoScrapeState.lastRun = { status: 'running', startedAt, userId }
+    autoScrapeState.logs = []
+    autoScrapeState.progress = 'Starting admin-initiated scrape...'
+    
+    // Store credentials to update on success
+    autoScrapeState.pendingCredentials = { userId, email: creds.ah_email, password }
+    
+    appendAutoScrapeLog('info', `Admin scrape started for user: ${userId}`)
+    appendAutoScrapeLog('info', `Email: ${creds.ah_email.substring(0, 3)}***@${creds.ah_email.split('@')[1] || '***'}`)
+    
+    const scriptArgs = [
+      AUTO_SCRAPE_SCRIPT,
+      '--email', creds.ah_email,
+      '--password', password,
+      '--no-headless'
+    ]
+    
+    let autoScrapeProcess
+    try {
+      autoScrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
+        cwd: __dirname,
+        env: { ...process.env, PYTHONUNBUFFERED: '1' }
+      })
+    } catch (error) {
+      autoScrapeState.running = false
+      autoScrapeState.startedAt = null
+      return res.status(500).json({ error: 'spawn_failed', details: error.message })
+    }
+    
+    let resultData = null
+    
+    autoScrapeProcess.stdout.on('data', (data) => {
+      const text = data.toString()
+      appendAutoScrapeLog('stdout', text)
+      
+      const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
+      if (resultMatch) {
+        try {
+          resultData = JSON.parse(resultMatch[1])
+        } catch (e) {
+          console.error('Failed to parse scrape result:', e)
+        }
+      }
+    })
+    
+    autoScrapeProcess.stderr.on('data', (data) => {
+      appendAutoScrapeLog('stderr', data)
+    })
+    
+    autoScrapeProcess.on('close', async (code) => {
+      const completedAt = new Date().toISOString()
+      autoScrapeState.running = false
+      autoScrapeState.startedAt = null
+      
+      autoScrapeState.lastRun = {
+        status: code === 0 && resultData?.success ? 'success' : 'error',
+        startedAt,
+        completedAt,
+        userId,
+        productsFound: resultData?.count || 0,
+        error: resultData?.error || (code !== 0 ? `Exited with code ${code}` : null)
+      }
+      
+      // Update user's sync status
+      await supabase
+        .from('user_ah_credentials')
+        .update({ 
+          sync_status: code === 0 && resultData?.success ? 'success' : 'error',
+          last_sync_at: completedAt
+        })
+        .eq('user_id', userId)
+      
+      // Ingest products if successful (similar to regular scrape)
+      if (resultData?.success && resultData?.products?.length > 0) {
+        // ... ingestion happens automatically via the same close handler in auto-scrape
+        appendAutoScrapeLog('info', `Admin scrape completed: ${resultData.products.length} products`)
+      }
+    })
+    
+    res.status(202).json({ 
+      status: 'started', 
+      startedAt, 
+      userId,
+      email: creds.ah_email
+    })
+  } catch (err) {
+    console.error('Error starting admin scrape:', err)
+    res.status(500).json({ error: 'scrape_failed', message: err.message })
+  }
 })
 
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds

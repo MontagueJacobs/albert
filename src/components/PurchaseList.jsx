@@ -1,26 +1,28 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ShoppingBag, LogIn, Loader2 } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
-import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser, useAHFetch } from '../lib/ahUserContext'
+import ScoreBreakdownModal from './ScoreBreakdownModal'
 
-function PurchaseList({ syncVersion, onLoginClick }) {
+function PurchaseList({ syncVersion }) {
   const { t, lang } = useI18n()
-  const { user, isAuthenticated } = useAuth()
-  const authFetch = useAuthenticatedFetch()
+  const { ahEmail } = useAHUser()
+  const ahFetch = useAHFetch()
   
   const [purchases, setPurchases] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selectedProduct, setSelectedProduct] = useState(null)
 
   const fetchPurchases = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!ahEmail) {
       setLoading(false)
       return
     }
     
     setLoading(true)
     try {
-      const res = await authFetch('/api/user/purchases')
+      const res = await ahFetch('/api/user/purchases')
       if (res.ok) {
         const data = await res.json()
         setPurchases(data.purchases || [])
@@ -33,14 +35,14 @@ function PurchaseList({ syncVersion, onLoginClick }) {
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, authFetch])
+  }, [ahEmail, ahFetch])
 
   useEffect(() => {
     fetchPurchases()
   }, [fetchPurchases, syncVersion])
 
-  // Not logged in - show login prompt
-  if (!isAuthenticated) {
+  // Not logged in - fallback (shouldn't happen with new flow)
+  if (!ahEmail) {
     return (
       <div style={{
         textAlign: 'center',
@@ -50,17 +52,10 @@ function PurchaseList({ syncVersion, onLoginClick }) {
         border: '1px solid var(--border, #334155)'
       }}>
         <LogIn size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('login_required_title') || 'Login Required'}</h2>
+        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('login_required_title') || 'Connect Required'}</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          {t('login_required_history') || 'Please log in to view your purchase history.'}
+          {t('login_required_history') || 'Connect your AH account to view your purchase history.'}
         </p>
-        <button 
-          className="btn btn-primary btn-lg"
-          onClick={onLoginClick}
-        >
-          <LogIn size={20} />
-          {t('login_button') || 'Log In / Sign Up'}
-        </button>
       </div>
     )
   }
@@ -108,7 +103,15 @@ function PurchaseList({ syncVersion, onLoginClick }) {
     <div className="purchase-list">
       <h2 style={{marginBottom: '1rem'}}>{t('tab_history')} ({purchases.length})</h2>
       {purchases.map((purchase, index) => (
-        <div key={purchase.id || index} className="purchase-item">
+        <div 
+          key={purchase.id || index} 
+          className="purchase-item"
+          onClick={() => setSelectedProduct({
+            name: purchase.product_name || purchase.product,
+            url: purchase.url || null
+          })}
+          style={{ cursor: 'pointer' }}
+        >
           <div className="info">
             <div className="product-name">{purchase.product_name || purchase.product}</div>
             <div className="details">
@@ -120,6 +123,14 @@ function PurchaseList({ syncVersion, onLoginClick }) {
           </div>
         </div>
       ))}
+      
+      {/* Score breakdown modal */}
+      {selectedProduct && (
+        <ScoreBreakdownModal 
+          product={selectedProduct} 
+          onClose={() => setSelectedProduct(null)} 
+        />
+      )}
     </div>
   )
 }

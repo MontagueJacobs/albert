@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
+import AccountSettings from './AccountSettings'
 
 export default function UserMenu({ onLoginClick }) {
   const { user, isAuthenticated, signOut, loading } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const menuRef = useRef(null)
 
   // Close menu when clicking outside
@@ -74,13 +76,15 @@ export default function UserMenu({ onLoginClick }) {
             📦 My Purchases
           </a>
           
-          <a
-            href="#profile"
-            onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          <button
+            onClick={() => {
+              setMenuOpen(false)
+              setSettingsOpen(true)
+            }}
+            className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            👤 Profile
-          </a>
+            ⚙️ Account Settings
+          </button>
           
           <div className="border-t border-gray-100 mt-1">
             <button
@@ -95,6 +99,11 @@ export default function UserMenu({ onLoginClick }) {
           </div>
         </div>
       )}
+
+      <AccountSettings 
+        isOpen={settingsOpen} 
+        onClose={() => setSettingsOpen(false)} 
+      />
     </div>
   )
 }

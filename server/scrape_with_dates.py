@@ -86,7 +86,7 @@ def scrape_products(page):
     
     for i, card in enumerate(cards):
         try:
-            product = {'order': i}  # Order indicates recency (0 = most recent)
+            product = {'purchase_rank': i + 1}  # Rank 1 = most recently purchased
             
             # Title
             title_el = card.query_selector('[data-testhook="product-title"], [class*="title"]')
@@ -227,18 +227,23 @@ def main():
         
         # Scrape products
         print('\nScraping products...')
+        scraped_at = datetime.now().isoformat()
         products = scrape_products(page)
         print(f'Found {len(products)} products')
         
-        # Assign estimated dates
+        # Add scraped_at to each product for database insertion
+        for p in products:
+            p['scraped_at'] = scraped_at
+        
+        # Assign estimated dates (optional, for reference)
         if products:
             products = assign_estimated_dates(products)
             
             # Save to file
             output = {
-                'scraped_at': datetime.now().isoformat(),
+                'scraped_at': scraped_at,
                 'total_products': len(products),
-                'note': 'Products sorted by "laatst gekocht" (most recent first). Dates are estimated based on sort order.',
+                'note': 'Products sorted by "laatst gekocht" (most recent first). purchase_rank: 1 = most recent purchase.',
                 'products': products
             }
             

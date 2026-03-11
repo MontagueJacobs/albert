@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, Lock, Mail, Eye, EyeOff, CheckCircle, AlertCircle, Info, Cookie, RefreshCw, Trash2 } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
-import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser, useAHFetch } from '../lib/ahUserContext'
+import AHLoginForm from './AHLoginForm'
 
 function AutoScrape({ onScrapeCompleted }) {
   const { t } = useI18n()
-  const { user, isAuthenticated } = useAuth()
-  const authFetch = useAuthenticatedFetch()
-  const [email, setEmail] = useState('')
+  const { ahEmail, setEmail: setAHEmail } = useAHUser()
+  const ahFetch = useAHFetch()
+  const [email, setEmail] = useState(ahEmail || '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [saveCredentials, setSaveCredentials] = useState(true) // Default to save
@@ -19,7 +20,8 @@ function AutoScrape({ onScrapeCompleted }) {
   const [available, setAvailable] = useState(true)
   const [cookieStatus, setCookieStatus] = useState(null)
   const [capturingCookies, setCapturingCookies] = useState(false)
-  const [mode, setMode] = useState('credentials') // 'cookies' or 'credentials'
+  const [mode, setMode] = useState('cookies') // Always use cookies mode with AH login form
+  const [showAHLogin, setShowAHLogin] = useState(false)
   const pollRef = useRef(null)
   const lastCompletedRef = useRef(null)
 
@@ -44,14 +46,14 @@ function AutoScrape({ onScrapeCompleted }) {
     }
   }, [])
 
-  // Check if user has saved AH credentials
+  // Check if user has saved AH credentials  
   const fetchSavedCredentials = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!ahEmail) {
       setSavedCredentials(null)
       return
     }
     try {
-      const res = await authFetch('/api/user/ah-credentials')
+      const res = await ahFetch('/api/user/ah-credentials')
       if (res.ok) {
         const data = await res.json()
         setSavedCredentials(data)
@@ -62,7 +64,7 @@ function AutoScrape({ onScrapeCompleted }) {
     } catch (err) {
       console.error('Failed to fetch saved credentials:', err)
     }
-  }, [isAuthenticated, authFetch])
+  }, [ahEmail, ahFetch])
 
   useEffect(() => {
     fetchCookieStatus()
@@ -134,15 +136,15 @@ function AutoScrape({ onScrapeCompleted }) {
     setError(null)
     
     try {
-      // Use authFetch if authenticated to allow credential saving
-      const fetchFn = isAuthenticated ? authFetch : fetch
-      const res = await fetchFn('/api/auto-scrape', {
+      // Use visual-login instead of password-based login to avoid CAPTCHA issues
+      // The visual-login endpoint saves credentials and sets up user by email
+      const res = await ahFetch('/api/auto-scrape/visual-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           email, 
           password,
-          save_credentials: isAuthenticated && saveCredentials 
+          save_credentials: saveCredentials 
         })
       })
       
@@ -154,6 +156,8 @@ function AutoScrape({ onScrapeCompleted }) {
         const payload = await res.json().catch(() => ({}))
         throw new Error(payload?.error || 'failed to start auto-scrape')
       } else {
+        // Set the AH email in context so user is "logged in"
+        setAHEmail(email)
         // Clear password after successful start for security
         setPassword('')
         fetchStatus()
@@ -164,7 +168,7 @@ function AutoScrape({ onScrapeCompleted }) {
     } finally {
       setStarting(false)
     }
-  }, [email, password, starting, status, fetchStatus, t, isAuthenticated, authFetch, saveCredentials])
+  }, [email, password, starting, status, fetchStatus, t, ahFetch, saveCredentials, setAHEmail])
 
   // Start scrape using saved credentials (resync)
   const handleResync = useCallback(async () => {
@@ -178,7 +182,7 @@ function AutoScrape({ onScrapeCompleted }) {
     setError(null)
     
     try {
-      const res = await authFetch('/api/auto-scrape/resync', {
+      const res = await ahFetch('/api/auto-scrape/resync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -201,9 +205,9 @@ function AutoScrape({ onScrapeCompleted }) {
     } finally {
       setStarting(false)
     }
-  }, [starting, status, savedCredentials, fetchStatus, t, authFetch])
+  }, [starting, status, savedCredentials, fetchStatus, t, ahFetch])
 
-  // Start scrape with cookies
+  // Start scrape with cookies - also saves credentials if provided
   const handleCookieScrape = useCallback(async () => {
     if (starting || status?.running) return
     
@@ -211,10 +215,18 @@ function AutoScrape({ onScrapeCompleted }) {
     setError(null)
     
     try {
-      // Use authenticated fetch to associate purchases with user
-      const res = await authFetch('/api/auto-scrape/with-cookies', {
+      // Build body with credentials if provided (to save them)
+      const body = email && password ? {
+        email,
+        password,
+        save_credentials: true
+      } : {}
+      
+      // Use ahFetch to associate purchases with user
+      const res = await ahFetch('/api/auto-scrape/with-cookies', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
       })
       
       if (res.status === 400) {
@@ -237,9 +249,9 @@ function AutoScrape({ onScrapeCompleted }) {
     } finally {
       setStarting(false)
     }
-  }, [starting, status, fetchStatus, t, authFetch])
+  }, [starting, status, fetchStatus, t, ahFetch, email, password])
 
-  // Start cookie capture (manual login)
+  // Start cookie capture (manual login) or auto-login if credentials provided
   const handleCaptureCookies = useCallback(async () => {
     if (capturingCookies || status?.running) return
     
@@ -247,17 +259,66 @@ function AutoScrape({ onScrapeCompleted }) {
     setError(null)
     
     try {
-      const res = await fetch('/api/auto-scrape/capture-cookies', {
-        method: 'POST'
-      })
-      
-      if (res.status === 501) {
-        setError(t('auto_scrape_capture_not_supported'))
-      } else if (res.status === 409) {
-        setError(t('auto_scrape_conflict'))
-      } else if (!res.ok) {
-        throw new Error('failed to start cookie capture')
+      // If email and password provided, use auto-login endpoint
+      if (email && password) {
+        console.log('[DEBUG] handleCaptureCookies - using auto-login with credentials')
+        
+        const res = await ahFetch('/api/auto-scrape/auto-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        })
+        
+        if (res.status === 501) {
+          setError(t('auto_scrape_capture_not_supported'))
+          setCapturingCookies(false)
+          return
+        } else if (res.status === 409) {
+          setError(t('auto_scrape_conflict'))
+          setCapturingCookies(false)
+          return
+        } else if (res.status === 400) {
+          setError(t('auto_scrape_missing_credentials') || 'Please enter email and password')
+          setCapturingCookies(false)
+          return
+        } else if (!res.ok) {
+          throw new Error('Failed to start auto-login')
+        }
+        
+        // Poll for completion
+        const pollLogin = setInterval(async () => {
+          const statusRes = await fetch('/api/auto-scrape/auto-login/status')
+          const statusData = await statusRes.json()
+          
+          if (!statusData.running) {
+            clearInterval(pollLogin)
+            setCapturingCookies(false)
+            fetchCookieStatus()
+            fetchSavedCredentials()
+          }
+        }, 2000)
       } else {
+        // No credentials - use manual capture-cookies flow
+        console.log('[DEBUG] handleCaptureCookies - using manual capture flow')
+        
+        const res = await ahFetch('/api/auto-scrape/capture-cookies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        })
+        
+        if (res.status === 501) {
+          setError(t('auto_scrape_capture_not_supported'))
+          setCapturingCookies(false)
+          return
+        } else if (res.status === 409) {
+          setError(t('auto_scrape_conflict'))
+          setCapturingCookies(false)
+          return
+        } else if (!res.ok) {
+          throw new Error('Failed to start cookie capture')
+        }
+        
         // Poll for completion
         const pollCapture = setInterval(async () => {
           const statusRes = await fetch('/api/auto-scrape/capture-cookies/status')
@@ -267,6 +328,7 @@ function AutoScrape({ onScrapeCompleted }) {
             clearInterval(pollCapture)
             setCapturingCookies(false)
             fetchCookieStatus()
+            fetchSavedCredentials()
           }
         }, 2000)
       }
@@ -275,7 +337,87 @@ function AutoScrape({ onScrapeCompleted }) {
       setError(t('auto_scrape_error_generic'))
       setCapturingCookies(false)
     }
-  }, [capturingCookies, status, fetchCookieStatus, t])
+  }, [capturingCookies, status, fetchCookieStatus, fetchSavedCredentials, t, ahFetch, email, password])
+
+  // Handle auto-login with credentials passed directly (from AHLoginForm)
+  const handleCaptureCookiesWithCredentials = useCallback(async (ahEmail, ahPassword) => {
+    if (capturingCookies || status?.running) return
+    
+    setCapturingCookies(true)
+    setError(null)
+    
+    try {
+      // Save credentials to database immediately (before auto-login)
+      console.log('[DEBUG] handleCaptureCookiesWithCredentials - saving credentials first')
+      console.log('[DEBUG] Email:', ahEmail, 'Password length:', ahPassword?.length)
+      try {
+        const saveRes = await ahFetch('/api/user/ah-credentials/password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ah_email: ahEmail, ah_password: ahPassword })
+        })
+        const saveData = await saveRes.json()
+        console.log('[DEBUG] Save response:', saveRes.status, saveData)
+        if (saveRes.ok) {
+          console.log('[DEBUG] AH credentials saved successfully')
+          // Set the AH email in context so user is "logged in"
+          setAHEmail(ahEmail)
+          fetchSavedCredentials() // Update the UI to show credentials are saved
+        } else {
+          console.error('[DEBUG] Failed to save AH credentials:', saveData)
+          setError(`Failed to save credentials: ${saveData.message || saveData.error || 'Unknown error'}`)
+          setCapturingCookies(false)
+          return
+        }
+      } catch (saveErr) {
+        console.error('[DEBUG] Error saving AH credentials:', saveErr)
+        setError(`Error saving credentials: ${saveErr.message}`)
+        setCapturingCookies(false)
+        return
+      }
+      
+      console.log('[DEBUG] handleCaptureCookiesWithCredentials - using auto-login with AH credentials')
+      
+      const res = await ahFetch('/api/auto-scrape/auto-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ahEmail, password: ahPassword })
+      })
+      
+      if (res.status === 501) {
+        setError(t('auto_scrape_capture_not_supported'))
+        setCapturingCookies(false)
+        return
+      } else if (res.status === 409) {
+        setError(t('auto_scrape_conflict'))
+        setCapturingCookies(false)
+        return
+      } else if (res.status === 400) {
+        setError(t('auto_scrape_missing_credentials') || 'Please enter email and password')
+        setCapturingCookies(false)
+        return
+      } else if (!res.ok) {
+        throw new Error('Failed to start auto-login')
+      }
+      
+      // Poll for completion
+      const pollLogin = setInterval(async () => {
+        const statusRes = await fetch('/api/auto-scrape/auto-login/status')
+        const statusData = await statusRes.json()
+        
+        if (!statusData.running) {
+          clearInterval(pollLogin)
+          setCapturingCookies(false)
+          fetchCookieStatus()
+          fetchSavedCredentials()
+        }
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to start auto-login:', err)
+      setError(t('auto_scrape_error_generic'))
+      setCapturingCookies(false)
+    }
+  }, [capturingCookies, status, fetchCookieStatus, fetchSavedCredentials, t, ahFetch, setAHEmail])
 
   // Delete cookies
   const handleDeleteCookies = useCallback(async () => {
@@ -340,54 +482,7 @@ function AutoScrape({ onScrapeCompleted }) {
           {t('auto_scrape_description')}
         </p>
 
-        {/* Mode tabs */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '0.5rem', 
-          marginBottom: '1rem',
-          borderBottom: '1px solid var(--border, #334155)',
-          paddingBottom: '0.5rem'
-        }}>
-          <button
-            type="button"
-            onClick={() => setMode('cookies')}
-            style={{
-              padding: '0.5rem 1rem',
-              background: mode === 'cookies' ? '#e0e7ff' : 'transparent',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: mode === 'cookies' ? 600 : 400,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem'
-            }}
-          >
-            <Cookie size={16} />
-            {t('auto_scrape_mode_cookies')}
-            {hasCookies && <CheckCircle size={14} style={{ color: '#16a34a' }} />}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('credentials')}
-            style={{
-              padding: '0.5rem 1rem',
-              background: mode === 'credentials' ? '#e0e7ff' : 'transparent',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: mode === 'credentials' ? 600 : 400,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem'
-            }}
-          >
-            <Lock size={16} />
-            {t('auto_scrape_mode_credentials')}
-          </button>
-        </div>
-
-        {/* Cookie mode */}
+        {/* Cookie mode - now the main/only mode with AH login form */}
         {mode === 'cookies' && (
           <div>
             {/* Cookie status */}
@@ -431,23 +526,121 @@ function AutoScrape({ onScrapeCompleted }) {
               )}
             </div>
 
-            {/* How it works */}
-            <div style={{ 
-              padding: '0.75rem 1rem', 
-              background: 'rgba(59, 130, 246, 0.1)', 
-              borderRadius: '8px', 
-              marginBottom: '1rem',
-              fontSize: '0.85rem',
-              color: 'var(--text, #f3f4f6)'
-            }}>
-              <strong>ℹ️ {t('auto_scrape_cookie_how_title')}</strong>
-              <ol style={{ margin: '0.5rem 0 0 1.25rem', padding: 0, color: 'var(--text-muted, #9ca3af)' }}>
-                <li>{t('auto_scrape_cookie_step1')}</li>
-                <li>{t('auto_scrape_cookie_step2')}</li>
-                <li>{t('auto_scrape_cookie_step3')}</li>
-              </ol>
-            </div>
+            {/* AH Login Button - opens modal for entering Albert Heijn credentials */}
+            {!hasCookies && (
+              <button
+                onClick={() => setShowAHLogin(true)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  background: '#00ADE6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '1rem'
+                }}
+              >
+                <Lock size={18} />
+                {t('auto_scrape_connect_ah') || 'Verbinden met Albert Heijn'}
+              </button>
+            )}
 
+            {/* AH Login Modal */}
+            <AHLoginForm
+              isOpen={showAHLogin}
+              onClose={() => setShowAHLogin(false)}
+              onSubmit={({ email: ahEmail, password: ahPassword }) => {
+                setEmail(ahEmail)
+                setPassword(ahPassword)
+                setShowAHLogin(false)
+                // Trigger auto-login with a small delay to let state update
+                setTimeout(() => {
+                  handleCaptureCookiesWithCredentials(ahEmail, ahPassword)
+                }, 100)
+              }}
+              loading={capturingCookies}
+              error={error}
+            />
+
+            {/* Show saved credentials status */}
+            {savedCredentials?.ah_email && (
+              <div style={{ 
+                marginTop: '1rem',
+                padding: '0.75rem 1rem', 
+                background: 'rgba(34, 197, 94, 0.15)', 
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                color: '#22c55e',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <CheckCircle size={16} />
+                AH credentials saved for: {savedCredentials.ah_email}
+              </div>
+            )}
+
+            {/* Actions when cookies already exist */}
+            {hasCookies && (
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleCookieScrape}
+                  disabled={isRunning}
+                  className="btn btn-primary"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem'
+                  }}
+                >
+                  {isRunning ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      {t('auto_scrape_button_running')}
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={18} />
+                      {t('auto_scrape_with_cookies_button')}
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeleteCookies()
+                  }}
+                  className="btn"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem',
+                    background: 'var(--bg-hover, #334155)',
+                    border: '1px solid var(--border, #334155)',
+                    color: 'var(--text, #f3f4f6)'
+                  }}
+                >
+                  <Trash2 size={18} />
+                  {t('auto_scrape_reconnect') || 'Reconnect AH Account'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Credentials mode - legacy direct login */}
+        {mode === 'credentials' && false && (  /* Hidden - use cookies mode with AH form instead */
+          <div>
             {/* Actions */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               {!hasCookies ? (
@@ -471,7 +664,7 @@ function AutoScrape({ onScrapeCompleted }) {
                   ) : (
                     <>
                       <Cookie size={18} />
-                      {t('auto_scrape_capture_button')}
+                      Login & Connect
                     </>
                   )}
                 </button>
@@ -517,7 +710,7 @@ function AutoScrape({ onScrapeCompleted }) {
                     }}
                   >
                     <Cookie size={18} />
-                    {t('auto_scrape_refresh_cookies')}
+                    {email && password ? (t('auto_scrape_login_again') || 'Login Again') : t('auto_scrape_refresh_cookies')}
                   </button>
                 </>
               )}
@@ -624,37 +817,35 @@ function AutoScrape({ onScrapeCompleted }) {
                 </div>
               </div>
 
-              {/* Save credentials checkbox (only for authenticated users) */}
-              {isAuthenticated && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '0.5rem',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem'
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={saveCredentials}
-                      onChange={(e) => setSaveCredentials(e.target.checked)}
-                      disabled={isRunning}
-                      style={{ width: '18px', height: '18px' }}
-                    />
-                    <span>{t('auto_scrape_save_credentials') || 'Save credentials for future syncs'}</span>
-                  </label>
-                  <p style={{ 
-                    margin: '0.25rem 0 0 1.75rem', 
-                    fontSize: '0.8rem', 
-                    color: '#666' 
-                  }}>
-                    {t('auto_scrape_save_credentials_hint') || 'Your password is encrypted and stored securely'}
-                  </p>
-                </div>
-              )}
+              {/* Save credentials checkbox */}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={saveCredentials}
+                    onChange={(e) => setSaveCredentials(e.target.checked)}
+                    disabled={isRunning}
+                    style={{ width: '18px', height: '18px' }}
+                  />
+                  <span>{t('auto_scrape_save_credentials') || 'Save credentials for future syncs'}</span>
+                </label>
+                <p style={{ 
+                  margin: '0.25rem 0 0 1.75rem', 
+                  fontSize: '0.8rem', 
+                  color: '#666' 
+                }}>
+                  {t('auto_scrape_save_credentials_hint') || 'Your password is encrypted and stored securely'}
+                </p>
+              </div>
 
               {/* Show saved credentials status */}
-              {isAuthenticated && savedCredentials?.ah_email && (
+              {savedCredentials?.ah_email && (
                 <div style={{ 
                   padding: '0.75rem 1rem', 
                   background: '#dcfce7', 

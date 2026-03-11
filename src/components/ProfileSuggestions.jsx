@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { LogIn } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
-import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser, useAHFetch } from '../lib/ahUserContext'
+import ScoreBreakdownModal from './ScoreBreakdownModal'
 
 // Dark mode styles
 const styles = {
@@ -53,13 +54,14 @@ const styles = {
   }
 }
 
-function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
+function ProfileSuggestions({ refreshKey = 0 }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selectedProduct, setSelectedProduct] = useState(null)
   const { t } = useI18n()
-  const { user, isAuthenticated } = useAuth()
-  const authFetch = useAuthenticatedFetch()
+  const { ahEmail } = useAHUser()
+  const ahFetch = useAHFetch()
 
   function ScoreBadge({ score }) {
     const cls = score >= 7 ? 'score-high' : score >= 5 ? 'score-medium' : 'score-low'
@@ -76,23 +78,15 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
     )
   }
 
-  // If not authenticated, show login prompt
-  if (!isAuthenticated) {
+  // If not connected, show message
+  if (!ahEmail) {
     return (
       <div style={{textAlign: 'center', padding: '3rem 1rem'}}>
         <LogIn size={48} style={{color: 'var(--text-muted)', marginBottom: '1rem'}} />
-        <h3 style={{color: 'var(--text)', marginBottom: '0.5rem'}}>{t('login_required') || 'Login Required'}</h3>
+        <h3 style={{color: 'var(--text)', marginBottom: '0.5rem'}}>{t('login_required') || 'Connection Required'}</h3>
         <p style={{color: 'var(--text-muted)', marginBottom: '1.5rem'}}>
-          {t('login_to_view_suggestions') || 'Please log in to see personalized suggestions based on your purchases.'}
+          {t('login_to_view_suggestions') || 'Connect your AH account to see personalized suggestions based on your purchases.'}
         </p>
-        {onLoginClick && (
-          <button 
-            className="btn btn-primary"
-            onClick={onLoginClick}
-          >
-            {t('sign_in') || 'Sign In'}
-          </button>
-        )}
       </div>
     )
   }
@@ -100,12 +94,12 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
     let cancelled = false
 
     async function fetchData() {
-      if (!isAuthenticated) return
+      if (!ahEmail) return
       
       setLoading(true)
       setError(null)
       try {
-        const res = await authFetch('/api/user/suggestions')
+        const res = await ahFetch('/api/user/suggestions')
         if (!res.ok) throw new Error('Failed to load profile suggestions')
         const json = await res.json()
         if (!cancelled) {
@@ -126,7 +120,7 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
     return () => {
       cancelled = true
     }
-  }, [refreshKey, isAuthenticated, authFetch])
+  }, [refreshKey, ahEmail, ahFetch])
 
   if (loading) return <div style={{marginTop: '1rem'}}><SkeletonGrid /></div>
   if (error) return <div style={styles.error}>{t('error')} {error}</div>
@@ -212,15 +206,21 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
             {replacements.map((r, idx) => (
               <div key={idx} style={{background: 'var(--bg-hover)', borderRadius: '10px', padding: '0.75rem'}}>
                 <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap'}}>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                  <button 
+                    onClick={() => setSelectedProduct({ name: r.original.name, score: r.original.score })}
+                    style={{display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0}}
+                  >
                     <span style={{color: 'var(--text-muted)'}}>{r.original.name}</span>
                     <ScoreBadge score={r.original.score} />
-                  </div>
+                  </button>
                   <span style={{color: 'var(--text-muted)'}}>→</span>
-                  <a href={r.replacement.url} target="_blank" rel="noreferrer" style={{display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none'}}>
+                  <button 
+                    onClick={() => setSelectedProduct({ name: r.replacement.name, url: r.replacement.url, score: r.replacement.score })}
+                    style={{display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'none'}}
+                  >
                     <span style={{color: 'var(--text)', fontWeight: 600}}>{r.replacement.name}</span>
                     <ScoreBadge score={r.replacement.score} />
-                  </a>
+                  </button>
                 </div>
                 <div style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem'}}>{r.reason}</div>
               </div>
@@ -234,15 +234,28 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
         <h4 style={{...styles.heading, marginBottom: '0.5rem'}}>{t('top_suggestions') || '✨ Top Sustainable Products'}</h4>
         <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '0.5rem'}}>
           {suggestions && suggestions.length > 0 ? suggestions.map((s, idx) => (
-            <a key={idx} href={s.url} target="_blank" rel="noreferrer" className="suggestion-card" style={styles.suggestionCard}>
+            <button 
+              key={idx} 
+              onClick={() => setSelectedProduct({ name: s.name, url: s.url, score: s.sustainability_score })}
+              className="suggestion-card" 
+              style={{...styles.suggestionCard, cursor: 'pointer', textAlign: 'left', width: '100%'}}
+            >
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                 <div style={styles.suggestionName}>{s.name}</div>
                 <ScoreBadge score={s.sustainability_score} />
               </div>
-            </a>
+            </button>
           )) : <div style={{padding:'1rem', color: 'var(--text-muted, #9ca3af)'}}>{t('no_suggestions') || 'No suggestions available'}</div>}
         </div>
       </div>
+
+      {/* Score breakdown modal */}
+      {selectedProduct && (
+        <ScoreBreakdownModal 
+          product={selectedProduct} 
+          onClose={() => setSelectedProduct(null)} 
+        />
+      )}
     </section>
   )
 }

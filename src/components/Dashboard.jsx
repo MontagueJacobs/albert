@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TrendingUp, Award, ShoppingCart, DollarSign, LogIn, Loader2, ChevronDown, ChevronUp, Calendar, MapPin, Leaf, Apple } from 'lucide-react'
 import ProfileSuggestions from './ProfileSuggestions'
+import ScoreBreakdownModal from './ScoreBreakdownModal'
 import { useI18n } from '../i18n.jsx'
-import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser, useAHFetch } from '../lib/ahUserContext'
 
 // Dark mode styles
 const styles = {
@@ -97,10 +98,10 @@ const styles = {
   }
 }
 
-function Dashboard({ syncVersion, onLoginClick }) {
+function Dashboard({ syncVersion }) {
   const { t } = useI18n()
-  const { user, isAuthenticated } = useAuth()
-  const authFetch = useAuthenticatedFetch()
+  const { ahEmail } = useAHUser()
+  const ahFetch = useAHFetch()
   
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -113,16 +114,17 @@ function Dashboard({ syncVersion, onLoginClick }) {
   const [purchaseTotal, setPurchaseTotal] = useState(0)
   const [purchaseTotalPages, setPurchaseTotalPages] = useState(0)
   const [showHistory, setShowHistory] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState(null)
 
   const fetchInsights = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!ahEmail) {
       setLoading(false)
       return
     }
     
     setLoading(true)
     try {
-      const res = await authFetch('/api/user/insights')
+      const res = await ahFetch('/api/user/insights')
       if (res.ok) {
         const data = await res.json()
         setInsights(data)
@@ -135,14 +137,14 @@ function Dashboard({ syncVersion, onLoginClick }) {
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, authFetch])
+  }, [ahEmail, ahFetch])
 
   const fetchPurchaseHistory = useCallback(async (page = 1) => {
-    if (!isAuthenticated) return
+    if (!ahEmail) return
     
     setPurchasesLoading(true)
     try {
-      const res = await authFetch(`/api/user/purchases/history?page=${page}&limit=20`)
+      const res = await ahFetch(`/api/user/purchases/history?page=${page}&limit=20`)
       if (res.ok) {
         const data = await res.json()
         console.log('[Dashboard] Purchase history response:', data)
@@ -160,7 +162,7 @@ function Dashboard({ syncVersion, onLoginClick }) {
     } finally {
       setPurchasesLoading(false)
     }
-  }, [isAuthenticated, authFetch])
+  }, [ahEmail, ahFetch])
 
   useEffect(() => {
     fetchInsights()
@@ -173,22 +175,16 @@ function Dashboard({ syncVersion, onLoginClick }) {
     }
   }, [showHistory, fetchPurchaseHistory])
 
-  // Not logged in - show login prompt
-  if (!isAuthenticated) {
+  // Not logged in - shouldn't happen since we're only shown when ahEmail exists
+  // but keep as fallback
+  if (!ahEmail) {
     return (
       <div style={styles.loginPrompt}>
         <LogIn size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('login_required_title') || 'Login Required'}</h2>
+        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('login_required_title') || 'Connect Required'}</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          {t('login_required_desc') || 'Please log in or create an account to view your sustainability dashboard and purchase history.'}
+          {t('login_required_desc') || 'Connect your Albert Heijn account to view your sustainability dashboard.'}
         </p>
-        <button 
-          className="btn btn-primary btn-lg"
-          onClick={onLoginClick}
-        >
-          <LogIn size={20} />
-          {t('login_button') || 'Log In / Sign Up'}
-        </button>
       </div>
     )
   }
@@ -331,7 +327,14 @@ function Dashboard({ syncVersion, onLoginClick }) {
             ) : (
               <>
                 {purchases.map((purchase) => (
-                  <PurchaseItem key={purchase.id} purchase={purchase} />
+                  <PurchaseItem 
+                    key={purchase.id} 
+                    purchase={purchase} 
+                    onClick={() => setSelectedProduct({
+                      name: purchase.product_name,
+                      url: purchase.url || null
+                    })}
+                  />
                 ))}
                 
                 {/* Pagination */}
@@ -371,12 +374,20 @@ function Dashboard({ syncVersion, onLoginClick }) {
           </div>
         )}
       </div>
+      
+      {/* Score breakdown modal */}
+      {selectedProduct && (
+        <ScoreBreakdownModal 
+          product={selectedProduct} 
+          onClose={() => setSelectedProduct(null)} 
+        />
+      )}
     </div>
   )
 }
 
 // Helper component for individual purchase items
-function PurchaseItem({ purchase }) {
+function PurchaseItem({ purchase, onClick }) {
   const getScoreColor = (score) => {
     if (score >= 7) return '#22c55e'
     if (score >= 5) return '#eab308'
@@ -413,7 +424,7 @@ function PurchaseItem({ purchase }) {
   }
 
   return (
-    <div style={styles.purchaseItem}>
+    <div style={{ ...styles.purchaseItem, cursor: 'pointer' }} onClick={onClick}>
       {/* Product Image */}
       {purchase.image_url ? (
         <img 

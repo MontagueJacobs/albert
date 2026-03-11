@@ -2,604 +2,770 @@
   "success": true,
   "products": [
     {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi127726/ah-biologisch-vastkokende-aardappelen",
+      "price": 2.25,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303630373735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 1
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi474614/ah-terra-plantaardige-soja-kwark",
+      "price": 1.79,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313433333130?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 2
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi569952/ah-terra-plantaardige-spread-kruiden",
+      "price": 1.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313834313436?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 3
+    },
+    {
       "name": "AH Winterpeen",
       "url": "https://www.ah.nl/producten/product/wi99036/ah-winterpeen",
       "price": 0.35,
       "image": "https://static.ah.nl/dam/product/AHI_4354523130323031353530?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Zaanlander Belegen 48+ plakken",
-      "url": "https://www.ah.nl/producten/product/wi602290/ah-zaanlander-belegen-48-plakken",
-      "price": 3.25,
-      "image": "https://static.ah.nl/dam/product/AHI_44482d6461506f4c53624770613479557a6a68315541?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi197307/ah-biologisch-bieslook-pot",
-      "price": 2.19,
-      "image": "https://static.ah.nl/dam/product/AHI_434d50313939323036?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi435436/ah-biologisch-slamelange-rucola-veldsla",
-      "price": 1.99,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239383937353236?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Snoepgroente tomaat",
-      "url": "https://www.ah.nl/producten/product/wi471641/ah-snoepgroente-tomaat",
-      "price": 3.29,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393033383533?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi563706/ah-terra-plantaardige-shoarma",
-      "price": 2.89,
-      "image": "https://static.ah.nl/dam/product/AHI_336e417655683261525a435a426648454f3377706741?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi565766/ah-terra-amandeldrink-ongezoet",
-      "price": 1.49,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393536393633?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Tortilla naturel wraps large 12 stuks",
-      "url": "https://www.ah.nl/producten/product/wi173410/ah-tortilla-naturel-wraps-large-12-stuks",
-      "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323130363033?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH IJsbergsla",
-      "url": "https://www.ah.nl/producten/product/wi4099/ah-ijsbergsla",
-      "price": 1.09,
-      "image": "https://static.ah.nl/dam/product/AHI_4b747851773844525157616f68464a3278345a557467?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Paprika mix",
-      "url": "https://www.ah.nl/producten/product/wi41194/ah-paprika-mix",
-      "price": 1.99,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393339323738?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi237311/ah-biologisch-mandarijnen",
-      "price": 3.29,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393438313634?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Trostomaten",
-      "url": "https://www.ah.nl/producten/product/wi354172/ah-trostomaten",
-      "price": 1.19,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239373537383636?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Robuuste chips salt & vinegar",
-      "url": "https://www.ah.nl/producten/product/wi460462/ah-robuuste-chips-salt-en-vinegar",
-      "price": 2.19,
-      "image": "https://static.ah.nl/dam/product/AHI_57443672736263335361797830445874533538375051?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Petit stokbrood meerzaden",
-      "url": "https://www.ah.nl/producten/product/wi475816/ah-petit-stokbrood-meerzaden",
-      "price": 0.89,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303835363237?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi564794/ah-terra-plantaardige-shoarma",
-      "price": 1.99,
-      "image": "https://static.ah.nl/dam/product/AHI_7933677976575263526753644d6e5776745f2d664e41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Oma's Bakkerij Chocolate chip koek",
-      "url": "https://www.ah.nl/producten/product/wi602105/oma-s-bakkerij-chocolate-chip-koek",
-      "price": 2.99,
-      "image": "https://static.ah.nl/dam/product/AHI_3337456e334c30545170714e675a30384f6154376567?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi395307/ah-biologisch-tomatenblokjes",
-      "price": 0.59,
-      "image": "https://static.ah.nl/dam/product/AHI_754a344d62736144515071534c6446735f4c78463167?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Baguette",
-      "url": "https://www.ah.nl/producten/product/wi366073/ah-baguette",
-      "price": 0.69,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303835363037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi564865/ah-terra-plantaardige-schnitzel",
-      "price": 1.69,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313639393735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi565765/ah-terra-plantaardige-sojadrink-ongezoet",
-      "price": 0.89,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313832393437?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Cashewnoten ongezouten",
-      "url": "https://www.ah.nl/producten/product/wi582888/ah-cashewnoten-ongezouten",
-      "price": 5.99,
-      "image": "https://static.ah.nl/dam/product/AHI_524474596e624b785448696e736a5276724278676577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi543591/ah-biologisch-fusilli",
-      "price": 1.29,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313834313433?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi564798/ah-terra-terra-plantaardige-rulgehakt",
-      "price": 2.69,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323035343035?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi101170/ah-biologisch-maiskorrels",
-      "price": 1.39,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313136373030?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Red Bull Energy drink suikervrij 4-pack",
-      "url": "https://www.ah.nl/producten/product/wi112749/red-bull-energy-drink-suikervrij-4-pack",
-      "price": 6.95,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393334313737?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Bakkers speculaas",
-      "url": "https://www.ah.nl/producten/product/wi474154/ah-bakkers-speculaas",
-      "price": 1.49,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313935393938?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi185774/ah-biologisch-knoflook",
-      "price": 1.45,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393536383837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Excellent Olijfolie extra vierge Italiaans",
-      "url": "https://www.ah.nl/producten/product/wi80100/ah-excellent-olijfolie-extra-vierge-italiaans",
-      "price": 6.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303636303330?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Valess Vegetarische schnitzel",
-      "url": "https://www.ah.nl/producten/product/wi133171/valess-vegetarische-schnitzel",
-      "price": 3.75,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313438323530?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Spinazie feta börek",
-      "url": "https://www.ah.nl/producten/product/wi429658/ah-spinazie-feta-borek",
-      "price": 1.09,
-      "image": "https://static.ah.nl/dam/product/AHI_6d674677646b35625158797a4a6b59756f4c79687877?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Haribo Bananas",
-      "url": "https://www.ah.nl/producten/product/wi451273/haribo-bananas",
-      "price": 1.99,
-      "image": "https://static.ah.nl/dam/product/AHI_76746f72376776595332533461614c3575466f4a6851?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi460465/ah-terra-walnoten-ongebrand",
-      "price": 7.19,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313634373535?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Biologisch Brie 60+",
-      "url": "https://www.ah.nl/producten/product/wi540552/ah-biologisch-brie-60",
-      "price": 2.85,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393236333336?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi525845/ah-biologisch-rode-uien",
-      "price": 1.19,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239383834353832?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Courgette",
-      "url": "https://www.ah.nl/producten/product/wi4164/ah-courgette",
-      "price": 1.09,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323031313936?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Goudreinette",
-      "url": "https://www.ah.nl/producten/product/wi94755/ah-goudreinette",
-      "price": 1.85,
-      "image": "https://static.ah.nl/dam/product/AHI_396a704733542d4c5255436a635266716f4b575f7a41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Avocado",
-      "url": "https://www.ah.nl/producten/product/wi169797/ah-avocado",
-      "price": 1.39,
-      "image": "https://static.ah.nl/dam/product/AHI_65667643744f624252722d5a38426563756a53376a41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Blauwe bessen",
-      "url": "https://www.ah.nl/producten/product/wi177754/ah-blauwe-bessen",
-      "price": 4.49,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239383832393636?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Rondeel eieren M L",
-      "url": "https://www.ah.nl/producten/product/wi216367/ah-rondeel-eieren-m-l",
-      "price": 4.29,
-      "image": "https://static.ah.nl/dam/product/AHI_434d50313535353233?revLabel=6&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Sesam bagels",
-      "url": "https://www.ah.nl/producten/product/wi591668/ah-sesam-bagels",
-      "price": 1.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313435343938?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi565424/ah-terra-plantaardige-rasp-mild",
-      "price": 1.55,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313331393438?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi67845/ah-biologisch-zonnebloemolie",
-      "price": 2.19,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313237373232?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Rondeel eieren M L",
-      "url": "https://www.ah.nl/producten/product/wi168503/ah-rondeel-eieren-m-l",
-      "price": 2.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313934353230?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Tomaten passata gezeefd basilicum",
-      "url": "https://www.ah.nl/producten/product/wi455615/ah-tomaten-passata-gezeefd-basilicum",
-      "price": 1.69,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313833303833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Flammkuchendeeg",
-      "url": "https://www.ah.nl/producten/product/wi560988/ah-flammkuchendeeg",
-      "price": 2.19,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303739333236?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Mozzarella",
-      "url": "https://www.ah.nl/producten/product/wi506235/ah-mozzarella",
-      "price": 0.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313835313636?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH XL pizzadeeg",
-      "url": "https://www.ah.nl/producten/product/wi598611/ah-xl-pizzadeeg",
-      "price": 2.49,
-      "image": "https://static.ah.nl/dam/product/AHI_5163574c5553674c5148697341517348584e4c5f4877?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Romaatjes",
-      "url": "https://www.ah.nl/producten/product/wi107685/ah-romaatjes",
-      "price": 2.39,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313637333437?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi199922/ah-excellent-biologische-kalamata-olijf-zonder-pit",
-      "price": 2.19,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303234363831?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "De Zaanse Hoeve Yoghurt Griekse stijl 10% vet",
-      "url": "https://www.ah.nl/producten/product/wi216237/de-zaanse-hoeve-yoghurt-griekse-stijl-10-vet",
-      "price": 2.15,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303233373134?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi238140/ah-biologisch-vastkokende-aardappelen",
-      "price": 4.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303632313732?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi239716/ah-biologisch-passata-di-pomodoro-fijn-gekruid",
-      "price": 2.09,
-      "image": "https://static.ah.nl/dam/product/AHI_434d50323037323636?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Pizzadeeg",
-      "url": "https://www.ah.nl/producten/product/wi435163/ah-pizzadeeg",
-      "price": 1.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303739333039?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi443661/ah-biologisch-halfvolle-melk",
-      "price": 2.59,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313832393537?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Slagroom spuitbus",
-      "url": "https://www.ah.nl/producten/product/wi475115/ah-slagroom-spuitbus",
-      "price": 1.49,
-      "image": "https://static.ah.nl/dam/product/AHI_3962452d44684853512d4b4a596455766d6337756e41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi564790/ah-terra-plantaardig-rulgehakt-italiaans",
-      "price": 2.39,
-      "image": "https://static.ah.nl/dam/product/AHI_4b4a7538476a6e66513265475572384d486864713651?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi564796/ah-terra-plantaardig-rulgehakt",
-      "price": 1.59,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323035343036?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Dreamfarm Plantaardig alternatief voor mozzarella",
-      "url": "https://www.ah.nl/producten/product/wi575881/dreamfarm-plantaardig-alternatief-voor-mozzarella",
-      "price": 3.79,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303735343034?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi185202/ah-biologisch-courgette",
-      "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323031353331?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi207510/ah-biologisch-tomaten-gepeld",
-      "price": 0.79,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393338343537?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Steenoven pizza 5 formaggi",
-      "url": "https://www.ah.nl/producten/product/wi445235/ah-steenoven-pizza-5-formaggi",
-      "price": 2.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303632353732?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Steenoven pizza margherita",
-      "url": "https://www.ah.nl/producten/product/wi445254/ah-steenoven-pizza-margherita",
-      "price": 2.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313836353737?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi543592/ah-biologisch-farfalle",
-      "price": 1.39,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313934313734?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi580545/ah-terra-plantaardige-kipstukjes",
-      "price": 3.49,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313034383036?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Kiwi groen",
-      "url": "https://www.ah.nl/producten/product/wi231922/ah-kiwi-groen",
-      "price": 3.24,
-      "image": "https://static.ah.nl/dam/product/AHI_434d50313937363739?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Italiaanse grana padano 32+ stuk",
-      "url": "https://www.ah.nl/producten/product/wi462470/ah-italiaanse-grana-padano-32-stuk",
-      "price": 3.99,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393332383730?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Tuinerwten fijn",
-      "url": "https://www.ah.nl/producten/product/wi788/ah-tuinerwten-fijn",
-      "price": 0.99,
-      "image": "https://static.ah.nl/dam/product/AHI_5f454c48597a713252634364724c7144794131653667?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Ciabatta",
-      "url": "https://www.ah.nl/producten/product/wi31584/ah-ciabatta",
-      "price": 0.89,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239383738313238?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Kruimige aardappelen",
-      "url": "https://www.ah.nl/producten/product/wi123955/ah-kruimige-aardappelen",
-      "price": 1.19,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313135373831?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Spinazie",
-      "url": "https://www.ah.nl/producten/product/wi162711/ah-spinazie",
-      "price": 1.15,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313932353934?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Broccoliroosjes",
-      "url": "https://www.ah.nl/producten/product/wi226367/ah-broccoliroosjes",
-      "price": 1.49,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313836313439?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Petit stokbrood wit",
-      "url": "https://www.ah.nl/producten/product/wi475815/ah-petit-stokbrood-wit",
-      "price": 0.89,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303835363238?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "source": "ah_auto_scrape",
+      "purchase_rank": 4
     },
     {
       "name": "Premium",
       "url": "https://www.ah.nl/producten/product/wi564839/ah-terra-plantaardig-biologisch-100-pindakaas",
       "price": 2.89,
       "image": "https://static.ah.nl/dam/product/AHI_4c6f7947574c44615345717349706a6c747a72486577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "source": "ah_auto_scrape",
+      "purchase_rank": 5
+    },
+    {
+      "name": "Zeeuws meisje Plantaardig voor koken bakken en braden",
+      "url": "https://www.ah.nl/producten/product/wi129484/zeeuws-meisje-plantaardig-voor-koken-bakken-en-braden",
+      "price": 1.59,
+      "image": "https://static.ah.nl/dam/product/AHI_6f4d73507a427073526d796871575236434d52464477?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 6
+    },
+    {
+      "name": "AH Zoete kleine appeltjes",
+      "url": "https://www.ah.nl/producten/product/wi129993/ah-zoete-kleine-appeltjes",
+      "price": 2.99,
+      "image": "https://static.ah.nl/dam/product/AHI_6543797562394f56533871746f317865383839337741?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 7
     },
     {
       "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi101130/ah-biologisch-komkommer",
-      "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_43545237393530383039?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "url": "https://www.ah.nl/producten/product/wi159760/ah-biologisch-spaghetti",
+      "price": 0.85,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239383939363230?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 8
     },
     {
       "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi561000/ah-terra-plantaardige-hummus-naturel",
+      "url": "https://www.ah.nl/producten/product/wi168502/ah-biologisch-eieren-s-m-l",
+      "price": 4.59,
+      "image": "https://static.ah.nl/dam/product/AHI_6d4d39766479444a5151615456795564304a31714151?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 9
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi170729/ah-biologisch-augurken-zoetzuur",
       "price": 2.39,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393538313037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313930393434?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 10
+    },
+    {
+      "name": "Van Gilse Lichte basterdsuiker",
+      "url": "https://www.ah.nl/producten/product/wi187622/van-gilse-lichte-basterdsuiker",
+      "price": 1.49,
+      "image": "https://static.ah.nl/dam/product/AHI_33326a46764c505854344b4d4e7279503078684b7151?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 11
     },
     {
       "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi569963/ah-terra-plantaardige-bacon",
+      "url": "https://www.ah.nl/producten/product/wi188949/ah-biologisch-reep-extra-puur",
       "price": 2.49,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303335333131?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "image": "https://static.ah.nl/dam/product/AHI_4272336a6b7a4c4651304f366465526f53642d434f41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 12
     },
     {
-      "name": "AH Jonagold zak",
-      "url": "https://www.ah.nl/producten/product/wi109078/ah-jonagold-zak",
+      "name": "AH Broccoli",
+      "url": "https://www.ah.nl/producten/product/wi210154/ah-broccoli",
+      "price": 2.78,
+      "image": "https://static.ah.nl/dam/product/AHI_335750456439566751696531384f7277616567364577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 13
+    },
+    {
+      "name": "Dr. Oetker Vanille aroma",
+      "url": "https://www.ah.nl/producten/product/wi228598/dr-oetker-vanille-aroma",
+      "price": 1.39,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313734383533?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 14
+    },
+    {
+      "name": "AH Liefde & Passie Stokbrood spelt",
+      "url": "https://www.ah.nl/producten/product/wi475818/ah-liefde-en-passie-stokbrood-spelt",
+      "price": null,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303839383434?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 15
+    },
+    {
+      "name": "AH Liefde & Passie Volkoren stokbrood",
+      "url": "https://www.ah.nl/producten/product/wi519065/ah-liefde-en-passie-volkoren-stokbrood",
+      "price": null,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313931393831?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 16
+    },
+    {
+      "name": "AH Bakpoeder",
+      "url": "https://www.ah.nl/producten/product/wi521091/ah-bakpoeder",
+      "price": 0.39,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313838373130?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 17
+    },
+    {
+      "name": "De Zaanse Hoeve Jong komijn 30+ plakken",
+      "url": "https://www.ah.nl/producten/product/wi553806/de-zaanse-hoeve-jong-komijn-30-plakken",
       "price": 2.69,
-      "image": "https://static.ah.nl/dam/product/AHI_355079486e36707351743261797866315562656e5577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Lazy Pasta al pesto",
-      "url": "https://www.ah.nl/producten/product/wi514075/lazy-pasta-al-pesto",
-      "price": 5.79,
-      "image": "https://static.ah.nl/dam/product/AHI_47336e6d6876584d5149693378475053743547673777?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Hellmann's Real mayonaise",
-      "url": "https://www.ah.nl/producten/product/wi516642/hellmann-s-real-mayonaise",
-      "price": 5.59,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393934303833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Lazy Korean noodles maaltijd",
-      "url": "https://www.ah.nl/producten/product/wi564333/lazy-korean-noodles-maaltijd",
-      "price": 5.79,
-      "image": "https://static.ah.nl/dam/product/AHI_696d48466e4d624c524e4b56375056655170486d6141?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323130353430?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 18
     },
     {
       "name": "Premium",
       "url": "https://www.ah.nl/producten/product/wi565737/ah-terra-groenteschnitzel",
       "price": 1.69,
       "image": "https://static.ah.nl/dam/product/AHI_4354523130303135393334?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "source": "ah_auto_scrape",
+      "purchase_rank": 19
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi587238/ah-terra-crispy-tofu",
+      "price": 2.49,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313338393338?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 20
+    },
+    {
+      "name": "AH classic reep",
+      "url": "https://www.ah.nl/producten/product/wi587901/ah-vegan-classic-reep",
+      "price": 2.19,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313235393334?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 21
+    },
+    {
+      "name": "AH karamel zeezout reep",
+      "url": "https://www.ah.nl/producten/product/wi587903/ah-vegan-karamel-zeezout-reep",
+      "price": 2.19,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313235393236?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 22
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi605272/ah-terra-biologisch-haverdrink-ongezoet",
+      "price": 1.49,
+      "image": "https://static.ah.nl/dam/product/AHI_73624d6777646364546771394a4a38784536526d6741?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 23
+    },
+    {
+      "name": "AH Baguette",
+      "url": "https://www.ah.nl/producten/product/wi366073/ah-baguette",
+      "price": 0.69,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303835363037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 24
+    },
+    {
+      "name": "AH Margarine",
+      "url": "https://www.ah.nl/producten/product/wi136100/ah-margarine",
+      "price": 1.39,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303734363834?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 25
+    },
+    {
+      "name": "Bonne Maman Aardbeien meer fruit minder suiker",
+      "url": "https://www.ah.nl/producten/product/wi413575/bonne-maman-aardbeien-meer-fruit-minder-suiker",
+      "price": 3.99,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239353639313631?revLabel=4&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 26
+    },
+    {
+      "name": "AH Speculoos crunchy pasta",
+      "url": "https://www.ah.nl/producten/product/wi548234/ah-speculoos-crunchy-pasta",
+      "price": 1.89,
+      "image": "https://static.ah.nl/dam/product/AHI_4d4936594747367a5247695359434d7832726a4c4b67?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 27
     },
     {
       "name": "Hellmann's mayo",
-      "url": "https://www.ah.nl/producten/product/wi571942/hellmann-s-vegan-mayo",
-      "price": 4.45,
-      "image": "https://static.ah.nl/dam/product/AHI_2d6d645a315977325148756b427a65336352384f7777?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "url": "https://www.ah.nl/producten/product/wi576658/hellmann-s-vegan-mayo",
+      "price": 3.65,
+      "image": "https://static.ah.nl/dam/product/AHI_2d326a715a5f74545338656a7851737148435f747067?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 28
+    },
+    {
+      "name": "AH Cashewnoten ongezouten",
+      "url": "https://www.ah.nl/producten/product/wi582888/ah-cashewnoten-ongezouten",
+      "price": 5.99,
+      "image": "https://static.ah.nl/dam/product/AHI_524474596e624b785448696e736a5276724278676577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 29
+    },
+    {
+      "name": "AH Oatmeal cookie",
+      "url": "https://www.ah.nl/producten/product/wi231926/ah-oatmeal-cookie",
+      "price": 1.69,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313638323834?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 30
+    },
+    {
+      "name": "Dr. Oetker Ristorante pizza spinazie",
+      "url": "https://www.ah.nl/producten/product/wi514000/dr-oetker-ristorante-pizza-spinazie",
+      "price": 3.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313734393133?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 31
     },
     {
       "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi101132/ah-biologisch-kastanjechampignons",
+      "url": "https://www.ah.nl/producten/product/wi519526/ah-terra-plantaardige-spekjes",
+      "price": 1.49,
+      "image": "https://static.ah.nl/dam/product/AHI_447752563738663754396532434d4266705577523667?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 32
+    },
+    {
+      "name": "online",
+      "url": "https://www.ah.nl/producten/product/wi580261/ah-terra-plantaardig-volle-drink",
+      "price": 1.69,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313933303738?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 33
+    },
+    {
+      "name": "Dr. Oetker Ristorante pizza al salame o",
+      "url": "https://www.ah.nl/producten/product/wi586452/dr-oetker-ristorante-pizza-al-salame-vegano",
+      "price": 4.49,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313238353038?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 34
+    },
+    {
+      "name": "Dr. Oetker Ristorante pizza tiramisu",
+      "url": "https://www.ah.nl/producten/product/wi601305/dr-oetker-ristorante-pizza-tiramisu",
+      "price": 3.89,
+      "image": "https://static.ah.nl/dam/product/AHI_4239666239544269535143467634482d427a76707a67?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 35
+    },
+    {
+      "name": "AH Zaanlander Belegen 48+ plakken",
+      "url": "https://www.ah.nl/producten/product/wi602290/ah-zaanlander-belegen-48-plakken",
+      "price": 3.25,
+      "image": "https://static.ah.nl/dam/product/AHI_44482d6461506f4c53624770613479557a6a68315541?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 36
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi197307/ah-biologisch-bieslook-pot",
       "price": 2.19,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303337393337?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "image": "https://static.ah.nl/dam/product/AHI_434d50313939323036?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 37
     },
     {
       "name": "Premium",
-      "url": "https://www.ah.nl/producten/product/wi476742/ah-biologisch-rucola",
-      "price": 1.39,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239383937353234?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "url": "https://www.ah.nl/producten/product/wi435436/ah-biologisch-slamelange-rucola-veldsla",
+      "price": 1.99,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239383937353236?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 38
     },
     {
       "name": "AH Snoepgroente tomaat",
-      "url": "https://www.ah.nl/producten/product/wi490796/ah-snoepgroente-tomaat",
+      "url": "https://www.ah.nl/producten/product/wi471641/ah-snoepgroente-tomaat",
+      "price": 3.29,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393033383533?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 39
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi563706/ah-terra-plantaardige-shoarma",
+      "price": 2.89,
+      "image": "https://static.ah.nl/dam/product/AHI_336e417655683261525a435a426648454f3377706741?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 40
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi565766/ah-terra-amandeldrink-ongezoet",
+      "price": 1.49,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393536393633?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 41
+    },
+    {
+      "name": "AH Tortilla naturel wraps large 12 stuks",
+      "url": "https://www.ah.nl/producten/product/wi173410/ah-tortilla-naturel-wraps-large-12-stuks",
+      "price": 1.79,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323130363033?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 42
+    },
+    {
+      "name": "AH IJsbergsla",
+      "url": "https://www.ah.nl/producten/product/wi4099/ah-ijsbergsla",
+      "price": 1.19,
+      "image": "https://static.ah.nl/dam/product/AHI_4b747851773844525157616f68464a3278345a557467?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 43
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi237311/ah-biologisch-mandarijnen",
+      "price": 3.19,
+      "image": "https://static.ah.nl/dam/product/AHI_34585a512d4e7177525a617051754a4b354f494e2d41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 44
+    },
+    {
+      "name": "AH Trostomaten",
+      "url": "https://www.ah.nl/producten/product/wi354172/ah-trostomaten",
+      "price": 1.29,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239373537383636?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 45
+    },
+    {
+      "name": "AH Robuuste chips salt & vinegar",
+      "url": "https://www.ah.nl/producten/product/wi460462/ah-robuuste-chips-salt-en-vinegar",
       "price": 2.19,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393430313934?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "image": "https://static.ah.nl/dam/product/AHI_57443672736263335361797830445874533538375051?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 46
+    },
+    {
+      "name": "AH Petit stokbrood meerzaden",
+      "url": "https://www.ah.nl/producten/product/wi475816/ah-petit-stokbrood-meerzaden",
+      "price": 0.89,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303835363237?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 47
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi564794/ah-terra-plantaardige-shoarma",
+      "price": 1.79,
+      "image": "https://static.ah.nl/dam/product/AHI_7933677976575263526753644d6e5776745f2d664e41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 48
+    },
+    {
+      "name": "Oma's Bakkerij Chocolate chip koek",
+      "url": "https://www.ah.nl/producten/product/wi602105/oma-s-bakkerij-chocolate-chip-koek",
+      "price": 2.99,
+      "image": "https://static.ah.nl/dam/product/AHI_3337456e334c30545170714e675a30384f6154376567?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 49
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi395307/ah-biologisch-tomatenblokjes",
+      "price": 0.59,
+      "image": "https://static.ah.nl/dam/product/AHI_754a344d62736144515071534c6446735f4c78463167?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 50
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi565765/ah-terra-plantaardige-sojadrink-ongezoet",
+      "price": 0.89,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313832393437?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 51
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi543591/ah-biologisch-fusilli",
+      "price": 1.29,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313834313433?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 52
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi564865/ah-terra-plantaardige-schnitzel",
+      "price": 1.69,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313639393735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 53
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi101170/ah-biologisch-maiskorrels",
+      "price": 1.39,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313136373030?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 54
+    },
+    {
+      "name": "Red Bull Energy drink suikervrij 4-pack",
+      "url": "https://www.ah.nl/producten/product/wi112749/red-bull-energy-drink-suikervrij-4-pack",
+      "price": 6.95,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393334313737?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 55
+    },
+    {
+      "name": "AH Bakkers speculaas",
+      "url": "https://www.ah.nl/producten/product/wi474154/ah-bakkers-speculaas",
+      "price": 1.49,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313935393938?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 56
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi564798/ah-terra-terra-plantaardige-rulgehakt",
+      "price": 2.69,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323035343035?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 57
+    },
+    {
+      "name": "AH Excellent Olijfolie extra vierge Italiaans",
+      "url": "https://www.ah.nl/producten/product/wi80100/ah-excellent-olijfolie-extra-vierge-italiaans",
+      "price": 6.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303636303330?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 58
+    },
+    {
+      "name": "Valess Vegetarische schnitzel",
+      "url": "https://www.ah.nl/producten/product/wi133171/valess-vegetarische-schnitzel",
+      "price": 3.75,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313438323530?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 59
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi185774/ah-biologisch-knoflook",
+      "price": 1.49,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393536383837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 60
+    },
+    {
+      "name": "AH Spinazie feta börek",
+      "url": "https://www.ah.nl/producten/product/wi429658/ah-spinazie-feta-borek",
+      "price": 1.09,
+      "image": "https://static.ah.nl/dam/product/AHI_6d674677646b35625158797a4a6b59756f4c79687877?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 61
+    },
+    {
+      "name": "Haribo Bananas",
+      "url": "https://www.ah.nl/producten/product/wi451273/haribo-bananas",
+      "price": 2.15,
+      "image": "https://static.ah.nl/dam/product/AHI_76746f72376776595332533461614c3575466f4a6851?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 62
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi460465/ah-terra-walnoten-ongebrand",
+      "price": 7.19,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313634373535?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 63
+    },
+    {
+      "name": "AH Biologisch Brie 60+",
+      "url": "https://www.ah.nl/producten/product/wi540552/ah-biologisch-brie-60",
+      "price": 2.85,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393236333336?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 64
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi525845/ah-biologisch-rode-uien",
+      "price": 1.19,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239383834353832?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 65
+    },
+    {
+      "name": "AH Courgette",
+      "url": "https://www.ah.nl/producten/product/wi4164/ah-courgette",
+      "price": 0.95,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323031313936?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 66
+    },
+    {
+      "name": "AH Goudreinette",
+      "url": "https://www.ah.nl/producten/product/wi94755/ah-goudreinette",
+      "price": 1.85,
+      "image": "https://static.ah.nl/dam/product/AHI_396a704733542d4c5255436a635266716f4b575f7a41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 67
+    },
+    {
+      "name": "AH Avocado",
+      "url": "https://www.ah.nl/producten/product/wi169797/ah-avocado",
+      "price": 1.39,
+      "image": "https://static.ah.nl/dam/product/AHI_65667643744f624252722d5a38426563756a53376a41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 68
+    },
+    {
+      "name": "AH Blauwe bessen",
+      "url": "https://www.ah.nl/producten/product/wi177754/ah-blauwe-bessen",
+      "price": 4.49,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239383832393636?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 69
+    },
+    {
+      "name": "AH Rondeel eieren M L",
+      "url": "https://www.ah.nl/producten/product/wi216367/ah-rondeel-eieren-m-l",
+      "price": 4.29,
+      "image": "https://static.ah.nl/dam/product/AHI_434d50313535353233?revLabel=6&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 70
+    },
+    {
+      "name": "AH Sesam bagels",
+      "url": "https://www.ah.nl/producten/product/wi591668/ah-sesam-bagels",
+      "price": 1.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313435343938?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 71
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi565424/ah-terra-plantaardige-rasp-mild",
+      "price": 1.55,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313331393438?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 72
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi67845/ah-biologisch-zonnebloemolie",
+      "price": 2.19,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313237373232?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 73
+    },
+    {
+      "name": "AH Rondeel eieren M L",
+      "url": "https://www.ah.nl/producten/product/wi168503/ah-rondeel-eieren-m-l",
+      "price": 2.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313934353230?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 74
+    },
+    {
+      "name": "AH Tomaten passata gezeefd basilicum",
+      "url": "https://www.ah.nl/producten/product/wi455615/ah-tomaten-passata-gezeefd-basilicum",
+      "price": 1.69,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313833303833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 75
+    },
+    {
+      "name": "AH Flammkuchendeeg",
+      "url": "https://www.ah.nl/producten/product/wi560988/ah-flammkuchendeeg",
+      "price": 2.19,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303739333236?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 76
+    },
+    {
+      "name": "AH XL pizzadeeg",
+      "url": "https://www.ah.nl/producten/product/wi598611/ah-xl-pizzadeeg",
+      "price": 2.49,
+      "image": "https://static.ah.nl/dam/product/AHI_5163574c5553674c5148697341517348584e4c5f4877?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 77
+    },
+    {
+      "name": "AH Romaatjes",
+      "url": "https://www.ah.nl/producten/product/wi107685/ah-romaatjes",
+      "price": 2.39,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313637333437?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 78
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi199922/ah-excellent-biologische-kalamata-olijf-zonder-pit",
+      "price": 2.19,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303234363831?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 79
+    },
+    {
+      "name": "De Zaanse Hoeve Yoghurt Griekse stijl 10% vet",
+      "url": "https://www.ah.nl/producten/product/wi216237/de-zaanse-hoeve-yoghurt-griekse-stijl-10-vet",
+      "price": 2.29,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303233373134?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 80
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi238140/ah-biologisch-vastkokende-aardappelen",
+      "price": 4.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303632313732?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 81
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi239716/ah-biologisch-passata-di-pomodoro-fijn-gekruid",
+      "price": 2.09,
+      "image": "https://static.ah.nl/dam/product/AHI_434d50323037323636?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 82
+    },
+    {
+      "name": "AH Pizzadeeg",
+      "url": "https://www.ah.nl/producten/product/wi435163/ah-pizzadeeg",
+      "price": 1.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303739333039?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 83
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi443661/ah-biologisch-halfvolle-melk",
+      "price": 2.59,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313832393537?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 84
+    },
+    {
+      "name": "AH Slagroom spuitbus",
+      "url": "https://www.ah.nl/producten/product/wi475115/ah-slagroom-spuitbus",
+      "price": 1.49,
+      "image": "https://static.ah.nl/dam/product/AHI_3962452d44684853512d4b4a596455766d6337756e41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 85
+    },
+    {
+      "name": "AH Mozzarella",
+      "url": "https://www.ah.nl/producten/product/wi506235/ah-mozzarella",
+      "price": 0.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313835313636?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 86
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi564790/ah-terra-plantaardig-rulgehakt-italiaans",
+      "price": 2.39,
+      "image": "https://static.ah.nl/dam/product/AHI_4b4a7538476a6e66513265475572384d486864713651?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 87
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi564796/ah-terra-plantaardig-rulgehakt",
+      "price": 1.59,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323035343036?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 88
+    },
+    {
+      "name": "Dreamfarm Plantaardig alternatief voor mozzarella",
+      "url": "https://www.ah.nl/producten/product/wi575881/dreamfarm-plantaardig-alternatief-voor-mozzarella",
+      "price": 3.79,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303735343034?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 89
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi185202/ah-biologisch-courgette",
+      "price": 1.59,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323031353331?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 90
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi207510/ah-biologisch-tomaten-gepeld",
+      "price": 0.79,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393338343537?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 91
+    },
+    {
+      "name": "AH Steenoven pizza 5 formaggi",
+      "url": "https://www.ah.nl/producten/product/wi445235/ah-steenoven-pizza-5-formaggi",
+      "price": 2.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303632353732?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 92
+    },
+    {
+      "name": "AH Steenoven pizza margherita",
+      "url": "https://www.ah.nl/producten/product/wi445254/ah-steenoven-pizza-margherita",
+      "price": 2.99,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313836353737?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 93
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi543592/ah-biologisch-farfalle",
+      "price": 1.39,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313934313734?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 94
+    },
+    {
+      "name": "Premium",
+      "url": "https://www.ah.nl/producten/product/wi580545/ah-terra-plantaardige-kipstukjes",
+      "price": 3.49,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313034383036?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
+      "source": "ah_auto_scrape",
+      "purchase_rank": 95
     }
   ],
   "error": null,
-  "scraped_at": "2026-02-10T19:14:37.215138+01:00",
+  "scraped_at": "2026-02-26T15:49:35.334686+01:00",
   "login_method": "cookies",
   "login_required": false,
-  "count": 85
+  "sorted_by_purchase_date": true,
+  "count": 95
 }
