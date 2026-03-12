@@ -271,21 +271,42 @@ function requireAuth(req, res, next) {
 // ============================================================================
 
 /**
- * Look up a user by their AH email address in user_ah_credentials table.
+ * Look up a user by their email address.
+ * Checks both user_ah_credentials.ah_email AND users.email tables.
  * Returns the user_id if found, null otherwise.
  */
 async function getUserIdByAHEmail(ahEmail) {
   if (!supabase || !ahEmail) return null
   
+  const normalizedEmail = ahEmail.toLowerCase().trim()
+  
   try {
-    const { data, error } = await supabase
+    // First, check user_ah_credentials table (AH-specific email)
+    const { data: credData, error: credError } = await supabase
       .from('user_ah_credentials')
       .select('user_id, ah_email')
-      .eq('ah_email', ahEmail.toLowerCase().trim())
+      .eq('ah_email', normalizedEmail)
       .single()
     
-    if (error || !data) return null
-    return data.user_id
+    if (!credError && credData) {
+      console.log(`[Auth] Found user ${credData.user_id} via user_ah_credentials for ${normalizedEmail}`)
+      return credData.user_id
+    }
+    
+    // Second, check users table (main account email)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', normalizedEmail)
+      .single()
+    
+    if (!userError && userData) {
+      console.log(`[Auth] Found user ${userData.id} via users table for ${normalizedEmail}`)
+      return userData.id
+    }
+    
+    console.log(`[Auth] No user found for email: ${normalizedEmail}`)
+    return null
   } catch (err) {
     console.error('Error looking up user by AH email:', err.message)
     return null
@@ -3765,7 +3786,8 @@ const loginAndSyncState = {
   progress: null,
   error: null,
   result: null,
-  email: null
+  email: null,
+  process: null  // Store process ref for cancellation
 }
 
 // Combined login + scrape: User enters credentials, we log in AND scrape their products
@@ -3825,6 +3847,9 @@ app.post('/api/auto-scrape/login-and-sync', async (req, res) => {
     cwd: __dirname,
     env: { ...process.env, PYTHONUNBUFFERED: '1' }
   })
+  
+  // Store process reference for cancellation
+  loginAndSyncState.process = loginProcess
   
   loginProcess.stdout.on('data', (data) => {
     const text = data.toString()
@@ -3986,6 +4011,36 @@ app.get('/api/auto-scrape/login-and-sync/status', (req, res) => {
     result: loginAndSyncState.result,
     logs: loginAndSyncState.logs.slice(-50)
   })
+})
+
+// Cancel login-and-sync (reset state)
+app.post('/api/auto-scrape/login-and-sync/cancel', (req, res) => {
+  console.log('[LOGIN-AND-SYNC] Cancel requested')
+  
+  // Kill any running process
+  if (loginAndSyncState.process) {
+    try {
+      loginAndSyncState.process.kill('SIGTERM')
+      console.log('[LOGIN-AND-SYNC] Process killed')
+    } catch (e) {
+      console.log('[LOGIN-AND-SYNC] Could not kill process:', e.message)
+    }
+  }
+  
+  // Reset all states
+  loginAndSyncState.running = false
+  loginAndSyncState.phase = null
+  loginAndSyncState.startedAt = null
+  loginAndSyncState.progress = 0
+  loginAndSyncState.error = null
+  loginAndSyncState.result = null
+  loginAndSyncState.logs = []
+  loginAndSyncState.process = null
+  
+  autoLoginState.running = false
+  autoScrapeState.running = false
+  
+  res.json({ success: true, message: 'State reset' })
 })
 
 // Cookie capture state
