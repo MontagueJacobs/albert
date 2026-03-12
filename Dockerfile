@@ -16,9 +16,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Setup Python venv and install playwright
+# Setup Python venv and install playwright + captcha solver deps
 RUN python3 -m venv /app/venv
-RUN /app/venv/bin/pip install --no-cache-dir playwright==1.40.0
+RUN /app/venv/bin/pip install --no-cache-dir playwright==1.40.0 aiohttp>=3.9.0
 
 # Pre-download Chromium during build
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/browsers

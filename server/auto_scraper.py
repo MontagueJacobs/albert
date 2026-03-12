@@ -22,6 +22,14 @@ except ImportError:
     print("ERROR: Playwright not installed. Run: pip install playwright && playwright install chromium", file=sys.stderr)
     sys.exit(1)
 
+# Import CAPTCHA solver (optional - only used if API key is set)
+try:
+    from captcha_solver import CaptchaSolver, extract_hcaptcha_sitekey, inject_captcha_response
+    CAPTCHA_SOLVER_AVAILABLE = True
+except ImportError:
+    CAPTCHA_SOLVER_AVAILABLE = False
+    print("[INFO] CAPTCHA solver module not available", file=sys.stderr)
+
 
 class AHAutoScraper:
     """Automated scraper for Albert Heijn using Playwright."""
@@ -1652,14 +1660,61 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
             
             max_wait = 180  # 3 minutes for CAPTCHA solving
             captcha_shown_at = None
+            captcha_solve_attempted = False
+            
+            # Check if we have a CAPTCHA solver available
+            captcha_solver = None
+            captcha_api_key = os.environ.get('CAPTCHA_API_KEY')
+            if CAPTCHA_SOLVER_AVAILABLE and captcha_api_key:
+                try:
+                    captcha_solver = CaptchaSolver(captcha_api_key)
+                    balance = await captcha_solver.get_balance()
+                    if balance is not None:
+                        print(f"[INFO] CAPTCHA solver ready (balance: ${balance:.2f})", flush=True)
+                    else:
+                        print("[WARN] CAPTCHA solver configured but couldn't verify balance", flush=True)
+                except Exception as e:
+                    print(f"[WARN] CAPTCHA solver init failed: {e}", flush=True)
+                    captcha_solver = None
             
             for i in range(max_wait):
                 await asyncio.sleep(1)
                 current_url = page.url.lower()
                 
-                # Check for CAPTCHA and show browser if found
+                # Check for CAPTCHA
                 if await has_captcha():
-                    if not browser_shown:
+                    if not captcha_solve_attempted and captcha_solver:
+                        # Try to solve CAPTCHA automatically with 2Captcha
+                        print("[INFO] CAPTCHA detected! Attempting automatic solve...", flush=True)
+                        captcha_solve_attempted = True
+                        
+                        try:
+                            # Extract sitekey from page
+                            sitekey = await extract_hcaptcha_sitekey(page)
+                            if sitekey:
+                                print(f"[INFO] Found hCaptcha sitekey: {sitekey[:20]}...", flush=True)
+                                
+                                # Solve the CAPTCHA
+                                token = await captcha_solver.solve_hcaptcha(sitekey, page.url, timeout=120)
+                                
+                                if token:
+                                    print("[INFO] CAPTCHA solved! Injecting response...", flush=True)
+                                    await inject_captcha_response(page, token, 'hcaptcha')
+                                    await asyncio.sleep(3)  # Wait for form submission
+                                else:
+                                    print("[WARN] CAPTCHA solve failed, showing browser for manual solve", flush=True)
+                                    await show_browser()
+                                    captcha_shown_at = i
+                            else:
+                                print("[WARN] Could not extract CAPTCHA sitekey, showing browser", flush=True)
+                                await show_browser()
+                                captcha_shown_at = i
+                        except Exception as e:
+                            print(f"[WARN] CAPTCHA solve error: {e}, showing browser", flush=True)
+                            await show_browser()
+                            captcha_shown_at = i
+                    elif not browser_shown and not captcha_solver:
+                        # No solver available, show browser for manual solve
                         await show_browser()
                         captcha_shown_at = i
                     elif captcha_shown_at and (i - captcha_shown_at) % 30 == 0:
@@ -1672,8 +1727,10 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
                     await asyncio.sleep(2)
                     
                     if 'login.ah.nl' not in page.url.lower():
-                        if browser_shown:
-                            print(f"[SUCCESS] Login successful after CAPTCHA solved! ({i+1} seconds)", flush=True)
+                        if captcha_solve_attempted and not browser_shown:
+                            print(f"[SUCCESS] Login successful with automatic CAPTCHA solve! ({i+1} seconds)", flush=True)
+                        elif browser_shown:
+                            print(f"[SUCCESS] Login successful after manual CAPTCHA solve! ({i+1} seconds)", flush=True)
                         else:
                             print(f"[SUCCESS] Login successful automatically! ({i+1} seconds)", flush=True)
                         break
