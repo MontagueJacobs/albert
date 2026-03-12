@@ -1097,24 +1097,34 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
     result = {'success': False, 'products': [], 'count': 0}
     
     try:
-        # Launch visible browser - try Firefox for better compatibility with AH
-        # Firefox tends to have less bot detection issues
-        browser = await p.firefox.launch(
+        # Launch visible Chromium browser - Firefox gets Access Denied on AH
+        browser = await p.chromium.launch(
             headless=False,
             args=[
-                '--width=1280',
-                '--height=900',
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-infobars',
+                '--window-size=1280,900',
             ]
         )
         
         context = await browser.new_context(
             viewport={'width': 1280, 'height': 900},
-            user_agent='Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             locale='nl-NL',
             timezone_id='Europe/Amsterdam',
         )
         
         page = await context.new_page()
+        
+        # Anti-detection script for Chromium
+        await page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['nl-NL', 'nl', 'en-US', 'en'] });
+            window.chrome = { runtime: {} };
+        """)
         
         # Navigate to AH login page directly
         print("[INFO] Opening Albert Heijn login page...", flush=True)
@@ -1560,39 +1570,78 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
             if not captcha_api_key:
                 print("[INFO] No CAPTCHA_API_KEY environment variable set", flush=True)
         
-        # Launch browser based on mode
-        if headless:
-            print("[INFO] Starting headless browser...", flush=True)
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--no-sandbox',
-                    '--disable-dev-shm-usage',
-                ]
-            )
-        else:
-            # Non-headless: start minimized, can show later
-            print("[INFO] Starting browser (minimized)...", flush=True)
-            browser = await p.chromium.launch(
-                headless=False,
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--no-sandbox',
-                    '--start-minimized',
-                ]
-            )
+        # Try Firefox first (better for avoiding detection), fall back to Chromium
+        browser = None
+        browser_type = None
         
-        context = await browser.new_context(
-            viewport={'width': 1280, 'height': 900},
-            locale='nl-NL',
-            timezone_id='Europe/Amsterdam',
-        )
+        # Launch browser based on mode - try Firefox first for better stealth
+        if headless:
+            print("[INFO] Starting Firefox in headless mode...", flush=True)
+            try:
+                browser = await p.firefox.launch(
+                    headless=True,
+                    firefox_user_prefs={
+                        'dom.webdriver.enabled': False,
+                        'useAutomationExtension': False,
+                    }
+                )
+                browser_type = 'firefox'
+            except Exception as e:
+                print(f"[WARN] Firefox failed, trying Chromium: {e}", flush=True)
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--no-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--headless=new',
+                    ]
+                )
+                browser_type = 'chromium'
+        else:
+            # Non-headless: start minimized
+            print("[INFO] Starting Firefox browser (minimized)...", flush=True)
+            try:
+                browser = await p.firefox.launch(headless=False)
+                browser_type = 'firefox'
+            except Exception as e:
+                print(f"[WARN] Firefox failed, trying Chromium: {e}", flush=True)
+                browser = await p.chromium.launch(
+                    headless=False,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--no-sandbox',
+                        '--start-minimized',
+                    ]
+                )
+                browser_type = 'chromium'
+        
+        print(f"[INFO] Using {browser_type} browser", flush=True)
+        
+        # Create context with appropriate settings for browser type
+        context_options = {
+            'viewport': {'width': 1920, 'height': 1080},
+            'locale': 'nl-NL',
+            'timezone_id': 'Europe/Amsterdam',
+        }
+        
+        # Only add user_agent override for Chromium (Firefox has better defaults)
+        if browser_type == 'chromium':
+            context_options['user_agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            context_options['extra_http_headers'] = {
+                'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+            }
+        
+        context = await browser.new_context(**context_options)
         
         page = await context.new_page()
         
-        # Minimize window using CDP (non-headless only)
-        if not headless:
+        # Initialize CDP session variables
+        cdp_session = None
+        window_id = None
+        
+        # Minimize window using CDP (Chromium only, non-headless)
+        if not headless and browser_type == 'chromium':
             try:
                 cdp_session = await context.new_cdp_session(page)
                 window_info = await cdp_session.send('Browser.getWindowForTarget')
@@ -1631,42 +1680,156 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
         # Helper to detect CAPTCHA
         async def has_captcha():
             try:
-                captcha = await page.query_selector('iframe[src*="hcaptcha"], iframe[src*="recaptcha"], [class*="captcha"], #captcha')
-                return captcha is not None
+                # More comprehensive CAPTCHA detection
+                captcha_selectors = [
+                    'iframe[src*="hcaptcha"]',
+                    'iframe[src*="newassets.hcaptcha"]',
+                    'iframe[data-hcaptcha-widget-id]',
+                    '[data-hcaptcha-response]',
+                    '.h-captcha',
+                    '#h-captcha',
+                    'iframe[src*="recaptcha"]',
+                    '.g-recaptcha',
+                    '[class*="captcha"]',
+                    '#captcha',
+                    'iframe[title*="hCaptcha"]',
+                    'iframe[title*="reCAPTCHA"]',
+                ]
+                for selector in captcha_selectors:
+                    captcha = await page.query_selector(selector)
+                    if captcha:
+                        return True
+                return False
             except:
                 return False
         
-        # Remove webdriver detection
+        # Comprehensive stealth script to avoid bot detection
         await page.add_init_script("""
+            // Overwrite webdriver property
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            
+            // Overwrite plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [
+                    { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+                    { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+                    { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }
+                ]
+            });
+            
+            // Overwrite languages
+            Object.defineProperty(navigator, 'languages', { get: () => ['nl-NL', 'nl', 'en-US', 'en'] });
+            
+            // Overwrite platform
+            Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+            
+            // Overwrite hardwareConcurrency
+            Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+            
+            // Overwrite deviceMemory
+            Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+            
+            // Fix permissions API
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+            
+            // Remove automation indicators from Chrome
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+            
+            // Fake chrome runtime
+            window.chrome = {
+                runtime: {},
+                loadTimes: function() {},
+                csi: function() {},
+                app: {}
+            };
+            
+            // Override toString to hide native code
+            const originalFunction = Function.prototype.toString;
+            Function.prototype.toString = function() {
+                if (this === navigator.permissions.query) {
+                    return 'function query() { [native code] }';
+                }
+                return originalFunction.apply(this, arguments);
+            };
         """)
         
         print("[INFO] Opening AH login page...", flush=True)
         await page.goto('https://www.ah.nl/mijn', wait_until='domcontentloaded')
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
         
-        # Wait for login form
+        # Debug: Print current URL
+        current_url = page.url
+        print(f"[DEBUG] Current URL: {current_url}", flush=True)
+        
+        # Check if we got redirected to login
+        on_login_page = 'login' in current_url.lower() or 'inloggen' in current_url.lower() or 'account' in current_url.lower()
+        print(f"[DEBUG] On login page: {on_login_page}", flush=True)
+        
+        # Wait for login form with multiple selectors
         print("[INFO] Waiting for login form...", flush=True)
-        try:
-            await page.wait_for_selector('input[type="email"], input[name="email"], input[id*="email"]', timeout=15000)
-        except Exception:
-            print("[INFO] Already logged in or redirected", flush=True)
+        email_found = False
+        for selector in ['input[type="email"]', 'input[name="email"]', 'input[id*="email"]', 'input[name="username"]', '#username', '#email', 'input[autocomplete="email"]', 'input[autocomplete="username"]']:
+            try:
+                await page.wait_for_selector(selector, timeout=3000)
+                print(f"[DEBUG] Found email input with: {selector}", flush=True)
+                email_found = True
+                break
+            except:
+                pass
         
-        # Check if we're on login page
-        if 'login.ah.nl' in page.url.lower() or 'inloggen' in page.url.lower():
+        if not email_found:
+            print("[WARN] Could not find email input with standard selectors", flush=True)
+            # Try to get page content for debugging
+            try:
+                page_html = await page.content()
+                if 'input' in page_html.lower():
+                    print(f"[DEBUG] Page has input elements. HTML length: {len(page_html)}", flush=True)
+                    # Find all input elements
+                    inputs = await page.query_selector_all('input')
+                    for inp in inputs[:5]:  # Log first 5 inputs
+                        inp_type = await inp.get_attribute('type') or 'unknown'
+                        inp_name = await inp.get_attribute('name') or 'no-name'
+                        inp_id = await inp.get_attribute('id') or 'no-id'
+                        print(f"[DEBUG] Input: type={inp_type}, name={inp_name}, id={inp_id}", flush=True)
+                else:
+                    print(f"[DEBUG] Page may not have loaded properly. Title: {await page.title()}", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] Could not inspect page: {e}", flush=True)
+        
+        # Proceed with login if we have email field or are on login-like page
+        if email_found or on_login_page:
             print("[INFO] Filling in credentials...", flush=True)
             await asyncio.sleep(0.5)
             
-            # Fill email
-            email_input = await page.query_selector('input[type="email"], input[name="email"], input[id*="email"], input[name="username"]')
+            # Fill email - try multiple selectors
+            email_input = None
+            for selector in ['input[type="email"]', 'input[name="email"]', 'input[id*="email"]', 'input[name="username"]', '#username', '#email', 'input[autocomplete="email"]', 'input[autocomplete="username"]']:
+                email_input = await page.query_selector(selector)
+                if email_input:
+                    print(f"[DEBUG] Found email with selector: {selector}", flush=True)
+                    break
+            
             if email_input:
                 await email_input.fill(email)
                 print("[INFO] Email entered", flush=True)
             else:
                 print("[WARN] Could not find email input", flush=True)
             
-            # Fill password
-            password_input = await page.query_selector('input[type="password"], input[name="password"]')
+            # Fill password - try multiple selectors
+            password_input = None
+            for selector in ['input[type="password"]', 'input[name="password"]', '#password', 'input[autocomplete="current-password"]']:
+                password_input = await page.query_selector(selector)
+                if password_input:
+                    print(f"[DEBUG] Found password with selector: {selector}", flush=True)
+                    break
+            
             if password_input:
                 await password_input.fill(password)
                 print("[INFO] Password entered", flush=True)
@@ -1694,6 +1857,18 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
             for i in range(max_wait):
                 await asyncio.sleep(1)
                 current_url = page.url.lower()
+                
+                # Debug logging every 10 seconds
+                if (i + 1) % 10 == 0:
+                    page_title = await page.title()
+                    captcha_detected = await has_captcha()
+                    print(f"[DEBUG] t={i+1}s URL: {current_url[:80]}... Title: {page_title[:40]}... CAPTCHA: {captcha_detected}", flush=True)
+                    
+                    # Also check for error messages
+                    error_msg = await page.query_selector('.error, .alert-error, [role="alert"], .notification--error')
+                    if error_msg:
+                        error_text = await error_msg.text_content()
+                        print(f"[DEBUG] Error message found: {error_text[:100]}", flush=True)
                 
                 # Check for CAPTCHA
                 if await has_captcha():
@@ -1783,11 +1958,28 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
                             print(f"[SUCCESS] Login successful! ({i+1} seconds)", flush=True)
                         break
                 
-                if (i + 1) % 10 == 0:
-                    print(f"[INFO] Still processing... ({i+1}s)", flush=True)
+                # Debug logging is now at the top of the loop
             else:
                 print("[ERROR] Login timeout", flush=True)
                 result = {'success': False, 'error': 'Login timeout'}
+                print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                await browser.close()
+                await p.stop()
+                return 1
+        else:
+            # Not on login page and no email found - could be already logged in or page blocked
+            print("[INFO] Checking if already logged in...", flush=True)
+            
+            # Check for signs of being logged in
+            mijn_account = await page.query_selector('[data-testid="mijn-ah"], [href*="/mijn"], .account-menu, .user-menu')
+            eerder_gekocht_link = await page.query_selector('[href*="eerder-gekocht"]')
+            
+            if mijn_account or eerder_gekocht_link or 'mijn/eerder-gekocht' in current_url:
+                print("[INFO] Appears to be already logged in!", flush=True)
+            else:
+                # Page might be blocked or errored
+                print("[ERROR] Could not find login form and not logged in", flush=True)
+                result = {'success': False, 'error': 'Could not navigate to login page - page may be blocked'}
                 print(f"\n[RESULT] {json.dumps(result)}", flush=True)
                 await browser.close()
                 await p.stop()
