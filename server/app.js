@@ -3756,6 +3756,238 @@ app.get('/api/auto-scrape/auto-login/status', (req, res) => {
   })
 })
 
+// Login-and-Sync state (combined login + scrape for seamless user onboarding)
+const loginAndSyncState = {
+  running: false,
+  phase: null, // 'login', 'scrape', 'done'
+  startedAt: null,
+  logs: [],
+  progress: null,
+  error: null,
+  result: null,
+  email: null
+}
+
+// Combined login + scrape: User enters credentials, we log in AND scrape their products
+app.post('/api/auto-scrape/login-and-sync', async (req, res) => {
+  console.log('[LOGIN-AND-SYNC] Endpoint hit!')
+  
+  // This works on Railway with headless mode
+  if (loginAndSyncState.running || autoLoginState.running || autoScrapeState.running) {
+    return res.status(409).json({ error: 'operation_in_progress' })
+  }
+  
+  const { email, password } = req.body || {}
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'missing_credentials', message: 'Email and password are required' })
+  }
+  
+  try {
+    await fs.access(AUTO_SCRAPE_SCRIPT)
+  } catch (error) {
+    return res.status(500).json({ error: 'script_missing' })
+  }
+  
+  const startedAt = new Date().toISOString()
+  loginAndSyncState.running = true
+  loginAndSyncState.phase = 'login'
+  loginAndSyncState.startedAt = startedAt
+  loginAndSyncState.logs = []
+  loginAndSyncState.progress = 'Starting login...'
+  loginAndSyncState.error = null
+  loginAndSyncState.result = null
+  loginAndSyncState.email = email
+  
+  // First: register the user in our database
+  if (supabase) {
+    try {
+      await supabase
+        .from('user_ah_credentials')
+        .upsert({ ah_email: email }, { onConflict: 'ah_email' })
+      console.log('[LOGIN-AND-SYNC] User registered/updated:', email)
+    } catch (e) {
+      console.error('[LOGIN-AND-SYNC] Failed to register user:', e)
+    }
+  }
+  
+  const cookiesFile = path.join(__dirname, `cookies_${Date.now()}.json`)
+  
+  // Run auto-login to get cookies
+  const loginProcess = spawn(PYTHON_CMD, [
+    AUTO_SCRAPE_SCRIPT,
+    '--auto-login',
+    '--ah-email', email,
+    '--ah-password', password,
+    '--save-cookies', cookiesFile,
+    '--headless'  // Always headless on server
+  ], {
+    cwd: __dirname,
+    env: { ...process.env, PYTHONUNBUFFERED: '1' }
+  })
+  
+  loginProcess.stdout.on('data', (data) => {
+    const text = data.toString()
+    console.log('[LOGIN stdout]', text.trim())
+    loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stdout', message: text.trim() })
+    
+    // Parse progress
+    if (text.includes('[INFO]')) {
+      loginAndSyncState.progress = text.replace(/\[INFO\]\s*/g, '').trim()
+    } else if (text.includes('[SUCCESS]')) {
+      loginAndSyncState.progress = text.replace(/\[SUCCESS\]\s*/g, '').trim()
+    }
+  })
+  
+  loginProcess.stderr.on('data', (data) => {
+    console.log('[LOGIN stderr]', data.toString().trim())
+    loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stderr', message: data.toString().trim() })
+  })
+  
+  loginProcess.on('close', async (code) => {
+    console.log(`[LOGIN-AND-SYNC] Login process exited with code ${code}`)
+    
+    if (code !== 0) {
+      loginAndSyncState.running = false
+      loginAndSyncState.phase = 'done'
+      loginAndSyncState.error = 'Login failed - possibly incorrect credentials or CAPTCHA required'
+      loginAndSyncState.result = { success: false, error: loginAndSyncState.error }
+      // Clean up temp cookies file
+      try { await fs.unlink(cookiesFile) } catch {}
+      return
+    }
+    
+    // Login succeeded - save credentials to database
+    if (supabase) {
+      try {
+        const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
+        const iv = crypto.randomBytes(16)
+        const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
+        let encrypted = cipher.update(password, 'utf8', 'hex')
+        encrypted += cipher.final('hex')
+        const password_encrypted = iv.toString('hex') + ':' + encrypted
+        
+        await supabase
+          .from('user_ah_credentials')
+          .upsert({
+            ah_email: email,
+            ah_password_encrypted: password_encrypted
+          }, { onConflict: 'ah_email' })
+        console.log('[LOGIN-AND-SYNC] Saved encrypted credentials')
+      } catch (e) {
+        console.error('[LOGIN-AND-SYNC] Failed to save credentials:', e)
+      }
+    }
+    
+    // Now start scraping with the cookies
+    loginAndSyncState.phase = 'scrape'
+    loginAndSyncState.progress = 'Login successful! Now syncing your products...'
+    
+    const scrapeProcess = spawn(PYTHON_CMD, [
+      AUTO_SCRAPE_SCRIPT,
+      '--cookies', cookiesFile,
+      '--stealth',
+      '--headless',
+      '--output', path.join(__dirname, `auto_scrape_${Date.now()}.json`)
+    ], {
+      cwd: __dirname,
+      env: { ...process.env, PYTHONUNBUFFERED: '1' }
+    })
+    
+    let scrapeStdout = ''
+    
+    scrapeProcess.stdout.on('data', (data) => {
+      const text = data.toString()
+      scrapeStdout += text
+      console.log('[SCRAPE stdout]', text.trim())
+      loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stdout', message: text.trim() })
+      
+      if (text.includes('[INFO]')) {
+        loginAndSyncState.progress = text.replace(/\[INFO\]\s*/g, '').trim()
+      } else if (text.includes('[SUCCESS]')) {
+        loginAndSyncState.progress = text.replace(/\[SUCCESS\]\s*/g, '').trim()
+      }
+    })
+    
+    scrapeProcess.stderr.on('data', (data) => {
+      console.log('[SCRAPE stderr]', data.toString().trim())
+      loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stderr', message: data.toString().trim() })
+    })
+    
+    scrapeProcess.on('close', async (scrapeCode) => {
+      console.log(`[LOGIN-AND-SYNC] Scrape process exited with code ${scrapeCode}`)
+      
+      // Parse result
+      let productsCount = 0
+      const resultMatch = scrapeStdout.match(/\[RESULT\]\s*(\{.*\})/s)
+      if (resultMatch) {
+        try {
+          const resultData = JSON.parse(resultMatch[1])
+          productsCount = resultData.products_stored || resultData.products_found || 0
+          
+          // Store products in database
+          if (supabase && resultData.products && resultData.products.length > 0) {
+            // Get user ID for this email
+            const { data: userData } = await supabase
+              .from('user_ah_credentials')
+              .select('id')
+              .eq('ah_email', email)
+              .single()
+            
+            if (userData) {
+              // Store each product
+              const purchases = resultData.products.map(p => ({
+                user_id: userData.id,
+                product_name: p.name,
+                product_data: p,
+                purchased_at: p.date || new Date().toISOString()
+              }))
+              
+              await supabase.from('user_purchases').insert(purchases)
+              console.log(`[LOGIN-AND-SYNC] Stored ${purchases.length} products for user`)
+            }
+          }
+        } catch (e) {
+          console.error('[LOGIN-AND-SYNC] Failed to parse scrape result:', e)
+        }
+      }
+      
+      loginAndSyncState.running = false
+      loginAndSyncState.phase = 'done'
+      
+      if (scrapeCode === 0) {
+        loginAndSyncState.result = { 
+          success: true, 
+          productsStored: productsCount,
+          email: email
+        }
+        loginAndSyncState.progress = `Synced ${productsCount} products!`
+      } else {
+        loginAndSyncState.error = 'Scraping failed'
+        loginAndSyncState.result = { success: false, error: 'Scraping failed' }
+      }
+      
+      // Clean up temp cookies file
+      try { await fs.unlink(cookiesFile) } catch {}
+    })
+  })
+  
+  res.status(202).json({ status: 'started', startedAt })
+})
+
+// Get login-and-sync status
+app.get('/api/auto-scrape/login-and-sync/status', (req, res) => {
+  res.json({
+    running: loginAndSyncState.running,
+    phase: loginAndSyncState.phase,
+    startedAt: loginAndSyncState.startedAt,
+    progress: loginAndSyncState.progress,
+    error: loginAndSyncState.error,
+    result: loginAndSyncState.result,
+    logs: loginAndSyncState.logs.slice(-50)
+  })
+})
+
 // Cookie capture state
 const cookieCaptureState = {
   running: false,

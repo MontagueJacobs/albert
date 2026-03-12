@@ -2,12 +2,13 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { Mail, ShoppingCart, Leaf, ArrowRight, Loader2, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react'
 import { useAHUser } from '../lib/ahUserContext'
 import { useI18n } from '../i18n.jsx'
+import AHLoginForm from './AHLoginForm'
 
 /**
  * Landing page for non-identified users
  * Options:
  * 1. Enter AH email to view saved data (returning user)
- * 2. Connect AH account for the first time (new user) - triggers visual login flow
+ * 2. Connect AH account for the first time (new user) - shows AH-style login popup
  */
 export default function AHLanding({ onConnectNew }) {
   const { setAHEmail } = useAHUser()
@@ -17,10 +18,13 @@ export default function AHLanding({ onConnectNew }) {
   const [checking, setChecking] = useState(false)
   
   // Connect flow state
-  const [connectStep, setConnectStep] = useState('idle') // 'idle', 'email', 'connecting', 'syncing', 'success', 'error'
-  const [connectEmail, setConnectEmail] = useState('')
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [connectStep, setConnectStep] = useState('idle') // 'idle', 'syncing', 'success', 'error'
   const [connectProgress, setConnectProgress] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
   const [productsCount, setProductsCount] = useState(0)
+  const [syncEmail, setSyncEmail] = useState('')
   const pollRef = useRef(null)
 
   const handleSubmit = async (e) => {
@@ -58,12 +62,12 @@ export default function AHLanding({ onConnectNew }) {
     }
   }, [])
 
-  // Poll for sync status while connecting/syncing
+  // Poll for sync status while syncing
   useEffect(() => {
-    if (connectStep === 'connecting' || connectStep === 'syncing') {
+    if (connectStep === 'syncing') {
       pollRef.current = setInterval(async () => {
         try {
-          const res = await fetch('/api/auto-scrape/status')
+          const res = await fetch('/api/auto-scrape/login-and-sync/status')
           const data = await res.json()
           
           if (data.progress) {
@@ -74,16 +78,16 @@ export default function AHLanding({ onConnectNew }) {
             clearInterval(pollRef.current)
             pollRef.current = null
             
-            if (data.lastRun?.status === 'success') {
+            if (data.result?.success) {
               setConnectStep('success')
-              setProductsCount(data.lastRun.productsStored || data.lastRun.productsFound || 0)
+              setProductsCount(data.result.productsStored || 0)
               // Wait a moment then log user in
               setTimeout(() => {
-                setAHEmail(connectEmail.trim())
+                setAHEmail(syncEmail)
               }, 2000)
             } else {
               setConnectStep('error')
-              setError(data.lastRun?.error || t('landing_error_generic'))
+              setLoginError(data.error || data.result?.error || t('landing_error_generic'))
             }
           }
         } catch (e) {
@@ -98,68 +102,62 @@ export default function AHLanding({ onConnectNew }) {
         pollRef.current = null
       }
     }
-  }, [connectStep, connectEmail, setAHEmail, t])
+  }, [connectStep, syncEmail, setAHEmail, t])
 
-  // Start the connect flow - first ask for email
+  // Open the AH login modal
   const handleConnectClick = () => {
     if (onConnectNew) {
       onConnectNew()
     } else {
-      setConnectStep('email')
+      setShowLoginModal(true)
+      setLoginError('')
     }
   }
 
-  // After email entered, start visual login
-  const handleStartVisualLogin = async (e) => {
-    e.preventDefault()
-    if (!connectEmail.trim()) return
-    
-    setConnectStep('connecting')
-    setConnectProgress(t('landing_opening_browser'))
-    setError('')
+  // Handle credentials from AH login form
+  const handleLoginSubmit = async ({ email, password }) => {
+    setLoginLoading(true)
+    setLoginError('')
     
     try {
-      // First register the user
-      await fetch('/api/ah-user/register', {
+      // Start login + scrape
+      const res = await fetch('/api/auto-scrape/login-and-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: connectEmail.trim() })
+        body: JSON.stringify({ email, password })
       })
-      
-      // Start visual login with email header so data is tied to this user
-      const res = await fetch('/api/auto-scrape/visual-login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-AH-Email': connectEmail.trim()
-        }
-      })
-      
-      if (res.status === 501) {
-        // Not supported on hosted version - fall back to simple registration
-        setError(t('landing_visual_not_supported'))
-        setConnectStep('error')
-        return
-      }
       
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.error || 'Failed to start')
+        throw new Error(data.message || data.error || 'Failed to start')
       }
       
-      setConnectProgress(t('landing_please_login'))
+      // Close modal and start showing progress
+      setSyncEmail(email)
+      setShowLoginModal(false)
+      setLoginLoading(false)
       setConnectStep('syncing')
+      setConnectProgress(t('landing_logging_in'))
       // Polling will take over from here
       
     } catch (err) {
-      console.error('Connect failed:', err)
-      setError(err.message)
-      setConnectStep('error')
+      console.error('Login failed:', err)
+      setLoginError(err.message)
+      setLoginLoading(false)
     }
   }
 
   return (
     <div style={styles.container}>
+      {/* AH Login Modal */}
+      <AHLoginForm
+        isOpen={showLoginModal}
+        onClose={() => { setShowLoginModal(false); setLoginError(''); }}
+        onSubmit={handleLoginSubmit}
+        loading={loginLoading}
+        error={loginError}
+      />
+
       <div style={styles.card}>
         {/* Header */}
         <div style={styles.header}>
@@ -231,51 +229,14 @@ export default function AHLanding({ onConnectNew }) {
             </button>
           )}
           
-          {connectStep === 'email' && (
-            <form onSubmit={handleStartVisualLogin} style={styles.registerForm}>
-              <p style={styles.registerHint}>{t('landing_enter_ah_email')}</p>
-              <div style={styles.inputGroup}>
-                <Mail size={20} style={styles.inputIcon} />
-                <input
-                  type="email"
-                  value={connectEmail}
-                  onChange={(e) => setConnectEmail(e.target.value)}
-                  placeholder={t('landing_email_placeholder')}
-                  style={styles.input}
-                  required
-                  autoFocus
-                />
-              </div>
-              <button 
-                type="submit" 
-                disabled={!connectEmail.trim()}
-                style={{
-                  ...styles.submitBtn,
-                  background: 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
-                  opacity: !connectEmail.trim() ? 0.7 : 1,
-                }}
-              >
-                <ExternalLink size={18} />
-                {t('landing_open_ah_login')}
-              </button>
-              <button 
-                type="button"
-                onClick={() => setConnectStep('idle')}
-                style={styles.cancelBtn}
-              >
-                {t('landing_cancel')}
-              </button>
-            </form>
-          )}
-          
-          {(connectStep === 'connecting' || connectStep === 'syncing') && (
+          {connectStep === 'syncing' && (
             <div style={styles.connectingBox}>
               <div style={styles.spinnerContainer}>
                 <Loader2 size={32} style={{ color: '#00ADE6', animation: 'spin 1s linear infinite' }} />
               </div>
               <p style={styles.connectingText}>{connectProgress}</p>
               <p style={styles.connectingHint}>
-                {t('landing_login_hint')}
+                {t('landing_syncing_hint')}
               </p>
             </div>
           )}
@@ -291,9 +252,9 @@ export default function AHLanding({ onConnectNew }) {
           {connectStep === 'error' && (
             <div style={styles.errorBox}>
               <AlertCircle size={32} style={{ color: '#ef4444' }} />
-              <p style={styles.errorText}>{error}</p>
+              <p style={styles.errorText}>{loginError}</p>
               <button 
-                onClick={() => { setConnectStep('idle'); setError(''); }}
+                onClick={() => { setConnectStep('idle'); setLoginError(''); }}
                 style={styles.connectBtn}
               >
                 {t('landing_try_again')}
