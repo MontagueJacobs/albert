@@ -22,7 +22,7 @@ function PurchaseList({ syncVersion }) {
     
     setLoading(true)
     try {
-      const res = await ahFetch('/api/user/purchases')
+      const res = await ahFetch('/api/user/purchases/history')
       if (res.ok) {
         const data = await res.json()
         setPurchases(data.purchases || [])
@@ -118,8 +118,8 @@ function PurchaseList({ syncVersion }) {
               {purchase.quantity || 1}x • €{(purchase.price || 0).toFixed(2)} • {formatDate(purchase.scraped_at || purchase.date)}
             </div>
           </div>
-          <div className={`score-badge ${getScoreClass(purchase.sustainability_score || 5)}`}>
-            {purchase.sustainability_score || 5}/10
+          <div className={`score-badge ${getScoreClass(purchase.sustainability_score)}`}>
+            {purchase.sustainability_score != null ? `${purchase.sustainability_score}/10` : '—'}
           </div>
         </div>
       ))}

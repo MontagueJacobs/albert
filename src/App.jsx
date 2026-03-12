@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Leaf, TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle, LogOut } from 'lucide-react'
-import AddPurchase from './components/AddPurchase'
 import Dashboard from './components/Dashboard'
 import PurchaseList from './components/PurchaseList'
 import ProfileSuggestions from './components/ProfileSuggestions'
@@ -13,13 +12,6 @@ import { I18nProvider, useI18n, getSavedLang, saveLang } from './i18n.jsx'
 
 // Feature cards for the homepage
 const features = [
-  {
-    id: 'add',
-    emoji: '🛒',
-    titleKey: 'tab_add',
-    descKey: 'feature_add_desc',
-    color: '#10b981'
-  },
   {
     id: 'dashboard',
     emoji: '📊',
@@ -261,7 +253,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </div>
         
         <div className="content-card">
-          {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} />}
           {activeTab === 'dashboard' && <Dashboard />}
           {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} />}
           {activeTab === 'lookup' && <ScoreLookup />}

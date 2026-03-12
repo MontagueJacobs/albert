@@ -20,8 +20,9 @@ RUN npm ci
 RUN python3 -m venv /app/venv
 RUN /app/venv/bin/pip install --no-cache-dir playwright==1.40.0 aiohttp>=3.9.0
 
-# Pre-download Chromium during build
+# Pre-download browsers during build - Firefox is better for avoiding detection
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/browsers
+RUN /app/venv/bin/playwright install firefox --with-deps || true
 RUN /app/venv/bin/playwright install chromium --with-deps || true
 
 # Copy app and build with VITE env vars (these are public keys, safe to embed)
