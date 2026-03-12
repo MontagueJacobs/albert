@@ -1524,26 +1524,64 @@ async def main():
 async def auto_login_and_save_cookies(email: str, password: str, output_file: str, headless: bool = False) -> int:
     """
     Automatically log in using provided credentials and save cookies.
-    Browser starts minimized, only shows when CAPTCHA appears.
+    
+    In headless mode (Railway): Uses 2Captcha to solve CAPTCHAs automatically.
+    In non-headless mode (local): Shows browser window if CAPTCHA appears.
     """
     print("[INFO] === Auto Login Mode ===", flush=True)
     print(f"[INFO] Logging in as: {email}", flush=True)
+    print(f"[INFO] Headless mode: {headless}", flush=True)
     print("[INFO] Attempting automatic login...", flush=True)
     print("", flush=True)
     
     p = await async_playwright().start()
-    browser_shown = False  # Track if we've shown browser to user
+    browser_shown = False  # Track if we've shown browser to user (non-headless only)
+    cdp_session = None
+    window_id = None
     
     try:
-        # Start browser minimized so user doesn't see automation
-        browser = await p.chromium.launch(
-            headless=False,  # Must be visible to show later
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--no-sandbox',
-                '--start-minimized',  # Start minimized
-            ]
-        )
+        # Initialize CAPTCHA solver if available
+        captcha_solver = None
+        captcha_api_key = os.environ.get('CAPTCHA_API_KEY')
+        if CAPTCHA_SOLVER_AVAILABLE and captcha_api_key:
+            try:
+                captcha_solver = CaptchaSolver(captcha_api_key)
+                balance = await captcha_solver.get_balance()
+                if balance is not None:
+                    print(f"[INFO] CAPTCHA solver ready (balance: ${balance:.2f})", flush=True)
+                else:
+                    print("[WARN] CAPTCHA solver configured but couldn't verify balance", flush=True)
+            except Exception as e:
+                print(f"[WARN] CAPTCHA solver init failed: {e}", flush=True)
+                captcha_solver = None
+        else:
+            if not CAPTCHA_SOLVER_AVAILABLE:
+                print("[INFO] CAPTCHA solver module not loaded", flush=True)
+            if not captcha_api_key:
+                print("[INFO] No CAPTCHA_API_KEY environment variable set", flush=True)
+        
+        # Launch browser based on mode
+        if headless:
+            print("[INFO] Starting headless browser...", flush=True)
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--no-sandbox',
+                    '--disable-dev-shm-usage',
+                ]
+            )
+        else:
+            # Non-headless: start minimized, can show later
+            print("[INFO] Starting browser (minimized)...", flush=True)
+            browser = await p.chromium.launch(
+                headless=False,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--no-sandbox',
+                    '--start-minimized',
+                ]
+            )
         
         context = await browser.new_context(
             viewport={'width': 1280, 'height': 900},
@@ -1553,31 +1591,29 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
         
         page = await context.new_page()
         
-        # Store CDP session and window ID for later use
-        cdp_session = None
-        window_id = None
+        # Minimize window using CDP (non-headless only)
+        if not headless:
+            try:
+                cdp_session = await context.new_cdp_session(page)
+                window_info = await cdp_session.send('Browser.getWindowForTarget')
+                window_id = window_info['windowId']
+                await cdp_session.send('Browser.setWindowBounds', {
+                    'windowId': window_id,
+                    'bounds': {'windowState': 'minimized'}
+                })
+                print("[INFO] Browser minimized", flush=True)
+            except Exception as e:
+                print(f"[WARN] Could not minimize browser: {e}", flush=True)
         
-        # Minimize window immediately using CDP
-        try:
-            cdp_session = await context.new_cdp_session(page)
-            window_info = await cdp_session.send('Browser.getWindowForTarget')
-            window_id = window_info['windowId']
-            await cdp_session.send('Browser.setWindowBounds', {
-                'windowId': window_id,
-                'bounds': {'windowState': 'minimized'}
-            })
-            print("[INFO] Browser minimized", flush=True)
-        except Exception as e:
-            print(f"[WARN] Could not minimize browser: {e}", flush=True)
-        
-        # Helper to bring browser window on-screen when needed
+        # Helper to bring browser window on-screen (non-headless only)
         async def show_browser():
             nonlocal browser_shown, cdp_session, window_id
+            if headless:
+                return  # Can't show browser in headless mode
             if not browser_shown:
-                print("[INFO] CAPTCHA detected! Showing browser for manual solving...", flush=True)
+                print("[INFO] Showing browser for manual CAPTCHA solving...", flush=True)
                 try:
                     if cdp_session and window_id:
-                        # Restore and bring to front
                         await cdp_session.send('Browser.setWindowBounds', {
                             'windowId': window_id,
                             'bounds': {'windowState': 'normal'}
@@ -1590,17 +1626,11 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
                     await page.bring_to_front()
                 except Exception as e:
                     print(f"[WARN] Could not show browser: {e}", flush=True)
-                    # Fallback: just bring to foreground with JavaScript
-                    try:
-                        await page.evaluate('window.focus()')
-                    except:
-                        pass
                 browser_shown = True
         
         # Helper to detect CAPTCHA
         async def has_captcha():
             try:
-                # Check for hCaptcha iframe or elements
                 captcha = await page.query_selector('iframe[src*="hcaptcha"], iframe[src*="recaptcha"], [class*="captcha"], #captcha')
                 return captcha is not None
             except:
@@ -1625,25 +1655,25 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
         # Check if we're on login page
         if 'login.ah.nl' in page.url.lower() or 'inloggen' in page.url.lower():
             print("[INFO] Filling in credentials...", flush=True)
-            await asyncio.sleep(0.5)  # Brief wait for page to settle
+            await asyncio.sleep(0.5)
             
-            # Fill email - try multiple selectors
+            # Fill email
             email_input = await page.query_selector('input[type="email"], input[name="email"], input[id*="email"], input[name="username"]')
             if email_input:
-                await email_input.fill(email)  # Instant fill
+                await email_input.fill(email)
                 print("[INFO] Email entered", flush=True)
             else:
                 print("[WARN] Could not find email input", flush=True)
             
-            # Fill password - try multiple selectors
+            # Fill password
             password_input = await page.query_selector('input[type="password"], input[name="password"]')
             if password_input:
-                await password_input.fill(password)  # Instant fill
+                await password_input.fill(password)
                 print("[INFO] Password entered", flush=True)
             else:
                 print("[WARN] Could not find password input", flush=True)
             
-            # Click login button - try multiple selectors
+            # Click login button
             await asyncio.sleep(0.2)
             login_button = await page.query_selector('button[type="submit"], button:has-text("Inloggen"), input[type="submit"]')
             if login_button:
@@ -1651,31 +1681,15 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
                 await login_button.click()
                 print("[INFO] Login button clicked", flush=True)
             else:
-                # Try pressing Enter as fallback
                 print("[INFO] No login button found, pressing Enter...", flush=True)
                 await page.keyboard.press('Enter')
             
             # Wait for login to complete or CAPTCHA
             print("[INFO] Waiting for login to complete...", flush=True)
             
-            max_wait = 180  # 3 minutes for CAPTCHA solving
+            max_wait = 180  # 3 minutes max
             captcha_shown_at = None
             captcha_solve_attempted = False
-            
-            # Check if we have a CAPTCHA solver available
-            captcha_solver = None
-            captcha_api_key = os.environ.get('CAPTCHA_API_KEY')
-            if CAPTCHA_SOLVER_AVAILABLE and captcha_api_key:
-                try:
-                    captcha_solver = CaptchaSolver(captcha_api_key)
-                    balance = await captcha_solver.get_balance()
-                    if balance is not None:
-                        print(f"[INFO] CAPTCHA solver ready (balance: ${balance:.2f})", flush=True)
-                    else:
-                        print("[WARN] CAPTCHA solver configured but couldn't verify balance", flush=True)
-                except Exception as e:
-                    print(f"[WARN] CAPTCHA solver init failed: {e}", flush=True)
-                    captcha_solver = None
             
             for i in range(max_wait):
                 await asyncio.sleep(1)
@@ -1683,46 +1697,80 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
                 
                 # Check for CAPTCHA
                 if await has_captcha():
-                    if not captcha_solve_attempted and captcha_solver:
-                        # Try to solve CAPTCHA automatically with 2Captcha
-                        print("[INFO] CAPTCHA detected! Attempting automatic solve...", flush=True)
+                    if not captcha_solve_attempted:
                         captcha_solve_attempted = True
                         
-                        try:
-                            # Extract sitekey from page
-                            sitekey = await extract_hcaptcha_sitekey(page)
-                            if sitekey:
-                                print(f"[INFO] Found hCaptcha sitekey: {sitekey[:20]}...", flush=True)
-                                
-                                # Solve the CAPTCHA
-                                token = await captcha_solver.solve_hcaptcha(sitekey, page.url, timeout=120)
-                                
-                                if token:
-                                    print("[INFO] CAPTCHA solved! Injecting response...", flush=True)
-                                    await inject_captcha_response(page, token, 'hcaptcha')
-                                    await asyncio.sleep(3)  # Wait for form submission
+                        if captcha_solver:
+                            # Try automatic CAPTCHA solving
+                            print("[INFO] CAPTCHA detected! Attempting automatic solve with 2Captcha...", flush=True)
+                            
+                            try:
+                                sitekey = await extract_hcaptcha_sitekey(page)
+                                if sitekey:
+                                    print(f"[INFO] Found hCaptcha sitekey: {sitekey[:20]}...", flush=True)
+                                    
+                                    # Solve the CAPTCHA
+                                    token = await captcha_solver.solve_hcaptcha(sitekey, page.url, timeout=120)
+                                    
+                                    if token:
+                                        print("[INFO] CAPTCHA solved! Injecting response...", flush=True)
+                                        await inject_captcha_response(page, token, 'hcaptcha')
+                                        await asyncio.sleep(3)
+                                        # Continue the loop to check if login succeeded
+                                    else:
+                                        if headless:
+                                            print("[ERROR] CAPTCHA solve failed in headless mode - cannot proceed", flush=True)
+                                            result = {'success': False, 'error': 'CAPTCHA could not be solved automatically'}
+                                            print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                                            await browser.close()
+                                            await p.stop()
+                                            return 1
+                                        else:
+                                            print("[WARN] Auto-solve failed, showing browser for manual solve", flush=True)
+                                            await show_browser()
+                                            captcha_shown_at = i
                                 else:
-                                    print("[WARN] CAPTCHA solve failed, showing browser for manual solve", flush=True)
+                                    if headless:
+                                        print("[ERROR] Could not extract CAPTCHA sitekey in headless mode", flush=True)
+                                        result = {'success': False, 'error': 'Could not extract CAPTCHA sitekey'}
+                                        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                                        await browser.close()
+                                        await p.stop()
+                                        return 1
+                                    else:
+                                        print("[WARN] Could not extract sitekey, showing browser", flush=True)
+                                        await show_browser()
+                                        captcha_shown_at = i
+                            except Exception as e:
+                                print(f"[WARN] CAPTCHA solve error: {e}", flush=True)
+                                if headless:
+                                    result = {'success': False, 'error': f'CAPTCHA solve error: {e}'}
+                                    print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                                    await browser.close()
+                                    await p.stop()
+                                    return 1
+                                else:
                                     await show_browser()
                                     captcha_shown_at = i
+                        else:
+                            # No CAPTCHA solver available
+                            if headless:
+                                print("[ERROR] CAPTCHA detected but no solver configured (headless mode)", flush=True)
+                                result = {'success': False, 'error': 'CAPTCHA required but CAPTCHA_API_KEY not configured'}
+                                print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                                await browser.close()
+                                await p.stop()
+                                return 1
                             else:
-                                print("[WARN] Could not extract CAPTCHA sitekey, showing browser", flush=True)
+                                print("[INFO] No CAPTCHA solver, showing browser for manual solve", flush=True)
                                 await show_browser()
                                 captcha_shown_at = i
-                        except Exception as e:
-                            print(f"[WARN] CAPTCHA solve error: {e}, showing browser", flush=True)
-                            await show_browser()
-                            captcha_shown_at = i
-                    elif not browser_shown and not captcha_solver:
-                        # No solver available, show browser for manual solve
-                        await show_browser()
-                        captcha_shown_at = i
+                    
                     elif captcha_shown_at and (i - captcha_shown_at) % 30 == 0:
                         print(f"[INFO] Waiting for CAPTCHA to be solved... ({i - captcha_shown_at}s)", flush=True)
                 
                 # Check if logged in
                 if 'login.ah.nl' not in current_url and ('mijn' in current_url or 'ah.nl' in current_url):
-                    # Verify by accessing protected page
                     await page.goto('https://www.ah.nl/mijn/eerder-gekocht', wait_until='domcontentloaded')
                     await asyncio.sleep(2)
                     
@@ -1732,15 +1780,14 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
                         elif browser_shown:
                             print(f"[SUCCESS] Login successful after manual CAPTCHA solve! ({i+1} seconds)", flush=True)
                         else:
-                            print(f"[SUCCESS] Login successful automatically! ({i+1} seconds)", flush=True)
+                            print(f"[SUCCESS] Login successful! ({i+1} seconds)", flush=True)
                         break
                 
-                # Only show periodic updates if browser not yet shown
-                if not browser_shown and (i + 1) % 10 == 0:
+                if (i + 1) % 10 == 0:
                     print(f"[INFO] Still processing... ({i+1}s)", flush=True)
             else:
                 print("[ERROR] Login timeout", flush=True)
-                result = {'success': False, 'error': 'Login timeout - CAPTCHA not solved?'}
+                result = {'success': False, 'error': 'Login timeout'}
                 print(f"\n[RESULT] {json.dumps(result)}", flush=True)
                 await browser.close()
                 await p.stop()
@@ -1759,7 +1806,7 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
             'success': True,
             'cookies_saved': len(ah_cookies),
             'output_file': output_file,
-            'email': email  # Include email for server to save
+            'email': email
         }
         print(f"\n[RESULT] {json.dumps(result)}", flush=True)
         
@@ -1771,7 +1818,10 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
         print(f"[ERROR] Auto login failed: {e}", flush=True)
         result = {'success': False, 'error': str(e)}
         print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-        await p.stop()
+        try:
+            await p.stop()
+        except:
+            pass
         return 1
 
 
