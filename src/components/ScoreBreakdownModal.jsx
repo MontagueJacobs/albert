@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { X, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useI18n } from '../i18n.jsx'
 
 // Score breakdown modal component
 function ScoreBreakdownModal({ product, onClose }) {
+  const { t, lang } = useI18n()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -13,7 +15,7 @@ function ScoreBreakdownModal({ product, onClose }) {
     setLoading(true)
     setError(null)
     
-    fetch(`/api/score?product=${encodeURIComponent(product.name)}`)
+    fetch(`/api/score?product=${encodeURIComponent(product.name)}&lang=${lang}`)
       .then(res => res.json())
       .then(data => {
         setData(data)
@@ -23,7 +25,7 @@ function ScoreBreakdownModal({ product, onClose }) {
         setError(err.message)
         setLoading(false)
       })
-  }, [product])
+  }, [product, lang])
 
   if (!product) return null
 
@@ -101,7 +103,7 @@ function ScoreBreakdownModal({ product, onClose }) {
           <div>
             <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '1.1rem' }}>{product.name}</h3>
             <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Score Breakdown
+              {t('modal_score_breakdown')}
             </p>
           </div>
           <button 
@@ -121,13 +123,13 @@ function ScoreBreakdownModal({ product, onClose }) {
         <div style={modalBody}>
           {loading && (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              Loading...
+              {t('modal_loading')}
             </div>
           )}
           
           {error && (
             <div style={{ color: '#ef4444', padding: '1rem' }}>
-              Error: {error}
+              {t('modal_error')}: {error}
             </div>
           )}
           
@@ -149,7 +151,7 @@ function ScoreBreakdownModal({ product, onClose }) {
                   {data.score}
                 </div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  {data.rating || 'Score'} (base: 5)
+                  {data.rating || 'Score'} ({t('modal_base_score')}: 5)
                 </div>
               </div>
 
@@ -157,7 +159,7 @@ function ScoreBreakdownModal({ product, onClose }) {
               {data.enriched && data.enriched.length > 0 && (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                    Product attributes
+                    {t('modal_product_attributes')}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     {data.enriched.map((e, i) => (
@@ -179,7 +181,7 @@ function ScoreBreakdownModal({ product, onClose }) {
               {data.adjustments && data.adjustments.length > 0 && (
                 <div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                    Score adjustments
+                    {t('modal_score_adjustments')}
                   </div>
                   <div style={{ 
                     background: 'var(--bg-hover, #334155)', 
@@ -214,7 +216,7 @@ function ScoreBreakdownModal({ product, onClose }) {
               {data.categories && data.categories.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                    Categories
+                    {t('modal_categories')}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     {data.categories.map((cat, i) => (
@@ -236,7 +238,7 @@ function ScoreBreakdownModal({ product, onClose }) {
               {data.suggestions && data.suggestions.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                    💡 Suggestions
+                    {t('modal_suggestions')}
                   </div>
                   <ul style={{ 
                     margin: 0, 
@@ -269,12 +271,12 @@ function ScoreBreakdownModal({ product, onClose }) {
                       textDecoration: 'underline'
                     }}
                   >
-                    View on Albert Heijn →
+                    {t('modal_view_on_ah')}
                   </a>
                 </div>
               ) : (
                 <div style={{ marginTop: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  No product link available
+                  {t('modal_no_link')}
                 </div>
               )}
             </>

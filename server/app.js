@@ -863,7 +863,7 @@ function findCatalogMatch(productName = '') {
   }
 }
 
-function evaluateProduct(productName = '', enrichedData = null) {
+function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const input = typeof productName === 'string' ? productName : ''
   const normalized = normalizeProductName(input)
   const lowerProduct = input.toLowerCase()
@@ -873,7 +873,7 @@ function evaluateProduct(productName = '', enrichedData = null) {
   const matchedKeywords = []
   const matchedEnriched = []  // Track enriched field matches
   const categorySet = new Set()
-  let suggestions = getSuggestions(input)
+  let suggestions = getSuggestions(input, lang)
   let notes = null
   let matchedProduct = null
 
@@ -1204,31 +1204,52 @@ function searchProducts(query = '') {
   return results.slice(0, 10)
 }
 
-function getSuggestions(productName) {
+function getSuggestions(productName, lang = 'nl') {
   const suggestions = []
   const lowerProduct = productName.toLowerCase()
 
+  const i18n = {
+    nl: {
+      oat_milk: '🥬 Probeer havermelk of sojamelk - 75% minder CO2!',
+      tofu: '🥬 Probeer tofu of tempeh - 90% minder CO2!',
+      plant_chicken: '🥬 Probeer plantaardige kip alternatieven',
+      bio: '🌱 Zoek naar biologische of Fair Trade varianten',
+      packaging: '♻️ Kies voor producten met minder verpakking',
+      great_choice: 'Geweldig! Je maakt al een goede keuze! ✨'
+    },
+    en: {
+      oat_milk: '🥬 Try oat milk or soy milk - 75% less CO2!',
+      tofu: '🥬 Try tofu or tempeh - 90% less CO2!',
+      plant_chicken: '🥬 Try plant-based chicken alternatives',
+      bio: '🌱 Look for organic or Fair Trade options',
+      packaging: '♻️ Choose products with less packaging',
+      great_choice: 'Great! You\'re already making a good choice! ✨'
+    }
+  }
+
+  const t = i18n[lang] || i18n.nl
+
   if ((lowerProduct.includes('melk') || lowerProduct.includes('milk')) && !lowerProduct.includes('haver') && !lowerProduct.includes('soja')) {
-    suggestions.push('🥬 Probeer havermelk of sojamelk - 75% minder CO2!')
+    suggestions.push(t.oat_milk)
   }
 
   if (lowerProduct.includes('vlees') || lowerProduct.includes('beef') || lowerProduct.includes('rund')) {
-    suggestions.push('🥬 Probeer tofu of tempeh - 90% minder CO2!')
+    suggestions.push(t.tofu)
   }
 
   if (lowerProduct.includes('kip') || lowerProduct.includes('chicken')) {
-    suggestions.push('🥬 Probeer plantaardige kip alternatieven')
+    suggestions.push(t.plant_chicken)
   }
 
   if (!lowerProduct.includes('bio') && !lowerProduct.includes('organic') && !lowerProduct.includes('fair')) {
-    suggestions.push('🌱 Zoek naar biologische of Fair Trade varianten')
+    suggestions.push(t.bio)
   }
 
   if (lowerProduct.includes('plastic') || lowerProduct.includes('verpakt')) {
-    suggestions.push('♻️ Kies voor producten met minder verpakking')
+    suggestions.push(t.packaging)
   }
 
-  return suggestions.length > 0 ? suggestions : ['Geweldig! Je maakt al een goede keuze! ✨']
+  return suggestions.length > 0 ? suggestions : [t.great_choice]
 }
 
 function getRating(avgScore) {
@@ -2393,7 +2414,8 @@ app.post('/api/purchases', (req, res) => {
 
 // Support both GET and POST for score lookup
 app.get('/api/score', (req, res) => {
-  const { product, item } = req.query
+  const { product, item, lang } = req.query
+  const language = lang === 'en' ? 'en' : 'nl'
   const input = typeof product === 'string' && product.trim().length > 0
     ? product
     : (typeof item === 'string' ? item : '')
@@ -2403,7 +2425,7 @@ app.get('/api/score', (req, res) => {
     }
   }
 
-  const evaluation = evaluateProduct(input || product)
+  const evaluation = evaluateProduct(input || product, null, language)
   res.json(evaluation)
 })
 

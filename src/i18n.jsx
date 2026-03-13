@@ -276,7 +276,18 @@ const TRANSLATIONS = {
     landing_sync_success: 'Synchronisatie gelukt!',
     landing_products_synced: 'producten gesynchroniseerd',
     landing_try_again: 'Opnieuw proberen',
-    landing_visual_not_supported: 'Deze functie is alleen beschikbaar als je de app lokaal draait. Gebruik de bookmarklet methode in de Sync tab.'
+    landing_visual_not_supported: 'Deze functie is alleen beschikbaar als je de app lokaal draait. Gebruik de bookmarklet methode in de Sync tab.',
+    // Score Breakdown Modal
+    modal_score_breakdown: 'Score opbouw',
+    modal_loading: 'Laden...',
+    modal_error: 'Fout',
+    modal_base_score: 'basis',
+    modal_product_attributes: 'Product eigenschappen',
+    modal_score_adjustments: 'Score aanpassingen',
+    modal_categories: 'Categorieën',
+    modal_suggestions: '💡 Suggesties',
+    modal_view_on_ah: 'Bekijk op Albert Heijn →',
+    modal_no_link: 'Geen productlink beschikbaar'
   },
   en: {
     app_title: 'Sustainable Shopping',
@@ -553,7 +564,18 @@ const TRANSLATIONS = {
     landing_sync_success: 'Sync successful!',
     landing_products_synced: 'products synced',
     landing_try_again: 'Try again',
-    landing_visual_not_supported: 'This feature is only available when running the app locally. Use the bookmarklet method in the Sync tab.'
+    landing_visual_not_supported: 'This feature is only available when running the app locally. Use the bookmarklet method in the Sync tab.',
+    // Score Breakdown Modal
+    modal_score_breakdown: 'Score breakdown',
+    modal_loading: 'Loading...',
+    modal_error: 'Error',
+    modal_base_score: 'base',
+    modal_product_attributes: 'Product attributes',
+    modal_score_adjustments: 'Score adjustments',
+    modal_categories: 'Categories',
+    modal_suggestions: '💡 Suggestions',
+    modal_view_on_ah: 'View on Albert Heijn →',
+    modal_no_link: 'No product link available'
   }
 }
 
