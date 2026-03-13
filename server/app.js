@@ -103,7 +103,8 @@ app.get('/api/health', (req, res) => {
 
 // ============================================================================
 // AH USER CHECK ENDPOINT (Email-based user lookup)
-// Check if a user exists with the given AH email address
+// Check if a user exists with the given email address
+// Checks both user_ah_credentials and users tables for simpler login
 // ============================================================================
 app.get('/api/ah-user/check', async (req, res) => {
   try {
@@ -117,32 +118,75 @@ app.get('/api/ah-user/check', async (req, res) => {
       return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
     }
     
-    // Look up user by AH email in user_ah_credentials
-    const { data, error } = await supabase
+    const normalizedEmail = email.toLowerCase().trim()
+    
+    // First, check user_ah_credentials table (AH email)
+    const { data: ahData } = await supabase
       .from('user_ah_credentials')
       .select('id, ah_email, last_sync_at, sync_status')
-      .eq('ah_email', email.toLowerCase().trim())
+      .eq('ah_email', normalizedEmail)
       .single()
     
-    if (error || !data) {
-      return res.json({ 
-        exists: false, 
-        message: 'No account found. Connect your Albert Heijn account to get started.' 
+    if (ahData) {
+      // Found in user_ah_credentials - get purchase count
+      const { count } = await supabase
+        .from('user_purchases')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', ahData.id)
+      
+      return res.json({
+        exists: true,
+        email: ahData.ah_email,
+        lastSync: ahData.last_sync_at,
+        syncStatus: ahData.sync_status,
+        purchaseCount: count || 0
       })
     }
     
-    // User exists - get purchase count too
-    const { count } = await supabase
-      .from('user_purchases')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', data.id)
+    // Second, check users table (main account email)
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', normalizedEmail)
+      .single()
     
-    res.json({
-      exists: true,
-      email: data.ah_email,
-      lastSync: data.last_sync_at,
-      syncStatus: data.sync_status,
-      purchaseCount: count || 0
+    if (userData) {
+      // Found in users table - check if they have linked AH credentials
+      const { data: linkedAh } = await supabase
+        .from('user_ah_credentials')
+        .select('id, ah_email, last_sync_at, sync_status')
+        .eq('user_id', userData.id)
+        .single()
+      
+      if (linkedAh) {
+        const { count } = await supabase
+          .from('user_purchases')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', linkedAh.id)
+        
+        return res.json({
+          exists: true,
+          email: linkedAh.ah_email,
+          lastSync: linkedAh.last_sync_at,
+          syncStatus: linkedAh.sync_status,
+          purchaseCount: count || 0
+        })
+      }
+      
+      // User exists but no AH link - still allow login (can connect later)
+      return res.json({
+        exists: true,
+        email: userData.email,
+        lastSync: null,
+        syncStatus: 'not_connected',
+        purchaseCount: 0
+      })
+    }
+    
+    // Not found in either table
+    return res.json({ 
+      exists: false, 
+      message: 'No account found. Connect your Albert Heijn account to get started.' 
     })
   } catch (err) {
     console.error('Error checking AH user:', err)
