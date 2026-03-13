@@ -51,7 +51,7 @@ const features = [
 
 function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion }) {
   const { t, lang, setLang } = useI18n()
-  const { ahEmail, clearEmail } = useAHUser()
+  const { ahEmail, clearAHEmail } = useAHUser()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleToggleLanguage = useCallback(() => {
@@ -108,7 +108,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             </button>
             <div className="user-email-display">
               <span className="user-email">{ahEmail}</span>
-              <button className="logout-btn" onClick={clearEmail} title="Log out">
+              <button className="logout-btn" onClick={clearAHEmail} title="Log out">
                 <LogOut size={16} />
               </button>
             </div>
@@ -206,7 +206,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </button>
           <div className="user-email-display">
             <span className="user-email">{ahEmail}</span>
-            <button className="logout-btn" onClick={clearEmail} title="Log out">
+            <button className="logout-btn" onClick={clearAHEmail} title="Log out">
               <LogOut size={16} />
             </button>
           </div>
