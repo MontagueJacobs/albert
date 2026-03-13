@@ -282,15 +282,16 @@ async function getUserIdByAHEmail(ahEmail) {
   
   try {
     // First, check user_ah_credentials table (AH-specific email)
+    // Note: Use 'id' column as the user identifier (not 'user_id' which may be null)
     const { data: credData, error: credError } = await supabase
       .from('user_ah_credentials')
-      .select('user_id, ah_email')
+      .select('id, ah_email')
       .eq('ah_email', normalizedEmail)
       .single()
     
     if (!credError && credData) {
-      console.log(`[Auth] Found user ${credData.user_id} via user_ah_credentials for ${normalizedEmail}`)
-      return credData.user_id
+      console.log(`[Auth] Found user ${credData.id} via user_ah_credentials for ${normalizedEmail}`)
+      return credData.id
     }
     
     // Second, check users table (main account email)
