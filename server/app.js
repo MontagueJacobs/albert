@@ -183,10 +183,34 @@ app.get('/api/ah-user/check', async (req, res) => {
       })
     }
     
-    // Not found in either table
-    return res.json({ 
-      exists: false, 
-      message: 'No account found. Connect your Albert Heijn account to get started.' 
+    // Not found in either table - auto-create user in user_ah_credentials for thesis participants
+    // This ensures purchases can be linked correctly
+    const { data: newUser, error: insertError } = await supabase
+      .from('user_ah_credentials')
+      .insert([{ 
+        ah_email: normalizedEmail, 
+        sync_status: 'pending',
+        created_at: new Date().toISOString() 
+      }])
+      .select()
+      .single()
+    
+    if (insertError) {
+      console.error('Error auto-creating user:', insertError)
+      return res.json({ 
+        exists: false, 
+        message: 'Could not create account. Please try again.' 
+      })
+    }
+    
+    console.log(`[Auth] Auto-created user ${newUser.id} for ${normalizedEmail}`)
+    return res.json({
+      exists: true,
+      email: newUser.ah_email,
+      lastSync: null,
+      syncStatus: 'pending',
+      purchaseCount: 0,
+      isNew: true
     })
   } catch (err) {
     console.error('Error checking AH user:', err)
