@@ -9,6 +9,7 @@ import { spawn } from 'child_process'
 import dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 
 import {
   getCatalogIndex,
@@ -276,6 +277,144 @@ app.post('/api/ah-user/register', async (req, res) => {
   } catch (err) {
     console.error('Error registering AH user:', err)
     res.status(500).json({ error: 'register_failed', message: err.message })
+  }
+})
+
+// ============================================================================
+// PASSWORD-BASED AUTHENTICATION ENDPOINTS
+// Simple email + password login for thesis participants
+// ============================================================================
+
+// Register new user with email and password
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'missing_fields', message: 'Email and password are required' })
+    }
+    
+    if (password.length < 4) {
+      return res.status(400).json({ error: 'password_too_short', message: 'Password must be at least 4 characters' })
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim()
+    
+    if (!supabase) {
+      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
+    }
+    
+    // Check if user already exists
+    const { data: existing } = await supabase
+      .from('user_ah_credentials')
+      .select('id, ah_email')
+      .eq('ah_email', normalizedEmail)
+      .single()
+    
+    if (existing) {
+      return res.status(409).json({ 
+        error: 'user_exists', 
+        message: 'An account with this email already exists. Please login instead.' 
+      })
+    }
+    
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10)
+    
+    // Create new user with password
+    const { data: newUser, error: insertError } = await supabase
+      .from('user_ah_credentials')
+      .insert([{
+        ah_email: normalizedEmail,
+        password_hash: passwordHash,
+        sync_status: 'pending',
+        created_at: new Date().toISOString()
+      }])
+      .select('id, ah_email')
+      .single()
+    
+    if (insertError) {
+      console.error('Error creating user:', insertError)
+      return res.status(500).json({ error: 'create_failed', message: 'Could not create account' })
+    }
+    
+    console.log(`[Auth] Registered new user: ${normalizedEmail}`)
+    res.json({ 
+      success: true, 
+      email: newUser.ah_email,
+      userId: newUser.id
+    })
+  } catch (err) {
+    console.error('Error registering user:', err)
+    res.status(500).json({ error: 'register_failed', message: err.message })
+  }
+})
+
+// Login with email and password
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'missing_fields', message: 'Email and password are required' })
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim()
+    
+    if (!supabase) {
+      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
+    }
+    
+    // Find user
+    const { data: user, error } = await supabase
+      .from('user_ah_credentials')
+      .select('id, ah_email, password_hash, sync_status, last_sync_at')
+      .eq('ah_email', normalizedEmail)
+      .single()
+    
+    if (error || !user) {
+      return res.status(401).json({ 
+        error: 'invalid_credentials', 
+        message: 'Invalid email or password' 
+      })
+    }
+    
+    // Check if password_hash exists (legacy users might not have one)
+    if (!user.password_hash) {
+      return res.status(401).json({ 
+        error: 'no_password', 
+        message: 'This account does not have a password set. Please register again.' 
+      })
+    }
+    
+    // Verify password
+    const isValid = await bcrypt.compare(password, user.password_hash)
+    
+    if (!isValid) {
+      return res.status(401).json({ 
+        error: 'invalid_credentials', 
+        message: 'Invalid email or password' 
+      })
+    }
+    
+    // Get purchase count
+    const { count } = await supabase
+      .from('user_purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+    
+    console.log(`[Auth] User logged in: ${normalizedEmail}`)
+    res.json({ 
+      success: true, 
+      email: user.ah_email,
+      userId: user.id,
+      syncStatus: user.sync_status,
+      lastSync: user.last_sync_at,
+      purchaseCount: count || 0
+    })
+  } catch (err) {
+    console.error('Error logging in:', err)
+    res.status(500).json({ error: 'login_failed', message: err.message })
   }
 })
 

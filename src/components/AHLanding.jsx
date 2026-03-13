@@ -1,42 +1,54 @@
 import { useState } from 'react'
-import { Mail, ShoppingCart, Leaf, ArrowRight } from 'lucide-react'
+import { Mail, Lock, ShoppingCart, Leaf, ArrowRight, UserPlus, LogIn } from 'lucide-react'
 import { useAHUser } from '../lib/ahUserContext'
 import { useI18n } from '../i18n.jsx'
 
 /**
- * Landing page for non-identified users
- * Users enter their email to view saved data
+ * Landing page with email + password login/register
  */
 export default function AHLanding() {
   const { setAHEmail } = useAHUser()
   const { t } = useI18n()
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [checking, setChecking] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState('login') // 'login' or 'register'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!email.trim()) return
+    if (!email.trim() || !password) return
     
-    setChecking(true)
+    setLoading(true)
     setError('')
     
     try {
-      // Check if this email has data
-      const res = await fetch(`/api/ah-user/check?email=${encodeURIComponent(email.trim())}`)
+      const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login'
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password })
+      })
+      
       const data = await res.json()
       
-      if (data.exists) {
-        // User has data, log them in
-        setAHEmail(email.trim())
-      } else {
-        setError(t('landing_error_no_data'))
+      if (!res.ok) {
+        setError(data.message || 'An error occurred')
+        return
       }
+      
+      // Success - log the user in
+      setAHEmail(data.email)
     } catch (err) {
-      setError(t('landing_error_generic'))
+      setError(t('landing_error_generic') || 'Connection error. Please try again.')
     } finally {
-      setChecking(false)
+      setLoading(false)
     }
+  }
+
+  const toggleMode = () => {
+    setMode(mode === 'login' ? 'register' : 'login')
+    setError('')
   }
 
   return (
@@ -47,9 +59,9 @@ export default function AHLanding() {
           <div style={styles.logoContainer}>
             <Leaf size={32} style={{ color: '#00ADE6' }} />
           </div>
-          <h1 style={styles.title}>{t('landing_title')}</h1>
+          <h1 style={styles.title}>{t('landing_title') || 'Sustainable Shop'}</h1>
           <p style={styles.subtitle}>
-            {t('landing_subtitle')}
+            {t('landing_subtitle') || 'Track your sustainable shopping'}
           </p>
         </div>
 
@@ -57,20 +69,33 @@ export default function AHLanding() {
         <div style={styles.features}>
           <div style={styles.feature}>
             <ShoppingCart size={20} style={{ color: '#00ADE6' }} />
-            <span>{t('landing_feature_history')}</span>
+            <span>{t('landing_feature_history') || 'View purchase history'}</span>
           </div>
           <div style={styles.feature}>
             <Leaf size={20} style={{ color: '#22c55e' }} />
-            <span>{t('landing_feature_scores')}</span>
+            <span>{t('landing_feature_scores') || 'Sustainability scores'}</span>
           </div>
         </div>
 
-        {/* Divider */}
-        <div style={styles.divider}>
-          <span style={styles.dividerText}>{t('landing_already_connected')}</span>
+        {/* Mode tabs */}
+        <div style={styles.tabs}>
+          <button 
+            style={{...styles.tab, ...(mode === 'login' ? styles.tabActive : {})}}
+            onClick={() => setMode('login')}
+          >
+            <LogIn size={16} />
+            {t('login') || 'Login'}
+          </button>
+          <button 
+            style={{...styles.tab, ...(mode === 'register' ? styles.tabActive : {})}}
+            onClick={() => setMode('register')}
+          >
+            <UserPlus size={16} />
+            {t('register') || 'Register'}
+          </button>
         </div>
 
-        {/* Email lookup form */}
+        {/* Login/Register form */}
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
             <Mail size={20} style={styles.inputIcon} />
@@ -78,9 +103,24 @@ export default function AHLanding() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={t('landing_email_placeholder')}
+              placeholder={t('email_placeholder') || 'Email address'}
               style={styles.input}
               required
+              autoComplete="email"
+            />
+          </div>
+          
+          <div style={styles.inputGroup}>
+            <Lock size={20} style={styles.inputIcon} />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t('password_placeholder') || 'Password'}
+              style={styles.input}
+              required
+              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+              minLength={4}
             />
           </div>
           
@@ -88,21 +128,41 @@ export default function AHLanding() {
           
           <button 
             type="submit" 
-            disabled={checking || !email.trim()}
+            disabled={loading || !email.trim() || !password}
             style={{
               ...styles.submitBtn,
-              opacity: checking || !email.trim() ? 0.7 : 1,
+              opacity: loading || !email.trim() || !password ? 0.7 : 1,
             }}
           >
-            {checking ? t('landing_checking') : t('landing_view_data')}
+            {loading 
+              ? (t('loading') || 'Loading...') 
+              : mode === 'register' 
+                ? (t('create_account') || 'Create Account')
+                : (t('login') || 'Login')
+            }
             <ArrowRight size={18} />
           </button>
         </form>
+
+        {/* Toggle link */}
+        <p style={styles.toggleText}>
+          {mode === 'login' 
+            ? (t('no_account') || "Don't have an account?")
+            : (t('have_account') || 'Already have an account?')
+          }
+          {' '}
+          <button style={styles.toggleBtn} onClick={toggleMode}>
+            {mode === 'login' 
+              ? (t('register') || 'Register')
+              : (t('login') || 'Login')
+            }
+          </button>
+        </p>
       </div>
 
       {/* Footer */}
       <p style={styles.footer}>
-        {t('landing_privacy_notice')}
+        {t('landing_privacy_notice') || 'Your data is stored securely and used only for this study.'}
       </p>
     </div>
   )
@@ -128,7 +188,7 @@ const styles = {
   },
   header: {
     textAlign: 'center',
-    marginBottom: '2rem',
+    marginBottom: '1.5rem',
   },
   logoContainer: {
     width: '64px',
@@ -164,21 +224,34 @@ const styles = {
     fontSize: '0.95rem',
     color: '#444',
   },
-  divider: {
-    textAlign: 'center',
+  tabs: {
+    display: 'flex',
+    gap: '0.5rem',
     marginBottom: '1.5rem',
-    position: 'relative',
   },
-  dividerText: {
+  tab: {
+    flex: 1,
+    padding: '0.75rem',
+    fontSize: '0.95rem',
+    fontWeight: 600,
+    border: '2px solid #e0e0e0',
+    borderRadius: '10px',
     background: 'white',
-    padding: '0 1rem',
-    color: '#888',
-    fontSize: '0.9rem',
-    position: 'relative',
-    zIndex: 1,
+    color: '#666',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s',
+  },
+  tabActive: {
+    borderColor: '#00ADE6',
+    color: '#00ADE6',
+    background: '#f0f9ff',
   },
   form: {
-    marginBottom: '1.5rem',
+    marginBottom: '1rem',
   },
   inputGroup: {
     position: 'relative',
@@ -205,6 +278,9 @@ const styles = {
     color: '#ef4444',
     fontSize: '0.9rem',
     marginBottom: '1rem',
+    padding: '0.75rem',
+    background: '#fef2f2',
+    borderRadius: '8px',
   },
   submitBtn: {
     width: '100%',
@@ -220,6 +296,22 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '0.5rem',
+    transition: 'background 0.2s',
+  },
+  toggleText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: '0.9rem',
+    margin: 0,
+  },
+  toggleBtn: {
+    color: '#00ADE6',
+    fontWeight: 600,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
+    fontSize: '0.9rem',
   },
   footer: {
     marginTop: '1.5rem',
