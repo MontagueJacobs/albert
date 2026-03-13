@@ -108,7 +108,8 @@ function PurchaseList({ syncVersion }) {
           className="purchase-item"
           onClick={() => setSelectedProduct({
             name: purchase.product_name || purchase.product,
-            url: purchase.url || null
+            url: purchase.product_url || purchase.url || null,
+            image_url: purchase.image_url || null
           })}
           style={{ cursor: 'pointer' }}
         >

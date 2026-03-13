@@ -215,7 +215,7 @@ function ProfileSuggestions({ refreshKey = 0 }) {
                   </button>
                   <span style={{color: 'var(--text-muted)'}}>→</span>
                   <button 
-                    onClick={() => setSelectedProduct({ name: r.replacement.name, url: r.replacement.url, score: r.replacement.score })}
+                    onClick={() => setSelectedProduct({ name: r.replacement.name, url: r.replacement.url, image_url: r.replacement.image_url, score: r.replacement.score })}
                     style={{display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'none'}}
                   >
                     <span style={{color: 'var(--text)', fontWeight: 600}}>{r.replacement.name}</span>
@@ -236,7 +236,7 @@ function ProfileSuggestions({ refreshKey = 0 }) {
           {suggestions && suggestions.length > 0 ? suggestions.map((s, idx) => (
             <button 
               key={idx} 
-              onClick={() => setSelectedProduct({ name: s.name, url: s.url, score: s.sustainability_score })}
+              onClick={() => setSelectedProduct({ name: s.name, url: s.url, image_url: s.image_url, score: s.sustainability_score })}
               className="suggestion-card" 
               style={{...styles.suggestionCard, cursor: 'pointer', textAlign: 'left', width: '100%'}}
             >

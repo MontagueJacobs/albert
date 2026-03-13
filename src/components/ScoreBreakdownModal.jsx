@@ -100,11 +100,28 @@ function ScoreBreakdownModal({ product, onClose }) {
     <div style={modalOverlay} onClick={onClose}>
       <div style={modalContent} onClick={e => e.stopPropagation()}>
         <div style={modalHeader}>
-          <div>
-            <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '1.1rem' }}>{product.name}</h3>
-            <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              {t('modal_score_breakdown')}
-            </p>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flex: 1 }}>
+            {product.image_url && (
+              <img 
+                src={product.image_url} 
+                alt={product.name}
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  objectFit: 'contain',
+                  borderRadius: '8px',
+                  background: 'var(--bg-hover, #334155)',
+                  flexShrink: 0
+                }}
+                onError={(e) => { e.target.style.display = 'none' }}
+              />
+            )}
+            <div>
+              <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '1.1rem' }}>{product.name}</h3>
+              <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                {t('modal_score_breakdown')}
+              </p>
+            </div>
           </div>
           <button 
             onClick={onClose}

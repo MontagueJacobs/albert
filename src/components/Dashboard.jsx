@@ -332,7 +332,8 @@ function Dashboard({ syncVersion }) {
                     purchase={purchase} 
                     onClick={() => setSelectedProduct({
                       name: purchase.product_name,
-                      url: purchase.url || null
+                      url: purchase.product_url || purchase.url || null,
+                      image_url: purchase.image_url || null
                     })}
                   />
                 ))}
