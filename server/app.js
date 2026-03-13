@@ -927,9 +927,8 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
       notes = entry.notes
     }
 
-    if (Array.isArray(entry.suggestions) && entry.suggestions.length > 0) {
-      suggestions = entry.suggestions
-    }
+    // Note: We no longer override suggestions from catalog entries
+    // because getSuggestions() already handles i18n translations
 
     // Only apply catalog-based scoring if the product is NOT plant-based
     // (Avoid penalizing "plantaardige gehakt" as meat)
