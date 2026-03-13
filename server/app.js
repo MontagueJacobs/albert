@@ -3827,6 +3827,9 @@ app.post('/api/auto-scrape/login-and-sync', async (req, res) => {
     return res.status(400).json({ error: 'missing_credentials', message: 'Email and password are required' })
   }
   
+  // Normalize email for consistent storage and lookup
+  const normalizedEmail = email.toLowerCase().trim()
+  
   try {
     await fs.access(AUTO_SCRAPE_SCRIPT)
   } catch (error) {
@@ -3841,15 +3844,15 @@ app.post('/api/auto-scrape/login-and-sync', async (req, res) => {
   loginAndSyncState.progress = 'Starting login...'
   loginAndSyncState.error = null
   loginAndSyncState.result = null
-  loginAndSyncState.email = email
+  loginAndSyncState.email = normalizedEmail
   
   // First: register the user in our database
   if (supabase) {
     try {
       await supabase
         .from('user_ah_credentials')
-        .upsert({ ah_email: email }, { onConflict: 'ah_email' })
-      console.log('[LOGIN-AND-SYNC] User registered/updated:', email)
+        .upsert({ ah_email: normalizedEmail }, { onConflict: 'ah_email' })
+      console.log('[LOGIN-AND-SYNC] User registered/updated:', normalizedEmail)
     } catch (e) {
       console.error('[LOGIN-AND-SYNC] Failed to register user:', e)
     }
