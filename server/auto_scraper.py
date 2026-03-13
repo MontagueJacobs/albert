@@ -22,14 +22,6 @@ except ImportError:
     print("ERROR: Playwright not installed. Run: pip install playwright && playwright install chromium", file=sys.stderr)
     sys.exit(1)
 
-# Import CAPTCHA solver (optional - only used if API key is set)
-try:
-    from captcha_solver import CaptchaSolver, extract_hcaptcha_sitekey, inject_captcha_response
-    CAPTCHA_SOLVER_AVAILABLE = True
-except ImportError:
-    CAPTCHA_SOLVER_AVAILABLE = False
-    print("[INFO] CAPTCHA solver module not available", file=sys.stderr)
-
 
 class AHAutoScraper:
     """Automated scraper for Albert Heijn using Playwright."""
@@ -1550,26 +1542,6 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
     window_id = None
     
     try:
-        # Initialize CAPTCHA solver if available
-        captcha_solver = None
-        captcha_api_key = os.environ.get('CAPTCHA_API_KEY')
-        if CAPTCHA_SOLVER_AVAILABLE and captcha_api_key:
-            try:
-                captcha_solver = CaptchaSolver(captcha_api_key)
-                balance = await captcha_solver.get_balance()
-                if balance is not None:
-                    print(f"[INFO] CAPTCHA solver ready (balance: ${balance:.2f})", flush=True)
-                else:
-                    print("[WARN] CAPTCHA solver configured but couldn't verify balance", flush=True)
-            except Exception as e:
-                print(f"[WARN] CAPTCHA solver init failed: {e}", flush=True)
-                captcha_solver = None
-        else:
-            if not CAPTCHA_SOLVER_AVAILABLE:
-                print("[INFO] CAPTCHA solver module not loaded", flush=True)
-            if not captcha_api_key:
-                print("[INFO] No CAPTCHA_API_KEY environment variable set", flush=True)
-        
         # Try Firefox first (better for avoiding detection), fall back to Chromium
         browser = None
         browser_type = None
@@ -1875,71 +1847,17 @@ async def auto_login_and_save_cookies(email: str, password: str, output_file: st
                     if not captcha_solve_attempted:
                         captcha_solve_attempted = True
                         
-                        if captcha_solver:
-                            # Try automatic CAPTCHA solving
-                            print("[INFO] CAPTCHA detected! Attempting automatic solve with 2Captcha...", flush=True)
-                            
-                            try:
-                                sitekey = await extract_hcaptcha_sitekey(page)
-                                if sitekey:
-                                    print(f"[INFO] Found hCaptcha sitekey: {sitekey[:20]}...", flush=True)
-                                    
-                                    # Solve the CAPTCHA
-                                    token = await captcha_solver.solve_hcaptcha(sitekey, page.url, timeout=120)
-                                    
-                                    if token:
-                                        print("[INFO] CAPTCHA solved! Injecting response...", flush=True)
-                                        await inject_captcha_response(page, token, 'hcaptcha')
-                                        await asyncio.sleep(3)
-                                        # Continue the loop to check if login succeeded
-                                    else:
-                                        if headless:
-                                            print("[ERROR] CAPTCHA solve failed in headless mode - cannot proceed", flush=True)
-                                            result = {'success': False, 'error': 'CAPTCHA could not be solved automatically'}
-                                            print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-                                            await browser.close()
-                                            await p.stop()
-                                            return 1
-                                        else:
-                                            print("[WARN] Auto-solve failed, showing browser for manual solve", flush=True)
-                                            await show_browser()
-                                            captcha_shown_at = i
-                                else:
-                                    if headless:
-                                        print("[ERROR] Could not extract CAPTCHA sitekey in headless mode", flush=True)
-                                        result = {'success': False, 'error': 'Could not extract CAPTCHA sitekey'}
-                                        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-                                        await browser.close()
-                                        await p.stop()
-                                        return 1
-                                    else:
-                                        print("[WARN] Could not extract sitekey, showing browser", flush=True)
-                                        await show_browser()
-                                        captcha_shown_at = i
-                            except Exception as e:
-                                print(f"[WARN] CAPTCHA solve error: {e}", flush=True)
-                                if headless:
-                                    result = {'success': False, 'error': f'CAPTCHA solve error: {e}'}
-                                    print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-                                    await browser.close()
-                                    await p.stop()
-                                    return 1
-                                else:
-                                    await show_browser()
-                                    captcha_shown_at = i
+                        if headless:
+                            print("[ERROR] CAPTCHA detected in headless mode - cannot proceed", flush=True)
+                            result = {'success': False, 'error': 'CAPTCHA detected - manual intervention required'}
+                            print(f"\n[RESULT] {json.dumps(result)}", flush=True)
+                            await browser.close()
+                            await p.stop()
+                            return 1
                         else:
-                            # No CAPTCHA solver available
-                            if headless:
-                                print("[ERROR] CAPTCHA detected but no solver configured (headless mode)", flush=True)
-                                result = {'success': False, 'error': 'CAPTCHA required but CAPTCHA_API_KEY not configured'}
-                                print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-                                await browser.close()
-                                await p.stop()
-                                return 1
-                            else:
-                                print("[INFO] No CAPTCHA solver, showing browser for manual solve", flush=True)
-                                await show_browser()
-                                captcha_shown_at = i
+                            print("[INFO] CAPTCHA detected, showing browser for manual solve", flush=True)
+                            await show_browser()
+                            captcha_shown_at = i
                     
                     elif captcha_shown_at and (i - captcha_shown_at) % 30 == 0:
                         print(f"[INFO] Waiting for CAPTCHA to be solved... ({i - captcha_shown_at}s)", flush=True)
