@@ -222,6 +222,9 @@ function ProductDetailModal({ purchase, onClose }) {
 
   if (!purchase) return null
 
+  // Handle both possible field names for product URL
+  const productUrl = purchase.product_url || purchase.url
+
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose()
@@ -239,18 +242,18 @@ function ProductDetailModal({ purchase, onClose }) {
         <div style={styles.header}>
           {purchase.image_url ? (
             <a 
-              href={purchase.url || '#'}
+              href={productUrl || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ cursor: purchase.url ? 'pointer' : 'default' }}
-              onClick={(e) => !purchase.url && e.preventDefault()}
+              style={{ cursor: productUrl ? 'pointer' : 'default' }}
+              onClick={(e) => !productUrl && e.preventDefault()}
             >
               <img 
                 src={purchase.image_url} 
                 alt={purchase.product_name}
                 style={{...styles.productImage, transition: 'transform 0.2s'}}
                 onError={(e) => { e.target.src = '' }}
-                onMouseEnter={(e) => purchase.url && (e.target.style.transform = 'scale(1.05)')}
+                onMouseEnter={(e) => productUrl && (e.target.style.transform = 'scale(1.05)')}
                 onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
               />
             </a>
@@ -460,10 +463,10 @@ function ProductDetailModal({ purchase, onClose }) {
             )}
 
             {/* View on AH */}
-            {purchase.url && (
+            {productUrl && (
               <div style={{ padding: '1rem 1.5rem 1.5rem' }}>
                 <a 
-                  href={purchase.url}
+                  href={productUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-primary"
