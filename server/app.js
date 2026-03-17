@@ -2135,6 +2135,218 @@ app.get('/api/products/:productId', async (req, res) => {
   }
 })
 
+// Get detailed product analysis with scoring breakdown and alternatives
+app.get('/api/product/:productId/details', requireAuth, async (req, res) => {
+  try {
+    const { productId } = req.params
+    
+    // Get product from database (if available)
+    let product = null
+    if (supabase) {
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .maybeSingle()
+      product = data
+    }
+    
+    // Get product name from database, user_purchases, or use productId as fallback
+    let productName = product?.name
+    if (!productName && supabase) {
+      // Try to find the product name from user_purchases
+      const { data: purchase } = await supabase
+        .from('user_purchases')
+        .select('product_name')
+        .eq('product_id', productId)
+        .limit(1)
+        .maybeSingle()
+      productName = purchase?.product_name
+    }
+    if (!productName) {
+      productName = decodeURIComponent(productId).replace(/-/g, ' ')
+    }
+    
+    // Get enriched data if available
+    const enrichedData = product ? getEnrichedData(product) : null
+    
+    // Evaluate product with full scoring breakdown
+    const evaluation = evaluateProduct(productName, enrichedData)
+    
+    // Create user-friendly breakdown
+    const breakdown = []
+    
+    // Base score
+    breakdown.push({
+      label: 'Base Score',
+      value: '5',
+      positive: false,
+      negative: false
+    })
+    
+    // Add adjustment explanations
+    for (const adj of evaluation.adjustments) {
+      let label = ''
+      let positive = adj.delta > 0
+      let negative = adj.delta < 0
+      
+      switch (adj.type) {
+        case 'catalog':
+          if (adj.code === 'catalog_base') {
+            label = 'Product Type'
+          } else {
+            label = adj.code.replace('catalog_', '').replace(/_/g, ' ')
+          }
+          break
+        case 'category':
+          label = adj.category?.replace(/_/g, ' ') || 'Category'
+          label = label.charAt(0).toUpperCase() + label.slice(1)
+          break
+        case 'keyword':
+          const keywordMap = {
+            'keyword_organic': 'Organic/Bio',
+            'keyword_local': 'Local Product',
+            'keyword_seasonal': 'Seasonal',
+            'keyword_fairtrade': 'Fairtrade',
+            'keyword_processed': 'Processed Food',
+            'keyword_plastic_packaging': 'Plastic Packaging',
+            'keyword_meat': 'Meat Product',
+            'keyword_palm_oil': 'Contains Palm Oil'
+          }
+          label = keywordMap[adj.code] || adj.code.replace('keyword_', '').replace(/_/g, ' ')
+          break
+        case 'enriched':
+          const enrichedMap = {
+            'enriched_vegan': 'Vegan',
+            'enriched_vegetarian': 'Vegetarian',
+            'enriched_organic': 'Organic Certified',
+            'enriched_nutriscore_A': 'Nutri-Score A',
+            'enriched_nutriscore_B': 'Nutri-Score B',
+            'enriched_nutriscore_C': 'Nutri-Score C',
+            'enriched_nutriscore_D': 'Nutri-Score D',
+            'enriched_nutriscore_E': 'Nutri-Score E',
+            'enriched_origin_local': 'Local Origin',
+            'enriched_origin_europe': 'European Origin',
+            'enriched_origin_overseas': 'Overseas Import',
+            'enriched_origin_unknown': 'Unknown Origin'
+          }
+          label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
+          break
+        default:
+          label = adj.code?.replace(/_/g, ' ') || 'Unknown'
+      }
+      
+      breakdown.push({
+        label,
+        value: (adj.delta > 0 ? '+' : '') + adj.delta.toFixed(1),
+        positive,
+        negative
+      })
+    }
+    
+    // Final score
+    breakdown.push({
+      label: 'Final Score',
+      value: evaluation.score.toString(),
+      positive: evaluation.score >= 7,
+      negative: evaluation.score < 5
+    })
+    
+    // Create improvement reasons
+    const improvements = []
+    
+    // Positive factors
+    for (const cat of evaluation.categories) {
+      if (cat.referenceScore > 5) {
+        improvements.push({
+          reason: `${cat.icon || '📦'} ${cat.category.replace(/_/g, ' ')} category bonus`,
+          positive: true
+        })
+      }
+    }
+    for (const adj of evaluation.adjustments.filter(a => a.delta > 0)) {
+      if (adj.type === 'keyword') {
+        improvements.push({
+          reason: `✅ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} bonus`,
+          positive: true
+        })
+      }
+    }
+    
+    // Negative factors
+    for (const cat of evaluation.categories) {
+      if (cat.referenceScore < 5) {
+        improvements.push({
+          reason: `${cat.icon || '📦'} Low sustainability for ${cat.category.replace(/_/g, ' ')}`,
+          positive: false
+        })
+      }
+    }
+    for (const adj of evaluation.adjustments.filter(a => a.delta < 0)) {
+      if (adj.type === 'keyword') {
+        improvements.push({
+          reason: `⚠️ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} penalty`,
+          positive: false
+        })
+      }
+    }
+    
+    // Find better alternatives from catalog
+    let alternatives = []
+    if (supabase && evaluation.score < 9) {
+      // Get products with better scores from the same general category
+      let query = supabase
+        .from('products')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score')
+        .neq('id', productId)
+        .order('seen_count', { ascending: false })
+        .limit(100)
+      
+      const { data: candidates } = await query
+      
+      if (candidates && candidates.length > 0) {
+        // Score all candidates and filter for better ones
+        const scored = candidates
+          .map(c => {
+            const enriched = getEnrichedData(c)
+            const productEval = evaluateProduct(c.name, enriched)
+            return {
+              id: c.id,
+              name: c.name,
+              url: c.url,
+              image_url: c.image_url,
+              price: c.price,
+              score: productEval.score,
+              is_vegan: c.is_vegan,
+              is_organic: c.is_organic
+            }
+          })
+          .filter(c => c.score > evaluation.score)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5)
+        
+        alternatives = scored
+      }
+    }
+    
+    res.json({
+      productId,
+      productName,
+      score: evaluation.score,
+      rating: evaluation.rating,
+      breakdown,
+      improvements,
+      alternatives,
+      categories: evaluation.categories,
+      suggestions: evaluation.suggestions,
+      hasEnrichedData: evaluation.hasEnrichedData
+    })
+  } catch (err) {
+    console.error('[product/details] Error:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
 // API Routes
 
 // DEPRECATED: Legacy purchase endpoints - now require authentication

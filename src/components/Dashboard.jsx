@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TrendingUp, Award, ShoppingCart, DollarSign, LogIn, Loader2, ChevronDown, ChevronUp, Calendar, MapPin, Leaf, Apple } from 'lucide-react'
 import ProfileSuggestions from './ProfileSuggestions'
+import ProductDetailModal from './ProductDetailModal'
 import { useI18n } from '../i18n.jsx'
 import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
 import { useAHUser } from '../lib/ahUserContext.jsx'
@@ -121,6 +122,7 @@ function Dashboard({ syncVersion, onLoginClick }) {
   const [purchaseTotal, setPurchaseTotal] = useState(0)
   const [purchaseTotalPages, setPurchaseTotalPages] = useState(0)
   const [showHistory, setShowHistory] = useState(false)
+  const [selectedPurchase, setSelectedPurchase] = useState(null)
 
   const fetchInsights = useCallback(async () => {
     console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'sessionId:', sessionId, 'sessionLoading:', sessionLoading)
@@ -354,7 +356,11 @@ function Dashboard({ syncVersion, onLoginClick }) {
             ) : (
               <>
                 {purchases.map((purchase) => (
-                  <PurchaseItem key={purchase.id} purchase={purchase} />
+                  <PurchaseItem 
+                    key={purchase.id} 
+                    purchase={purchase} 
+                    onClick={() => setSelectedPurchase(purchase)}
+                  />
                 ))}
                 
                 {/* Pagination */}
@@ -394,12 +400,20 @@ function Dashboard({ syncVersion, onLoginClick }) {
           </div>
         )}
       </div>
+      
+      {/* Product Detail Modal */}
+      {selectedPurchase && (
+        <ProductDetailModal 
+          purchase={selectedPurchase} 
+          onClose={() => setSelectedPurchase(null)} 
+        />
+      )}
     </div>
   )
 }
 
 // Helper component for individual purchase items
-function PurchaseItem({ purchase }) {
+function PurchaseItem({ purchase, onClick }) {
   const getScoreColor = (score) => {
     if (score >= 7) return '#22c55e'
     if (score >= 5) return '#eab308'
@@ -436,7 +450,22 @@ function PurchaseItem({ purchase }) {
   }
 
   return (
-    <div style={styles.purchaseItem}>
+    <div 
+      style={{
+        ...styles.purchaseItem,
+        cursor: 'pointer',
+        transition: 'transform 0.2s, box-shadow 0.2s'
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateX(4px)'
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateX(0)'
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+    >
       {/* Product Image */}
       {purchase.image_url ? (
         <img 
