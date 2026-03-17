@@ -39,7 +39,9 @@ const SUPABASE_PRODUCTS_TABLE = process.env.SUPABASE_PRODUCTS_TABLE || 'products
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null
-const PYTHON_CMD = process.env.PYTHON || 'python3'
+// Use virtualenv Python where Playwright is installed
+const DEFAULT_VENV_PYTHON = path.resolve(__dirname, '../../AH/bin/python')
+const PYTHON_CMD = process.env.PYTHON || (existsSync(DEFAULT_VENV_PYTHON) ? DEFAULT_VENV_PYTHON : 'python3')
 const MAX_LOG_ENTRIES = 200
 const CATALOG_REFRESH_INTERVAL_MS = Number.parseInt(process.env.CATALOG_REFRESH_INTERVAL_MS ?? '900000', 10) || 900000
 
@@ -131,14 +133,114 @@ async function getUserFromRequest(req) {
   }
 }
 
-// Middleware to require authentication
+// Get or create a user ID from session ID (for anonymous users)
+// Returns the user ID (UUID) from the user_ah_credentials table
+async function getUserIdFromSession(req) {
+  // First check for JWT auth
+  const jwtUser = await getUserFromRequest(req)
+  if (jwtUser) {
+    console.log('[DEBUG] getUserIdFromSession: JWT user found:', jwtUser.id)
+    return jwtUser.id
+  }
+  
+  // Check for session ID header
+  const sessionId = req.headers['x-session-id']
+  console.log('[DEBUG] getUserIdFromSession: sessionId header:', sessionId, 'supabase:', !!supabase)
+  if (!sessionId || !supabase) {
+    console.log('[DEBUG] getUserIdFromSession: No session ID or no supabase, returning null')
+    return null
+  }
+  
+  console.log('[DEBUG] Looking up user by session ID:', sessionId)
+  
+  try {
+    // Try to find existing user by session_id
+    const { data: existing, error: findError } = await supabase
+      .from('user_ah_credentials')
+      .select('id')
+      .eq('session_id', sessionId)
+      .maybeSingle()
+    
+    if (findError) {
+      console.error('[ERROR] Error looking up session:', findError.message)
+      return null
+    }
+    
+    if (existing) {
+      console.log('[DEBUG] Found existing user for session:', existing.id)
+      return existing.id
+    }
+    
+    // Create new anonymous user
+    const newId = crypto.randomUUID()
+    console.log('[DEBUG] Creating new session user with id:', newId)
+    const { error: insertError } = await supabase
+      .from('user_ah_credentials')
+      .insert({
+        id: newId,
+        session_id: sessionId,
+        ah_email: null
+        // Don't set sync_status - let database use default
+      })
+    
+    if (insertError) {
+      console.error('[ERROR] Error creating session user:', insertError.message)
+      return null
+    }
+    
+    console.log('[DEBUG] Created new user for session:', newId)
+    return newId
+  } catch (err) {
+    console.error('[ERROR] Session lookup error:', err.message)
+    return null
+  }
+}
+
+// Get ALL user IDs associated with this request (both JWT and session)
+// This helps when a user was previously session-based and is now JWT authenticated
+async function getAllUserIds(req) {
+  const userIds = []
+  
+  // Get JWT user ID
+  const jwtUser = await getUserFromRequest(req)
+  if (jwtUser) {
+    userIds.push(jwtUser.id)
+  }
+  
+  // Also get session-based user ID if present
+  const sessionId = req.headers['x-session-id']
+  if (sessionId && supabase) {
+    const { data: sessionUser } = await supabase
+      .from('user_ah_credentials')
+      .select('id')
+      .eq('session_id', sessionId)
+      .maybeSingle()
+    
+    if (sessionUser && !userIds.includes(sessionUser.id)) {
+      userIds.push(sessionUser.id)
+    }
+  }
+  
+  return userIds
+}
+
+// Middleware to require authentication (supports both JWT and session-based auth)
 function requireAuth(req, res, next) {
   getUserFromRequest(req).then(user => {
-    if (!user) {
-      return res.status(401).json({ error: 'unauthorized', message: 'Please log in to access this resource' })
+    if (user) {
+      req.user = user
+      return next()
     }
-    req.user = user
-    next()
+    
+    // Fallback: check for session-based auth
+    return getUserIdFromSession(req).then(sessionUserId => {
+      if (!sessionUserId) {
+        return res.status(401).json({ error: 'unauthorized', message: 'Please log in to access this resource' })
+      }
+      // Create a pseudo-user object for session-based users
+      req.user = { id: sessionUserId, session_based: true }
+      next()
+    })
   }).catch(err => {
     res.status(500).json({ error: 'auth_error', message: err.message })
   })
@@ -166,64 +268,91 @@ function extractProductFromUrl(url, originalName) {
   const normalized = normalizeProductName(name)
   
   if (!url) {
+    // No URL - use name as fallback
+    if (normalized && normalized.length > 2) {
+      return {
+        id: `ah-${normalized.replace(/\s+/g, '-').toLowerCase()}`,
+        name,
+        normalized
+      }
+    }
+    return { id: null, name, normalized }
+  }
+  
+  try {
+    const u = new URL(url)
+    
+    // Strategy 1: /producten/product/<wi...>/<slug> format
+    const match1 = u.pathname.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
+    if (match1 && match1[1]) {
+      const slug = match1[1].toLowerCase()
+      if (/^[a-z0-9-]+$/.test(slug) && slug.length > 2) {
+        let displayName = slug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        return {
+          id: slug,
+          name: name || displayName,
+          normalized: normalizeProductName(slug.replace(/-/g, ' '))
+        }
+      }
+    }
+    
+    // Strategy 2: /wi/<id>/<slug> format
+    const match2 = u.pathname.match(/\/wi\/([^/]+)\/([^/?#]+)/)
+    if (match2) {
+      const wiId = match2[1]
+      const slug = match2[2].toLowerCase()
+      if (slug.length > 2) {
+        let displayName = slug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        return {
+          id: `wi-${wiId}-${slug}`.substring(0, 100),  // Keep it reasonably short
+          name: name || displayName,
+          normalized: normalizeProductName(slug.replace(/-/g, ' '))
+        }
+      }
+    }
+    
+    // Strategy 3: Just /wi/<id> format
+    const match3 = u.pathname.match(/\/wi\/([^/?#]+)/)
+    if (match3 && match3[1]) {
+      const wiId = match3[1]
+      return {
+        id: `wi-${wiId}`,
+        name: name || `Product ${wiId}`,
+        normalized: normalized || wiId
+      }
+    }
+    
+    // Strategy 4: Any URL with a slug at the end
+    const pathParts = u.pathname.split('/').filter(p => p.length > 2)
+    if (pathParts.length > 0) {
+      const lastPart = pathParts[pathParts.length - 1]
+      const cleanSlug = lastPart.toLowerCase().replace(/[^a-z0-9-]/g, '')
+      if (cleanSlug.length > 3) {
+        let displayName = cleanSlug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        return {
+          id: `ah-${cleanSlug}`.substring(0, 100),
+          name: name || displayName,
+          normalized: normalizeProductName(cleanSlug.replace(/-/g, ' '))
+        }
+      }
+    }
+  } catch (_) {
+    // URL parsing failed
+  }
+  
+  // Fallback: use original name
+  if (normalized && normalized.length > 2) {
     return {
-      id: normalized ? `ah-${normalized.replace(/\s+/g, '-')}` : null,
+      id: `ah-${normalized.replace(/\s+/g, '-').toLowerCase()}`.substring(0, 100),
       name,
       normalized
     }
   }
   
-  try {
-    const u = new URL(url)
-    // Expected format: /producten/product/<wi...>/<slug>
-    const match = u.pathname.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
-    if (match && match[1]) {
-      const slug = match[1].toLowerCase()
-      // Validate slug (only lowercase letters, numbers, hyphens)
-      if (/^[a-z0-9-]+$/.test(slug) && slug.length > 2) {
-        // Create display name from slug
-        let displayName = slug.replace(/-/g, ' ')
-        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
-        
-        return {
-          id: slug,
-          name: displayName,
-          normalized: normalizeProductName(slug.replace(/-/g, ' '))
-        }
-      }
-    }
-  } catch (_) {
-    // URL parsing failed, fall back to original name
-  }
-  
-  // Check if original name looks like a generic/bad name
-  const normalizedLower = normalized.toLowerCase()
-  if (GENERIC_PRODUCT_NAMES.has(normalizedLower) || normalized.length < 3) {
-    // Don't use generic names, try to extract something from URL path
-    try {
-      const u = new URL(url)
-      const parts = u.pathname.split('/').filter(p => p.length > 2)
-      const lastPart = parts[parts.length - 1]
-      if (lastPart && lastPart.length > 3) {
-        const cleanSlug = lastPart.toLowerCase().replace(/[^a-z0-9-]/g, '')
-        if (cleanSlug.length > 3) {
-          let displayName = cleanSlug.replace(/-/g, ' ')
-          displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
-          return {
-            id: cleanSlug,
-            name: displayName,
-            normalized: normalizeProductName(cleanSlug.replace(/-/g, ' '))
-          }
-        }
-      }
-    } catch (_) {}
-  }
-  
-  return {
-    id: normalized ? `ah-${normalized.replace(/\s+/g, '-')}` : null,
-    name,
-    normalized
-  }
+  return { id: null, name, normalized }
 }
 
 // Data file path - DEPRECATED: Now using Supabase for all purchases
@@ -1207,10 +1336,18 @@ app.post('/api/user/purchases', requireAuth, async (req, res) => {
 // Get user's purchase insights/dashboard data
 app.get('/api/user/insights', requireAuth, async (req, res) => {
   try {
+    // Get all user IDs (JWT + session-based) to merge purchases
+    const userIds = await getAllUserIds(req)
+    console.log('[Insights] Fetching for user IDs:', userIds)
+    
+    if (userIds.length === 0) {
+      return res.json({ message: 'No purchases yet!' })
+    }
+    
     const { data: purchases, error } = await supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-      .eq('user_id', req.user.id)
+      .in('user_id', userIds)
     
     if (error) throw error
     
@@ -1255,11 +1392,25 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
     const sortBy = req.query.sortBy || 'scraped_at'  // Use scraped_at as default
     const sortOrder = req.query.sortOrder === 'asc' ? true : false
     
+    // Get all user IDs (JWT + session-based) to merge purchases
+    const userIds = await getAllUserIds(req)
+    console.log('[History] Fetching for user IDs:', userIds)
+    
+    if (userIds.length === 0) {
+      return res.json({ 
+        purchases: [], 
+        total: 0,
+        page,
+        limit,
+        totalPages: 0
+      })
+    }
+    
     // Get user purchases - use * to get all columns
     const { data: purchases, error, count } = await supabase
       .from('user_purchases')
       .select('*', { count: 'exact' })
-      .eq('user_id', req.user.id)
+      .in('user_id', userIds)
       .order(sortBy, { ascending: sortOrder })
       .range(offset, offset + limit - 1)
     
@@ -1268,7 +1419,7 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
       throw error
     }
     
-    console.log(`[History] Fetched ${purchases?.length || 0} purchases for user ${req.user.id}`)
+    console.log(`[History] Fetched ${purchases?.length || 0} purchases for user IDs ${userIds.join(', ')}`)
     
     if (!purchases || purchases.length === 0) {
       return res.json({ 
@@ -1372,11 +1523,28 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
 // Get personalized suggestions based on user's purchase history
 app.get('/api/user/suggestions', requireAuth, async (req, res) => {
   try {
+    // Get all user IDs (JWT + session-based) to merge purchases
+    const userIds = await getAllUserIds(req)
+    console.log('[Suggestions] Fetching for user IDs:', userIds)
+    
+    if (userIds.length === 0) {
+      return res.json({
+        profile: {
+          total_products: 0,
+          avg_sustainability_score: 0,
+          profile_type: 'balanced',
+          profile_info: USER_PROFILE_TYPES['balanced']
+        },
+        replacements: [],
+        suggestions: []
+      })
+    }
+    
     // Get user's purchases to analyze their profile
     const { data: purchases, error: purchasesError } = await supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-      .eq('user_id', req.user.id)
+      .in('user_id', userIds)
     
     if (purchasesError) throw purchasesError
     
@@ -3136,33 +3304,43 @@ app.post('/api/auto-scrape/resync', requireAuth, async (req, res) => {
 
 // Get auto-scrape status
 app.get('/api/auto-scrape/status', (req, res) => {
-  res.json({
-    status: autoScrapeState.running ? 'running' : 'idle',
-    running: autoScrapeState.running,
-    startedAt: autoScrapeState.startedAt,
-    lastRun: autoScrapeState.lastRun,
-    progress: autoScrapeState.progress,
-    logs: autoScrapeState.logs.slice(-100)
-  })
+  try {
+    res.json({
+      status: autoScrapeState.running ? 'running' : 'idle',
+      running: autoScrapeState.running,
+      startedAt: autoScrapeState.startedAt,
+      lastRun: autoScrapeState.lastRun,
+      progress: autoScrapeState.progress,
+      logs: autoScrapeState.logs.slice(-100)
+    })
+  } catch (err) {
+    console.error('[auto-scrape/status] Error:', err)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // Check if auto-scrape is available
 // Available if: (1) not on Vercel, OR (2) Browserless URL is configured
 app.get('/api/auto-scrape/available', (req, res) => {
-  const hasBrowserless = !!process.env.BROWSERLESS_URL
-  const isVercel = !!process.env.VERCEL
-  const available = !isVercel || hasBrowserless
-  
-  let reason = null
-  if (!available) {
-    reason = 'hosted_environment_no_browserless'
+  try {
+    const hasBrowserless = !!process.env.BROWSERLESS_URL
+    const isVercel = !!process.env.VERCEL
+    const available = !isVercel || hasBrowserless
+    
+    let reason = null
+    if (!available) {
+      reason = 'hosted_environment_no_browserless'
+    }
+    
+    res.json({
+      available,
+      reason,
+      mode: hasBrowserless ? 'remote' : 'local'
+    })
+  } catch (err) {
+    console.error('[auto-scrape/available] Error:', err)
+    res.status(500).json({ error: err.message })
   }
-  
-  res.json({
-    available,
-    reason,
-    mode: hasBrowserless ? 'remote' : 'local'
-  })
 })
 
 // Cookie file path for session persistence
@@ -3308,9 +3486,9 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
     return res.status(500).json({ error: 'script_missing', details: 'auto_scraper.py not found' })
   }
   
-  // Get user from auth header if provided (for recording purchases)
-  const user = await getUserFromRequest(req)
-  const userId = user?.id || null
+  // Get user from session ID or JWT (for recording purchases)
+  const userId = await getUserIdFromSession(req)
+  console.log('[DEBUG] Visual login - userId:', userId)
   
   const startedAt = new Date().toISOString()
   autoScrapeState.running = true
@@ -3345,9 +3523,11 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
   }
   
   let resultData = null
+  let stdoutBuffer = ''  // Buffer stdout to handle chunked result
   
   scrapeProcess.stdout.on('data', (data) => {
     const text = data.toString()
+    stdoutBuffer += text  // Accumulate for result parsing
     appendAutoScrapeLog('stdout', text)
     
     // Update progress based on log messages
@@ -3358,16 +3538,6 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
       const msg = text.replace(/.*\[SUCCESS\]\s*/, '').trim()
       if (msg) autoScrapeState.progress = msg
     }
-    
-    // Parse result
-    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
-    if (resultMatch) {
-      try {
-        resultData = JSON.parse(resultMatch[1])
-      } catch (e) {
-        console.error('Failed to parse scrape result:', e)
-      }
-    }
   })
   
   scrapeProcess.stderr.on('data', (data) => {
@@ -3377,6 +3547,49 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
   scrapeProcess.on('close', async (code) => {
     const completedAt = new Date().toISOString()
     const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    console.log('[DEBUG] Process closed with code:', code)
+    console.log('[DEBUG] stdout buffer length:', stdoutBuffer.length)
+    
+    // Parse result from buffered stdout (handles chunked output)
+    // The [RESULT] JSON can be very long on a single line
+    const resultIndex = stdoutBuffer.indexOf('[RESULT]')
+    if (resultIndex !== -1) {
+      const jsonStart = stdoutBuffer.indexOf('{', resultIndex)
+      if (jsonStart !== -1) {
+        // Find matching closing brace by counting braces
+        let depth = 0
+        let jsonEnd = -1
+        for (let i = jsonStart; i < stdoutBuffer.length; i++) {
+          if (stdoutBuffer[i] === '{') depth++
+          else if (stdoutBuffer[i] === '}') {
+            depth--
+            if (depth === 0) {
+              jsonEnd = i + 1
+              break
+            }
+          }
+        }
+        if (jsonEnd !== -1) {
+          const jsonStr = stdoutBuffer.substring(jsonStart, jsonEnd)
+          console.log('[DEBUG] Found JSON from', jsonStart, 'to', jsonEnd, ', length:', jsonStr.length)
+          try {
+            resultData = JSON.parse(jsonStr)
+            console.log('[DEBUG] Parsed visual-login result:', { success: resultData.success, count: resultData.count })
+          } catch (e) {
+            console.error('[ERROR] Failed to parse JSON:', e.message)
+            console.error('[ERROR] JSON preview:', jsonStr.substring(0, 200))
+          }
+        } else {
+          console.log('[DEBUG] Could not find closing brace in JSON')
+        }
+      } else {
+        console.log('[DEBUG] No JSON start found after [RESULT]')
+      }
+    } else {
+      console.log('[DEBUG] No [RESULT] found in stdout buffer')
+      console.log('[DEBUG] Buffer preview (last 500 chars):', stdoutBuffer.slice(-500))
+    }
     
     autoScrapeState.running = false
     autoScrapeState.startedAt = null
@@ -3394,15 +3607,25 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
     // Ingest products to database if successful
     if (resultData?.success && resultData?.products?.length > 0 && supabase) {
       appendAutoScrapeLog('info', `📦 Storing ${resultData.products.length} products...`)
+      console.log('[DEBUG] Starting product ingestion, raw products:', resultData.products.length)
+      console.log('[DEBUG] Sample raw product:', JSON.stringify(resultData.products[0], null, 2))
       
       try {
-        const cleaned = resultData.products.map((item) => {
+        const cleaned = resultData.products.map((item, index) => {
           const rawName = (item.name || '').toString().trim()
           const url = (item.url || '').toString().trim()
           
           // Use helper to extract ID and name from URL
           const extracted = extractProductFromUrl(url, rawName)
-          if (!extracted.id) return null
+          
+          if (index < 3) {
+            console.log(`[DEBUG] Product ${index}: url=${url.substring(0, 80)}, name=${rawName.substring(0, 40)}, extracted_id=${extracted.id}`)
+          }
+          
+          if (!extracted.id) {
+            console.log(`[DEBUG] Skipped product (no ID): ${rawName.substring(0, 40)}`)
+            return null
+          }
           
           return {
             id: extracted.id,
@@ -3417,15 +3640,23 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
           }
         }).filter((item) => item && item.name && item.id)
         
-        const { error: upsertError } = await supabase
-          .from(SUPABASE_PRODUCTS_TABLE)
-          .upsert(cleaned, { onConflict: 'id' })
+        console.log(`[DEBUG] Cleaned products ready for upsert: ${cleaned.length}`)
+        
+        if (cleaned.length === 0) {
+          console.log('[WARNING] No products passed cleaning - check extractProductFromUrl')
+          appendAutoScrapeLog('stderr', 'No products could be cleaned for storage')
+        } else {
+          const { error: upsertError } = await supabase
+            .from(SUPABASE_PRODUCTS_TABLE)
+            .upsert(cleaned, { onConflict: 'id' })
         
         if (upsertError) {
           appendAutoScrapeLog('stderr', `Database error: ${upsertError.message}`)
+          console.error('[ERROR] Supabase upsert error:', upsertError)
         } else {
           appendAutoScrapeLog('info', `✅ Stored ${cleaned.length} products to product catalog`)
           autoScrapeState.lastRun.productsStored = cleaned.length
+          console.log(`[SUCCESS] Stored ${cleaned.length} products to ${SUPABASE_PRODUCTS_TABLE}`)
           
           // Also save to user_purchases if we have a userId
           // Uses upsert to prevent duplicates when re-scraping
@@ -3469,9 +3700,18 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
             console.log('[WARNING] userId is null - products scraped but not saved to user_purchases')
           }
         }
+        }  // end if (cleaned.length > 0)
       } catch (e) {
         appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
+        console.error('[ERROR] Ingestion exception:', e)
       }
+    } else {
+      console.log('[DEBUG] Skipping ingestion:', {
+        hasResultData: !!resultData,
+        success: resultData?.success,
+        productsCount: resultData?.products?.length,
+        hasSupabase: !!supabase
+      })
     }
   })
   
@@ -3493,9 +3733,9 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     return res.status(409).json({ error: 'scrape_in_progress' })
   }
   
-  // Get user from auth header if provided
-  const user = await getUserFromRequest(req)
-  const userId = user?.id || req.body?.user_id || null
+  // Get user from session ID or JWT
+  const userId = await getUserIdFromSession(req) || req.body?.user_id || null
+  console.log('[DEBUG] With-cookies - userId:', userId)
   
   // Check if cookies exist
   if (!existsSync(COOKIES_FILE)) {
@@ -3546,19 +3786,12 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   }
   
   let resultData = null
+  let stdoutBuffer = ''  // Buffer stdout to handle chunked result
   
   scrapeProcess.stdout.on('data', (data) => {
     const text = data.toString()
+    stdoutBuffer += text  // Accumulate for result parsing
     appendAutoScrapeLog('stdout', text)
-    
-    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
-    if (resultMatch) {
-      try {
-        resultData = JSON.parse(resultMatch[1])
-      } catch (e) {
-        console.error('Failed to parse scrape result:', e)
-      }
-    }
   })
   
   scrapeProcess.stderr.on('data', (data) => {
@@ -3568,6 +3801,19 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   scrapeProcess.on('close', async (code) => {
     const completedAt = new Date().toISOString()
     const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    // Parse result from buffered stdout (handles chunked output)
+    const resultMatch = stdoutBuffer.match(/\[RESULT\]\s*(\{.*\})/s)
+    if (resultMatch) {
+      try {
+        resultData = JSON.parse(resultMatch[1])
+        console.log('[DEBUG] Parsed with-cookies result:', { success: resultData.success, count: resultData.count })
+      } catch (e) {
+        console.error('Failed to parse scrape result:', e)
+      }
+    } else {
+      console.log('[DEBUG] No [RESULT] found in stdout buffer, length:', stdoutBuffer.length)
+    }
     
     autoScrapeState.running = false
     autoScrapeState.startedAt = null
@@ -3708,6 +3954,15 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
 })
 
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
+// Global Express error handler - must be last middleware
+app.use((err, req, res, next) => {
+  console.error('[Express Error]', req.method, req.path, err.stack || err)
+  if (res.headersSent) {
+    return next(err)
+  }
+  res.status(500).json({ error: 'Internal server error', message: err.message })
+})
+
 if (existsSync(CLIENT_INDEX)) {
   app.use(express.static(CLIENT_DIST))
   app.get('*', (req, res) => {

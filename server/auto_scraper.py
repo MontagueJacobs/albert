@@ -23,6 +23,101 @@ except ImportError:
     sys.exit(1)
 
 
+async def dismiss_privacy_popup(page: Page) -> bool:
+    """
+    Dismiss the privacy/cookie consent popup if present.
+    This is a standalone function that can be used with any page object.
+    """
+    print("[DEBUG] Checking for privacy popup...", flush=True)
+    try:
+        # AH-specific selectors first (most likely to work)
+        ah_selectors = [
+            # AH cookie wall - the main one
+            'button#accept-cookies',
+            '[data-testid="cookie-dialog-accept"]',
+            '[data-testid="accept-cookies"]',
+            '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',  # Cookiebot
+            '#CybotCookiebotDialogBodyButtonAccept',
+            '#onetrust-accept-btn-handler',  # OneTrust
+            '.cookie-notice__button--accept',
+            'button.cookie-accept',
+            # Dutch text buttons
+            'button:has-text("Alles accepteren")',
+            'button:has-text("Accepteer alle cookies")',
+            'button:has-text("Akkoord")',
+            'button:has-text("Accepteren")',
+            'button:has-text("Toestaan")',
+            'button:has-text("Ja, ik accepteer")',
+            # Generic accept buttons
+            'button[id*="accept"]',
+            'button[class*="accept"]',
+            '[data-testid="cookie-accept-button"]',
+            'button:has-text("OK")',
+            # Close buttons on modals/overlays  
+            '[aria-label="Sluiten"]',
+            '[aria-label="Close"]',
+            'button[class*="close"]',
+            '[data-testid="modal-close"]',
+            # Generic overlay dismiss
+            '.cookie-banner button',
+            '#privacy-popup button',
+            '[class*="privacy"] button[class*="accept"]',
+            '[class*="consent"] button[class*="accept"]',
+        ]
+        
+        for selector in ah_selectors:
+            try:
+                button = await page.query_selector(selector)
+                if button:
+                    is_visible = await button.is_visible()
+                    if is_visible:
+                        print(f"[INFO] Found privacy popup button: {selector}", flush=True)
+                        await button.click()
+                        print(f"[SUCCESS] Dismissed privacy popup using: {selector}", flush=True)
+                        await asyncio.sleep(1)
+                        return True
+            except Exception as e:
+                continue
+        
+        # Try clicking any visible button with accept-like text using JavaScript
+        try:
+            clicked = await page.evaluate("""
+                () => {
+                    const buttons = document.querySelectorAll('button');
+                    for (const btn of buttons) {
+                        const text = btn.innerText.toLowerCase();
+                        if (text.includes('accepteer') || text.includes('akkoord') || 
+                            text.includes('toestaan') || text.includes('accept')) {
+                            if (btn.offsetParent !== null) {  // visible check
+                                btn.click();
+                                return btn.innerText;
+                            }
+                        }
+                    }
+                    return null;
+                }
+            """)
+            if clicked:
+                print(f"[SUCCESS] Dismissed popup via JS, clicked: {clicked}", flush=True)
+                await asyncio.sleep(1)
+                return True
+        except Exception as e:
+            print(f"[DEBUG] JS click attempt failed: {e}", flush=True)
+        
+        # Also try to dismiss any overlay by pressing Escape
+        try:
+            await page.keyboard.press('Escape')
+            await asyncio.sleep(0.3)
+        except:
+            pass
+        
+        print("[DEBUG] No privacy popup found or already dismissed", flush=True)
+        return False
+    except Exception as e:
+        print(f"[DEBUG] Error dismissing popup: {e}", flush=True)
+        return False
+
+
 class AHAutoScraper:
     """Automated scraper for Albert Heijn using Playwright."""
     
@@ -324,6 +419,10 @@ class AHAutoScraper:
         delay = random.randint(min_ms, max_ms) / 1000
         await asyncio.sleep(delay)
     
+    async def dismiss_privacy_popup(self):
+        """Dismiss the privacy/cookie consent popup if present."""
+        return await dismiss_privacy_popup(self.page)
+    
     async def type_slowly(self, selector: str, text: str):
         """Type text character by character like a human."""
         import random
@@ -445,7 +544,11 @@ class AHAutoScraper:
         try:
             # Start with the main eerder-gekocht page sorted by purchase date
             await self.page.goto('https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date&page=0', wait_until='networkidle')
-            await self.human_delay(2000, 3000)
+            await self.human_delay(1000, 2000)
+            
+            # Dismiss privacy/cookie popup if present
+            await self.dismiss_privacy_popup()
+            await self.human_delay(500, 1000)
             
             # Check if blocked
             page_content = await self.page.content()
@@ -895,15 +998,32 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
     then automatically scrapes their purchase history.
     
     This is the easiest flow for users:
-    1. Browser opens to AH login page
-    2. User logs in (handles CAPTCHA themselves)
+    1. Browser opens to AH login page (or eerder-gekocht if cookies exist)
+    2. User logs in (handles CAPTCHA themselves) if needed
     3. We detect successful login
     4. Automatically navigate to purchases and scrape
     5. Save cookies for future quick syncs
     """
     print("[INFO] === Visual Login Mode ===", flush=True)
-    print("[INFO] Opening browser window for Albert Heijn login...", flush=True)
-    print("[INFO] Please log in to your AH account. We'll detect when you're done.", flush=True)
+    
+    # Check if we have existing cookies
+    has_cookies = False
+    existing_cookies = []
+    if os.path.exists(cookies_file):
+        try:
+            with open(cookies_file, 'r') as f:
+                existing_cookies = json.load(f)
+                if existing_cookies and len(existing_cookies) > 0:
+                    has_cookies = True
+                    print(f"[INFO] Found {len(existing_cookies)} existing cookies", flush=True)
+        except Exception as e:
+            print(f"[DEBUG] Could not load existing cookies: {e}", flush=True)
+    
+    if has_cookies:
+        print("[INFO] Will try to use existing cookies for quick sync...", flush=True)
+    else:
+        print("[INFO] No saved cookies - will open login page first", flush=True)
+    
     print("", flush=True)
     
     p = await async_playwright().start()
@@ -925,6 +1045,15 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
             timezone_id='Europe/Amsterdam',
         )
         
+        # Load existing cookies if we have them
+        if has_cookies and existing_cookies:
+            try:
+                await context.add_cookies(existing_cookies)
+                print(f"[INFO] Loaded {len(existing_cookies)} cookies into browser", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] Could not load cookies into browser: {e}", flush=True)
+                has_cookies = False
+        
         page = await context.new_page()
         
         # Remove webdriver detection (same as capture_cookies)
@@ -932,9 +1061,16 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
         """)
         
-        # Navigate to AH login page directly
-        print("[INFO] Opening Albert Heijn login page...", flush=True)
-        await page.goto('https://www.ah.nl/mijn/inloggen', wait_until='domcontentloaded')
+        # Navigate based on whether we have cookies
+        if has_cookies:
+            # Try to go directly to purchase history with cookies
+            print("[INFO] Navigating to purchase history with saved cookies...", flush=True)
+            await page.goto('https://www.ah.nl/producten/eerder-gekocht', wait_until='domcontentloaded')
+        else:
+            # No cookies - go directly to login page
+            print("[INFO] Opening Albert Heijn login page...", flush=True)
+            await page.goto('https://www.ah.nl/mijn/inloggen', wait_until='domcontentloaded')
+        
         await asyncio.sleep(2)
         
         # Print current URL for debugging
@@ -985,6 +1121,11 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
                 print(f"\n[RESULT] {json.dumps(result)}", flush=True)
                 return 1
         
+        # Dismiss any privacy popup that appeared after login
+        print("[INFO] Checking for privacy popup after login...", flush=True)
+        await dismiss_privacy_popup(page)
+        await asyncio.sleep(1)
+        
         # Save cookies for future use
         cookies = await context.cookies()
         ah_cookies = [c for c in cookies if 'ah.nl' in c.get('domain', '')]
@@ -998,9 +1139,20 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
         print(f"[INFO] Navigating to your purchase history...", flush=True)
         print(f"[INFO] Target: {target_url}", flush=True)
         
-        # Navigate and wait for page to fully load
-        await page.goto(target_url, wait_until='networkidle', timeout=30000)
+        # Navigate and wait for page to load (use domcontentloaded - networkidle can timeout)
+        try:
+            await page.goto(target_url, wait_until='domcontentloaded', timeout=60000)
+        except Exception as nav_error:
+            print(f"[WARNING] Navigation slow, continuing anyway: {nav_error}", flush=True)
         await asyncio.sleep(3)
+        
+        # Dismiss privacy/cookie popup if present - try multiple times
+        print("[INFO] Checking for privacy popup on eerder-gekocht page...", flush=True)
+        for attempt in range(3):
+            dismissed = await dismiss_privacy_popup(page)
+            if dismissed:
+                break
+            await asyncio.sleep(1)
         
         actual_url = page.url
         print(f"[INFO] Actual URL: {actual_url}", flush=True)
@@ -1088,45 +1240,137 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
             scroll_attempts = 0
             max_scrolls = 30  # More scrolls to get more products
             
-            # Wait for products to load
+            # Debug: Check what's on the page
             try:
-                await page.wait_for_selector('a[href*="/producten/product/"]', timeout=10000)
-                print("[DEBUG] Product elements found on page", flush=True)
-            except:
-                print("[DEBUG] No product elements found immediately, will try scrolling...", flush=True)
+                page_debug = await page.evaluate("""
+                    () => {
+                        const allLinks = document.querySelectorAll('a[href*="product"]');
+                        const ahLinks = document.querySelectorAll('a[href*="ah.nl"]');
+                        const articles = document.querySelectorAll('article');
+                        const cards = document.querySelectorAll('[class*="card"], [class*="Card"], [class*="product"], [class*="Product"]');
+                        
+                        // Sample some href values
+                        const sampleHrefs = [];
+                        allLinks.forEach((a, i) => {
+                            if (i < 5) sampleHrefs.push(a.href);
+                        });
+                        
+                        return {
+                            allLinksCount: allLinks.length,
+                            ahLinksCount: ahLinks.length,
+                            articlesCount: articles.length,
+                            cardsCount: cards.length,
+                            sampleHrefs: sampleHrefs,
+                            bodyText: document.body?.innerText?.substring(0, 500) || ''
+                        };
+                    }
+                """)
+                print(f"[DEBUG] Page structure: links={page_debug['allLinksCount']}, ah_links={page_debug['ahLinksCount']}, articles={page_debug['articlesCount']}, cards={page_debug['cardsCount']}", flush=True)
+                print(f"[DEBUG] Sample hrefs: {page_debug['sampleHrefs'][:3]}", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] Page debug failed: {e}", flush=True)
+            
+            # Wait for products to load - try multiple selectors
+            product_selectors = [
+                'a[href*="/producten/product/"]',
+                'a[href*="/wi"]',  # AH product URLs often start with /wi
+                '[data-testhook="product-card"]',
+                'article[data-testhook]',
+                '[class*="product-card"]',
+                '[class*="ProductCard"]',
+            ]
+            
+            found_selector = None
+            for selector in product_selectors:
+                try:
+                    await page.wait_for_selector(selector, timeout=3000)
+                    count = await page.evaluate(f'document.querySelectorAll("{selector}").length')
+                    print(f"[DEBUG] Selector '{selector}' found {count} elements", flush=True)
+                    if count > 0:
+                        found_selector = selector
+                        break
+                except:
+                    continue
+            
+            if not found_selector:
+                print("[DEBUG] No product elements found with standard selectors, trying broader search...", flush=True)
             
             while scroll_attempts < max_scrolls:
                 await asyncio.sleep(1)
                 
                 try:
+                    # Try multiple extraction strategies
                     page_products = await page.evaluate("""
                     () => {
                         const items = [];
-                        const links = document.querySelectorAll('a[href*="/producten/product/"]');
+                        const seen = new Set();
                         
-                        links.forEach(a => {
+                        // Strategy 1: Links with /producten/product/ in href
+                        document.querySelectorAll('a[href*="/producten/product/"]').forEach(a => {
                             const url = a.href;
+                            if (seen.has(url)) return;
+                            seen.add(url);
+                            
                             let name = a.getAttribute('aria-label') || '';
                             if (!name) {
-                                const title = a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');
+                                const title = a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2, [class*="title"]');
                                 name = title?.textContent?.trim() || '';
                             }
+                            if (!name) {
+                                name = a.textContent?.trim() || '';
+                            }
                             
-                            const card = a.closest('article') || a.parentElement;
+                            const card = a.closest('article') || a.closest('[class*="card"]') || a.parentElement;
                             let price = null;
-                            const priceEl = card?.querySelector('[data-testhook="product-price"], [class*="price"]');
+                            const priceEl = card?.querySelector('[data-testhook="product-price"], [class*="price"], [class*="Price"]');
                             if (priceEl) {
                                 const match = priceEl.textContent?.replace(',', '.').match(/(\\d+\\.?\\d*)/);
                                 if (match) price = parseFloat(match[1]);
                             }
                             
-                            const img = card?.querySelector('img');
+                            const img = card?.querySelector('img') || a.querySelector('img');
                             const image = img?.src || '';
                             
                             if (name && url) {
-                                items.push({ name: name.trim(), url, price, image });
+                                items.push({ name: name.substring(0, 200), url, price, image });
                             }
                         });
+                        
+                        // Strategy 2: Links with /wi/ pattern (AH product IDs)
+                        if (items.length === 0) {
+                            document.querySelectorAll('a[href*="/wi/"]').forEach(a => {
+                                const url = a.href;
+                                if (seen.has(url)) return;
+                                seen.add(url);
+                                
+                                let name = a.getAttribute('aria-label') || a.getAttribute('title') || a.textContent?.trim() || '';
+                                const card = a.closest('article') || a.closest('[class*="card"]') || a.parentElement;
+                                const img = card?.querySelector('img') || a.querySelector('img');
+                                const image = img?.src || '';
+                                
+                                if (name && url && url.includes('ah.nl')) {
+                                    items.push({ name: name.substring(0, 200), url, price: null, image });
+                                }
+                            });
+                        }
+                        
+                        // Strategy 3: Any article with product-like structure
+                        if (items.length === 0) {
+                            document.querySelectorAll('article').forEach(article => {
+                                const link = article.querySelector('a[href*="ah.nl"]');
+                                const url = link?.href || '';
+                                if (!url || seen.has(url)) return;
+                                seen.add(url);
+                                
+                                const name = article.querySelector('h2, h3, [class*="title"]')?.textContent?.trim() || '';
+                                const img = article.querySelector('img');
+                                const image = img?.src || '';
+                                
+                                if (name && url) {
+                                    items.push({ name: name.substring(0, 200), url, price: null, image });
+                                }
+                            });
+                        }
                         
                         return items;
                     }
@@ -1145,8 +1389,10 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
                 
                 current_count = len(local_products)
                 if current_count > last_count:
-                    print(f"[INFO] Found {current_count} new products on this page...", flush=True)
+                    print(f"[INFO] Found {current_count} products so far...", flush=True)
                     last_count = current_count
+                elif scroll_attempts == 0:
+                    print(f"[DEBUG] First scroll: found {current_count} products", flush=True)
                 
                 # Scroll down
                 try:
@@ -1192,7 +1438,10 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
         return 0
         
     except Exception as e:
+        import traceback
         print(f"[ERROR] Visual login failed: {e}", flush=True)
+        print(f"[ERROR] Traceback:", flush=True)
+        traceback.print_exc()
         result['error'] = str(e)
         print(f"\n[RESULT] {json.dumps(result)}", flush=True)
         try:

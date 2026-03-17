@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { LogIn } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser } from '../lib/ahUserContext.jsx'
 
 // Dark mode styles
 const styles = {
@@ -59,7 +60,11 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
   const [error, setError] = useState(null)
   const { t } = useI18n()
   const { user, isAuthenticated } = useAuth()
+  const { sessionId, loading: sessionLoading } = useAHUser()
   const authFetch = useAuthenticatedFetch()
+  
+  // User is "connected" if they have JWT auth OR session-based auth
+  const isUserConnected = isAuthenticated || !!sessionId
 
   function ScoreBadge({ score }) {
     const cls = score >= 7 ? 'score-high' : score >= 5 ? 'score-medium' : 'score-low'
@@ -76,8 +81,17 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
     )
   }
 
-  // If not authenticated, show login prompt
-  if (!isAuthenticated) {
+  // Still loading session
+  if (sessionLoading) {
+    return (
+      <div style={styles.panel}>
+        <SkeletonGrid />
+      </div>
+    )
+  }
+
+  // If not authenticated (no JWT and no session), show login prompt
+  if (!isUserConnected) {
     return (
       <div style={{textAlign: 'center', padding: '3rem 1rem'}}>
         <LogIn size={48} style={{color: 'var(--text-muted)', marginBottom: '1rem'}} />
@@ -100,7 +114,7 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
     let cancelled = false
 
     async function fetchData() {
-      if (!isAuthenticated) return
+      if (!isUserConnected) return
       
       setLoading(true)
       setError(null)
@@ -126,7 +140,7 @@ function ProfileSuggestions({ refreshKey = 0, onLoginClick }) {
     return () => {
       cancelled = true
     }
-  }, [refreshKey, isAuthenticated, authFetch])
+  }, [refreshKey, isUserConnected, authFetch])
 
   if (loading) return <div style={{marginTop: '1rem'}}><SkeletonGrid /></div>
   if (error) return <div style={styles.error}>{t('error')} {error}</div>

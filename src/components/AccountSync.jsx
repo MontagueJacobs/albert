@@ -1,287 +1,469 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { RefreshCw, Loader2, BookOpen, Zap } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
-import EasyConnect from './EasyConnect.jsx'
-import AutoScrape from './AutoScrape.jsx'
+import { useAHUser, useAHFetch } from '../lib/ahUserContext.jsx'
 
+/**
+ * AccountSync - Simplified one-click AH account sync
+ * 
+ * Flow:
+ * 1. No cookies? Click "Login to Albert Heijn" -> Opens browser window
+ * 2. User logs in (handles CAPTCHA themselves)
+ * 3. Cookies saved, products scraped automatically
+ * 4. Have cookies? Click "Sync Now" to resync
+ */
 function AccountSync({ onSyncCompleted }) {
   const { t } = useI18n()
-  const [status, setStatus] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [starting, setStarting] = useState(false)
+  const { sessionId } = useAHUser()
+  const ahFetch = useAHFetch()
+  
+  const [status, setStatus] = useState('idle') // 'idle', 'connecting', 'syncing', 'success', 'error'
+  const [progress, setProgress] = useState('')
   const [error, setError] = useState(null)
-  const [hostedGuide, setHostedGuide] = useState(false)
-  const [scrapeMode, setScrapeMode] = useState('easy') // 'easy', 'auto' or 'manual'
+  const [cookieStatus, setCookieStatus] = useState(null)
+  const [lastSync, setLastSync] = useState(null)
+  const [productsCount, setProductsCount] = useState(0)
+  const [available, setAvailable] = useState(true)
   const pollRef = useRef(null)
-  const lastCompletedRef = useRef(null)
 
-  const statusFormatter = useMemo(() => new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }), [])
+  // Check if auto-scrape is available (local only)
+  useEffect(() => {
+    console.log('[AccountSync] Checking availability...')
+    ahFetch('/api/auto-scrape/available')
+      .then(res => {
+        console.log('[AccountSync] Availability response status:', res.status)
+        return res.json()
+      })
+      .then(data => {
+        console.log('[AccountSync] Availability data:', data)
+        setAvailable(data.available)
+      })
+      .catch(err => {
+        console.error('[AccountSync] Availability check failed:', err)
+        setAvailable(false)
+      })
+  }, [ahFetch])
 
-  const formatDateTime = useCallback((value) => {
-    if (!value) return null
-    try {
-      return statusFormatter.format(new Date(value))
-    } catch (_err) {
-      return value
-    }
-  }, [statusFormatter])
-
+  // Fetch cookie status and last run info
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/sync/status')
-      if (!res.ok) throw new Error('status request failed')
-      const json = await res.json()
-      setStatus(json)
-      setError(null)
+      // Check cookies
+      const cookieRes = await ahFetch('/api/auto-scrape/cookies')
+      const cookieData = await cookieRes.json()
+      setCookieStatus(cookieData)
+      
+      // Check scrape status
+      const statusRes = await ahFetch('/api/auto-scrape/status')
+      const statusData = await statusRes.json()
+      
+      if (statusData?.lastRun?.productsStored) {
+        setProductsCount(statusData.lastRun.productsStored)
+        setLastSync(statusData.lastRun.completedAt)
+      }
+      
+      if (statusData?.running) {
+        setStatus('syncing')
+        setProgress(statusData.progress || 'Syncing...')
+      }
+      
     } catch (err) {
-      console.error('Failed to fetch sync status:', err)
-      setError(t('sync_error_status'))
-    } finally {
-      setLoading(false)
+      console.error('Failed to fetch status:', err)
     }
-  }, [t])
+  }, [ahFetch])
 
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
 
+  // Poll for status updates while syncing
   useEffect(() => {
-    if (!status) return
-
-    if (status.running) {
-      if (!pollRef.current) {
-        pollRef.current = setInterval(() => {
-          fetchStatus()
-        }, 3000)
+    if (status === 'connecting' || status === 'syncing') {
+      pollRef.current = setInterval(async () => {
+        try {
+          const res = await ahFetch('/api/auto-scrape/status')
+          const data = await res.json()
+          
+          if (data.progress) {
+            setProgress(data.progress)
+          }
+          
+          if (!data.running) {
+            clearInterval(pollRef.current)
+            pollRef.current = null
+            
+            if (data.lastRun?.status === 'success') {
+              setStatus('success')
+              setProductsCount(data.lastRun.productsStored || data.lastRun.productsFound || 0)
+              setLastSync(new Date().toISOString())
+              fetchStatus()
+              if (onSyncCompleted) onSyncCompleted()
+            } else if (data.lastRun?.loginRequired) {
+              // Cookies expired
+              setStatus('idle')
+              setError('Session expired. Please login again.')
+              setCookieStatus({ hasCookies: false })
+            } else {
+              setStatus('error')
+              setError(data.lastRun?.error || 'Sync failed')
+            }
+          }
+        } catch (e) {
+          console.error('Poll error:', e)
+        }
+      }, 2000)
+    }
+    
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
       }
-    } else if (pollRef.current) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
     }
+  }, [status, fetchStatus, onSyncCompleted, ahFetch])
 
-    const completedAt = status?.lastRun?.completedAt
-    if (!status.running && completedAt && completedAt !== lastCompletedRef.current) {
-      lastCompletedRef.current = completedAt
-      if (typeof onSyncCompleted === 'function') {
-        onSyncCompleted()
+  // Start visual login flow (opens browser window for user to login)
+  const handleLogin = useCallback(async () => {
+    setStatus('connecting')
+    setError(null)
+    setProgress('Opening browser window...')
+    
+    try {
+      const res = await ahFetch('/api/auto-scrape/visual-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (res.status === 501) {
+        setError('This feature is only available when running locally.')
+        setStatus('error')
+        return
       }
+      
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to start')
+      }
+      
+      setProgress('Please log in to Albert Heijn in the browser window...')
+      // Polling will take over from here
+      
+    } catch (err) {
+      console.error('Login failed:', err)
+      setError(err.message)
+      setStatus('error')
     }
-  }, [status, fetchStatus, onSyncCompleted])
+  }, [ahFetch])
 
-  useEffect(() => () => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
+  // Quick resync using saved cookies
+  const handleSync = useCallback(async () => {
+    setStatus('syncing')
+    setError(null)
+    setProgress('Starting sync...')
+    
+    try {
+      const res = await ahFetch('/api/auto-scrape/with-cookies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (res.status === 400) {
+        // Cookies expired, need to reconnect
+        setError('Session expired. Please login again.')
+        setStatus('idle')
+        setCookieStatus({ hasCookies: false })
+        return
+      }
+      
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to start sync')
+      }
+      
+      setProgress('Syncing your purchases...')
+      // Polling will take over from here
+      
+    } catch (err) {
+      console.error('Sync failed:', err)
+      setError(err.message)
+      setStatus('error')
     }
-  }, [])
+  }, [ahFetch])
 
-  const handleStart = useCallback(() => {
-    setHostedGuide(true)
-  }, [])
+  // Disconnect (clear cookies)
+  const handleDisconnect = useCallback(async () => {
+    try {
+      await ahFetch('/api/auto-scrape/cookies', { method: 'DELETE' })
+      setCookieStatus({ hasCookies: false })
+      setProductsCount(0)
+      setLastSync(null)
+      setStatus('idle')
+    } catch (err) {
+      console.error('Disconnect failed:', err)
+    }
+  }, [ahFetch])
 
-  const logs = status?.logs ?? []
-  const lastRun = status?.lastRun
-  const durationLabel = lastRun?.durationMs ? `${(lastRun.durationMs / 1000).toFixed(1)}s` : 'N/A'
-  const lastRunSummary = lastRun
-    ? `${lastRun.status === 'success' ? t('sync_last_run_success') : t('sync_last_run_error')} · ${formatDateTime(lastRun.completedAt) || 'N/A'}`
-    : t('sync_last_run_never')
+  const formatDate = (dateStr) => {
+    if (!dateStr) return null
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }).format(new Date(dateStr))
+    } catch (e) {
+      return dateStr
+    }
+  }
 
-  const currentStatus = status?.running ? t('sync_status_running') : t('sync_status_idle')
-  const buttonDisabled = false
-  const logLines = logs.slice(-30).map((entry) => {
-    const timestamp = formatDateTime(entry.timestamp) || entry.timestamp
-    const level = entry.stream.toUpperCase()
-    return `[${timestamp}] ${level}: ${entry.message}`
-  })
+  const hasCookies = cookieStatus?.hasCookies
+  const isBusy = status === 'connecting' || status === 'syncing'
 
-  // Hosted-friendly bookmarklet approach (no extension required)
-  const BOOKMARKLET_HREF = useMemo(() => {
-    const api = 'https://albert-eosin.vercel.app'
-    const code = `(()=>{try{const API='${api}';function ex(){const links=document.querySelectorAll('a[href^="/producten/product/"], article a[href^="/producten/product/"]');const items=[];const seen=new Set();links.forEach(a=>{const url=new URL(a.href,location.origin).toString();if(seen.has(url))return;seen.add(url);let name=a.getAttribute('aria-label')||a.textContent||'';name=name.replace(/\\s+/g,' ').trim();if(!name){const title=a.closest('article')?.querySelector('[data-testhook="product-title"], h3, h2');name=(title?.textContent||'').trim()}const card=a.closest('article')||a.closest('[data-testhook="product-card"]')||a.parentElement;let price=null;const priceEl=card?.querySelector('[data-testhook="product-price"], [class*="price"], span:has(> sup)');const raw=priceEl?.textContent?.replace(',', '.').match(/(\\d+(\\.\\d{1,2})?)/);if(raw)price=parseFloat(raw[1]);const imgEl=card?.querySelector('img');const image=imgEl?.src||'';if(name){items.push({name,url,price,image,source:'ah_bonus'})}});return items}const items=ex();if(!items.length){alert('No products found yet. Scroll to load more and try again.');return}fetch(API+'/api/ingest/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'ah_bonus',scraped_at:new Date().toISOString()})}).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{if(!ok)throw new Error((data&&data.error)||'ingest_failed');alert('Uploaded '+((data&&data.stored)||items.length)+' items.')}).catch(e=>{console.error('Scrape upload failed:',e);alert('Upload failed: '+e.message)})}catch(e){alert('Error: '+e.message)}})()`
-      .replace(/\n/g, '')
-      .replace(/\s{2,}/g, ' ')
-    return `javascript:${code}`
-  }, [])
+  // Not available on hosted version
+  if (!available) {
+    return (
+      <div style={{
+        background: 'rgba(245, 158, 11, 0.1)',
+        border: '1px solid rgba(245, 158, 11, 0.3)',
+        borderRadius: '12px',
+        padding: '1.5rem',
+        marginTop: '1rem'
+      }}>
+        <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b' }}>
+          {t('auto_scrape_not_available_title') || 'Not Available'}
+        </h3>
+        <p style={{ margin: 0, color: 'var(--text-muted, #9ca3af)' }}>
+          {t('auto_scrape_not_available_desc') || 'This feature is only available when running the app locally.'}
+        </p>
+      </div>
+    )
+  }
 
   return (
-    <section style={{ marginTop: '1.5rem' }}>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 0.5rem 0' }}>{t('sync_title')}</h3>
-        <p style={{ margin: 0, color: '#aaa', maxWidth: '640px' }}>{t('sync_description')}</p>
+    <div style={{
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+      borderRadius: '16px',
+      padding: '2rem',
+      color: 'white',
+      marginTop: '1rem'
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{
+          width: '56px',
+          height: '56px',
+          background: 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <ShoppingCart size={28} />
+        </div>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
+            {t('sync_title') || 'Sync Your Purchases'}
+          </h3>
+          <p style={{ margin: '0.25rem 0 0 0', opacity: 0.7, fontSize: '0.9rem' }}>
+            {hasCookies 
+              ? (t('sync_connected') || 'Connected to Albert Heijn')
+              : (t('sync_not_connected') || 'Connect your AH account to import purchases')
+            }
+          </p>
+        </div>
       </div>
 
-      {/* Mode toggle tabs */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '0.5rem', 
-        marginBottom: '1.5rem',
-        borderBottom: '2px solid #333',
-        paddingBottom: '0'
-      }}>
-        <button
-          type="button"
-          onClick={() => setScrapeMode('easy')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            fontWeight: 500,
-            fontSize: '0.95rem',
-            color: scrapeMode === 'easy' ? '#3b82f6' : '#888',
-            borderBottom: scrapeMode === 'easy' ? '2px solid #3b82f6' : '2px solid transparent',
-            marginBottom: '-2px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Zap size={18} />
-          Easy Connect
-        </button>
-        <button
-          type="button"
-          onClick={() => setScrapeMode('auto')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            fontWeight: 500,
-            fontSize: '0.95rem',
-            color: scrapeMode === 'auto' ? '#3b82f6' : '#888',
-            borderBottom: scrapeMode === 'auto' ? '2px solid #3b82f6' : '2px solid transparent',
-            marginBottom: '-2px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <RefreshCw size={18} />
-          {t('sync_mode_auto')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setScrapeMode('manual')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            fontWeight: 500,
-            fontSize: '0.95rem',
-            color: scrapeMode === 'manual' ? '#3b82f6' : '#888',
-            borderBottom: scrapeMode === 'manual' ? '2px solid #3b82f6' : '2px solid transparent',
-            marginBottom: '-2px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <BookOpen size={18} />
-          {t('sync_mode_manual')}
-        </button>
-      </div>
-
-      {/* Easy Connect mode - recommended */}
-      {scrapeMode === 'easy' && (
-        <EasyConnect onSyncCompleted={onSyncCompleted} />
-      )}
-
-      {/* Auto-scrape mode (advanced) */}
-      {scrapeMode === 'auto' && (
-        <AutoScrape onScrapeCompleted={onSyncCompleted} />
-      )}
-
-      {/* Manual/Bookmarklet mode */}
-      {scrapeMode === 'manual' && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+      {/* Connected status */}
+      {hasCookies && !isBusy && status !== 'success' && (
+        <div style={{
+          background: 'rgba(34, 197, 94, 0.15)',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
+          borderRadius: '12px',
+          padding: '1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <CheckCircle size={24} style={{ color: '#22c55e' }} />
             <div>
-              <p style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_requires_auth')}</p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleStart}
-              disabled={buttonDisabled}
-              style={{ minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-            >
-              <RefreshCw size={18} />
-              {hostedGuide ? t('sync_button') : t('sync_show_guide')}
-            </button>
-          </div>
-
-          {error && <div style={{ color: '#ef4444', marginBottom: '0.75rem' }}>{error}</div>}
-          {hostedGuide && (
-            <div style={{ border: '1px dashed rgba(99, 102, 241, 0.5)', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--text, #f3f4f6)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
-              <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--text, #f3f4f6)' }}>{t('sync_bookmarklet_title')}</h4>
-              <ol style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-muted, #9ca3af)' }}>
-                <li>
-                  {t('sync_bookmarklet_step1')}{' '}
-                  <a href="https://www.ah.nl/bonus/eerder-gekocht" target="_blank" rel="noreferrer" style={{ color: '#60a5fa' }}>ah.nl/bonus/eerder-gekocht</a>
-                </li>
-                <li>{t('sync_bookmarklet_step2')}</li>
-                <li>
-                  {t('sync_bookmarklet_step3')}{' '}
-                  <a href={BOOKMARKLET_HREF} style={{ padding: '0.35rem 0.6rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', textDecoration: 'none' }}>AH: Scrape this page</a>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #9ca3af)', marginTop: '0.4rem' }}>
-                    {t('sync_bookmarklet_tip')}
-                  </div>
-                </li>
-                <li>{t('sync_bookmarklet_step4')}</li>
-              </ol>
-            </div>
-          )}
-          {status?.running && <div style={{ color: 'var(--text-muted, #9ca3af)', marginBottom: '0.75rem' }}>{t('sync_running_hint')}</div>}
-
-          <div style={{ border: '1px solid var(--border, #334155)', borderRadius: '12px', padding: '1rem', background: 'var(--bg-card, #1e293b)' }}>
-            {loading && !status ? (
-              <div style={{ color: 'var(--text, #f3f4f6)' }}>{t('loading')}</div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_status_label')}</div>
-                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{currentStatus}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_last_run_label')}</div>
-                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{lastRunSummary}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_started_label')}</div>
-                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{formatDateTime(lastRun?.startedAt) || 'N/A'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_completed_label')}</div>
-                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{formatDateTime(lastRun?.completedAt) || 'N/A'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #9ca3af)' }}>{t('sync_duration_label')}</div>
-                  <div style={{ fontWeight: 600, color: 'var(--text, #f3f4f6)' }}>{durationLabel}</div>
-                </div>
+              <div style={{ fontWeight: 500 }}>
+                {t('sync_account_connected') || 'Account Connected'}
               </div>
-            )}
-
-            <div style={{ marginTop: '1.25rem' }}>
-              <h4 style={{ marginBottom: '0.5rem', color: 'var(--text, #f3f4f6)' }}>{t('sync_logs_label')}</h4>
-              <div style={{ border: '1px solid var(--border, #334155)', background: 'var(--bg-hover, #334155)', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', padding: '0.75rem' }}>
-                {logLines.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted, #9ca3af)', fontSize: '0.9rem' }}>{t('sync_no_logs')}</div>
-                ) : (
-                  <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap', color: 'var(--text, #f3f4f6)' }}>
-                    {logLines.join('\n')}
-                  </pre>
-                )}
-              </div>
+              {lastSync && (
+                <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+                  {t('sync_last_sync') || 'Last sync'}: {formatDate(lastSync)}
+                  {productsCount > 0 && ` · ${productsCount} ${t('sync_products') || 'products'}`}
+                </div>
+              )}
             </div>
           </div>
-        </>
+          <button
+            onClick={handleDisconnect}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#ef4444',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '6px'
+            }}
+            title={t('sync_disconnect') || 'Disconnect'}
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
       )}
-    </section>
+
+      {/* Progress/Status display */}
+      {isBusy && (
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.15)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: '12px',
+          padding: '1rem',
+          marginBottom: '1rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Loader2 size={24} style={{ color: '#3b82f6', animation: 'spin 1s linear infinite' }} />
+            <div>
+              <div style={{ fontWeight: 500 }}>
+                {status === 'connecting' 
+                  ? (t('sync_connecting') || 'Connecting...')
+                  : (t('sync_syncing') || 'Syncing...')
+                }
+              </div>
+              <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+                {progress}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success message */}
+      {status === 'success' && (
+        <div style={{
+          background: 'rgba(34, 197, 94, 0.15)',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
+          borderRadius: '12px',
+          padding: '1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <CheckCircle size={24} style={{ color: '#22c55e' }} />
+          <div>
+            <div style={{ fontWeight: 500 }}>
+              {t('sync_success') || 'Sync Complete!'}
+            </div>
+            <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+              {productsCount > 0 && `${productsCount} ${t('sync_products_imported') || 'products imported'}`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error display */}
+      {error && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.15)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '12px',
+          padding: '1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <AlertCircle size={24} style={{ color: '#ef4444' }} />
+          <div style={{ color: '#fca5a5' }}>{error}</div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        {!hasCookies ? (
+          // Not connected - show login button
+          <button
+            onClick={handleLogin}
+            disabled={isBusy}
+            style={{
+              flex: 1,
+              padding: '1rem 1.5rem',
+              background: 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              color: 'white',
+              fontWeight: 600,
+              fontSize: '1rem',
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              opacity: isBusy ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            {isBusy ? (
+              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <ShoppingCart size={20} />
+            )}
+            {t('sync_login_button') || 'Login to Albert Heijn'}
+          </button>
+        ) : (
+          // Connected - show sync button
+          <button
+            onClick={handleSync}
+            disabled={isBusy}
+            style={{
+              flex: 1,
+              padding: '1rem 1.5rem',
+              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              color: 'white',
+              fontWeight: 600,
+              fontSize: '1rem',
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              opacity: isBusy ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            {isBusy ? (
+              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <RefreshCw size={20} />
+            )}
+            {t('sync_now_button') || 'Sync Now'}
+          </button>
+        )}
+      </div>
+
+      {/* How it works */}
+      {!hasCookies && !isBusy && (
+        <div style={{
+          marginTop: '1.5rem',
+          padding: '1rem',
+          background: 'rgba(255,255,255,0.05)',
+          borderRadius: '12px',
+          fontSize: '0.9rem'
+        }}>
+          <div style={{ fontWeight: 500, marginBottom: '0.5rem' }}>
+            {t('sync_how_it_works') || 'How it works:'}
+          </div>
+          <ol style={{ margin: 0, paddingLeft: '1.25rem', opacity: 0.8, lineHeight: 1.6 }}>
+            <li>{t('sync_step_1') || 'Click the button above to open Albert Heijn login'}</li>
+            <li>{t('sync_step_2') || 'Log in with your AH account (handle CAPTCHA if needed)'}</li>
+            <li>{t('sync_step_3') || 'Your purchases will be imported automatically'}</li>
+          </ol>
+        </div>
+      )}
+    </div>
   )
 }
 

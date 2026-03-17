@@ -10,6 +10,7 @@ import ScoreLookup from './components/ScoreLookup'
 import UserMenu from './components/UserMenu'
 import AuthModal from './components/AuthModal'
 import { AuthProvider, useAuth } from './lib/authContext'
+import { AHUserProvider } from './lib/ahUserContext.jsx'
 import { I18nProvider, useI18n, getSavedLang, saveLang } from './i18n.jsx'
 
 // Feature cards for the homepage
@@ -253,11 +254,11 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         
         <div className="content-card">
           {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} onLoginClick={handleLoginClick} />}
-          {activeTab === 'dashboard' && <Dashboard onLoginClick={handleLoginClick} />}
+          {activeTab === 'dashboard' && <Dashboard syncVersion={syncVersion} onLoginClick={handleLoginClick} />}
           {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} onLoginClick={handleLoginClick} />}
           {activeTab === 'lookup' && <ScoreLookup />}
           {activeTab === 'sync' && <AccountSync onSyncCompleted={onSyncCompleted} />}
-          {activeTab === 'history' && <PurchaseList onLoginClick={handleLoginClick} />}
+          {activeTab === 'history' && <PurchaseList syncVersion={syncVersion} onLoginClick={handleLoginClick} />}
           {activeTab === 'how' && <HowItWorks />}
         </div>
       </main>
@@ -295,15 +296,17 @@ function App() {
 
   return (
     <AuthProvider>
-      <I18nProvider lang={lang} setLang={handleSetLang}>
-        <AppShell
-          onPurchaseAdded={handlePurchaseAdded}
-          onSyncCompleted={handleSyncCompleted}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          syncVersion={syncVersion}
-        />
-      </I18nProvider>
+      <AHUserProvider>
+        <I18nProvider lang={lang} setLang={handleSetLang}>
+          <AppShell
+            onPurchaseAdded={handlePurchaseAdded}
+            onSyncCompleted={handleSyncCompleted}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            syncVersion={syncVersion}
+          />
+        </I18nProvider>
+      </AHUserProvider>
     </AuthProvider>
   )
 }

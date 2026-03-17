@@ -3,6 +3,7 @@ import { TrendingUp, Award, ShoppingCart, DollarSign, LogIn, Loader2, ChevronDow
 import ProfileSuggestions from './ProfileSuggestions'
 import { useI18n } from '../i18n.jsx'
 import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser } from '../lib/ahUserContext.jsx'
 
 // Dark mode styles
 const styles = {
@@ -100,7 +101,14 @@ const styles = {
 function Dashboard({ syncVersion, onLoginClick }) {
   const { t } = useI18n()
   const { user, isAuthenticated } = useAuth()
+  const { sessionId, loading: sessionLoading } = useAHUser()
   const authFetch = useAuthenticatedFetch()
+  
+  // User is "authenticated" if they have JWT auth OR session-based auth
+  const isUserConnected = isAuthenticated || !!sessionId
+  
+  // Debug log
+  console.log('[Dashboard] sessionId:', sessionId, 'isAuthenticated:', isAuthenticated, 'isUserConnected:', isUserConnected, 'sessionLoading:', sessionLoading)
   
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -115,7 +123,9 @@ function Dashboard({ syncVersion, onLoginClick }) {
   const [showHistory, setShowHistory] = useState(false)
 
   const fetchInsights = useCallback(async () => {
-    if (!isAuthenticated) {
+    console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'sessionId:', sessionId, 'sessionLoading:', sessionLoading)
+    if (sessionLoading || !isUserConnected) {
+      console.log('[Dashboard] Skipping fetch - session loading or not connected')
       setLoading(false)
       return
     }
@@ -123,10 +133,13 @@ function Dashboard({ syncVersion, onLoginClick }) {
     setLoading(true)
     try {
       const res = await authFetch('/api/user/insights')
+      console.log('[Dashboard] insights response status:', res.status)
       if (res.ok) {
         const data = await res.json()
+        console.log('[Dashboard] insights data:', data)
         setInsights(data)
       } else {
+        console.log('[Dashboard] insights response not ok')
         setInsights(null)
       }
     } catch (err) {
@@ -135,10 +148,10 @@ function Dashboard({ syncVersion, onLoginClick }) {
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, authFetch])
+  }, [isUserConnected, authFetch, sessionId, sessionLoading])
 
   const fetchPurchaseHistory = useCallback(async (page = 1) => {
-    if (!isAuthenticated) return
+    if (!isUserConnected) return
     
     setPurchasesLoading(true)
     try {
@@ -160,7 +173,7 @@ function Dashboard({ syncVersion, onLoginClick }) {
     } finally {
       setPurchasesLoading(false)
     }
-  }, [isAuthenticated, authFetch])
+  }, [isUserConnected, authFetch])
 
   useEffect(() => {
     fetchInsights()
@@ -173,8 +186,18 @@ function Dashboard({ syncVersion, onLoginClick }) {
     }
   }, [showHistory, fetchPurchaseHistory])
 
+  // Still loading session - show spinner
+  if (sessionLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem' }}>
+        <Loader2 size={48} className="spin" style={{ color: 'var(--primary)' }} />
+        <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>{t('loading') || 'Loading...'}</p>
+      </div>
+    )
+  }
+
   // Not logged in - show login prompt
-  if (!isAuthenticated) {
+  if (!isUserConnected) {
     return (
       <div style={styles.loginPrompt}>
         <LogIn size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
