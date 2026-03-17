@@ -440,6 +440,9 @@ const ENRICHED_SCORING = {
   is_vegetarian: { delta: 1, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
   is_organic: { delta: 2, icon: '🌿', label: 'Organic/Bio' },
   
+  // Ethical certifications
+  is_fairtrade: { delta: 2, icon: '🤝', label: 'Fairtrade' },
+  
   // Nutri-Score impact
   nutri_score: {
     'A': { delta: 2, label: 'Nutri-Score A' },
@@ -485,6 +488,29 @@ const ENRICHED_SCORING = {
     'Australia': { delta: -2, region: 'oceania' },
     'New Zealand': { delta: -2, region: 'oceania' }
   }
+}
+
+// Month abbreviations for origin_by_month lookups
+const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+/**
+ * Get the current month key for origin_by_month lookup
+ * @returns {string} Current month as 3-letter lowercase key (e.g., 'jan', 'feb')
+ */
+function getCurrentMonthKey() {
+  const now = new Date()
+  return MONTH_KEYS[now.getMonth()]
+}
+
+/**
+ * Get the origin country for the current month from origin_by_month data
+ * @param {Object} originByMonth - JSONB object with monthly origins
+ * @returns {string|null} - Country name for current month, or null if not available
+ */
+function getOriginForCurrentMonth(originByMonth) {
+  if (!originByMonth || typeof originByMonth !== 'object') return null
+  const monthKey = getCurrentMonthKey()
+  return originByMonth[monthKey] || null
 }
 
 // ============================================================================
@@ -936,6 +962,13 @@ function evaluateProduct(productName = '', enrichedData = null) {
       matchedEnriched.push({ code: 'organic', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
     }
 
+    // Fairtrade scoring
+    if (enrichedData.is_fairtrade === true) {
+      const scoring = ENRICHED_SCORING.is_fairtrade
+      applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
+      matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    }
+
     // Nutri-Score scoring (A-E)
     if (enrichedData.nutri_score && ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]) {
       const scoring = ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]
@@ -952,18 +985,36 @@ function evaluateProduct(productName = '', enrichedData = null) {
     }
 
     // Origin country scoring (local vs imported)
-    if (enrichedData.origin_country) {
-      const originScoring = ENRICHED_SCORING.origin_country[enrichedData.origin_country]
+    // Check monthly origin first (origin_by_month), then fall back to static origin_country
+    let effectiveOrigin = null
+    let isSeasonalOrigin = false
+    
+    if (enrichedData.origin_by_month) {
+      effectiveOrigin = getOriginForCurrentMonth(enrichedData.origin_by_month)
+      isSeasonalOrigin = effectiveOrigin !== null
+    }
+    
+    // Fall back to static origin if no monthly origin available
+    if (!effectiveOrigin && enrichedData.origin_country) {
+      effectiveOrigin = enrichedData.origin_country
+    }
+    
+    if (effectiveOrigin) {
+      const originScoring = ENRICHED_SCORING.origin_country[effectiveOrigin]
+      const monthLabel = isSeasonalOrigin ? ` (${getCurrentMonthKey().toUpperCase()})` : ''
+      
       if (originScoring) {
         if (originScoring.delta !== 0) {
           applyDelta('enriched', `enriched_origin_${originScoring.region}`, originScoring.delta)
           matchedEnriched.push({ 
             code: `origin_${originScoring.region}`, 
             icon: originScoring.delta > 0 ? '📍' : '✈️', 
-            label: `Origin: ${enrichedData.origin_country}`, 
+            label: `Origin: ${effectiveOrigin}${monthLabel}`, 
             delta: originScoring.delta,
-            country: enrichedData.origin_country,
-            region: originScoring.region
+            country: effectiveOrigin,
+            region: originScoring.region,
+            isSeasonal: isSeasonalOrigin,
+            originByMonth: enrichedData.origin_by_month
           })
         }
       } else {
@@ -972,9 +1023,10 @@ function evaluateProduct(productName = '', enrichedData = null) {
         matchedEnriched.push({ 
           code: 'origin_unknown', 
           icon: '🌍', 
-          label: `Origin: ${enrichedData.origin_country} (unknown region)`, 
+          label: `Origin: ${effectiveOrigin}${monthLabel} (unknown region)`, 
           delta: -0.5,
-          country: enrichedData.origin_country
+          country: effectiveOrigin,
+          isSeasonal: isSeasonalOrigin
         })
       }
     }
@@ -1018,8 +1070,10 @@ function getEnrichedData(product) {
     product.is_vegan !== null || 
     product.is_vegetarian !== null || 
     product.is_organic !== null || 
+    product.is_fairtrade !== null ||
     product.nutri_score !== null || 
-    product.origin_country !== null
+    product.origin_country !== null ||
+    product.origin_by_month !== null
   
   if (!hasEnrichedData) return null
   
@@ -1027,8 +1081,10 @@ function getEnrichedData(product) {
     is_vegan: product.is_vegan,
     is_vegetarian: product.is_vegetarian,
     is_organic: product.is_organic,
+    is_fairtrade: product.is_fairtrade,
     nutri_score: product.nutri_score,
     origin_country: product.origin_country,
+    origin_by_month: product.origin_by_month,
     brand: product.brand,
     allergens: product.allergens,
     details_scraped_at: product.details_scraped_at
@@ -1441,7 +1497,7 @@ app.get('/api/user/purchases/history', requireAuth, async (req, res) => {
     if (productIds.length > 0 && enrichedColumnsAvailable) {
       const { data: products, error: enrichError } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, image_url, url')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url')
         .in('id', productIds)
       
       if (enrichError?.message?.includes('does not exist')) {
@@ -1572,7 +1628,7 @@ app.get('/api/user/suggestions', requireAuth, async (req, res) => {
     if (enrichedColumnsAvailable) {
       const { data, error: productsError } = await supabase
         .from('products')
-        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand')
         .order('seen_count', { ascending: false })
         .limit(200)
       
@@ -1659,7 +1715,7 @@ app.get('/api/products/popular', async (req, res) => {
     if (enrichedColumnsAvailable) {
       const result = await supabase
         .from('products')
-        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, details_scraped_at')
+        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, details_scraped_at')
         .order('seen_count', { ascending: false })
         .limit(limit)
       
@@ -1716,7 +1772,7 @@ app.get('/api/products/search', async (req, res) => {
     if (enrichedColumnsAvailable) {
       const result = await supabase
         .from('products')
-        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
+        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand')
         .ilike('normalized_name', `%${query.toLowerCase()}%`)
         .limit(50)
       

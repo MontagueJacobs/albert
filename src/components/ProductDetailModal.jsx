@@ -311,6 +311,16 @@ function ProductDetailModal({ purchase, onClose }) {
                   <Leaf size={12} /> Vegan
                 </span>
               )}
+              
+              {purchase.is_fairtrade && (
+                <span style={{ 
+                  ...styles.badge, 
+                  background: 'rgba(59, 130, 246, 0.2)', 
+                  color: '#3b82f6' 
+                }}>
+                  🤝 Fairtrade
+                </span>
+              )}
             </div>
           </div>
         </div>
