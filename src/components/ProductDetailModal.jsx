@@ -238,12 +238,22 @@ function ProductDetailModal({ purchase, onClose }) {
         {/* Header */}
         <div style={styles.header}>
           {purchase.image_url ? (
-            <img 
-              src={purchase.image_url} 
-              alt={purchase.product_name}
-              style={styles.productImage}
-              onError={(e) => { e.target.src = '' }}
-            />
+            <a 
+              href={purchase.url || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ cursor: purchase.url ? 'pointer' : 'default' }}
+              onClick={(e) => !purchase.url && e.preventDefault()}
+            >
+              <img 
+                src={purchase.image_url} 
+                alt={purchase.product_name}
+                style={{...styles.productImage, transition: 'transform 0.2s'}}
+                onError={(e) => { e.target.src = '' }}
+                onMouseEnter={(e) => purchase.url && (e.target.style.transform = 'scale(1.05)')}
+                onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+              />
+            </a>
           ) : (
             <div style={{ 
               ...styles.productImage, 

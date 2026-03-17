@@ -272,9 +272,38 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState('home')
+  // Read initial tab from URL hash (e.g., #dashboard)
+  const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash.slice(1) // Remove #
+    const validTabs = ['home', 'add', 'dashboard', 'suggestions', 'lookup', 'sync', 'history', 'how']
+    return validTabs.includes(hash) ? hash : 'home'
+  })
   const [lang, setLang] = useState(() => getSavedLang())
   const [syncVersion, setSyncVersion] = useState(0)
+
+  // Sync activeTab with URL hash
+  useEffect(() => {
+    // Update hash when tab changes
+    if (activeTab !== 'home') {
+      window.location.hash = activeTab
+    } else {
+      // Clear hash for home
+      if (window.location.hash) {
+        history.replaceState(null, '', window.location.pathname)
+      }
+    }
+  }, [activeTab])
+
+  // Listen for browser back/forward navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1)
+      const validTabs = ['home', 'add', 'dashboard', 'suggestions', 'lookup', 'sync', 'history', 'how']
+      setActiveTab(validTabs.includes(hash) ? hash : 'home')
+    }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
 
   const handleSetLang = useCallback((value) => {
     const next = value === 'en' ? 'en' : 'nl'
