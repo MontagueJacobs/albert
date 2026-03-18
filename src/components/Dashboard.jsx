@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { TrendingUp, Award, ShoppingCart, DollarSign, Loader2, ChevronDown, ChevronUp, Calendar, MapPin, Leaf, Apple, CreditCard } from 'lucide-react'
+import { TrendingUp, Award, ShoppingCart, DollarSign, Loader2, ChevronDown, ChevronUp, Calendar, MapPin, Leaf, Apple, RefreshCw } from 'lucide-react'
 import ProductDetailModal from './ProductDetailModal'
 import { useI18n } from '../i18n.jsx'
 import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
@@ -213,21 +213,21 @@ function Dashboard({ syncVersion }) {
     )
   }
 
-  // Not logged in - show bonus card prompt
+  // Not logged in - show sync prompt
   if (!isUserConnected) {
     return (
       <div style={styles.loginPrompt}>
-        <CreditCard size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('access_required_title') || 'Access Your Dashboard'}</h2>
+        <RefreshCw size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
+        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('access_required_title') || 'Connect Your Account'}</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          {t('access_required_desc') || 'Enter your Albert Heijn bonus card number to view your sustainability dashboard.'}
+          {t('access_required_desc') || 'Sync your Albert Heijn account to view your sustainability dashboard.'}
         </p>
         <button 
           className="btn btn-primary btn-lg"
-          onClick={() => window.location.href = '/'}
+          onClick={() => window.location.hash = 'sync'}
         >
-          <CreditCard size={20} />
-          {t('enter_bonus_card') || 'Enter Bonus Card Number'}
+          <RefreshCw size={20} />
+          {t('sync_account') || 'Sync Account'}
         </button>
       </div>
     )
