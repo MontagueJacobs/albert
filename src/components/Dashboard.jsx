@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { TrendingUp, Award, ShoppingCart, DollarSign, LogIn, Loader2, ChevronDown, ChevronUp, Calendar, MapPin, Leaf, Apple } from 'lucide-react'
-import ProfileSuggestions from './ProfileSuggestions'
+import { TrendingUp, Award, ShoppingCart, DollarSign, Loader2, ChevronDown, ChevronUp, Calendar, MapPin, Leaf, Apple, CreditCard } from 'lucide-react'
 import ProductDetailModal from './ProductDetailModal'
 import { useI18n } from '../i18n.jsx'
 import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
 import { useAHUser } from '../lib/ahUserContext.jsx'
+import { useBonusCard } from '../lib/bonusCardContext.jsx'
 
 // Dark mode styles
 const styles = {
@@ -99,17 +99,18 @@ const styles = {
   }
 }
 
-function Dashboard({ syncVersion, onLoginClick }) {
+function Dashboard({ syncVersion }) {
   const { t } = useI18n()
   const { user, isAuthenticated } = useAuth()
   const { sessionId, loading: sessionLoading } = useAHUser()
+  const { bonusCardNumber, isAuthenticated: isBonusAuth, userInfo: bonusUserInfo } = useBonusCard()
   const authFetch = useAuthenticatedFetch()
   
-  // User is "authenticated" if they have JWT auth OR session-based auth
-  const isUserConnected = isAuthenticated || !!sessionId
+  // User is "connected" if they have JWT auth, session-based auth, OR bonus card
+  const isUserConnected = isAuthenticated || !!sessionId || isBonusAuth
   
   // Debug log
-  console.log('[Dashboard] sessionId:', sessionId, 'isAuthenticated:', isAuthenticated, 'isUserConnected:', isUserConnected, 'sessionLoading:', sessionLoading)
+  console.log('[Dashboard] sessionId:', sessionId, 'isAuthenticated:', isAuthenticated, 'isBonusAuth:', isBonusAuth, 'isUserConnected:', isUserConnected)
   
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -125,7 +126,7 @@ function Dashboard({ syncVersion, onLoginClick }) {
   const [selectedPurchase, setSelectedPurchase] = useState(null)
 
   const fetchInsights = useCallback(async () => {
-    console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'sessionId:', sessionId, 'sessionLoading:', sessionLoading)
+    console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'sessionId:', sessionId, 'bonusCardNumber:', bonusCardNumber)
     if (sessionLoading || !isUserConnected) {
       console.log('[Dashboard] Skipping fetch - session loading or not connected')
       setLoading(false)
@@ -134,7 +135,14 @@ function Dashboard({ syncVersion, onLoginClick }) {
     
     setLoading(true)
     try {
-      const res = await authFetch('/api/user/insights')
+      // Use bonus card API if available, otherwise use auth API
+      const url = bonusCardNumber 
+        ? `/api/bonus/${bonusCardNumber}/suggestions`
+        : '/api/user/insights'
+      const res = bonusCardNumber 
+        ? await fetch(url)
+        : await authFetch(url)
+        
       console.log('[Dashboard] insights response status:', res.status)
       if (res.ok) {
         const data = await res.json()
@@ -150,14 +158,21 @@ function Dashboard({ syncVersion, onLoginClick }) {
     } finally {
       setLoading(false)
     }
-  }, [isUserConnected, authFetch, sessionId, sessionLoading])
+  }, [isUserConnected, authFetch, sessionId, sessionLoading, bonusCardNumber])
 
   const fetchPurchaseHistory = useCallback(async (page = 1) => {
     if (!isUserConnected) return
     
     setPurchasesLoading(true)
     try {
-      const res = await authFetch(`/api/user/purchases/history?page=${page}&limit=20`)
+      // Use bonus card API if available
+      const url = bonusCardNumber
+        ? `/api/bonus/${bonusCardNumber}/purchases?page=${page}&limit=20`
+        : `/api/user/purchases/history?page=${page}&limit=20`
+      const res = bonusCardNumber
+        ? await fetch(url)
+        : await authFetch(url)
+        
       if (res.ok) {
         const data = await res.json()
         console.log('[Dashboard] Purchase history response:', data)
@@ -175,7 +190,7 @@ function Dashboard({ syncVersion, onLoginClick }) {
     } finally {
       setPurchasesLoading(false)
     }
-  }, [isUserConnected, authFetch])
+  }, [isUserConnected, authFetch, bonusCardNumber])
 
   useEffect(() => {
     fetchInsights()
@@ -198,21 +213,21 @@ function Dashboard({ syncVersion, onLoginClick }) {
     )
   }
 
-  // Not logged in - show login prompt
+  // Not logged in - show bonus card prompt
   if (!isUserConnected) {
     return (
       <div style={styles.loginPrompt}>
-        <LogIn size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('login_required_title') || 'Login Required'}</h2>
+        <CreditCard size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
+        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('access_required_title') || 'Access Your Dashboard'}</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          {t('login_required_desc') || 'Please log in or create an account to view your sustainability dashboard and purchase history.'}
+          {t('access_required_desc') || 'Enter your Albert Heijn bonus card number to view your sustainability dashboard.'}
         </p>
         <button 
           className="btn btn-primary btn-lg"
-          onClick={onLoginClick}
+          onClick={() => window.location.href = '/'}
         >
-          <LogIn size={20} />
-          {t('login_button') || 'Log In / Sign Up'}
+          <CreditCard size={20} />
+          {t('enter_bonus_card') || 'Enter Bonus Card Number'}
         </button>
       </div>
     )
@@ -309,8 +324,6 @@ function Dashboard({ syncVersion, onLoginClick }) {
           ))}
         </ul>
       </div>
-
-      <ProfileSuggestions />
       
       {/* Purchase History Section */}
       <div style={styles.card}>

@@ -127,6 +127,11 @@ class AHLoginScraper:
         self._playwright = None
         self.supabase: Optional[Client] = None
         
+        # User identification via bonus card
+        self.bonus_card_number: Optional[str] = None
+        self.user_email: Optional[str] = None
+        self.user_name: Optional[str] = None
+        
         self.seen_ids: Set[str] = set()
         self.products: List[Dict[str, Any]] = []
         
@@ -228,7 +233,10 @@ class AHLoginScraper:
             
             logged_in = await self.check_logged_in()
             if logged_in:
-                print("\n[OK] Login successful! Starting scraper...\n", flush=True)
+                print("\n[OK] Login successful!", flush=True)
+                # Extract bonus card number for user identification
+                await self.extract_bonus_card()
+                print("", flush=True)
                 return True
                 
             if waited % 30 == 0:
@@ -236,6 +244,115 @@ class AHLoginScraper:
                 
         print("\n[ERROR] Login timeout. Please try again.", flush=True)
         return False
+    
+    async def extract_bonus_card(self):
+        """Extract bonus card number from /klantenkaarten page."""
+        print("[INFO] Extracting bonus card number...", flush=True)
+        try:
+            await self.page.goto("https://www.ah.nl/klantenkaarten", wait_until="domcontentloaded")
+            await asyncio.sleep(2)
+            
+            # Handle cookie popup if not already done
+            await self.handle_cookie_popup()
+            
+            # Extract bonus card number - typically shown prominently on the page
+            # Look for the card number in various formats
+            content = await self.page.content()
+            
+            # Pattern: Bonus card numbers are typically 13-19 digits
+            # Format: 2610 0000 0000 00000 or similar
+            import re
+            
+            # Try to find card number in common locations
+            card_selectors = [
+                '[data-testid="bonus-card-number"]',
+                '[class*="bonuskaart"] [class*="number"]',
+                '[class*="card-number"]',
+                '[class*="klantenkaart"]',
+            ]
+            
+            for selector in card_selectors:
+                try:
+                    elem = await self.page.query_selector(selector)
+                    if elem:
+                        text = await elem.inner_text()
+                        # Extract digits only
+                        digits = re.sub(r'\D', '', text)
+                        if len(digits) >= 13:
+                            self.bonus_card_number = digits
+                            print(f"[OK] Found bonus card: {self.bonus_card_number[:4]}...{self.bonus_card_number[-4:]}", flush=True)
+                            break
+                except:
+                    pass
+            
+            # If not found via selectors, try regex on page content
+            if not self.bonus_card_number:
+                # Look for 2610 prefix (AH bonus cards) followed by 9-15 more digits
+                match = re.search(r'2610[\s-]?(\d{4})[\s-]?(\d{4})[\s-]?(\d{4,7})', content)
+                if match:
+                    self.bonus_card_number = '2610' + match.group(1) + match.group(2) + match.group(3)
+                    print(f"[OK] Found bonus card: {self.bonus_card_number[:4]}...{self.bonus_card_number[-4:]}", flush=True)
+            
+            # Also try to get user email/name
+            try:
+                # Check account page for email
+                await self.page.goto("https://www.ah.nl/mijn/account", wait_until="domcontentloaded")
+                await asyncio.sleep(1)
+                
+                email_elem = await self.page.query_selector('[type="email"], [class*="email"]')
+                if email_elem:
+                    self.user_email = await email_elem.get_attribute('value') or await email_elem.inner_text()
+                    if self.user_email:
+                        print(f"[OK] Found email: {self.user_email}", flush=True)
+                        
+                name_elem = await self.page.query_selector('[class*="user-name"], [class*="account-name"]')
+                if name_elem:
+                    self.user_name = await name_elem.inner_text()
+            except:
+                pass
+            
+            # Register user in database
+            if self.bonus_card_number and self.supabase:
+                await self.register_bonus_user()
+                
+            if not self.bonus_card_number:
+                print("[WARN] Could not extract bonus card number. Products will be saved without user association.", flush=True)
+                
+        except Exception as e:
+            print(f"[WARN] Error extracting bonus card: {e}", flush=True)
+    
+    async def register_bonus_user(self):
+        """Register or update user in ah_bonus_users table."""
+        if not self.supabase or not self.bonus_card_number:
+            return
+            
+        try:
+            record = {
+                'bonus_card_number': self.bonus_card_number,
+                'ah_email': self.user_email,
+                'name': self.user_name,
+                'last_scrape_at': datetime.now().isoformat(),
+            }
+            
+            # Check if user exists
+            result = self.supabase.table('ah_bonus_users').select('id, scrape_count').eq('bonus_card_number', self.bonus_card_number).execute()
+            
+            if result.data:
+                # Update existing user
+                scrape_count = (result.data[0].get('scrape_count') or 0) + 1
+                self.supabase.table('ah_bonus_users').update({
+                    **record,
+                    'scrape_count': scrape_count
+                }).eq('bonus_card_number', self.bonus_card_number).execute()
+                print(f"[DB] Updated user (scrape #{scrape_count})", flush=True)
+            else:
+                # Insert new user
+                record['scrape_count'] = 1
+                self.supabase.table('ah_bonus_users').insert(record).execute()
+                print("[DB] Registered new bonus card user", flush=True)
+                
+        except Exception as e:
+            print(f"[DB WARN] Could not register user: {e}", flush=True)
         
     async def check_logged_in(self) -> bool:
         """Check if user is logged in."""
@@ -561,6 +678,28 @@ class AHLoginScraper:
             
             self.supabase.table('products').upsert(record, on_conflict='id').execute()
             self.stats['products_saved'] += 1
+            
+            # Also save to user_purchases if we have a bonus card
+            if self.bonus_card_number:
+                purchase_record = {
+                    'bonus_card_number': self.bonus_card_number,
+                    'product_id': product['id'],
+                    'product_name': product.get('name', f"Product {product['id']}"),
+                    'price': product.get('price'),
+                    'quantity': 1,
+                    'source': 'catalog_scrape',
+                    'scraped_at': datetime.now().isoformat(),
+                }
+                try:
+                    self.supabase.table('user_purchases').upsert(
+                        purchase_record, 
+                        on_conflict='bonus_card_number,product_id'
+                    ).execute()
+                except Exception as pe:
+                    # Ignore duplicate errors
+                    if 'duplicate' not in str(pe).lower():
+                        print(f"    [PURCHASE ERROR] {pe}", flush=True)
+            
             return True
             
         except Exception as e:

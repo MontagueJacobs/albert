@@ -2210,6 +2210,185 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
   }
 })
 
+// =============================================================================
+// BONUS CARD BASED ACCESS (No Login Required)
+// =============================================================================
+
+// Get user info by bonus card number
+app.get('/api/bonus/:cardNumber/user', async (req, res) => {
+  try {
+    const { cardNumber } = req.params
+    
+    if (!cardNumber || cardNumber.length < 13) {
+      return res.status(400).json({ error: 'invalid_card', message: 'Invalid bonus card number' })
+    }
+    
+    const { data: user, error } = await supabase
+      .from('ah_bonus_users')
+      .select('*')
+      .eq('bonus_card_number', cardNumber)
+      .single()
+    
+    if (error || !user) {
+      return res.status(404).json({ error: 'not_found', message: 'No data found for this bonus card. Please run a scrape first.' })
+    }
+    
+    res.json(user)
+  } catch (err) {
+    console.error('Error fetching bonus user:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get purchase history by bonus card number (no login required)
+app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
+  try {
+    const { cardNumber } = req.params
+    const page = parseInt(req.query.page) || 1
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100)
+    const offset = (page - 1) * limit
+    const sortBy = req.query.sortBy || 'scraped_at'
+    const sortOrder = req.query.sortOrder === 'asc' ? true : false
+    
+    if (!cardNumber || cardNumber.length < 13) {
+      return res.status(400).json({ error: 'invalid_card', message: 'Invalid bonus card number' })
+    }
+    
+    // Get purchases by bonus card number
+    const { data: purchases, error, count } = await supabase
+      .from('user_purchases')
+      .select('*', { count: 'exact' })
+      .eq('bonus_card_number', cardNumber)
+      .order(sortBy, { ascending: sortOrder })
+      .range(offset, offset + limit - 1)
+    
+    if (error) {
+      console.error('Bonus purchase history fetch error:', error)
+      throw error
+    }
+    
+    console.log(`[Bonus] Fetched ${purchases?.length || 0} purchases for card ${cardNumber.slice(0,4)}...`)
+    
+    if (!purchases || purchases.length === 0) {
+      return res.json({ 
+        purchases: [], 
+        total: 0,
+        page,
+        limit,
+        totalPages: 0
+      })
+    }
+    
+    // Get product IDs to fetch enriched data
+    const productIds = [...new Set(purchases.map(p => p.product_id).filter(Boolean))]
+    
+    // Fetch enriched product data
+    let enrichedProducts = {}
+    if (productIds.length > 0) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url')
+        .in('id', productIds)
+      
+      if (products) {
+        enrichedProducts = products.reduce((acc, p) => {
+          acc[p.id] = p
+          return acc
+        }, {})
+      }
+    }
+    
+    // Combine purchase data with enriched product data
+    const purchasesWithDetails = purchases.map(purchase => {
+      const enriched = enrichedProducts[purchase.product_id] || {}
+      const evaluation = evaluateProduct(purchase.product_name)
+      
+      return {
+        id: purchase.id,
+        product_id: purchase.product_id,
+        product_name: purchase.product_name,
+        price: purchase.price,
+        quantity: purchase.quantity,
+        source: purchase.source,
+        purchased_at: purchase.scraped_at || purchase.created_at,
+        is_vegan: enriched.is_vegan ?? null,
+        is_vegetarian: enriched.is_vegetarian ?? null,
+        is_organic: enriched.is_organic ?? null,
+        is_fairtrade: enriched.is_fairtrade ?? null,
+        nutri_score: enriched.nutri_score ?? null,
+        origin_country: enriched.origin_country ?? null,
+        origin_by_month: enriched.origin_by_month ?? null,
+        brand: enriched.brand ?? null,
+        image_url: enriched.image_url ?? null,
+        product_url: enriched.url ?? null,
+        ...evaluation,
+        name: purchase.product_name
+      }
+    })
+    
+    res.json({
+      purchases: purchasesWithDetails,
+      total: count || purchases.length,
+      page,
+      limit,
+      totalPages: Math.ceil((count || purchases.length) / limit)
+    })
+  } catch (err) {
+    console.error('Error fetching bonus purchase history:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get suggestions by bonus card
+app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
+  try {
+    const { cardNumber } = req.params
+    
+    if (!cardNumber || cardNumber.length < 13) {
+      return res.status(400).json({ error: 'invalid_card', message: 'Invalid bonus card number' })
+    }
+    
+    // Get user's purchases
+    const { data: purchases, error } = await supabase
+      .from('user_purchases')
+      .select('product_name, quantity, price')
+      .eq('bonus_card_number', cardNumber)
+    
+    if (error) throw error
+    
+    if (!purchases || purchases.length === 0) {
+      return res.json({
+        profile: {
+          total_products: 0,
+          avg_sustainability_score: 0,
+          profile_type: 'balanced',
+          profile_info: USER_PROFILE_TYPES['balanced']
+        },
+        replacements: [],
+        suggestions: []
+      })
+    }
+    
+    // Analyze user profile
+    const userProfile = analyzeUserProfile(purchases)
+    const profileInfo = USER_PROFILE_TYPES[userProfile.profileType] || USER_PROFILE_TYPES['balanced']
+    
+    res.json({
+      profile: {
+        total_products: purchases.length,
+        avg_sustainability_score: userProfile.avgScore,
+        profile_type: userProfile.profileType,
+        profile_info: profileInfo
+      },
+      replacements: [],
+      suggestions: []
+    })
+  } catch (err) {
+    console.error('Error fetching bonus suggestions:', err)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
 // Get personalized suggestions based on user's purchase history
 app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
   try {
