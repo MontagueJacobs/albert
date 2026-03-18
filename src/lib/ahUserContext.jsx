@@ -1,53 +1,69 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
 /**
- * Simple AH Email-based "authentication"
- * - No password required
- * - Just identifies user by their AH email
- * - Stored in localStorage for persistence
+ * Anonymous session-based user context
+ * - No login required
+ * - Auto-generates a persistent session ID on first visit
+ * - Users scrape their purchases which populate their account
+ * - Session ID stored in localStorage for persistence
  */
 
 const AHUserContext = createContext({
-  ahEmail: null,
-  isIdentified: false,
+  sessionId: null,
+  isReady: false,
   loading: true,
-  setAHEmail: () => {},
-  clearAHEmail: () => {},
+  resetSession: () => {},
 })
 
-const STORAGE_KEY = 'ah_user_email'
+const STORAGE_KEY = 'ah_session_id'
+
+// Generate a random session ID
+function generateSessionId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let result = 'sess_'
+  for (let i = 0; i < 24; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
 
 export function AHUserProvider({ children }) {
-  const [ahEmail, setAHEmailState] = useState(null)
+  const [sessionId, setSessionId] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Load from localStorage on mount
+  // Load or create session ID on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      setAHEmailState(stored)
+    let stored = localStorage.getItem(STORAGE_KEY)
+    if (!stored) {
+      // First visit - generate new session ID
+      stored = generateSessionId()
+      localStorage.setItem(STORAGE_KEY, stored)
+      console.log('[Session] Created new session:', stored)
+    } else {
+      console.log('[Session] Loaded existing session:', stored)
     }
+    setSessionId(stored)
     setLoading(false)
   }, [])
 
-  const setAHEmail = useCallback((email) => {
-    if (email) {
-      localStorage.setItem(STORAGE_KEY, email)
-      setAHEmailState(email)
-    }
-  }, [])
-
-  const clearAHEmail = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    setAHEmailState(null)
+  // Reset session (clears data and creates new session)
+  const resetSession = useCallback(() => {
+    const newId = generateSessionId()
+    localStorage.setItem(STORAGE_KEY, newId)
+    setSessionId(newId)
+    console.log('[Session] Reset to new session:', newId)
   }, [])
 
   const value = {
-    ahEmail,
-    isIdentified: !!ahEmail,
+    sessionId,
+    isReady: !!sessionId,
     loading,
-    setAHEmail,
-    clearAHEmail,
+    resetSession,
+    // Backwards compatibility
+    ahEmail: sessionId,
+    isIdentified: !!sessionId,
+    setAHEmail: () => {}, // no-op
+    clearAHEmail: resetSession,
   }
 
   return (
@@ -66,23 +82,23 @@ export function useAHUser() {
 }
 
 /**
- * Custom fetch that adds ah_email header for API calls
+ * Custom fetch that adds session ID header for API calls
  */
 export function useAHFetch() {
-  const { ahEmail } = useAHUser()
+  const { sessionId } = useAHUser()
   
   return useCallback(async (url, options = {}) => {
     const headers = {
       ...options.headers,
     }
     
-    if (ahEmail) {
-      headers['X-AH-Email'] = ahEmail
+    if (sessionId) {
+      headers['X-Session-ID'] = sessionId
     }
     
     return fetch(url, {
       ...options,
       headers,
     })
-  }, [ahEmail])
+  }, [sessionId])
 }

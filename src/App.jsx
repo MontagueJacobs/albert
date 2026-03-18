@@ -1,17 +1,27 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Leaf, TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle, LogOut } from 'lucide-react'
+import { Leaf, TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle } from 'lucide-react'
+import AddPurchase from './components/AddPurchase'
 import Dashboard from './components/Dashboard'
 import PurchaseList from './components/PurchaseList'
 import ProfileSuggestions from './components/ProfileSuggestions'
 import HowItWorks from './components/HowItWorks'
 import AccountSync from './components/AccountSync'
 import ScoreLookup from './components/ScoreLookup'
-import AHLanding from './components/AHLanding'
-import { AHUserProvider, useAHUser } from './lib/ahUserContext'
+import UserMenu from './components/UserMenu'
+import AuthModal from './components/AuthModal'
+import { AuthProvider, useAuth } from './lib/authContext'
+import { AHUserProvider } from './lib/ahUserContext.jsx'
 import { I18nProvider, useI18n, getSavedLang, saveLang } from './i18n.jsx'
 
 // Feature cards for the homepage
 const features = [
+  {
+    id: 'add',
+    emoji: '🛒',
+    titleKey: 'tab_add',
+    descKey: 'feature_add_desc',
+    color: '#10b981'
+  },
   {
     id: 'dashboard',
     emoji: '📊',
@@ -51,8 +61,13 @@ const features = [
 
 function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion }) {
   const { t, lang, setLang } = useI18n()
-  const { ahEmail, clearAHEmail } = useAHUser()
+  const { user } = useAuth()
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  
+  const handleLoginClick = useCallback(() => {
+    setShowAuthModal(true)
+  }, [])
 
   const handleToggleLanguage = useCallback(() => {
     const nextLang = lang === 'nl' ? 'en' : 'nl'
@@ -62,28 +77,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
   const navigateTo = (tab) => {
     setActiveTab(tab)
     setMenuOpen(false)
-  }
-
-  // Show landing page if no AH email is set
-  if (!ahEmail) {
-    return (
-      <div className="app-wrapper">
-        <header className="app-header">
-          <div className="header-logo">
-            <Leaf size={28} className="logo-icon" />
-            <span className="logo-text">Sustainable Shop</span>
-          </div>
-          
-          <div className="header-actions">
-            <button className="lang-btn" onClick={handleToggleLanguage}>
-              {lang === 'nl' ? 'EN' : 'NL'}
-            </button>
-          </div>
-        </header>
-        
-        <AHLanding />
-      </div>
-    )
   }
 
   // Homepage / Landing view
@@ -106,12 +99,13 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
-            <div className="user-email-display">
-              <span className="user-email">{ahEmail}</span>
-              <button className="logout-btn" onClick={clearAHEmail} title="Log out">
-                <LogOut size={16} />
+            {user ? (
+              <UserMenu onLoginClick={() => setShowAuthModal(true)} />
+            ) : (
+              <button className="auth-btn" onClick={() => setShowAuthModal(true)}>
+                {t('sign_in')} / {t('register')}
               </button>
-            </div>
+            )}
           </div>
         </header>
 
@@ -181,6 +175,11 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             ))}
           </div>
         </section>
+
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+        />
       </div>
     )
   }
@@ -204,12 +203,13 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           <button className="lang-btn" onClick={handleToggleLanguage}>
             {lang === 'nl' ? 'EN' : 'NL'}
           </button>
-          <div className="user-email-display">
-            <span className="user-email">{ahEmail}</span>
-            <button className="logout-btn" onClick={clearAHEmail} title="Log out">
-              <LogOut size={16} />
+          {user ? (
+            <UserMenu onLoginClick={() => setShowAuthModal(true)} />
+          ) : (
+            <button className="auth-btn" onClick={() => setShowAuthModal(true)}>
+              {t('sign_in')} / {t('register')}
             </button>
-          </div>
+          )}
         </div>
       </header>
 
@@ -253,37 +253,56 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </div>
         
         <div className="content-card">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} />}
+          {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} onLoginClick={handleLoginClick} />}
+          {activeTab === 'dashboard' && <Dashboard syncVersion={syncVersion} onLoginClick={handleLoginClick} />}
+          {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} onLoginClick={handleLoginClick} />}
           {activeTab === 'lookup' && <ScoreLookup />}
           {activeTab === 'sync' && <AccountSync onSyncCompleted={onSyncCompleted} />}
-          {activeTab === 'history' && <PurchaseList />}
+          {activeTab === 'history' && <PurchaseList syncVersion={syncVersion} onLoginClick={handleLoginClick} />}
           {activeTab === 'how' && <HowItWorks />}
         </div>
       </main>
+
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </div>
   )
 }
 
 function App() {
+  // Read initial tab from URL hash (e.g., #dashboard)
   const [activeTab, setActiveTab] = useState(() => {
-    try {
-      return localStorage.getItem('activeTab') || 'home'
-    } catch {
-      return 'home'
-    }
+    const hash = window.location.hash.slice(1) // Remove #
+    const validTabs = ['home', 'add', 'dashboard', 'suggestions', 'lookup', 'sync', 'history', 'how']
+    return validTabs.includes(hash) ? hash : 'home'
   })
   const [lang, setLang] = useState(() => getSavedLang())
   const [syncVersion, setSyncVersion] = useState(0)
 
-  // Persist active tab to localStorage
-  const handleSetActiveTab = useCallback((tab) => {
-    setActiveTab(tab)
-    try {
-      localStorage.setItem('activeTab', tab)
-    } catch {
-      // Ignore storage errors
+  // Sync activeTab with URL hash
+  useEffect(() => {
+    // Update hash when tab changes
+    if (activeTab !== 'home') {
+      window.location.hash = activeTab
+    } else {
+      // Clear hash for home
+      if (window.location.hash) {
+        history.replaceState(null, '', window.location.pathname)
+      }
     }
+  }, [activeTab])
+
+  // Listen for browser back/forward navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1)
+      const validTabs = ['home', 'add', 'dashboard', 'suggestions', 'lookup', 'sync', 'history', 'how']
+      setActiveTab(validTabs.includes(hash) ? hash : 'home')
+    }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
 
   const handleSetLang = useCallback((value) => {
@@ -305,17 +324,19 @@ function App() {
   }, [])
 
   return (
-    <AHUserProvider>
-      <I18nProvider lang={lang} setLang={handleSetLang}>
-        <AppShell
-          onPurchaseAdded={handlePurchaseAdded}
-          onSyncCompleted={handleSyncCompleted}
-          activeTab={activeTab}
-          setActiveTab={handleSetActiveTab}
-          syncVersion={syncVersion}
-        />
-      </I18nProvider>
-    </AHUserProvider>
+    <AuthProvider>
+      <AHUserProvider>
+        <I18nProvider lang={lang} setLang={handleSetLang}>
+          <AppShell
+            onPurchaseAdded={handlePurchaseAdded}
+            onSyncCompleted={handleSyncCompleted}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            syncVersion={syncVersion}
+          />
+        </I18nProvider>
+      </AHUserProvider>
+    </AuthProvider>
   )
 }
 

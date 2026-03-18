@@ -149,8 +149,10 @@ class AHProductDetailScraper:
             'is_vegan': None,
             'is_vegetarian': None,
             'is_organic': None,
+            'is_fairtrade': None,
             'nutri_score': None,
             'origin_country': None,
+            'origin_by_month': None,  # Monthly origin data: {"jan": "Country", "feb": "Country", ...}
             'brand': None,
             'unit_size': None,
             'price': None,
@@ -285,6 +287,48 @@ class AHProductDetailScraper:
                         break
             except:
                 pass
+            
+            # ================================================================
+            # Extract Fairtrade Certification
+            # ================================================================
+            fairtrade_indicators = [
+                'fairtrade',
+                'fair trade',
+                'max havelaar',  # Fairtrade certification mark used in Netherlands
+                'utz certified',  # UTZ (now Rainforest Alliance) sustainable farming
+                'rainforest alliance',
+                'eerlijke handel',  # Dutch for "fair trade"
+            ]
+            
+            # Check in page content
+            for indicator in fairtrade_indicators:
+                if indicator in content_lower:
+                    result['is_fairtrade'] = True
+                    break
+                    
+            # Check for Fairtrade badges/logos
+            if not result['is_fairtrade']:
+                try:
+                    fairtrade_badges = await self.page.query_selector_all(
+                        '[alt*="fairtrade"], [alt*="fair trade"], [alt*="havelaar"], '
+                        'img[src*="fairtrade"], img[src*="havelaar"], '
+                        '[class*="fairtrade"], [class*="fair-trade"]'
+                    )
+                    if fairtrade_badges and len(fairtrade_badges) > 0:
+                        result['is_fairtrade'] = True
+                except:
+                    pass
+                    
+            # Also check the keurmerken/certification section for Fairtrade
+            try:
+                badge_sections = await self.page.query_selector_all('[class*="keurmerk"], [class*="badge"], [class*="certification"]')
+                for section in badge_sections:
+                    text = (await section.inner_text()).lower()
+                    if any(ind in text for ind in fairtrade_indicators):
+                        result['is_fairtrade'] = True
+                        break
+            except:
+                pass
                 
             # ================================================================
             # Extract Nutri-Score
@@ -318,8 +362,24 @@ class AHProductDetailScraper:
                 pass
                 
             # ================================================================
-            # Extract Country of Origin
+            # Extract Country of Origin (including monthly variations)
             # ================================================================
+            # Month name mappings (Dutch to English abbreviations)
+            MONTH_NAMES = {
+                'januari': 'jan', 'jan': 'jan',
+                'februari': 'feb', 'feb': 'feb',
+                'maart': 'mar', 'mrt': 'mar',
+                'april': 'apr', 'apr': 'apr',
+                'mei': 'may',
+                'juni': 'jun', 'jun': 'jun',
+                'juli': 'jul', 'jul': 'jul',
+                'augustus': 'aug', 'aug': 'aug',
+                'september': 'sep', 'sept': 'sep', 'sep': 'sep',
+                'oktober': 'oct', 'okt': 'oct',
+                'november': 'nov', 'nov': 'nov',
+                'december': 'dec', 'dec': 'dec',
+            }
+            
             origin_patterns = [
                 r'herkomst[:\s]*([^<\n,]+)',
                 r'land van herkomst[:\s]*([^<\n,]+)',
@@ -328,6 +388,62 @@ class AHProductDetailScraper:
                 r'geproduceerd in[:\s]*([^<\n,]+)',
             ]
             
+            # First, try to find the herkomst section which might contain monthly data
+            try:
+                # Look for the herkomst foldout/accordion section
+                herkomst_section = await self.page.query_selector('[class*="origin"], [data-testid*="origin"], [id*="herkomst"]')
+                if herkomst_section:
+                    herkomst_text = await herkomst_section.inner_text()
+                    
+                    # Check for monthly patterns like "januari - maart: Nederland, april - juni: Spanje"
+                    # Or "Jan-Mar: Netherlands, Apr-Jun: Spain"
+                    monthly_pattern = r'(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december|jan|feb|mrt|apr|jun|jul|aug|sept?|okt|nov|dec)[:\s\-–]+\s*(?:tot|t/m|-)?\s*(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december|jan|feb|mrt|apr|jun|jul|aug|sept?|okt|nov|dec)?[:\s]*([a-zA-Z\s]+?)(?=,|januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december|jan|feb|mrt|apr|jun|jul|aug|sept?|okt|nov|dec|$)'
+                    
+                    monthly_matches = re.findall(monthly_pattern, herkomst_text.lower(), re.IGNORECASE)
+                    
+                    if monthly_matches:
+                        origin_by_month = {}
+                        for start_month, end_month, country_raw in monthly_matches:
+                            # Clean country name
+                            country_raw = country_raw.strip()
+                            country_raw = re.sub(r'[^\w\s]', '', country_raw).strip()
+                            
+                            # Map to standardized country name
+                            country = None
+                            for dutch_name, english_name in COUNTRY_MAPPINGS.items():
+                                if dutch_name in country_raw.lower():
+                                    country = english_name
+                                    break
+                            if not country and len(country_raw) > 2:
+                                country = country_raw.title()
+                            
+                            if country:
+                                # Get month keys
+                                start_key = MONTH_NAMES.get(start_month.lower())
+                                end_key = MONTH_NAMES.get(end_month.lower()) if end_month else start_key
+                                
+                                if start_key:
+                                    # Fill in all months in the range
+                                    month_order = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+                                    start_idx = month_order.index(start_key) if start_key in month_order else -1
+                                    end_idx = month_order.index(end_key) if end_key and end_key in month_order else start_idx
+                                    
+                                    if start_idx >= 0:
+                                        if end_idx < start_idx:  # Wraps around year
+                                            for i in range(start_idx, 12):
+                                                origin_by_month[month_order[i]] = country
+                                            for i in range(0, end_idx + 1):
+                                                origin_by_month[month_order[i]] = country
+                                        else:
+                                            for i in range(start_idx, end_idx + 1):
+                                                origin_by_month[month_order[i]] = country
+                        
+                        if origin_by_month:
+                            result['origin_by_month'] = origin_by_month
+            except:
+                pass
+            
+            # Standard origin extraction (single country)
             for pattern in origin_patterns:
                 match = re.search(pattern, content, re.IGNORECASE)
                 if match:

@@ -40,7 +40,9 @@ const SUPABASE_PRODUCTS_TABLE = process.env.SUPABASE_PRODUCTS_TABLE || 'products
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null
-const PYTHON_CMD = process.env.PYTHON || 'python3'
+// Use virtualenv Python where Playwright is installed
+const DEFAULT_VENV_PYTHON = path.resolve(__dirname, '../../AH/bin/python')
+const PYTHON_CMD = process.env.PYTHON || (existsSync(DEFAULT_VENV_PYTHON) ? DEFAULT_VENV_PYTHON : 'python3')
 const MAX_LOG_ENTRIES = 200
 const CATALOG_REFRESH_INTERVAL_MS = Number.parseInt(process.env.CATALOG_REFRESH_INTERVAL_MS ?? '900000', 10) || 900000
 
@@ -459,14 +461,114 @@ async function getUserFromRequest(req) {
   }
 }
 
-// Middleware to require authentication
+// Get or create a user ID from session ID (for anonymous users)
+// Returns the user ID (UUID) from the user_ah_credentials table
+async function getUserIdFromSession(req) {
+  // First check for JWT auth
+  const jwtUser = await getUserFromRequest(req)
+  if (jwtUser) {
+    console.log('[DEBUG] getUserIdFromSession: JWT user found:', jwtUser.id)
+    return jwtUser.id
+  }
+  
+  // Check for session ID header
+  const sessionId = req.headers['x-session-id']
+  console.log('[DEBUG] getUserIdFromSession: sessionId header:', sessionId, 'supabase:', !!supabase)
+  if (!sessionId || !supabase) {
+    console.log('[DEBUG] getUserIdFromSession: No session ID or no supabase, returning null')
+    return null
+  }
+  
+  console.log('[DEBUG] Looking up user by session ID:', sessionId)
+  
+  try {
+    // Try to find existing user by session_id
+    const { data: existing, error: findError } = await supabase
+      .from('user_ah_credentials')
+      .select('id')
+      .eq('session_id', sessionId)
+      .maybeSingle()
+    
+    if (findError) {
+      console.error('[ERROR] Error looking up session:', findError.message)
+      return null
+    }
+    
+    if (existing) {
+      console.log('[DEBUG] Found existing user for session:', existing.id)
+      return existing.id
+    }
+    
+    // Create new anonymous user
+    const newId = crypto.randomUUID()
+    console.log('[DEBUG] Creating new session user with id:', newId)
+    const { error: insertError } = await supabase
+      .from('user_ah_credentials')
+      .insert({
+        id: newId,
+        session_id: sessionId,
+        ah_email: null
+        // Don't set sync_status - let database use default
+      })
+    
+    if (insertError) {
+      console.error('[ERROR] Error creating session user:', insertError.message)
+      return null
+    }
+    
+    console.log('[DEBUG] Created new user for session:', newId)
+    return newId
+  } catch (err) {
+    console.error('[ERROR] Session lookup error:', err.message)
+    return null
+  }
+}
+
+// Get ALL user IDs associated with this request (both JWT and session)
+// This helps when a user was previously session-based and is now JWT authenticated
+async function getAllUserIds(req) {
+  const userIds = []
+  
+  // Get JWT user ID
+  const jwtUser = await getUserFromRequest(req)
+  if (jwtUser) {
+    userIds.push(jwtUser.id)
+  }
+  
+  // Also get session-based user ID if present
+  const sessionId = req.headers['x-session-id']
+  if (sessionId && supabase) {
+    const { data: sessionUser } = await supabase
+      .from('user_ah_credentials')
+      .select('id')
+      .eq('session_id', sessionId)
+      .maybeSingle()
+    
+    if (sessionUser && !userIds.includes(sessionUser.id)) {
+      userIds.push(sessionUser.id)
+    }
+  }
+  
+  return userIds
+}
+
+// Middleware to require authentication (supports both JWT and session-based auth)
 function requireAuth(req, res, next) {
   getUserFromRequest(req).then(user => {
-    if (!user) {
-      return res.status(401).json({ error: 'unauthorized', message: 'Please log in to access this resource' })
+    if (user) {
+      req.user = user
+      return next()
     }
-    req.user = user
-    next()
+    
+    // Fallback: check for session-based auth
+    return getUserIdFromSession(req).then(sessionUserId => {
+      if (!sessionUserId) {
+        return res.status(401).json({ error: 'unauthorized', message: 'Please log in to access this resource' })
+      }
+      // Create a pseudo-user object for session-based users
+      req.user = { id: sessionUserId, session_based: true }
+      next()
+    })
   }).catch(err => {
     res.status(500).json({ error: 'auth_error', message: err.message })
   })
@@ -591,64 +693,91 @@ function extractProductFromUrl(url, originalName) {
   const normalized = normalizeProductName(name)
   
   if (!url) {
+    // No URL - use name as fallback
+    if (normalized && normalized.length > 2) {
+      return {
+        id: `ah-${normalized.replace(/\s+/g, '-').toLowerCase()}`,
+        name,
+        normalized
+      }
+    }
+    return { id: null, name, normalized }
+  }
+  
+  try {
+    const u = new URL(url)
+    
+    // Strategy 1: /producten/product/<wi...>/<slug> format
+    const match1 = u.pathname.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
+    if (match1 && match1[1]) {
+      const slug = match1[1].toLowerCase()
+      if (/^[a-z0-9-]+$/.test(slug) && slug.length > 2) {
+        let displayName = slug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        return {
+          id: slug,
+          name: name || displayName,
+          normalized: normalizeProductName(slug.replace(/-/g, ' '))
+        }
+      }
+    }
+    
+    // Strategy 2: /wi/<id>/<slug> format
+    const match2 = u.pathname.match(/\/wi\/([^/]+)\/([^/?#]+)/)
+    if (match2) {
+      const wiId = match2[1]
+      const slug = match2[2].toLowerCase()
+      if (slug.length > 2) {
+        let displayName = slug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        return {
+          id: `wi-${wiId}-${slug}`.substring(0, 100),  // Keep it reasonably short
+          name: name || displayName,
+          normalized: normalizeProductName(slug.replace(/-/g, ' '))
+        }
+      }
+    }
+    
+    // Strategy 3: Just /wi/<id> format
+    const match3 = u.pathname.match(/\/wi\/([^/?#]+)/)
+    if (match3 && match3[1]) {
+      const wiId = match3[1]
+      return {
+        id: `wi-${wiId}`,
+        name: name || `Product ${wiId}`,
+        normalized: normalized || wiId
+      }
+    }
+    
+    // Strategy 4: Any URL with a slug at the end
+    const pathParts = u.pathname.split('/').filter(p => p.length > 2)
+    if (pathParts.length > 0) {
+      const lastPart = pathParts[pathParts.length - 1]
+      const cleanSlug = lastPart.toLowerCase().replace(/[^a-z0-9-]/g, '')
+      if (cleanSlug.length > 3) {
+        let displayName = cleanSlug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        return {
+          id: `ah-${cleanSlug}`.substring(0, 100),
+          name: name || displayName,
+          normalized: normalizeProductName(cleanSlug.replace(/-/g, ' '))
+        }
+      }
+    }
+  } catch (_) {
+    // URL parsing failed
+  }
+  
+  // Fallback: use original name
+  if (normalized && normalized.length > 2) {
     return {
-      id: normalized ? `ah-${normalized.replace(/\s+/g, '-')}` : null,
+      id: `ah-${normalized.replace(/\s+/g, '-').toLowerCase()}`.substring(0, 100),
       name,
       normalized
     }
   }
   
-  try {
-    const u = new URL(url)
-    // Expected format: /producten/product/<wi...>/<slug>
-    const match = u.pathname.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
-    if (match && match[1]) {
-      const slug = match[1].toLowerCase()
-      // Validate slug (only lowercase letters, numbers, hyphens)
-      if (/^[a-z0-9-]+$/.test(slug) && slug.length > 2) {
-        // Create display name from slug
-        let displayName = slug.replace(/-/g, ' ')
-        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
-        
-        return {
-          id: slug,
-          name: displayName,
-          normalized: normalizeProductName(slug.replace(/-/g, ' '))
-        }
-      }
-    }
-  } catch (_) {
-    // URL parsing failed, fall back to original name
-  }
-  
-  // Check if original name looks like a generic/bad name
-  const normalizedLower = normalized.toLowerCase()
-  if (GENERIC_PRODUCT_NAMES.has(normalizedLower) || normalized.length < 3) {
-    // Don't use generic names, try to extract something from URL path
-    try {
-      const u = new URL(url)
-      const parts = u.pathname.split('/').filter(p => p.length > 2)
-      const lastPart = parts[parts.length - 1]
-      if (lastPart && lastPart.length > 3) {
-        const cleanSlug = lastPart.toLowerCase().replace(/[^a-z0-9-]/g, '')
-        if (cleanSlug.length > 3) {
-          let displayName = cleanSlug.replace(/-/g, ' ')
-          displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
-          return {
-            id: cleanSlug,
-            name: displayName,
-            normalized: normalizeProductName(cleanSlug.replace(/-/g, ' '))
-          }
-        }
-      }
-    } catch (_) {}
-  }
-  
-  return {
-    id: normalized ? `ah-${normalized.replace(/\s+/g, '-')}` : null,
-    name,
-    normalized
-  }
+  return { id: null, name, normalized }
 }
 
 // Data file path - DEPRECATED: Now using Supabase for all purchases
@@ -736,6 +865,9 @@ const ENRICHED_SCORING = {
   is_vegetarian: { delta: 1, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
   is_organic: { delta: 2, icon: '🌿', label: 'Organic/Bio' },
   
+  // Ethical certifications
+  is_fairtrade: { delta: 2, icon: '🤝', label: 'Fairtrade' },
+  
   // Nutri-Score impact
   nutri_score: {
     'A': { delta: 2, label: 'Nutri-Score A' },
@@ -781,6 +913,29 @@ const ENRICHED_SCORING = {
     'Australia': { delta: -2, region: 'oceania' },
     'New Zealand': { delta: -2, region: 'oceania' }
   }
+}
+
+// Month abbreviations for origin_by_month lookups
+const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+/**
+ * Get the current month key for origin_by_month lookup
+ * @returns {string} Current month as 3-letter lowercase key (e.g., 'jan', 'feb')
+ */
+function getCurrentMonthKey() {
+  const now = new Date()
+  return MONTH_KEYS[now.getMonth()]
+}
+
+/**
+ * Get the origin country for the current month from origin_by_month data
+ * @param {Object} originByMonth - JSONB object with monthly origins
+ * @returns {string|null} - Country name for current month, or null if not available
+ */
+function getOriginForCurrentMonth(originByMonth) {
+  if (!originByMonth || typeof originByMonth !== 'object') return null
+  const monthKey = getCurrentMonthKey()
+  return originByMonth[monthKey] || null
 }
 
 // ============================================================================
@@ -1231,6 +1386,13 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
       matchedEnriched.push({ code: 'organic', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
     }
 
+    // Fairtrade scoring
+    if (enrichedData.is_fairtrade === true) {
+      const scoring = ENRICHED_SCORING.is_fairtrade
+      applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
+      matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    }
+
     // Nutri-Score scoring (A-E)
     if (enrichedData.nutri_score && ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]) {
       const scoring = ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]
@@ -1247,18 +1409,36 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     }
 
     // Origin country scoring (local vs imported)
-    if (enrichedData.origin_country) {
-      const originScoring = ENRICHED_SCORING.origin_country[enrichedData.origin_country]
+    // Check monthly origin first (origin_by_month), then fall back to static origin_country
+    let effectiveOrigin = null
+    let isSeasonalOrigin = false
+    
+    if (enrichedData.origin_by_month) {
+      effectiveOrigin = getOriginForCurrentMonth(enrichedData.origin_by_month)
+      isSeasonalOrigin = effectiveOrigin !== null
+    }
+    
+    // Fall back to static origin if no monthly origin available
+    if (!effectiveOrigin && enrichedData.origin_country) {
+      effectiveOrigin = enrichedData.origin_country
+    }
+    
+    if (effectiveOrigin) {
+      const originScoring = ENRICHED_SCORING.origin_country[effectiveOrigin]
+      const monthLabel = isSeasonalOrigin ? ` (${getCurrentMonthKey().toUpperCase()})` : ''
+      
       if (originScoring) {
         if (originScoring.delta !== 0) {
           applyDelta('enriched', `enriched_origin_${originScoring.region}`, originScoring.delta)
           matchedEnriched.push({ 
             code: `origin_${originScoring.region}`, 
             icon: originScoring.delta > 0 ? '📍' : '✈️', 
-            label: `Origin: ${enrichedData.origin_country}`, 
+            label: `Origin: ${effectiveOrigin}${monthLabel}`, 
             delta: originScoring.delta,
-            country: enrichedData.origin_country,
-            region: originScoring.region
+            country: effectiveOrigin,
+            region: originScoring.region,
+            isSeasonal: isSeasonalOrigin,
+            originByMonth: enrichedData.origin_by_month
           })
         }
       } else {
@@ -1267,9 +1447,10 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
         matchedEnriched.push({ 
           code: 'origin_unknown', 
           icon: '🌍', 
-          label: `Origin: ${enrichedData.origin_country} (unknown region)`, 
+          label: `Origin: ${effectiveOrigin}${monthLabel} (unknown region)`, 
           delta: -0.5,
-          country: enrichedData.origin_country
+          country: effectiveOrigin,
+          isSeasonal: isSeasonalOrigin
         })
       }
     }
@@ -1313,8 +1494,10 @@ function getEnrichedData(product) {
     product.is_vegan !== null || 
     product.is_vegetarian !== null || 
     product.is_organic !== null || 
+    product.is_fairtrade !== null ||
     product.nutri_score !== null || 
-    product.origin_country !== null
+    product.origin_country !== null ||
+    product.origin_by_month !== null
   
   if (!hasEnrichedData) return null
   
@@ -1322,8 +1505,10 @@ function getEnrichedData(product) {
     is_vegan: product.is_vegan,
     is_vegetarian: product.is_vegetarian,
     is_organic: product.is_organic,
+    is_fairtrade: product.is_fairtrade,
     nutri_score: product.nutri_score,
     origin_country: product.origin_country,
+    origin_by_month: product.origin_by_month,
     brand: product.brand,
     allergens: product.allergens,
     details_scraped_at: product.details_scraped_at
@@ -1689,10 +1874,18 @@ app.post('/api/user/purchases', requireAuth, async (req, res) => {
 // Get user's purchase insights/dashboard data
 app.get('/api/user/insights', requireAHEmail, async (req, res) => {
   try {
+    // Get all user IDs (JWT + session-based) to merge purchases
+    const userIds = await getAllUserIds(req)
+    console.log('[Insights] Fetching for user IDs:', userIds)
+    
+    if (userIds.length === 0) {
+      return res.json({ message: 'No purchases yet!' })
+    }
+    
     const { data: purchases, error } = await supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-      .eq('user_id', req.user.id)
+      .in('user_id', userIds)
     
     if (error) throw error
     
@@ -1887,11 +2080,25 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     const sortBy = req.query.sortBy || 'scraped_at'  // Use scraped_at as default
     const sortOrder = req.query.sortOrder === 'asc' ? true : false
     
+    // Get all user IDs (JWT + session-based) to merge purchases
+    const userIds = await getAllUserIds(req)
+    console.log('[History] Fetching for user IDs:', userIds)
+    
+    if (userIds.length === 0) {
+      return res.json({ 
+        purchases: [], 
+        total: 0,
+        page,
+        limit,
+        totalPages: 0
+      })
+    }
+    
     // Get user purchases - use * to get all columns
     const { data: purchases, error, count } = await supabase
       .from('user_purchases')
       .select('*', { count: 'exact' })
-      .eq('user_id', req.user.id)
+      .in('user_id', userIds)
       .order(sortBy, { ascending: sortOrder })
       .range(offset, offset + limit - 1)
     
@@ -1900,7 +2107,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
       throw error
     }
     
-    console.log(`[History] Fetched ${purchases?.length || 0} purchases for user ${req.user.id}`)
+    console.log(`[History] Fetched ${purchases?.length || 0} purchases for user IDs ${userIds.join(', ')}`)
     
     if (!purchases || purchases.length === 0) {
       return res.json({ 
@@ -1922,7 +2129,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     if (productIds.length > 0 && enrichedColumnsAvailable) {
       const { data: products, error: enrichError } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, image_url, url')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url')
         .in('id', productIds)
       
       if (enrichError?.message?.includes('does not exist')) {
@@ -1975,8 +2182,10 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
         is_vegan: enriched.is_vegan ?? null,
         is_vegetarian: enriched.is_vegetarian ?? null,
         is_organic: enriched.is_organic ?? null,
+        is_fairtrade: enriched.is_fairtrade ?? null,
         nutri_score: enriched.nutri_score ?? null,
         origin_country: enriched.origin_country ?? null,
+        origin_by_month: enriched.origin_by_month ?? null,
         brand: enriched.brand ?? null,
         image_url: enriched.image_url ?? null,
         product_url: enriched.url ?? null,
@@ -2004,11 +2213,28 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
 // Get personalized suggestions based on user's purchase history
 app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
   try {
+    // Get all user IDs (JWT + session-based) to merge purchases
+    const userIds = await getAllUserIds(req)
+    console.log('[Suggestions] Fetching for user IDs:', userIds)
+    
+    if (userIds.length === 0) {
+      return res.json({
+        profile: {
+          total_products: 0,
+          avg_sustainability_score: 0,
+          profile_type: 'balanced',
+          profile_info: USER_PROFILE_TYPES['balanced']
+        },
+        replacements: [],
+        suggestions: []
+      })
+    }
+    
     // Get user's purchases to analyze their profile
     const { data: purchases, error: purchasesError } = await supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-      .eq('user_id', req.user.id)
+      .in('user_id', userIds)
     
     if (purchasesError) throw purchasesError
     
@@ -2036,7 +2262,7 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
     if (enrichedColumnsAvailable) {
       const { data, error: productsError } = await supabase
         .from('products')
-        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand')
         .order('seen_count', { ascending: false })
         .limit(200)
       
@@ -2125,7 +2351,7 @@ app.get('/api/products/popular', async (req, res) => {
     if (enrichedColumnsAvailable) {
       const result = await supabase
         .from('products')
-        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand, details_scraped_at')
+        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, details_scraped_at')
         .order('seen_count', { ascending: false })
         .limit(limit)
       
@@ -2182,7 +2408,7 @@ app.get('/api/products/search', async (req, res) => {
     if (enrichedColumnsAvailable) {
       const result = await supabase
         .from('products')
-        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, origin_country, brand')
+        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand')
         .ilike('normalized_name', `%${query.toLowerCase()}%`)
         .limit(50)
       
@@ -2597,6 +2823,218 @@ app.get('/api/products/:productId', async (req, res) => {
       score_details: evaluation
     })
   } catch (err) {
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// Get detailed product analysis with scoring breakdown and alternatives
+app.get('/api/product/:productId/details', requireAuth, async (req, res) => {
+  try {
+    const { productId } = req.params
+    
+    // Get product from database (if available)
+    let product = null
+    if (supabase) {
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .maybeSingle()
+      product = data
+    }
+    
+    // Get product name from database, user_purchases, or use productId as fallback
+    let productName = product?.name
+    if (!productName && supabase) {
+      // Try to find the product name from user_purchases
+      const { data: purchase } = await supabase
+        .from('user_purchases')
+        .select('product_name')
+        .eq('product_id', productId)
+        .limit(1)
+        .maybeSingle()
+      productName = purchase?.product_name
+    }
+    if (!productName) {
+      productName = decodeURIComponent(productId).replace(/-/g, ' ')
+    }
+    
+    // Get enriched data if available
+    const enrichedData = product ? getEnrichedData(product) : null
+    
+    // Evaluate product with full scoring breakdown
+    const evaluation = evaluateProduct(productName, enrichedData)
+    
+    // Create user-friendly breakdown
+    const breakdown = []
+    
+    // Base score
+    breakdown.push({
+      label: 'Base Score',
+      value: '5',
+      positive: false,
+      negative: false
+    })
+    
+    // Add adjustment explanations
+    for (const adj of evaluation.adjustments) {
+      let label = ''
+      let positive = adj.delta > 0
+      let negative = adj.delta < 0
+      
+      switch (adj.type) {
+        case 'catalog':
+          if (adj.code === 'catalog_base') {
+            label = 'Product Type'
+          } else {
+            label = adj.code.replace('catalog_', '').replace(/_/g, ' ')
+          }
+          break
+        case 'category':
+          label = adj.category?.replace(/_/g, ' ') || 'Category'
+          label = label.charAt(0).toUpperCase() + label.slice(1)
+          break
+        case 'keyword':
+          const keywordMap = {
+            'keyword_organic': 'Organic/Bio',
+            'keyword_local': 'Local Product',
+            'keyword_seasonal': 'Seasonal',
+            'keyword_fairtrade': 'Fairtrade',
+            'keyword_processed': 'Processed Food',
+            'keyword_plastic_packaging': 'Plastic Packaging',
+            'keyword_meat': 'Meat Product',
+            'keyword_palm_oil': 'Contains Palm Oil'
+          }
+          label = keywordMap[adj.code] || adj.code.replace('keyword_', '').replace(/_/g, ' ')
+          break
+        case 'enriched':
+          const enrichedMap = {
+            'enriched_vegan': 'Vegan',
+            'enriched_vegetarian': 'Vegetarian',
+            'enriched_organic': 'Organic Certified',
+            'enriched_nutriscore_A': 'Nutri-Score A',
+            'enriched_nutriscore_B': 'Nutri-Score B',
+            'enriched_nutriscore_C': 'Nutri-Score C',
+            'enriched_nutriscore_D': 'Nutri-Score D',
+            'enriched_nutriscore_E': 'Nutri-Score E',
+            'enriched_origin_local': 'Local Origin',
+            'enriched_origin_europe': 'European Origin',
+            'enriched_origin_overseas': 'Overseas Import',
+            'enriched_origin_unknown': 'Unknown Origin'
+          }
+          label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
+          break
+        default:
+          label = adj.code?.replace(/_/g, ' ') || 'Unknown'
+      }
+      
+      breakdown.push({
+        label,
+        value: (adj.delta > 0 ? '+' : '') + adj.delta.toFixed(1),
+        positive,
+        negative
+      })
+    }
+    
+    // Final score
+    breakdown.push({
+      label: 'Final Score',
+      value: evaluation.score.toString(),
+      positive: evaluation.score >= 7,
+      negative: evaluation.score < 5
+    })
+    
+    // Create improvement reasons
+    const improvements = []
+    
+    // Positive factors
+    for (const cat of evaluation.categories) {
+      if (cat.referenceScore > 5) {
+        improvements.push({
+          reason: `${cat.icon || '📦'} ${cat.category.replace(/_/g, ' ')} category bonus`,
+          positive: true
+        })
+      }
+    }
+    for (const adj of evaluation.adjustments.filter(a => a.delta > 0)) {
+      if (adj.type === 'keyword') {
+        improvements.push({
+          reason: `✅ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} bonus`,
+          positive: true
+        })
+      }
+    }
+    
+    // Negative factors
+    for (const cat of evaluation.categories) {
+      if (cat.referenceScore < 5) {
+        improvements.push({
+          reason: `${cat.icon || '📦'} Low sustainability for ${cat.category.replace(/_/g, ' ')}`,
+          positive: false
+        })
+      }
+    }
+    for (const adj of evaluation.adjustments.filter(a => a.delta < 0)) {
+      if (adj.type === 'keyword') {
+        improvements.push({
+          reason: `⚠️ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} penalty`,
+          positive: false
+        })
+      }
+    }
+    
+    // Find better alternatives from catalog
+    let alternatives = []
+    if (supabase && evaluation.score < 9) {
+      // Get products with better scores from the same general category
+      let query = supabase
+        .from('products')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score')
+        .neq('id', productId)
+        .order('seen_count', { ascending: false })
+        .limit(100)
+      
+      const { data: candidates } = await query
+      
+      if (candidates && candidates.length > 0) {
+        // Score all candidates and filter for better ones
+        const scored = candidates
+          .map(c => {
+            const enriched = getEnrichedData(c)
+            const productEval = evaluateProduct(c.name, enriched)
+            return {
+              id: c.id,
+              name: c.name,
+              url: c.url,
+              image_url: c.image_url,
+              price: c.price,
+              score: productEval.score,
+              is_vegan: c.is_vegan,
+              is_organic: c.is_organic
+            }
+          })
+          .filter(c => c.score > evaluation.score)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5)
+        
+        alternatives = scored
+      }
+    }
+    
+    res.json({
+      productId,
+      productName,
+      score: evaluation.score,
+      rating: evaluation.rating,
+      breakdown,
+      improvements,
+      alternatives,
+      categories: evaluation.categories,
+      suggestions: evaluation.suggestions,
+      hasEnrichedData: evaluation.hasEnrichedData
+    })
+  } catch (err) {
+    console.error('[product/details] Error:', err)
     res.status(500).json({ error: 'fetch_failed', message: err.message })
   }
 })
@@ -3795,33 +4233,43 @@ app.post('/api/auto-scrape/resync', requireAuth, async (req, res) => {
 
 // Get auto-scrape status
 app.get('/api/auto-scrape/status', (req, res) => {
-  res.json({
-    status: autoScrapeState.running ? 'running' : 'idle',
-    running: autoScrapeState.running,
-    startedAt: autoScrapeState.startedAt,
-    lastRun: autoScrapeState.lastRun,
-    progress: autoScrapeState.progress,
-    logs: autoScrapeState.logs.slice(-100)
-  })
+  try {
+    res.json({
+      status: autoScrapeState.running ? 'running' : 'idle',
+      running: autoScrapeState.running,
+      startedAt: autoScrapeState.startedAt,
+      lastRun: autoScrapeState.lastRun,
+      progress: autoScrapeState.progress,
+      logs: autoScrapeState.logs.slice(-100)
+    })
+  } catch (err) {
+    console.error('[auto-scrape/status] Error:', err)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // Check if auto-scrape is available
 // Available if: (1) not on Vercel, OR (2) Browserless URL is configured
 app.get('/api/auto-scrape/available', (req, res) => {
-  const hasBrowserless = !!process.env.BROWSERLESS_URL
-  const isVercel = !!process.env.VERCEL
-  const available = !isVercel || hasBrowserless
-  
-  let reason = null
-  if (!available) {
-    reason = 'hosted_environment_no_browserless'
+  try {
+    const hasBrowserless = !!process.env.BROWSERLESS_URL
+    const isVercel = !!process.env.VERCEL
+    const available = !isVercel || hasBrowserless
+    
+    let reason = null
+    if (!available) {
+      reason = 'hosted_environment_no_browserless'
+    }
+    
+    res.json({
+      available,
+      reason,
+      mode: hasBrowserless ? 'remote' : 'local'
+    })
+  } catch (err) {
+    console.error('[auto-scrape/available] Error:', err)
+    res.status(500).json({ error: err.message })
   }
-  
-  res.json({
-    available,
-    reason,
-    mode: hasBrowserless ? 'remote' : 'local'
-  })
 })
 
 // Cookie file path for session persistence
@@ -4564,9 +5012,11 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
   }
   
   let resultData = null
+  let stdoutBuffer = ''  // Buffer stdout to handle chunked result
   
   scrapeProcess.stdout.on('data', (data) => {
     const text = data.toString()
+    stdoutBuffer += text  // Accumulate for result parsing
     appendAutoScrapeLog('stdout', text)
     
     // Update progress based on log messages
@@ -4577,16 +5027,6 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
       const msg = text.replace(/.*\[SUCCESS\]\s*/, '').trim()
       if (msg) autoScrapeState.progress = msg
     }
-    
-    // Parse result
-    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
-    if (resultMatch) {
-      try {
-        resultData = JSON.parse(resultMatch[1])
-      } catch (e) {
-        console.error('Failed to parse scrape result:', e)
-      }
-    }
   })
   
   scrapeProcess.stderr.on('data', (data) => {
@@ -4596,6 +5036,49 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
   scrapeProcess.on('close', async (code) => {
     const completedAt = new Date().toISOString()
     const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    console.log('[DEBUG] Process closed with code:', code)
+    console.log('[DEBUG] stdout buffer length:', stdoutBuffer.length)
+    
+    // Parse result from buffered stdout (handles chunked output)
+    // The [RESULT] JSON can be very long on a single line
+    const resultIndex = stdoutBuffer.indexOf('[RESULT]')
+    if (resultIndex !== -1) {
+      const jsonStart = stdoutBuffer.indexOf('{', resultIndex)
+      if (jsonStart !== -1) {
+        // Find matching closing brace by counting braces
+        let depth = 0
+        let jsonEnd = -1
+        for (let i = jsonStart; i < stdoutBuffer.length; i++) {
+          if (stdoutBuffer[i] === '{') depth++
+          else if (stdoutBuffer[i] === '}') {
+            depth--
+            if (depth === 0) {
+              jsonEnd = i + 1
+              break
+            }
+          }
+        }
+        if (jsonEnd !== -1) {
+          const jsonStr = stdoutBuffer.substring(jsonStart, jsonEnd)
+          console.log('[DEBUG] Found JSON from', jsonStart, 'to', jsonEnd, ', length:', jsonStr.length)
+          try {
+            resultData = JSON.parse(jsonStr)
+            console.log('[DEBUG] Parsed visual-login result:', { success: resultData.success, count: resultData.count })
+          } catch (e) {
+            console.error('[ERROR] Failed to parse JSON:', e.message)
+            console.error('[ERROR] JSON preview:', jsonStr.substring(0, 200))
+          }
+        } else {
+          console.log('[DEBUG] Could not find closing brace in JSON')
+        }
+      } else {
+        console.log('[DEBUG] No JSON start found after [RESULT]')
+      }
+    } else {
+      console.log('[DEBUG] No [RESULT] found in stdout buffer')
+      console.log('[DEBUG] Buffer preview (last 500 chars):', stdoutBuffer.slice(-500))
+    }
     
     autoScrapeState.running = false
     autoScrapeState.startedAt = null
@@ -4613,15 +5096,25 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
     // Ingest products to database if successful
     if (resultData?.success && resultData?.products?.length > 0 && supabase) {
       appendAutoScrapeLog('info', `📦 Storing ${resultData.products.length} products...`)
+      console.log('[DEBUG] Starting product ingestion, raw products:', resultData.products.length)
+      console.log('[DEBUG] Sample raw product:', JSON.stringify(resultData.products[0], null, 2))
       
       try {
-        const cleaned = resultData.products.map((item) => {
+        const cleaned = resultData.products.map((item, index) => {
           const rawName = (item.name || '').toString().trim()
           const url = (item.url || '').toString().trim()
           
           // Use helper to extract ID and name from URL
           const extracted = extractProductFromUrl(url, rawName)
-          if (!extracted.id) return null
+          
+          if (index < 3) {
+            console.log(`[DEBUG] Product ${index}: url=${url.substring(0, 80)}, name=${rawName.substring(0, 40)}, extracted_id=${extracted.id}`)
+          }
+          
+          if (!extracted.id) {
+            console.log(`[DEBUG] Skipped product (no ID): ${rawName.substring(0, 40)}`)
+            return null
+          }
           
           return {
             id: extracted.id,
@@ -4636,15 +5129,23 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
           }
         }).filter((item) => item && item.name && item.id)
         
-        const { error: upsertError } = await supabase
-          .from(SUPABASE_PRODUCTS_TABLE)
-          .upsert(cleaned, { onConflict: 'id' })
+        console.log(`[DEBUG] Cleaned products ready for upsert: ${cleaned.length}`)
+        
+        if (cleaned.length === 0) {
+          console.log('[WARNING] No products passed cleaning - check extractProductFromUrl')
+          appendAutoScrapeLog('stderr', 'No products could be cleaned for storage')
+        } else {
+          const { error: upsertError } = await supabase
+            .from(SUPABASE_PRODUCTS_TABLE)
+            .upsert(cleaned, { onConflict: 'id' })
         
         if (upsertError) {
           appendAutoScrapeLog('stderr', `Database error: ${upsertError.message}`)
+          console.error('[ERROR] Supabase upsert error:', upsertError)
         } else {
           appendAutoScrapeLog('info', `✅ Stored ${cleaned.length} products to product catalog`)
           autoScrapeState.lastRun.productsStored = cleaned.length
+          console.log(`[SUCCESS] Stored ${cleaned.length} products to ${SUPABASE_PRODUCTS_TABLE}`)
           
           // Also save to user_purchases if we have a userId
           // Uses upsert to prevent duplicates when re-scraping
@@ -4728,9 +5229,18 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
             console.log('[WARNING] userId is null - products scraped but not saved to user_purchases')
           }
         }
+        }  // end if (cleaned.length > 0)
       } catch (e) {
         appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
+        console.error('[ERROR] Ingestion exception:', e)
       }
+    } else {
+      console.log('[DEBUG] Skipping ingestion:', {
+        hasResultData: !!resultData,
+        success: resultData?.success,
+        productsCount: resultData?.products?.length,
+        hasSupabase: !!supabase
+      })
     }
   })
   
@@ -4753,9 +5263,9 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     return res.status(409).json({ error: 'scrape_in_progress' })
   }
   
-  // Get user from auth header if provided
-  const user = await getUserFromRequest(req)
-  const userId = user?.id || req.body?.user_id || null
+  // Get user from session ID or JWT
+  const userId = await getUserIdFromSession(req) || req.body?.user_id || null
+  console.log('[DEBUG] With-cookies - userId:', userId)
   
   // Accept optional email/password to save credentials (for admin manual logins)
   const { email, password, save_credentials } = req.body || {}
@@ -4863,19 +5373,12 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   }
   
   let resultData = null
+  let stdoutBuffer = ''  // Buffer stdout to handle chunked result
   
   scrapeProcess.stdout.on('data', (data) => {
     const text = data.toString()
+    stdoutBuffer += text  // Accumulate for result parsing
     appendAutoScrapeLog('stdout', text)
-    
-    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
-    if (resultMatch) {
-      try {
-        resultData = JSON.parse(resultMatch[1])
-      } catch (e) {
-        console.error('Failed to parse scrape result:', e)
-      }
-    }
   })
   
   scrapeProcess.stderr.on('data', (data) => {
@@ -4885,6 +5388,19 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   scrapeProcess.on('close', async (code) => {
     const completedAt = new Date().toISOString()
     const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+    
+    // Parse result from buffered stdout (handles chunked output)
+    const resultMatch = stdoutBuffer.match(/\[RESULT\]\s*(\{.*\})/s)
+    if (resultMatch) {
+      try {
+        resultData = JSON.parse(resultMatch[1])
+        console.log('[DEBUG] Parsed with-cookies result:', { success: resultData.success, count: resultData.count })
+      } catch (e) {
+        console.error('Failed to parse scrape result:', e)
+      }
+    } else {
+      console.log('[DEBUG] No [RESULT] found in stdout buffer, length:', stdoutBuffer.length)
+    }
     
     autoScrapeState.running = false
     autoScrapeState.startedAt = null
@@ -5321,6 +5837,15 @@ app.post('/api/admin/scrape/:userId', requireAdmin, async (req, res) => {
 })
 
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
+// Global Express error handler - must be last middleware
+app.use((err, req, res, next) => {
+  console.error('[Express Error]', req.method, req.path, err.stack || err)
+  if (res.headersSent) {
+    return next(err)
+  }
+  res.status(500).json({ error: 'Internal server error', message: err.message })
+})
+
 if (existsSync(CLIENT_INDEX)) {
   app.use(express.static(CLIENT_DIST))
   app.get('*', (req, res) => {

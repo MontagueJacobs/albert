@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TrendingUp, Award, ShoppingCart, DollarSign, LogIn, Loader2, ChevronDown, ChevronUp, Calendar, MapPin, Leaf, Apple } from 'lucide-react'
 import ProfileSuggestions from './ProfileSuggestions'
-import ScoreBreakdownModal from './ScoreBreakdownModal'
+import ProductDetailModal from './ProductDetailModal'
 import { useI18n } from '../i18n.jsx'
-import { useAHUser, useAHFetch } from '../lib/ahUserContext'
+import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
+import { useAHUser } from '../lib/ahUserContext.jsx'
 
 // Dark mode styles
 const styles = {
@@ -98,10 +99,17 @@ const styles = {
   }
 }
 
-function Dashboard({ syncVersion }) {
+function Dashboard({ syncVersion, onLoginClick }) {
   const { t } = useI18n()
-  const { ahEmail } = useAHUser()
-  const ahFetch = useAHFetch()
+  const { user, isAuthenticated } = useAuth()
+  const { sessionId, loading: sessionLoading } = useAHUser()
+  const authFetch = useAuthenticatedFetch()
+  
+  // User is "authenticated" if they have JWT auth OR session-based auth
+  const isUserConnected = isAuthenticated || !!sessionId
+  
+  // Debug log
+  console.log('[Dashboard] sessionId:', sessionId, 'isAuthenticated:', isAuthenticated, 'isUserConnected:', isUserConnected, 'sessionLoading:', sessionLoading)
   
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -114,21 +122,26 @@ function Dashboard({ syncVersion }) {
   const [purchaseTotal, setPurchaseTotal] = useState(0)
   const [purchaseTotalPages, setPurchaseTotalPages] = useState(0)
   const [showHistory, setShowHistory] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [selectedPurchase, setSelectedPurchase] = useState(null)
 
   const fetchInsights = useCallback(async () => {
-    if (!ahEmail) {
+    console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'sessionId:', sessionId, 'sessionLoading:', sessionLoading)
+    if (sessionLoading || !isUserConnected) {
+      console.log('[Dashboard] Skipping fetch - session loading or not connected')
       setLoading(false)
       return
     }
     
     setLoading(true)
     try {
-      const res = await ahFetch('/api/user/insights')
+      const res = await authFetch('/api/user/insights')
+      console.log('[Dashboard] insights response status:', res.status)
       if (res.ok) {
         const data = await res.json()
+        console.log('[Dashboard] insights data:', data)
         setInsights(data)
       } else {
+        console.log('[Dashboard] insights response not ok')
         setInsights(null)
       }
     } catch (err) {
@@ -137,14 +150,14 @@ function Dashboard({ syncVersion }) {
     } finally {
       setLoading(false)
     }
-  }, [ahEmail, ahFetch])
+  }, [isUserConnected, authFetch, sessionId, sessionLoading])
 
   const fetchPurchaseHistory = useCallback(async (page = 1) => {
-    if (!ahEmail) return
+    if (!isUserConnected) return
     
     setPurchasesLoading(true)
     try {
-      const res = await ahFetch(`/api/user/purchases/history?page=${page}&limit=20`)
+      const res = await authFetch(`/api/user/purchases/history?page=${page}&limit=20`)
       if (res.ok) {
         const data = await res.json()
         console.log('[Dashboard] Purchase history response:', data)
@@ -162,7 +175,7 @@ function Dashboard({ syncVersion }) {
     } finally {
       setPurchasesLoading(false)
     }
-  }, [ahEmail, ahFetch])
+  }, [isUserConnected, authFetch])
 
   useEffect(() => {
     fetchInsights()
@@ -175,16 +188,32 @@ function Dashboard({ syncVersion }) {
     }
   }, [showHistory, fetchPurchaseHistory])
 
-  // Not logged in - shouldn't happen since we're only shown when ahEmail exists
-  // but keep as fallback
-  if (!ahEmail) {
+  // Still loading session - show spinner
+  if (sessionLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem' }}>
+        <Loader2 size={48} className="spin" style={{ color: 'var(--primary)' }} />
+        <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>{t('loading') || 'Loading...'}</p>
+      </div>
+    )
+  }
+
+  // Not logged in - show login prompt
+  if (!isUserConnected) {
     return (
       <div style={styles.loginPrompt}>
         <LogIn size={64} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('login_required_title') || 'Connect Required'}</h2>
+        <h2 style={{ color: 'var(--text)', marginBottom: '0.5rem' }}>{t('login_required_title') || 'Login Required'}</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          {t('login_required_desc') || 'Connect your Albert Heijn account to view your sustainability dashboard.'}
+          {t('login_required_desc') || 'Please log in or create an account to view your sustainability dashboard and purchase history.'}
         </p>
+        <button 
+          className="btn btn-primary btn-lg"
+          onClick={onLoginClick}
+        >
+          <LogIn size={20} />
+          {t('login_button') || 'Log In / Sign Up'}
+        </button>
       </div>
     )
   }
@@ -330,11 +359,7 @@ function Dashboard({ syncVersion }) {
                   <PurchaseItem 
                     key={purchase.id} 
                     purchase={purchase} 
-                    onClick={() => setSelectedProduct({
-                      name: purchase.product_name,
-                      url: purchase.product_url || purchase.url || null,
-                      image_url: purchase.image_url || null
-                    })}
+                    onClick={() => setSelectedPurchase(purchase)}
                   />
                 ))}
                 
@@ -376,11 +401,11 @@ function Dashboard({ syncVersion }) {
         )}
       </div>
       
-      {/* Score breakdown modal */}
-      {selectedProduct && (
-        <ScoreBreakdownModal 
-          product={selectedProduct} 
-          onClose={() => setSelectedProduct(null)} 
+      {/* Product Detail Modal */}
+      {selectedPurchase && (
+        <ProductDetailModal 
+          purchase={selectedPurchase} 
+          onClose={() => setSelectedPurchase(null)} 
         />
       )}
     </div>
@@ -425,7 +450,22 @@ function PurchaseItem({ purchase, onClick }) {
   }
 
   return (
-    <div style={{ ...styles.purchaseItem, cursor: 'pointer' }} onClick={onClick}>
+    <div 
+      style={{
+        ...styles.purchaseItem,
+        cursor: 'pointer',
+        transition: 'transform 0.2s, box-shadow 0.2s'
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateX(4px)'
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateX(0)'
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+    >
       {/* Product Image */}
       {purchase.image_url ? (
         <img 
@@ -498,6 +538,16 @@ function PurchaseItem({ purchase, onClick }) {
               color: '#22c55e' 
             }}>
               🌿 Bio
+            </span>
+          )}
+          
+          {purchase.is_fairtrade && (
+            <span style={{ 
+              ...styles.badge, 
+              background: 'rgba(59, 130, 246, 0.2)', 
+              color: '#3b82f6' 
+            }}>
+              🤝 Fairtrade
             </span>
           )}
           

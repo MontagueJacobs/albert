@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 
+// Session ID key (matches ahUserContext.jsx)
+const SESSION_ID_KEY = 'ah_session_id'
+
 const AuthContext = createContext({
   user: null,
   session: null,
@@ -104,19 +107,27 @@ export function useAuth() {
 }
 
 // Helper hook for authenticated API calls
+// Supports both JWT auth (Supabase) and session-based auth (X-Session-ID)
 export function useAuthenticatedFetch() {
   const { getAccessToken } = useAuth()
   
   return useCallback(async (url, options = {}) => {
     const token = getAccessToken()
+    const sessionId = localStorage.getItem(SESSION_ID_KEY)
     
     const headers = {
       ...options.headers,
       'Content-Type': 'application/json'
     }
     
+    // Add JWT token if available
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
+    }
+    
+    // Also add session ID for session-based auth fallback
+    if (sessionId) {
+      headers['X-Session-ID'] = sessionId
     }
     
     return fetch(url, {
