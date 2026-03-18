@@ -1,0 +1,435 @@
+[
+  {
+    "id": "wi583797",
+    "url": "https://www.ah.nl/producten/product/wi583797/ah-gesneden-courgetti-carbonara-verspakket",
+    "category": "Groente & Fruit",
+    "name": "AH Gesneden Courgetti Carbonara Verspakket",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313135373639?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahgesnedencourgetticarbonaraverspakket",
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi54074",
+    "url": "https://www.ah.nl/producten/product/wi54074/ah-komkommer",
+    "category": "Groente & Fruit",
+    "name": "AH Komkommer",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_75706767466c336f52572d5668754f38427130507851?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahkomkommer",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "feb": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "mar": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "apr": [
+        "Netherlands"
+      ],
+      "may": [
+        "Netherlands"
+      ],
+      "jun": [
+        "Netherlands"
+      ],
+      "jul": [
+        "Netherlands"
+      ],
+      "aug": [
+        "Netherlands"
+      ],
+      "sep": [
+        "Netherlands"
+      ],
+      "oct": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "nov": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "dec": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ]
+    },
+    "origin_country": "Netherlands"
+  },
+  {
+    "id": "wi611283",
+    "url": "https://www.ah.nl/producten/product/wi611283/ah-groentestoof-krokante-kip-verspakket",
+    "category": "Groente & Fruit",
+    "name": "AH Groentestoof krokante kip verspakket",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_56614767396e2d6252684b6148773647564966613351?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahgroentestoofkrokantekipverspakket",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi4117",
+    "url": "https://www.ah.nl/producten/product/wi4117/ah-paprika-rood",
+    "category": "Groente & Fruit",
+    "name": "AH Paprika rood",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_456c7944504c756f536e655059444f3349425f4e3441?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahpaprikarood",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi4164",
+    "url": "https://www.ah.nl/producten/product/wi4164/ah-courgette",
+    "category": "Groente & Fruit",
+    "name": "AH Courgette",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303838383439?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahcourgette",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Spain"
+      ],
+      "feb": [
+        "Spain"
+      ],
+      "mar": [
+        "Spain",
+        "Netherlands"
+      ],
+      "apr": [
+        "Netherlands"
+      ],
+      "may": [
+        "Netherlands"
+      ],
+      "jun": [
+        "Netherlands"
+      ],
+      "jul": [
+        "Netherlands"
+      ],
+      "aug": [
+        "Netherlands"
+      ],
+      "sep": [
+        "Spain",
+        "Netherlands"
+      ],
+      "oct": [
+        "Spain",
+        "Netherlands"
+      ],
+      "nov": [
+        "Spain",
+        "Netherlands"
+      ],
+      "dec": [
+        "Spain"
+      ]
+    },
+    "origin_country": "Spain"
+  },
+  {
+    "id": "wi171425",
+    "url": "https://www.ah.nl/producten/product/wi171425/ah-prei",
+    "category": "Groente & Fruit",
+    "name": "AH Prei",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303838383331?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahprei",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi4177",
+    "url": "https://www.ah.nl/producten/product/wi4177/ah-broccoli",
+    "category": "Groente & Fruit",
+    "name": "AH Broccoli",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_4564774d74546b5f5331367779586a44336c446a3341?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahbroccoli",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Spain"
+      ],
+      "feb": [
+        "Spain"
+      ],
+      "mar": [
+        "Spain"
+      ],
+      "apr": [
+        "Spain"
+      ],
+      "may": [
+        "Spain",
+        "Netherlands"
+      ],
+      "jun": [
+        "Netherlands"
+      ],
+      "jul": [
+        "Netherlands"
+      ],
+      "aug": [
+        "Netherlands"
+      ],
+      "sep": [
+        "Netherlands"
+      ],
+      "oct": [
+        "Netherlands"
+      ],
+      "nov": [
+        "Spain"
+      ],
+      "dec": [
+        "Spain"
+      ]
+    },
+    "origin_country": "Spain"
+  },
+  {
+    "id": "wi101130",
+    "url": "https://www.ah.nl/producten/product/wi101130/ah-biologisch-komkommer",
+    "category": "Groente & Fruit",
+    "name": "AH Biologisch Komkommer",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_43545237393530383039?revLabel=2&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahbiologischkomkommer",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "is_fairtrade": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Morocco",
+        "Spain"
+      ],
+      "feb": [
+        "Morocco",
+        "Spain"
+      ],
+      "mar": [
+        "Morocco",
+        "Spain"
+      ],
+      "apr": [
+        "Netherlands",
+        "Spain"
+      ],
+      "may": [
+        "Netherlands",
+        "Spain"
+      ],
+      "jun": [
+        "Netherlands",
+        "Spain"
+      ],
+      "jul": [
+        "Netherlands",
+        "Spain"
+      ],
+      "aug": [
+        "Netherlands",
+        "Spain"
+      ],
+      "sep": [
+        "Netherlands",
+        "Spain"
+      ],
+      "oct": [
+        "Netherlands",
+        "Spain"
+      ],
+      "nov": [
+        "Morocco",
+        "Spain"
+      ],
+      "dec": [
+        "Morocco",
+        "Spain"
+      ]
+    },
+    "origin_country": "Morocco"
+  },
+  {
+    "id": "wi471641",
+    "url": "https://www.ah.nl/producten/product/wi471641/ah-snoepgroente-tomaat",
+    "category": "Groente & Fruit",
+    "name": "AH Snoepgroente tomaat",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303130343634?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahsnoepgroentetomaat",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Morocco"
+      ],
+      "feb": [
+        "Morocco"
+      ],
+      "mar": [
+        "Morocco",
+        "Netherlands"
+      ],
+      "apr": [
+        "Morocco",
+        "Netherlands"
+      ],
+      "may": [
+        "Morocco",
+        "Netherlands"
+      ],
+      "jun": [
+        "Netherlands"
+      ],
+      "jul": [
+        "Netherlands"
+      ],
+      "aug": [
+        "Netherlands"
+      ],
+      "sep": [
+        "Netherlands"
+      ],
+      "oct": [
+        "Morocco",
+        "Netherlands"
+      ],
+      "nov": [
+        "Morocco",
+        "Netherlands"
+      ],
+      "dec": [
+        "Morocco",
+        "Netherlands"
+      ]
+    },
+    "origin_country": "Morocco"
+  },
+  {
+    "id": "wi129400",
+    "url": "https://www.ah.nl/producten/product/wi129400",
+    "category": "Groente & Fruit",
+    "name": "AH Avocado eetrijp",
+    "price": 12.87,
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323031353339?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "normalized_name": "ahavocadoeetrijp",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Chile",
+        "Colombia",
+        "Morocco",
+        "Spain"
+      ],
+      "feb": [
+        "Chile",
+        "Colombia",
+        "Morocco",
+        "Spain"
+      ],
+      "mar": [
+        "Chile",
+        "Colombia",
+        "Morocco",
+        "Spain"
+      ],
+      "apr": [
+        "Colombia",
+        "Peru",
+        "Spain",
+        "South Africa"
+      ],
+      "may": [
+        "Colombia",
+        "Peru",
+        "South Africa"
+      ],
+      "jun": [
+        "Colombia",
+        "Peru",
+        "South Africa"
+      ],
+      "jul": [
+        "Colombia",
+        "Peru",
+        "South Africa"
+      ],
+      "aug": [
+        "Colombia",
+        "Peru",
+        "South Africa"
+      ],
+      "sep": [
+        "Colombia",
+        "Peru",
+        "South Africa"
+      ],
+      "oct": [
+        "Chile",
+        "Colombia",
+        "South Africa"
+      ],
+      "nov": [
+        "Chile",
+        "Colombia",
+        "South Africa"
+      ],
+      "dec": [
+        "Chile",
+        "Colombia",
+        "South Africa"
+      ]
+    },
+    "origin_country": "Chile"
+  }
+]

@@ -1,0 +1,820 @@
+[
+  {
+    "id": "wi54074",
+    "url": "https://www.ah.nl/producten/product/wi54074/ah-komkommer",
+    "category": "Groente & Fruit",
+    "name": "AH Komkommer",
+    "normalized_name": "ahkomkommer",
+    "image_url": "https://static.ah.nl/dam/product/AHI_75706767466c336f52572d5668754f38427130507851?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "feb": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "mar": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "apr": [
+        "Netherlands"
+      ],
+      "may": [
+        "Netherlands"
+      ],
+      "jun": [
+        "Netherlands"
+      ],
+      "jul": [
+        "Netherlands"
+      ],
+      "aug": [
+        "Netherlands"
+      ],
+      "sep": [
+        "Netherlands"
+      ],
+      "oct": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "nov": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ],
+      "dec": [
+        "Netherlands",
+        "Spain",
+        "Morocco",
+        "Greece"
+      ]
+    },
+    "origin_country": "Netherlands"
+  },
+  {
+    "id": "wi4117",
+    "url": "https://www.ah.nl/producten/product/wi4117/ah-paprika-rood",
+    "category": "Groente & Fruit",
+    "name": "AH Paprika rood",
+    "normalized_name": "ahpaprikarood",
+    "image_url": "https://static.ah.nl/dam/product/AHI_456c7944504c756f536e655059444f3349425f4e3441?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi550888",
+    "url": "https://www.ah.nl/producten/product/wi550888/ah-gesneden-verspakket-tomatenrisotto",
+    "category": "Groente & Fruit",
+    "name": "AH Gesneden verspakket tomatenrisotto",
+    "normalized_name": "ahgesnedenverspakkettomatenrisotto",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303939343935?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi4164",
+    "url": "https://www.ah.nl/producten/product/wi4164/ah-courgette",
+    "category": "Groente & Fruit",
+    "name": "AH Courgette",
+    "normalized_name": "ahcourgette",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303838383439?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Spain"
+      ],
+      "feb": [
+        "Spain"
+      ],
+      "mar": [
+        "Spain",
+        "Netherlands"
+      ],
+      "apr": [
+        "Netherlands"
+      ],
+      "may": [
+        "Netherlands"
+      ],
+      "jun": [
+        "Netherlands"
+      ],
+      "jul": [
+        "Netherlands"
+      ],
+      "aug": [
+        "Netherlands"
+      ],
+      "sep": [
+        "Spain",
+        "Netherlands"
+      ],
+      "oct": [
+        "Spain",
+        "Netherlands"
+      ],
+      "nov": [
+        "Spain",
+        "Netherlands"
+      ],
+      "dec": [
+        "Spain"
+      ]
+    },
+    "origin_country": "Spain"
+  },
+  {
+    "id": "wi171425",
+    "url": "https://www.ah.nl/producten/product/wi171425/ah-prei",
+    "category": "Groente & Fruit"
+  },
+  {
+    "id": "wi550232",
+    "url": "https://www.ah.nl/producten/product/wi550232/ah-gesneden-verspakket-courgetti-carbonara",
+    "category": "Groente & Fruit",
+    "name": "AH Gesneden verspakket courgetti carbonara",
+    "normalized_name": "ahgesnedenverspakketcourgetticarbonara",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303530343231?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi221032",
+    "url": "https://www.ah.nl/producten/product/wi221032",
+    "category": "Vlees, Kip, Vis & Vega",
+    "name": "Meester & Zn. Gerookte spekreepjes",
+    "normalized_name": "meesterzngerooktespekreepjes",
+    "image_url": "https://static.ah.nl/dam/product/AHI_434d50313439323632?revLabel=8&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi4004",
+    "url": "https://www.ah.nl/producten/product/wi4004",
+    "category": "Vlees, Kip, Vis & Vega",
+    "name": "AH Rundergehakt",
+    "normalized_name": "ahrundergehakt",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323031313534?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi533080",
+    "url": "https://www.ah.nl/producten/product/wi533080/ah-scharrel-kipfilet-blokjes",
+    "category": "Vlees, Kip, Vis & Vega",
+    "name": "AH Scharrel kipfilet blokjes",
+    "normalized_name": "ahscharrelkipfiletblokjes",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313939383730?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi4011",
+    "url": "https://www.ah.nl/producten/product/wi4011/ah-rundergehakt",
+    "category": "Vlees, Kip, Vis & Vega",
+    "name": "AH Rundergehakt",
+    "normalized_name": "ahrundergehakt",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323031313537?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi605090",
+    "url": "https://www.ah.nl/producten/product/wi605090/ah-katenspekrolletjes-roomkaas",
+    "category": "Vlees, Kip, Vis & Vega",
+    "name": "AH Katenspekrolletjes roomkaas",
+    "normalized_name": "ahkatenspekrolletjesroomkaas",
+    "image_url": "https://static.ah.nl/dam/product/AHI_43437a4e5864617a524c3670712d4577343342334a41?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "D"
+  },
+  {
+    "id": "wi531875",
+    "url": "https://www.ah.nl/producten/product/wi531875/ah-scharrel-krokante-kipfiletschnitzel",
+    "category": "Vlees, Kip, Vis & Vega",
+    "name": "AH Scharrel krokante kipfiletschnitzel",
+    "normalized_name": "ahscharrelkrokantekipfiletschnitzel",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303938393832?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "C"
+  },
+  {
+    "id": "wi444854",
+    "url": "https://www.ah.nl/producten/product/wi444854/boursin-creamy-knoflook-fijne-kruiden",
+    "category": "Kaas & Vleeswaren",
+    "name": "Boursin Creamy knoflook fijne kruiden",
+    "normalized_name": "boursincreamyknoflookfijnekruiden",
+    "image_url": "https://static.ah.nl/dam/product/AHI_726d66656f624c54523271476b666951364156426267?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "D"
+  },
+  {
+    "id": "wi1983",
+    "url": "https://www.ah.nl/producten/product/wi1983/boursin-knoflook-en-fijne-kruiden",
+    "category": "Kaas & Vleeswaren",
+    "name": "Boursin Knoflook & fijne kruiden",
+    "normalized_name": "boursinknoflookfijnekruiden",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313538303231?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "D"
+  },
+  {
+    "id": "wi239019",
+    "url": "https://www.ah.nl/producten/product/wi239019/garlan-verse-roomkaas-met-knoflook-en-kruiden",
+    "category": "Kaas & Vleeswaren",
+    "name": "Garlan Verse roomkaas met knoflook & kruiden",
+    "normalized_name": "garlanverseroomkaasmetknoflookkruiden",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4b79654f33364474534375593067714671646e495967?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "D"
+  },
+  {
+    "id": "wi197226",
+    "url": "https://www.ah.nl/producten/product/wi197226/de-zaanse-hoeve-goudse-jong-48-plakken-voordeel",
+    "category": "Kaas & Vleeswaren",
+    "name": "De Zaanse Hoeve Goudse jong 48+ plakken voordeel",
+    "normalized_name": "dezaansehoevegoudsejong48plakkenvoordeel",
+    "image_url": "https://static.ah.nl/dam/product/AHI_55342d6f45454273515369573168786f484b516e4951?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A",
+    "origin_country": "Netherlands"
+  },
+  {
+    "id": "wi506228",
+    "url": "https://www.ah.nl/producten/product/wi506228/ah-zuivelspread-naturel",
+    "category": "Kaas & Vleeswaren",
+    "name": "AH Zuivelspread naturel",
+    "normalized_name": "ahzuivelspreadnaturel",
+    "image_url": "https://static.ah.nl/dam/product/AHI_7948494577777039514c6d435a7952756c4548773467?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi589890",
+    "url": "https://www.ah.nl/producten/product/wi589890/old-amsterdam-original-35-plakken",
+    "category": "Kaas & Vleeswaren",
+    "name": "Old Amsterdam Original 35+ plakken",
+    "normalized_name": "oldamsterdamoriginal35plakken",
+    "image_url": "https://static.ah.nl/dam/product/AHI_6276726d7477636a5351716279415f69344936784741?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "D",
+    "origin_country": "Netherlands"
+  },
+  {
+    "id": "wi101130",
+    "url": "https://www.ah.nl/producten/product/wi101130/ah-biologisch-komkommer",
+    "category": "Zuivel & Eieren",
+    "name": "AH Biologisch Komkommer",
+    "normalized_name": "ahbiologischkomkommer",
+    "image_url": "https://static.ah.nl/dam/product/AHI_43545237393530383039?revLabel=2&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "is_fairtrade": true,
+    "nutri_score": "A",
+    "origin_by_month": {
+      "jan": [
+        "Morocco",
+        "Spain"
+      ],
+      "feb": [
+        "Morocco",
+        "Spain"
+      ],
+      "mar": [
+        "Morocco",
+        "Spain"
+      ],
+      "apr": [
+        "Netherlands",
+        "Spain"
+      ],
+      "may": [
+        "Netherlands",
+        "Spain"
+      ],
+      "jun": [
+        "Netherlands",
+        "Spain"
+      ],
+      "jul": [
+        "Netherlands",
+        "Spain"
+      ],
+      "aug": [
+        "Netherlands",
+        "Spain"
+      ],
+      "sep": [
+        "Netherlands",
+        "Spain"
+      ],
+      "oct": [
+        "Netherlands",
+        "Spain"
+      ],
+      "nov": [
+        "Morocco",
+        "Spain"
+      ],
+      "dec": [
+        "Morocco",
+        "Spain"
+      ]
+    },
+    "origin_country": "Morocco"
+  },
+  {
+    "id": "wi167873",
+    "url": "https://www.ah.nl/producten/product/wi167873/ah-terra-kikkererwten",
+    "category": "Zuivel & Eieren",
+    "name": "AH Terra Kikkererwten",
+    "normalized_name": "ahterrakikkererwten",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313531343336?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi164936",
+    "url": "https://www.ah.nl/producten/product/wi164936/fairtrade-original-kokosmelk",
+    "category": "Zuivel & Eieren",
+    "name": "Fairtrade Original Kokosmelk",
+    "normalized_name": "fairtradeoriginalkokosmelk",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303532333333?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "is_fairtrade": true,
+    "nutri_score": "C"
+  },
+  {
+    "id": "wi94754",
+    "url": "https://www.ah.nl/producten/product/wi94754/ah-jonagold",
+    "category": "Zuivel & Eieren",
+    "name": "AH Jonagold",
+    "normalized_name": "ahjonagold",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313935363538?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "is_fairtrade": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi214571",
+    "url": "https://www.ah.nl/producten/product/wi214571/l-or-espresso-forza-koffiebonen",
+    "category": "Koffie & Thee",
+    "name": "L'OR Espresso forza koffiebonen",
+    "normalized_name": "lorespressoforzakoffiebonen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_43545239353834313930?revLabel=3&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi387548",
+    "url": "https://www.ah.nl/producten/product/wi387548/nescafe%CC%81-dolce-gusto-cappuccino-capsules",
+    "category": "Koffie & Thee",
+    "name": "Nescafé Dolce Gusto Cappuccino capsules",
+    "normalized_name": "nescafdolcegustocappuccinocapsules",
+    "image_url": "https://static.ah.nl/dam/product/AHI_5871634875394665534a437048324e62455967353741?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi1108",
+    "url": "https://www.ah.nl/producten/product/wi1108/ah-halfvolle-koffiemelk",
+    "category": "Koffie & Thee",
+    "name": "AH Halfvolle koffiemelk",
+    "normalized_name": "ahhalfvollekoffiemelk",
+    "image_url": "https://static.ah.nl/dam/product/AHI_434d50303134353530?revLabel=2&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi173573",
+    "url": "https://www.ah.nl/producten/product/wi173573/ah-halfvolle-koffiemelk-cups",
+    "category": "Koffie & Thee",
+    "name": "AH Halfvolle koffiemelk cups",
+    "normalized_name": "ahhalfvollekoffiemelkcups",
+    "image_url": "https://static.ah.nl/dam/product/AHI_434d50313837333932?revLabel=2&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi511002",
+    "url": "https://www.ah.nl/producten/product/wi511002/ah-kristalsuiker",
+    "category": "Koffie & Thee",
+    "name": "AH Kristalsuiker",
+    "normalized_name": "ahkristalsuiker",
+    "image_url": "https://static.ah.nl/dam/product/AHI_43545239383337393137?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi476548",
+    "url": "https://www.ah.nl/producten/product/wi476548",
+    "category": "Koffie & Thee",
+    "name": "Nescafé Dolce Gusto Lungo capsules",
+    "normalized_name": "nescafdolcegustolungocapsules",
+    "image_url": "https://static.ah.nl/dam/product/AHI_427272347a48387752796551475f5f7355734a553567?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "is_fairtrade": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi602305",
+    "url": "https://www.ah.nl/producten/product/wi602305/bonduelle-pasta-pronto-gnocchi-tomaat-mozzarella",
+    "category": "Diepvries",
+    "name": "Bonduelle Pasta pronto gnocchi tomaat mozzarella",
+    "normalized_name": "bonduellepastaprontognocchitomaatmozzarella",
+    "image_url": "https://static.ah.nl/dam/product/AHI_33476c354a5a757a527a3663534d6a6e5050636c3351?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi607588",
+    "url": "https://www.ah.nl/producten/product/wi607588/dr-oetker-big-americans-airfryer-snack-pepperoni",
+    "category": "Diepvries",
+    "name": "Dr. Oetker Big Americans airfryer snack pepperoni",
+    "normalized_name": "droetkerbigamericansairfryersnackpepperoni",
+    "image_url": "https://static.ah.nl/dam/product/AHI_704e525566417a5a5473757738367752704b74496241?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "C"
+  },
+  {
+    "id": "wi376521",
+    "url": "https://www.ah.nl/producten/product/wi376521/ah-zakje-met-blauwe-bessen",
+    "category": "Diepvries",
+    "name": "AH Zakje met blauwe bessen",
+    "normalized_name": "ahzakjemetblauwebessen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313835313036?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi195093",
+    "url": "https://www.ah.nl/producten/product/wi195093/ah-airfryer-ovenfriet",
+    "category": "Diepvries",
+    "name": "AH Airfryer ovenfriet",
+    "normalized_name": "ahairfryerovenfriet",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313139393436?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi226367",
+    "url": "https://www.ah.nl/producten/product/wi226367/ah-broccoliroosjes",
+    "category": "Diepvries",
+    "name": "AH Broccoliroosjes",
+    "normalized_name": "ahbroccoliroosjes",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313836313439?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi141487",
+    "url": "https://www.ah.nl/producten/product/wi141487/lambweston-twister-fries-seasoned",
+    "category": "Diepvries",
+    "name": "LambWeston Twister fries seasoned",
+    "normalized_name": "lambwestontwisterfriesseasoned",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313031363332?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi172985",
+    "url": "https://www.ah.nl/producten/product/wi172985",
+    "category": "Baby & Kind",
+    "name": "Bepanthen Baby zalf bij rode babybilletjes",
+    "normalized_name": "bepanthenbabyzalfbijrodebabybilletjes",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313132373138?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi606071",
+    "url": "https://www.ah.nl/producten/product/wi606071/goodies-strawberry-fruity-gummies",
+    "category": "Baby & Kind",
+    "name": "Goodies Strawberry fruity gummies",
+    "normalized_name": "goodiesstrawberryfruitygummies",
+    "image_url": "https://static.ah.nl/dam/product/AHI_42366f4e513743615378534763313061436b58336477?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "is_fairtrade": true,
+    "nutri_score": "E"
+  },
+  {
+    "id": "wi498269",
+    "url": "https://www.ah.nl/producten/product/wi498269/ah-baby-waterdoekjes",
+    "category": "Baby & Kind",
+    "name": "AH Baby waterdoekjes",
+    "normalized_name": "ahbabywaterdoekjes",
+    "image_url": "https://static.ah.nl/dam/product/AHI_43545239393334343039?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi126997",
+    "url": "https://www.ah.nl/producten/product/wi126997",
+    "category": "Baby & Kind",
+    "name": "AH Beregoede kids toetenvegers",
+    "normalized_name": "ahberegoedekidstoetenvegers",
+    "image_url": "https://static.ah.nl/dam/product/AHI_43545239393331373239?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi388786",
+    "url": "https://www.ah.nl/producten/product/wi388786/de-kleine-keuken-biologische-rozijntjes-12m",
+    "category": "Baby & Kind",
+    "name": "De Kleine Keuken Biologische rozijntjes 12m+",
+    "normalized_name": "dekleinekeukenbiologischerozijntjes12m",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303933343838?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi223597",
+    "url": "https://www.ah.nl/producten/product/wi223597/ella-s-kitchen-hartverwarmende-runderstoof-8m-bio",
+    "category": "Baby & Kind",
+    "name": "Ella's kitchen Hartverwarmende runderstoof 8m+ bio",
+    "normalized_name": "ellaskitchenhartverwarmenderunderstoof8mbio",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313039343838?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi458607",
+    "url": "https://www.ah.nl/producten/product/wi458607/taft-matt-styling-wax",
+    "category": "Drogisterij",
+    "name": "Taft Matt styling wax",
+    "normalized_name": "taftmattstylingwax",
+    "image_url": "https://static.ah.nl/dam/product/AHI_453977774e577a515456474644433743696772614f77?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi188685",
+    "url": "https://www.ah.nl/producten/product/wi188685/gliss-every-day-oil-elixir-ultimate",
+    "category": "Drogisterij",
+    "name": "Gliss Every day oil elixir ultimate",
+    "normalized_name": "glisseverydayoilelixirultimate",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313337363237?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "D"
+  },
+  {
+    "id": "wi553430",
+    "url": "https://www.ah.nl/producten/product/wi553430",
+    "category": "Drogisterij",
+    "name": "Prodent Cool mint tandpasta",
+    "normalized_name": "prodentcoolminttandpasta",
+    "image_url": "https://static.ah.nl/dam/product/AHI_3051584c63354b615277533053373733676d666c4f77?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "E"
+  },
+  {
+    "id": "wi600132",
+    "url": "https://www.ah.nl/producten/product/wi600132",
+    "category": "Drogisterij",
+    "name": "Care Cotton pads",
+    "normalized_name": "carecottonpads",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323037313131?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi211047",
+    "url": "https://www.ah.nl/producten/product/wi211047/aquafresh-fresh-en-minty-bescherming-tandpasta",
+    "category": "Drogisterij",
+    "name": "Aquafresh Fresh & minty bescherming tandpasta",
+    "normalized_name": "aquafreshfreshmintybeschermingtandpasta",
+    "image_url": "https://static.ah.nl/dam/product/AHI_675a73366e4e693154794f303233735955515f566367?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi86696",
+    "url": "https://www.ah.nl/producten/product/wi86696/gliss-anti-klitspray-total-repair",
+    "category": "Drogisterij",
+    "name": "Gliss Anti- klitspray total repair",
+    "normalized_name": "glissantiklitspraytotalrepair",
+    "image_url": "https://static.ah.nl/dam/product/AHI_436e4c736c6c636e51334330354a5f427573544d7551?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi556445",
+    "url": "https://www.ah.nl/producten/product/wi556445",
+    "category": "Huishouden",
+    "name": "Sun Brilliant shine all-in-1 vaatwascapsules",
+    "normalized_name": "sunbrilliantshineallin1vaatwascapsules",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130303534353539?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "D"
+  },
+  {
+    "id": "wi211029",
+    "url": "https://www.ah.nl/producten/product/wi211029",
+    "category": "Huishouden",
+    "name": "Robijn Klein & krachtig color wasmiddel",
+    "normalized_name": "robijnkleinkrachtigcolorwasmiddel",
+    "image_url": "https://static.ah.nl/dam/product/AHI_36475459686a506451355342665036387a4143705141?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi595094",
+    "url": "https://www.ah.nl/producten/product/wi595094/ah-toiletpapier-zacht-4-laags-12%3D18-rollen",
+    "category": "Huishouden",
+    "name": "AH Toiletpapier zacht 4-laags 12=18 rollen",
+    "normalized_name": "ahtoiletpapierzacht4laags1218rollen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313532323930?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi584125",
+    "url": "https://www.ah.nl/producten/product/wi584125/ah-keukenpapier-sterk-en-abs-2%3D3-rollen",
+    "category": "Huishouden",
+    "name": "AH Keukenpapier sterk & abs 2=3 rollen",
+    "normalized_name": "ahkeukenpapiersterkabs23rollen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130313130363934?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  },
+  {
+    "id": "wi517687",
+    "url": "https://www.ah.nl/producten/product/wi517687/frisse-reus-wasmiddel-vloeibaar-gel-orchidee",
+    "category": "Huishouden",
+    "name": "Frisse Reus Wasmiddel vloeibaar gel orchidee",
+    "normalized_name": "frissereuswasmiddelvloeibaargelorchidee",
+    "image_url": "https://static.ah.nl/dam/product/AHI_567141593934655751575742565f43634e65396c3777?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "B"
+  },
+  {
+    "id": "wi57559",
+    "url": "https://www.ah.nl/producten/product/wi57559/mr-muscle-badkamerreiniger-spray",
+    "category": "Huishouden",
+    "name": "Mr Muscle Badkamerreiniger spray",
+    "normalized_name": "mrmusclebadkamerreinigerspray",
+    "image_url": "https://static.ah.nl/dam/product/AHI_467a6f34432d6b73547a5746396a45686c732d572d77?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "price": 0.0,
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_organic": true,
+    "nutri_score": "A"
+  }
+]

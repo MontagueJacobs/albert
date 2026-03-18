@@ -5,153 +5,129 @@
       "name": "AH Biologisch Komkommer",
       "url": "https://www.ah.nl/producten/product/wi101130/ah-biologisch-komkommer",
       "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_43545237393530383039?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Cherrytomaten",
-      "url": "https://www.ah.nl/producten/product/wi4137/ah-cherrytomaten",
-      "price": 1.09,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303637303134?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Fairtrade Original Kokosmelk",
-      "url": "https://www.ah.nl/producten/product/wi164936/fairtrade-original-kokosmelk",
-      "price": 2.89,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303532333334?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Terra Kikkererwten",
-      "url": "https://www.ah.nl/producten/product/wi167873/ah-terra-kikkererwten",
-      "price": 0.99,
-      "image": "https://static.ah.nl/dam/product/AHI_38597863424b726f534f4f6b32357370696331484841?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Biologisch Knoflook",
-      "url": "https://www.ah.nl/producten/product/wi185774/ah-biologisch-knoflook",
-      "price": 1.49,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393536383837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Sebahat Tahin sesampasta",
-      "url": "https://www.ah.nl/producten/product/wi198150/sebahat-tahin-sesampasta",
-      "price": 3.99,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239353732353035?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Platte peterselie",
-      "url": "https://www.ah.nl/producten/product/wi238971/ah-platte-peterselie",
-      "price": 1.29,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303737343735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Biologisch Citroensap",
-      "url": "https://www.ah.nl/producten/product/wi398477/ah-biologisch-citroensap",
-      "price": 1.35,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313933303834?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Royal Kalamata olijven zonder pit",
-      "url": "https://www.ah.nl/producten/product/wi462229/royal-kalamata-olijven-zonder-pit",
-      "price": 3.09,
-      "image": "https://static.ah.nl/dam/product/AHI_34586444537a4d595131757633647971634536747877?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "image": "https://static.ah.nl/dam/product/AHI_43545237393530383039?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
       "name": "AH Rode uien",
       "url": "https://www.ah.nl/producten/product/wi490280/ah-rode-uien",
-      "price": 1.09,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239383834353837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "price": 1.093,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239383834353837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
-      "name": "AH Extra lang lekker tijger volkoren heel",
-      "url": "https://www.ah.nl/producten/product/wi523365/ah-extra-lang-lekker-tijger-volkoren-heel",
-      "price": 1.23,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323037383237?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "name": "AH Platte peterselie",
+      "url": "https://www.ah.nl/producten/product/wi238971/ah-platte-peterselie",
+      "price": 1.2915,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303737343735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
-      "name": "AH Terra Plantaardige witte blokjes in pekel",
-      "url": "https://www.ah.nl/producten/product/wi598686/ah-terra-plantaardige-witte-blokjes-in-pekel",
-      "price": 2.75,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323036373434?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "name": "AH Biologisch Knoflook",
+      "url": "https://www.ah.nl/producten/product/wi185774/ah-biologisch-knoflook",
+      "price": 1.491,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393536383837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
-      "name": "AH Jonagold",
-      "url": "https://www.ah.nl/producten/product/wi94754/ah-jonagold",
-      "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313935363538?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Biologisch Cabernet sauvignon",
-      "url": "https://www.ah.nl/producten/product/wi167299/ah-biologisch-cabernet-sauvignon",
-      "price": 4.99,
-      "image": "https://static.ah.nl/dam/product/AHI_434d50323032313433?revLabel=3&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "AH Pindakaas naturel",
-      "url": "https://www.ah.nl/producten/product/wi461685/ah-pindakaas-naturel",
-      "price": 1.47,
-      "image": "https://static.ah.nl/dam/product/AHI_45685472746f685952734b5645636c54717a337a4a51?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "name": "AH Cherrytomaten",
+      "url": "https://www.ah.nl/producten/product/wi4137/ah-cherrytomaten",
+      "price": 1.1925,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303637303134?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
       "name": "AH Elstar",
       "url": "https://www.ah.nl/producten/product/wi80583/ah-elstar",
       "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_68377a6f6935547754525732463071734f3671524b77?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "image": "https://static.ah.nl/dam/product/AHI_68377a6f6935547754525732463071734f3671524b77?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
-      "name": "AH Zakje met blauwe bessen",
-      "url": "https://www.ah.nl/producten/product/wi376521/ah-zakje-met-blauwe-bessen",
-      "price": 5.99,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313835313036?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Oatly! Haverdrank bio",
-      "url": "https://www.ah.nl/producten/product/wi401934/oatly-haverdrank-bio",
-      "price": 2.89,
-      "image": "https://static.ah.nl/dam/product/AHI_5870767143466673523032554b375338586b69546541?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
-    },
-    {
-      "name": "Oatly! Haverdrank no sugar",
-      "url": "https://www.ah.nl/producten/product/wi548465/oatly-haverdrank-no-sugar",
-      "price": 2.89,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313036343638?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "name": "AH Jonagold",
+      "url": "https://www.ah.nl/producten/product/wi94754/ah-jonagold",
+      "price": 1.79,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313935363538?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
       "name": "AH Terra Plantaardige hummus naturel",
       "url": "https://www.ah.nl/producten/product/wi561000/ah-terra-plantaardige-hummus-naturel",
-      "price": 2.39,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393538313037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "price": 2.3935,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239393538313037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "Oatly! Haverdrank no sugar",
+      "url": "https://www.ah.nl/producten/product/wi548465/oatly-haverdrank-no-sugar",
+      "price": 2.891,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313036343638?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "Oatly! Haverdrank bio",
+      "url": "https://www.ah.nl/producten/product/wi401934/oatly-haverdrank-bio",
+      "price": 2.891,
+      "image": "https://static.ah.nl/dam/product/AHI_5870767143466673523032554b375338586b69546541?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "AH Terra Plantaardige witte blokjes in pekel",
+      "url": "https://www.ah.nl/producten/product/wi598686/ah-terra-plantaardige-witte-blokjes-in-pekel",
+      "price": 2.7542,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323036373434?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "Fairtrade Original Kokosmelk",
+      "url": "https://www.ah.nl/producten/product/wi164936/fairtrade-original-kokosmelk",
+      "price": 2.894,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130303532333334?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "AH Extra lang lekker tijger volkoren heel",
+      "url": "https://www.ah.nl/producten/product/wi523365/ah-extra-lang-lekker-tijger-volkoren-heel",
+      "price": 1.23,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130323037383237?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "Royal Kalamata olijven zonder pit",
+      "url": "https://www.ah.nl/producten/product/wi462229/royal-kalamata-olijven-zonder-pit",
+      "price": 3.09195,
+      "image": "https://static.ah.nl/dam/product/AHI_34586444537a4d595131757633647971634536747877?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
     },
     {
       "name": "AH Pinda's ongezouten",
       "url": "https://www.ah.nl/producten/product/wi582889/ah-pinda-s-ongezouten",
-      "price": 1.15,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313930323833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary",
-      "source": "ah_auto_scrape"
+      "price": 1.155,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313930323833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "Sebahat Tahin sesampasta",
+      "url": "https://www.ah.nl/producten/product/wi198150/sebahat-tahin-sesampasta",
+      "price": 3.9929,
+      "image": "https://static.ah.nl/dam/product/AHI_43545239353732353035?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "AH Biologisch Citroensap",
+      "url": "https://www.ah.nl/producten/product/wi398477/ah-biologisch-citroensap",
+      "price": 1.3525,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313933303834?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "AH Terra Kikkererwten",
+      "url": "https://www.ah.nl/producten/product/wi167873/ah-terra-kikkererwten",
+      "price": 0.994,
+      "image": "https://static.ah.nl/dam/product/AHI_38597863424b726f534f4f6b32357370696331484841?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "AH Pindakaas naturel",
+      "url": "https://www.ah.nl/producten/product/wi461685/ah-pindakaas-naturel",
+      "price": 1.476,
+      "image": "https://static.ah.nl/dam/product/AHI_45685472746f685952734b5645636c54717a337a4a51?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "AH Zakje met blauwe bessen",
+      "url": "https://www.ah.nl/producten/product/wi376521/ah-zakje-met-blauwe-bessen",
+      "price": 5.991,
+      "image": "https://static.ah.nl/dam/product/AHI_4354523130313835313036?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+    },
+    {
+      "name": "AH Biologisch Cabernet sauvignon",
+      "url": "https://www.ah.nl/producten/product/wi167299/ah-biologisch-cabernet-sauvignon",
+      "price": 4.99,
+      "image": "https://static.ah.nl/dam/product/AHI_434d50323032313433?revLabel=3&rendition=200x200_JPG_Q85&fileType=binary"
     }
   ],
-  "error": null,
-  "scraped_at": "2026-03-17T20:19:02.281912+01:00",
-  "login_method": "cookies",
-  "login_required": false,
-  "count": 21
+  "count": 21,
+  "cookies_saved": 38
 }

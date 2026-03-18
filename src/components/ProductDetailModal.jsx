@@ -3,6 +3,26 @@ import { X, Leaf, Apple, MapPin, ArrowRight, ExternalLink, Loader2, TrendingUp, 
 import { useI18n } from '../i18n.jsx'
 import { useAuthenticatedFetch } from '../lib/authContext'
 
+const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+function getCurrentMonthOrigin(originByMonth, originCountry) {
+  if (originByMonth && typeof originByMonth === 'object') {
+    const monthKey = MONTH_KEYS[new Date().getMonth()]
+    if (originByMonth[monthKey]) {
+      const origins = originByMonth[monthKey]
+      // Handle both array and string formats
+      const originText = Array.isArray(origins) ? origins.join(' / ') : origins
+      return { origin: originText, month: MONTH_LABELS[new Date().getMonth()] }
+    }
+  }
+  // Fall back to static origin_country
+  if (originCountry) {
+    return { origin: originCountry, month: null }
+  }
+  return null
+}
+
 const styles = {
   overlay: {
     position: 'fixed',
@@ -321,6 +341,23 @@ function ProductDetailModal({ purchase, onClose }) {
                   🤝 Fairtrade
                 </span>
               )}
+              
+              {(() => {
+                const originInfo = getCurrentMonthOrigin(purchase.origin_by_month, purchase.origin_country)
+                if (originInfo) {
+                  return (
+                    <span style={{ 
+                      ...styles.badge, 
+                      background: 'rgba(168, 85, 247, 0.2)', 
+                      color: '#a855f7' 
+                    }}>
+                      <MapPin size={12} /> {originInfo.origin}
+                      {originInfo.month && <span style={{ opacity: 0.7, marginLeft: '4px' }}>({originInfo.month})</span>}
+                    </span>
+                  )
+                }
+                return null
+              })()}
             </div>
           </div>
         </div>
@@ -469,6 +506,69 @@ function ProductDetailModal({ purchase, onClose }) {
                     </div>
                   </a>
                 ))}
+              </div>
+            )}
+
+            {/* Monthly Origin Calendar */}
+            {purchase.origin_by_month && Object.keys(purchase.origin_by_month).length > 0 && (
+              <div style={styles.section}>
+                <div style={styles.sectionTitle}>
+                  <MapPin size={14} style={{ marginRight: '0.5rem' }} />
+                  Origin Calendar
+                </div>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(4, 1fr)', 
+                  gap: '0.5rem',
+                  fontSize: '0.75rem'
+                }}>
+                  {MONTH_KEYS.map((monthKey, idx) => {
+                    const origins = purchase.origin_by_month[monthKey]
+                    const isCurrentMonth = idx === new Date().getMonth()
+                    const originText = origins 
+                      ? (Array.isArray(origins) ? origins.join(', ') : origins)
+                      : '—'
+                    
+                    return (
+                      <div 
+                        key={monthKey}
+                        style={{
+                          padding: '0.5rem',
+                          borderRadius: '6px',
+                          background: isCurrentMonth 
+                            ? 'rgba(168, 85, 247, 0.2)' 
+                            : 'var(--bg-hover, #334155)',
+                          border: isCurrentMonth 
+                            ? '1px solid rgba(168, 85, 247, 0.5)' 
+                            : '1px solid transparent'
+                        }}
+                      >
+                        <div style={{ 
+                          fontWeight: '600', 
+                          color: isCurrentMonth ? '#a855f7' : 'var(--text-muted)',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {MONTH_LABELS[idx].slice(0, 3)}
+                        </div>
+                        <div style={{ 
+                          color: 'var(--text)',
+                          lineHeight: '1.3',
+                          wordBreak: 'break-word'
+                        }}>
+                          {originText}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ 
+                  marginTop: '0.75rem', 
+                  fontSize: '0.7rem', 
+                  color: 'var(--text-muted)',
+                  fontStyle: 'italic'
+                }}>
+                  Origin may vary due to seasonal availability
+                </div>
               </div>
             )}
 
