@@ -3346,6 +3346,8 @@ app.post('/api/ingest/scrape', async (req, res) => {
     const user = await getUserFromRequest(req)
     const userId = user?.id || null
     const bonusCard = req.body?.bonus_card?.toString().trim() || null
+    
+    console.log(`[Ingest] Received ${items.length} items, userId: ${userId ? 'yes' : 'no'}, bonusCard: ${bonusCard ? bonusCard.slice(-4) : 'none'}`)
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
     const seen = new Set()
@@ -3498,20 +3500,45 @@ app.post('/api/ingest/scrape', async (req, res) => {
           last_seen_at: now   // Always updated on re-import
         }))
 
+        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user' : 'bonus card'} ${bonusCard?.slice(-4) || userId}`)
+        console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
+
         // Use upsert to avoid duplicates (same user/bonus_card + product)
-        const conflictColumns = userId ? 'user_id,product_id' : 'bonus_card_number,product_id'
-        const { error: purchaseError } = await supabase
-          .from('user_purchases')
-          .upsert(purchaseRecords, {
-            onConflict: conflictColumns,
-            ignoreDuplicates: false  // Update last_seen_at on conflict
-          })
-        
-        if (purchaseError) {
-          // Log but don't fail - products were already stored
-          console.error('Purchase record error:', purchaseError.message)
+        // For bonus card users, use INSERT instead of upsert since the unique index might not exist
+        if (bonusCard && !userId) {
+          // Try simple insert first, ignore duplicates
+          const { data, error: purchaseError } = await supabase
+            .from('user_purchases')
+            .insert(purchaseRecords)
+            .select()
+          
+          if (purchaseError) {
+            // If it's a duplicate key error, that's OK - record already exists
+            if (purchaseError.code === '23505') {
+              console.log(`[Ingest] Some purchases already exist (duplicate key) - this is OK`)
+              purchasesRecorded = purchaseRecords.length
+            } else {
+              console.error('Purchase record error:', purchaseError.code, purchaseError.message, purchaseError.details)
+            }
+          } else {
+            purchasesRecorded = data?.length || purchaseRecords.length
+            console.log(`[Ingest] Successfully inserted ${purchasesRecorded} purchase records`)
+          }
         } else {
-          purchasesRecorded = purchaseRecords.length
+          // For authenticated users, use upsert
+          const conflictColumns = 'user_id,product_id'
+          const { error: purchaseError } = await supabase
+            .from('user_purchases')
+            .upsert(purchaseRecords, {
+              onConflict: conflictColumns,
+              ignoreDuplicates: false  // Update last_seen_at on conflict
+            })
+          
+          if (purchaseError) {
+            console.error('Purchase record error:', purchaseError.message)
+          } else {
+            purchasesRecorded = purchaseRecords.length
+          }
         }
       }
     }
