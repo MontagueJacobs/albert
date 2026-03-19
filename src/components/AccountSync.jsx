@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react'
+import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, Trash2, Monitor, ExternalLink } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useAHUser, useAHFetch } from '../lib/ahUserContext.jsx'
+import { useBonusCard } from '../lib/bonusCardContext.jsx'
+
+// Railway scraper URL - set this to your Railway deployment URL
+const RAILWAY_SCRAPER_URL = import.meta.env.VITE_RAILWAY_SCRAPER_URL || ''
 
 /**
  * AccountSync - Simplified one-click AH account sync
@@ -11,11 +15,15 @@ import { useAHUser, useAHFetch } from '../lib/ahUserContext.jsx'
  * 2. User logs in (handles CAPTCHA themselves)
  * 3. Cookies saved, products scraped automatically
  * 4. Have cookies? Click "Sync Now" to resync
+ * 
+ * Remote mode (when local unavailable):
+ * - Uses Railway backend with noVNC for visible browser
  */
 function AccountSync({ onSyncCompleted }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { sessionId } = useAHUser()
   const ahFetch = useAHFetch()
+  const { login: bonusLogin } = useBonusCard()
   
   const [status, setStatus] = useState('idle') // 'idle', 'connecting', 'syncing', 'success', 'error'
   const [progress, setProgress] = useState('')
@@ -24,6 +32,9 @@ function AccountSync({ onSyncCompleted }) {
   const [lastSync, setLastSync] = useState(null)
   const [productsCount, setProductsCount] = useState(0)
   const [available, setAvailable] = useState(true)
+  const [remoteAvailable, setRemoteAvailable] = useState(false)
+  const [remoteSession, setRemoteSession] = useState(null)
+  const [showVnc, setShowVnc] = useState(false)
   const pollRef = useRef(null)
 
   // Check if auto-scrape is available (local only)
@@ -37,6 +48,20 @@ function AccountSync({ onSyncCompleted }) {
       .then(data => {
         console.log('[AccountSync] Availability data:', data)
         setAvailable(data.available)
+        
+        // If local not available, check Railway remote scraper
+        if (!data.available && RAILWAY_SCRAPER_URL) {
+          fetch(`${RAILWAY_SCRAPER_URL}/health`)
+            .then(res => res.json())
+            .then(health => {
+              console.log('[AccountSync] Railway health:', health)
+              setRemoteAvailable(health.vnc_available)
+            })
+            .catch(err => {
+              console.log('[AccountSync] Railway not available:', err)
+              setRemoteAvailable(false)
+            })
+        }
       })
       .catch(err => {
         console.error('[AccountSync] Availability check failed:', err)
@@ -202,6 +227,86 @@ function AccountSync({ onSyncCompleted }) {
     }
   }, [ahFetch])
 
+  // Start remote scraper (Railway backend)
+  const handleRemoteScrape = useCallback(async () => {
+    if (!RAILWAY_SCRAPER_URL) {
+      setError('Remote scraper not configured')
+      return
+    }
+    
+    setStatus('connecting')
+    setError(null)
+    setProgress(lang === 'nl' ? 'Remote browser starten...' : 'Starting remote browser...')
+    
+    try {
+      const res = await fetch(`${RAILWAY_SCRAPER_URL}/api/scrape/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (!res.ok) {
+        throw new Error('Failed to start remote scraper')
+      }
+      
+      const data = await res.json()
+      setRemoteSession(data)
+      setShowVnc(true)
+      setProgress(lang === 'nl' ? 'Log in op de AH website in het browservenster hieronder' : 'Log in to the AH website in the browser window below')
+      
+      // Start polling for remote scraper status
+      const pollRemoteStatus = async () => {
+        try {
+          const statusRes = await fetch(`${RAILWAY_SCRAPER_URL}${data.status_url}`)
+          const statusData = await statusRes.json()
+          
+          setProgress(statusData.message || 'Scraping...')
+          
+          if (statusData.status === 'complete') {
+            setStatus('success')
+            setProductsCount(statusData.products_scraped || 0)
+            setShowVnc(false)
+            
+            // Save bonus card to localStorage
+            if (statusData.bonus_card) {
+              localStorage.setItem('ah_bonus_card', statusData.bonus_card)
+              // Update bonus card context
+              if (bonusLogin) {
+                bonusLogin(statusData.bonus_card, {
+                  ah_email: statusData.email,
+                  last_scrape_at: new Date().toISOString()
+                })
+              }
+            }
+            
+            if (onSyncCompleted) onSyncCompleted()
+            return
+          }
+          
+          if (statusData.status === 'error' || statusData.status === 'timeout') {
+            setStatus('error')
+            setError(statusData.error || 'Scraping failed')
+            setShowVnc(false)
+            return
+          }
+          
+          // Continue polling
+          setTimeout(pollRemoteStatus, 2000)
+        } catch (err) {
+          console.error('Remote status poll error:', err)
+          setTimeout(pollRemoteStatus, 3000)
+        }
+      }
+      
+      // Start polling after a short delay
+      setTimeout(pollRemoteStatus, 3000)
+      
+    } catch (err) {
+      console.error('Remote scrape failed:', err)
+      setError(err.message)
+      setStatus('error')
+    }
+  }, [lang, bonusLogin, onSyncCompleted])
+
   const formatDate = (dateStr) => {
     if (!dateStr) return null
     try {
@@ -217,22 +322,198 @@ function AccountSync({ onSyncCompleted }) {
   const hasCookies = cookieStatus?.hasCookies
   const isBusy = status === 'connecting' || status === 'syncing'
 
-  // Not available on hosted version
+  // Not available locally - show remote scraper option if Railway configured
   if (!available) {
+    // No remote scraper configured
+    if (!remoteAvailable && !RAILWAY_SCRAPER_URL) {
+      return (
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          borderRadius: '12px',
+          padding: '1.5rem',
+          marginTop: '1rem'
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b' }}>
+            {t('auto_scrape_not_available_title') || 'Automatic Scraping Not Available'}
+          </h3>
+          <p style={{ margin: 0, color: 'var(--text-muted, #9ca3af)' }}>
+            {t('auto_scrape_not_available_desc') || 'This feature is only available when running the app locally. On the hosted version, use the manual bookmarklet method.'}
+          </p>
+        </div>
+      )
+    }
+    
+    // Remote scraper available - show it
     return (
       <div style={{
-        background: 'rgba(245, 158, 11, 0.1)',
-        border: '1px solid rgba(245, 158, 11, 0.3)',
-        borderRadius: '12px',
-        padding: '1.5rem',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        borderRadius: '16px',
+        padding: '2rem',
+        color: 'white',
         marginTop: '1rem'
       }}>
-        <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b' }}>
-          {t('auto_scrape_not_available_title') || 'Not Available'}
-        </h3>
-        <p style={{ margin: 0, color: 'var(--text-muted, #9ca3af)' }}>
-          {t('auto_scrape_not_available_desc') || 'This feature is only available when running the app locally.'}
-        </p>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Monitor size={28} />
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
+              {lang === 'nl' ? 'Remote Browser Sync' : 'Remote Browser Sync'}
+            </h3>
+            <p style={{ margin: '0.25rem 0 0 0', opacity: 0.7, fontSize: '0.9rem' }}>
+              {lang === 'nl' 
+                ? 'Log in via een beveiligde browser in de cloud'
+                : 'Log in via a secure browser in the cloud'}
+            </p>
+          </div>
+        </div>
+
+        {/* Progress/status messages */}
+        {progress && (
+          <div style={{
+            background: 'rgba(139, 92, 246, 0.15)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: '12px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+            <span>{progress}</span>
+          </div>
+        )}
+
+        {/* Error display */}
+        {error && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '12px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <AlertCircle size={24} style={{ color: '#ef4444' }} />
+            <div style={{ color: '#fca5a5' }}>{error}</div>
+          </div>
+        )}
+
+        {/* Success display */}
+        {status === 'success' && (
+          <div style={{
+            background: 'rgba(34, 197, 94, 0.15)',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
+            borderRadius: '12px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <CheckCircle size={24} style={{ color: '#22c55e' }} />
+            <div>
+              <div style={{ fontWeight: 500 }}>
+                {t('sync_success') || 'Sync Complete!'}
+              </div>
+              <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+                {productsCount > 0 && `${productsCount} ${t('sync_products_imported') || 'products imported'}`}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* noVNC Browser Window */}
+        {showVnc && remoteSession && (
+          <div style={{
+            marginBottom: '1rem',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            border: '2px solid rgba(139, 92, 246, 0.5)'
+          }}>
+            <div style={{
+              background: 'rgba(139, 92, 246, 0.2)',
+              padding: '0.5rem 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+                {lang === 'nl' ? 'AH Browser Venster' : 'AH Browser Window'}
+              </span>
+              <a 
+                href={`${RAILWAY_SCRAPER_URL}/vnc.html`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#a78bfa', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+              >
+                <ExternalLink size={14} />
+                {lang === 'nl' ? 'Open in nieuw venster' : 'Open in new window'}
+              </a>
+            </div>
+            <iframe
+              src={`${RAILWAY_SCRAPER_URL}/vnc.html?autoconnect=true&resize=scale`}
+              style={{
+                width: '100%',
+                height: '500px',
+                border: 'none',
+                background: '#000'
+              }}
+              title="Remote Browser"
+            />
+          </div>
+        )}
+
+        {/* Start button */}
+        {status === 'idle' && (
+          <button
+            onClick={handleRemoteScrape}
+            style={{
+              width: '100%',
+              padding: '1rem 1.5rem',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              color: 'white',
+              fontWeight: 600,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <Monitor size={20} />
+            {lang === 'nl' ? 'Start Remote Sync' : 'Start Remote Sync'}
+          </button>
+        )}
+
+        {/* How it works */}
+        <div style={{ marginTop: '1.5rem', fontSize: '0.9rem', opacity: 0.7 }}>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 500 }}>
+            {lang === 'nl' ? 'Hoe werkt het:' : 'How it works:'}
+          </p>
+          <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            <li>{lang === 'nl' ? 'Klik op "Start Remote Sync"' : 'Click "Start Remote Sync"'}</li>
+            <li>{lang === 'nl' ? 'Een browser venster opent hieronder' : 'A browser window opens below'}</li>
+            <li>{lang === 'nl' ? 'Log in op je AH account' : 'Log in to your AH account'}</li>
+            <li>{lang === 'nl' ? 'Je aankopen worden automatisch opgehaald' : 'Your purchases are fetched automatically'}</li>
+          </ol>
+        </div>
       </div>
     )
   }
