@@ -3419,6 +3419,8 @@ app.post('/api/ingest/scrape', async (req, res) => {
       })
     }
     
+    let purchaseError = null
+    
     if (supabase) {
       // 1. Upsert products to shared 'products' table (unified catalog)
       console.log(`[Ingest] Upserting ${cleaned.length} products to ${SUPABASE_PRODUCTS_TABLE}`)
@@ -3486,7 +3488,6 @@ app.post('/api/ingest/scrape', async (req, res) => {
 
       // 3. If user is authenticated OR bonus card provided, record purchases
       // Uses upsert to prevent duplicates when scanning same products again
-      let purchaseError = null
       if (userId || bonusCard) {
         const now = new Date().toISOString()
         const purchaseRecords = cleaned.map(p => ({
