@@ -90,8 +90,8 @@ function buildIndex(entries) {
 async function fetchSupabaseCatalog() {
   if (!supabase) return null
   
-  // Try fetching from unified 'products' table first
-  // The new schema has: id, name, alt_names, base_score, categories, adjustments, suggestions, notes
+  // Fetch from unified 'products' table
+  // The schema has: id, name, alt_names, base_score, categories, adjustments, suggestions, notes
   const { data, error } = await supabase
     .from(SUPABASE_TABLE)
     .select('id, name, alt_names, base_score, categories, adjustments, suggestions, notes')
@@ -100,48 +100,18 @@ async function fetchSupabaseCatalog() {
     .limit(2000)
 
   if (error) {
-    // If 'products' table doesn't exist yet, try legacy 'product_catalog'
-    if (error.message.includes('does not exist') || error.code === '42P01') {
-      console.log('Products table not found, trying legacy product_catalog...')
-      const { data: legacyData, error: legacyError } = await supabase
-        .from('product_catalog')
-        .select('id, names, base_score, categories, adjustments, suggestions, notes')
-        .order('id', { ascending: true })
-        .limit(2000)
-      
-      if (legacyError) {
-        throw new Error(`Supabase fetch error: ${legacyError.message}`)
-      }
-      
-      if (!legacyData || legacyData.length === 0) return []
-      
-      // Transform legacy format
-      return legacyData
-        .map((row) => {
-          const names = toStringArray(row.names)
-          const id = row.id?.trim() || names[0] || null
-          if (!id || names.length === 0) return null
-          
-          return {
-            id,
-            names,
-            baseScore: row.base_score ?? 5,
-            categories: toStringArray(row.categories),
-            adjustments: normalizeAdjustments(row.adjustments),
-            suggestions: toStringArray(row.suggestions),
-            notes: row.notes || null
-          }
-        })
-        .filter(Boolean)
-    }
-    throw new Error(`Supabase fetch error: ${error.message}`)
+    // Log the error but don't try legacy table - it was dropped
+    console.error(`[catalogLoader] Supabase error: ${error.message}`)
+    console.log('[catalogLoader] Using fallback local catalog')
+    return null  // Will fall back to local PRODUCT_CATALOG
   }
 
   if (!data || data.length === 0) {
-    return []
+    console.log('[catalogLoader] No products with scores found in Supabase, using local catalog')
+    return null
   }
 
-  // Transform new unified products format
+  // Transform unified products format
   return data
     .map((row) => {
       // alt_names contains alternative names, name is the primary name
