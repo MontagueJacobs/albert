@@ -268,7 +268,11 @@
       progressEl.style.width = '100%';
       
       if (!res.ok) {
-        throw new Error(data?.error || data?.detail || 'Upload mislukt');
+        // Show both error code and detail if available
+        const errMsg = data?.detail 
+          ? `${data.error}: ${data.detail}` 
+          : (data?.error || 'Upload mislukt');
+        throw new Error(errMsg);
       }
       
       // Success!

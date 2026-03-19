@@ -3377,14 +3377,29 @@ app.post('/api/ingest/scrape', async (req, res) => {
     let purchasesRecorded = 0
     let queuedForEnrichment = 0
     
+    if (!supabase) {
+      console.warn('[Ingest] Supabase not configured - SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing')
+      return res.status(500).json({ 
+        error: 'supabase_not_configured', 
+        detail: 'Server missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+      })
+    }
+    
     if (supabase) {
       // 1. Upsert products to shared 'products' table (unified catalog)
+      console.log(`[Ingest] Upserting ${cleaned.length} products to ${SUPABASE_PRODUCTS_TABLE}`)
       const { error: productError } = await supabase
         .from(SUPABASE_PRODUCTS_TABLE)
         .upsert(cleaned, { onConflict: 'id' })
       if (productError) {
-        console.error('Product upsert error:', productError)
-        return res.status(500).json({ error: 'supabase_insert_failed', detail: productError.message })
+        console.error('Product upsert error:', JSON.stringify(productError, null, 2))
+        console.error('First product sample:', JSON.stringify(cleaned[0], null, 2))
+        return res.status(500).json({ 
+          error: 'supabase_insert_failed', 
+          detail: productError.message,
+          code: productError.code,
+          hint: productError.hint
+        })
       }
       stored = cleaned.length
 
