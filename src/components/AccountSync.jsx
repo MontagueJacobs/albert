@@ -345,318 +345,7 @@ function AccountSync({ onSyncCompleted }) {
   const hasCookies = cookieStatus?.hasCookies
   const isBusy = status === 'connecting' || status === 'syncing'
 
-  // Not available locally - show alternative sync methods
-  if (!available) {
-    // No remote scraper configured - show bookmarklet and extension options
-    if (!remoteAvailable && !RAILWAY_SCRAPER_URL) {
-      return (
-        <div style={{
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-          borderRadius: '16px',
-          padding: '2rem',
-          color: 'white',
-          marginTop: '1rem'
-        }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem' }}>
-            {lang === 'nl' ? 'Sync Methodes' : 'Sync Methods'}
-          </h3>
-          
-          {/* Bookmarklet Option */}
-          <div style={{
-            background: 'rgba(34, 197, 94, 0.1)',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            borderRadius: '12px',
-            padding: '1.25rem',
-            marginBottom: '1rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Bookmark size={20} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem' }}>
-                  {lang === 'nl' ? 'Bookmarklet (Aanbevolen)' : 'Bookmarklet (Recommended)'}
-                </h4>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
-                  {lang === 'nl' ? 'Eén klik sync - geen installatie' : 'One-click sync - no install needed'}
-                </p>
-              </div>
-            </div>
-            <a
-              href="/bookmarklet.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.25rem',
-                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                color: 'white',
-                textDecoration: 'none',
-                borderRadius: '8px',
-                fontWeight: 500,
-                fontSize: '0.9rem'
-              }}
-            >
-              <ExternalLink size={16} />
-              {lang === 'nl' ? 'Bookmarklet Instellen' : 'Setup Bookmarklet'}
-            </a>
-          </div>
-
-          {/* Extension Option */}
-          <div style={{
-            background: 'rgba(139, 92, 246, 0.1)',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
-            borderRadius: '12px',
-            padding: '1.25rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Puzzle size={20} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem' }}>
-                  {lang === 'nl' ? 'Browser Extensie' : 'Browser Extension'}
-                </h4>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
-                  {lang === 'nl' ? 'Chrome/Firefox extensie' : 'Chrome/Firefox extension'}
-                </p>
-              </div>
-            </div>
-            <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', opacity: 0.8 }}>
-              {lang === 'nl' 
-                ? 'Download de extensie map en laad hem als "unpacked extension" in Chrome.' 
-                : 'Download the extension folder and load it as an "unpacked extension" in Chrome.'}
-            </p>
-            <a
-              href="https://github.com/MontagueJacobs/albert/tree/main/sustainable-shop-webapp/extension"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.25rem',
-                background: 'rgba(139, 92, 246, 0.3)',
-                color: 'white',
-                textDecoration: 'none',
-                borderRadius: '8px',
-                fontWeight: 500,
-                fontSize: '0.9rem'
-              }}
-            >
-              <ExternalLink size={16} />
-              {lang === 'nl' ? 'Download Extensie' : 'Download Extension'}
-            </a>
-          </div>
-
-          {/* Instructions */}
-          <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-            <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', opacity: 0.9 }}>
-              {lang === 'nl' ? 'Hoe het werkt:' : 'How it works:'}
-            </h4>
-            <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.6 }}>
-              <li>{lang === 'nl' ? 'Ga naar ah.nl en log in' : 'Go to ah.nl and log in'}</li>
-              <li>{lang === 'nl' ? 'Ga naar "Eerder gekocht"' : 'Go to "Previously purchased"'}</li>
-              <li>{lang === 'nl' ? 'Klik op de bookmarklet of extensie' : 'Click the bookmarklet or extension'}</li>
-              <li>{lang === 'nl' ? 'Je producten worden automatisch gesynct!' : 'Your products sync automatically!'}</li>
-            </ol>
-          </div>
-        </div>
-      )
-    }
-    
-    // Remote scraper available - show it
-    return (
-      <div style={{
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-        borderRadius: '16px',
-        padding: '2rem',
-        color: 'white',
-        marginTop: '1rem'
-      }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-          <div style={{
-            width: '56px',
-            height: '56px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Monitor size={28} />
-          </div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-              {lang === 'nl' ? 'Remote Browser Sync' : 'Remote Browser Sync'}
-            </h3>
-            <p style={{ margin: '0.25rem 0 0 0', opacity: 0.7, fontSize: '0.9rem' }}>
-              {lang === 'nl' 
-                ? 'Log in via een beveiligde browser in de cloud'
-                : 'Log in via a secure browser in the cloud'}
-            </p>
-          </div>
-        </div>
-
-        {/* Progress/status messages */}
-        {progress && (
-          <div style={{
-            background: 'rgba(139, 92, 246, 0.15)',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
-            borderRadius: '12px',
-            padding: '1rem',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-            <span>{progress}</span>
-          </div>
-        )}
-
-        {/* Error display */}
-        {error && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '12px',
-            padding: '1rem',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <AlertCircle size={24} style={{ color: '#ef4444' }} />
-            <div style={{ color: '#fca5a5' }}>{error}</div>
-          </div>
-        )}
-
-        {/* Success display */}
-        {status === 'success' && (
-          <div style={{
-            background: 'rgba(34, 197, 94, 0.15)',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            borderRadius: '12px',
-            padding: '1rem',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <CheckCircle size={24} style={{ color: '#22c55e' }} />
-            <div>
-              <div style={{ fontWeight: 500 }}>
-                {t('sync_success') || 'Sync Complete!'}
-              </div>
-              <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-                {productsCount > 0 && `${productsCount} ${t('sync_products_imported') || 'products imported'}`}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* noVNC Browser Window */}
-        {showVnc && remoteSession && (
-          <div style={{
-            marginBottom: '1rem',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            border: '2px solid rgba(139, 92, 246, 0.5)'
-          }}>
-            <div style={{
-              background: 'rgba(139, 92, 246, 0.2)',
-              padding: '0.5rem 1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>
-                {lang === 'nl' ? 'AH Browser Venster' : 'AH Browser Window'}
-              </span>
-              <a 
-                href={`${RAILWAY_SCRAPER_URL}/vnc.html`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#a78bfa', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-              >
-                <ExternalLink size={14} />
-                {lang === 'nl' ? 'Open in nieuw venster' : 'Open in new window'}
-              </a>
-            </div>
-            <iframe
-              src={`${RAILWAY_SCRAPER_URL}/vnc.html?autoconnect=true&resize=scale`}
-              style={{
-                width: '100%',
-                height: '500px',
-                border: 'none',
-                background: '#000'
-              }}
-              title="Remote Browser"
-            />
-          </div>
-        )}
-
-        {/* Start button */}
-        {status === 'idle' && (
-          <button
-            onClick={handleRemoteScrape}
-            style={{
-              width: '100%',
-              padding: '1rem 1.5rem',
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-              border: 'none',
-              borderRadius: '12px',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '1rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <Monitor size={20} />
-            {lang === 'nl' ? 'Start Remote Sync' : 'Start Remote Sync'}
-          </button>
-        )}
-
-        {/* How it works */}
-        <div style={{ marginTop: '1.5rem', fontSize: '0.9rem', opacity: 0.7 }}>
-          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 500 }}>
-            {lang === 'nl' ? 'Hoe werkt het:' : 'How it works:'}
-          </p>
-          <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
-            <li>{lang === 'nl' ? 'Klik op "Start Remote Sync"' : 'Click "Start Remote Sync"'}</li>
-            <li>{lang === 'nl' ? 'Een browser venster opent hieronder' : 'A browser window opens below'}</li>
-            <li>{lang === 'nl' ? 'Log in op je AH account' : 'Log in to your AH account'}</li>
-            <li>{lang === 'nl' ? 'Je aankopen worden automatisch opgehaald' : 'Your purchases are fetched automatically'}</li>
-          </ol>
-        </div>
-      </div>
-    )
-  }
-
+  // Always show all sync methods
   return (
     <div style={{
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
@@ -665,106 +354,15 @@ function AccountSync({ onSyncCompleted }) {
       color: 'white',
       marginTop: '1rem'
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{
-          width: '56px',
-          height: '56px',
-          background: 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <ShoppingCart size={28} />
-        </div>
-        <div>
-          <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-            {t('sync_title') || 'Sync Your Purchases'}
-          </h3>
-          <p style={{ margin: '0.25rem 0 0 0', opacity: 0.7, fontSize: '0.9rem' }}>
-            {hasCookies 
-              ? (t('sync_connected') || 'Connected to Albert Heijn')
-              : (t('sync_not_connected') || 'Connect your AH account to import purchases')
-            }
-          </p>
-        </div>
-      </div>
+      <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem' }}>
+        {lang === 'nl' ? 'Sync Methodes' : 'Sync Methods'}
+      </h3>
 
-      {/* Connected status */}
-      {hasCookies && !isBusy && status !== 'success' && (
-        <div style={{
-          background: 'rgba(34, 197, 94, 0.15)',
-          border: '1px solid rgba(34, 197, 94, 0.3)',
-          borderRadius: '12px',
-          padding: '1rem',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <CheckCircle size={24} style={{ color: '#22c55e' }} />
-            <div>
-              <div style={{ fontWeight: 500 }}>
-                {t('sync_account_connected') || 'Account Connected'}
-              </div>
-              {lastSync && (
-                <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-                  {t('sync_last_sync') || 'Last sync'}: {formatDate(lastSync)}
-                  {productsCount > 0 && ` · ${productsCount} ${t('sync_products') || 'products'}`}
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={handleDisconnect}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#ef4444',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '6px'
-            }}
-            title={t('sync_disconnect') || 'Disconnect'}
-          >
-            <Trash2 size={18} />
-          </button>
-        </div>
-      )}
-
-      {/* Progress/Status display */}
-      {isBusy && (
+      {/* Global status messages */}
+      {progress && (
         <div style={{
           background: 'rgba(59, 130, 246, 0.15)',
           border: '1px solid rgba(59, 130, 246, 0.3)',
-          borderRadius: '12px',
-          padding: '1rem',
-          marginBottom: '1rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Loader2 size={24} style={{ color: '#3b82f6', animation: 'spin 1s linear infinite' }} />
-            <div>
-              <div style={{ fontWeight: 500 }}>
-                {status === 'connecting' 
-                  ? (t('sync_connecting') || 'Connecting...')
-                  : (t('sync_syncing') || 'Syncing...')
-                }
-              </div>
-              <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-                {progress}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success message */}
-      {status === 'success' && (
-        <div style={{
-          background: 'rgba(34, 197, 94, 0.15)',
-          border: '1px solid rgba(34, 197, 94, 0.3)',
           borderRadius: '12px',
           padding: '1rem',
           marginBottom: '1rem',
@@ -772,19 +370,11 @@ function AccountSync({ onSyncCompleted }) {
           alignItems: 'center',
           gap: '0.75rem'
         }}>
-          <CheckCircle size={24} style={{ color: '#22c55e' }} />
-          <div>
-            <div style={{ fontWeight: 500 }}>
-              {t('sync_success') || 'Sync Complete!'}
-            </div>
-            <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-              {productsCount > 0 && `${productsCount} ${t('sync_products_imported') || 'products imported'}`}
-            </div>
-          </div>
+          <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+          <span>{progress}</span>
         </div>
       )}
 
-      {/* Error display */}
       {error && (
         <div style={{
           background: 'rgba(239, 68, 68, 0.15)',
@@ -801,88 +391,387 @@ function AccountSync({ onSyncCompleted }) {
         </div>
       )}
 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        {!hasCookies ? (
-          // Not connected - show login button
-          <button
-            onClick={handleLogin}
-            disabled={isBusy}
-            style={{
-              flex: 1,
-              padding: '1rem 1.5rem',
-              background: 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
-              border: 'none',
-              borderRadius: '12px',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '1rem',
-              cursor: isBusy ? 'not-allowed' : 'pointer',
-              opacity: isBusy ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            {isBusy ? (
-              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <ShoppingCart size={20} />
-            )}
-            {t('sync_login_button') || 'Login to Albert Heijn'}
-          </button>
-        ) : (
-          // Connected - show sync button
-          <button
-            onClick={handleSync}
-            disabled={isBusy}
-            style={{
-              flex: 1,
-              padding: '1rem 1.5rem',
-              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-              border: 'none',
-              borderRadius: '12px',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '1rem',
-              cursor: isBusy ? 'not-allowed' : 'pointer',
-              opacity: isBusy ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            {isBusy ? (
-              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <RefreshCw size={20} />
-            )}
-            {t('sync_now_button') || 'Sync Now'}
-          </button>
-        )}
-      </div>
-
-      {/* How it works */}
-      {!hasCookies && !isBusy && (
+      {status === 'success' && (
         <div style={{
-          marginTop: '1.5rem',
-          padding: '1rem',
-          background: 'rgba(255,255,255,0.05)',
+          background: 'rgba(34, 197, 94, 0.15)',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
           borderRadius: '12px',
-          fontSize: '0.9rem'
+          padding: '1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
         }}>
-          <div style={{ fontWeight: 500, marginBottom: '0.5rem' }}>
-            {t('sync_how_it_works') || 'How it works:'}
+          <CheckCircle size={24} style={{ color: '#22c55e' }} />
+          <div>
+            <div style={{ fontWeight: 500 }}>{t('sync_success') || 'Sync Complete!'}</div>
+            {productsCount > 0 && (
+              <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+                {productsCount} {t('sync_products_imported') || 'products imported'}
+              </div>
+            )}
           </div>
-          <ol style={{ margin: 0, paddingLeft: '1.25rem', opacity: 0.8, lineHeight: 1.6 }}>
-            <li>{t('sync_step_1') || 'Click the button above to open Albert Heijn login'}</li>
-            <li>{t('sync_step_2') || 'Log in with your AH account (handle CAPTCHA if needed)'}</li>
-            <li>{t('sync_step_3') || 'Your purchases will be imported automatically'}</li>
-          </ol>
         </div>
       )}
+
+      {/* ===== METHOD 1: Bookmarklet (Recommended) ===== */}
+      <div style={{
+        background: 'rgba(34, 197, 94, 0.1)',
+        border: '1px solid rgba(34, 197, 94, 0.3)',
+        borderRadius: '12px',
+        padding: '1.25rem',
+        marginBottom: '1rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Bookmark size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: 0, fontSize: '1rem' }}>
+              {lang === 'nl' ? '1. Bookmarklet' : '1. Bookmarklet'}
+              <span style={{ 
+                marginLeft: '0.5rem', 
+                fontSize: '0.75rem', 
+                background: '#22c55e', 
+                padding: '2px 8px', 
+                borderRadius: '4px',
+                verticalAlign: 'middle'
+              }}>
+                {lang === 'nl' ? 'Aanbevolen' : 'Recommended'}
+              </span>
+            </h4>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
+              {lang === 'nl' ? 'Eén klik sync - geen installatie nodig' : 'One-click sync - no install needed'}
+            </p>
+          </div>
+        </div>
+        <a
+          href="/bookmarklet.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1.25rem',
+            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '8px',
+            fontWeight: 500,
+            fontSize: '0.9rem'
+          }}
+        >
+          <ExternalLink size={16} />
+          {lang === 'nl' ? 'Bookmarklet Instellen' : 'Setup Bookmarklet'}
+        </a>
+      </div>
+
+      {/* ===== METHOD 2: Browser Extension ===== */}
+      <div style={{
+        background: 'rgba(139, 92, 246, 0.1)',
+        border: '1px solid rgba(139, 92, 246, 0.3)',
+        borderRadius: '12px',
+        padding: '1.25rem',
+        marginBottom: '1rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Puzzle size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: 0, fontSize: '1rem' }}>
+              {lang === 'nl' ? '2. Browser Extensie' : '2. Browser Extension'}
+            </h4>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
+              {lang === 'nl' ? 'Chrome/Firefox extensie' : 'Chrome/Firefox extension'}
+            </p>
+          </div>
+        </div>
+        <a
+          href="https://github.com/MontagueJacobs/albert/tree/main/sustainable-shop-webapp/extension"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1.25rem',
+            background: 'rgba(139, 92, 246, 0.3)',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '8px',
+            fontWeight: 500,
+            fontSize: '0.9rem'
+          }}
+        >
+          <ExternalLink size={16} />
+          {lang === 'nl' ? 'Download Extensie' : 'Download Extension'}
+        </a>
+      </div>
+
+      {/* ===== METHOD 3: Remote Browser (if configured) ===== */}
+      {RAILWAY_SCRAPER_URL && (
+        <div style={{
+          background: 'rgba(236, 72, 153, 0.1)',
+          border: '1px solid rgba(236, 72, 153, 0.3)',
+          borderRadius: '12px',
+          padding: '1.25rem',
+          marginBottom: '1rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Monitor size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: 0, fontSize: '1rem' }}>
+                {lang === 'nl' ? '3. Remote Browser' : '3. Remote Browser'}
+                <span style={{ 
+                  marginLeft: '0.5rem', 
+                  fontSize: '0.75rem', 
+                  background: '#ec4899', 
+                  padding: '2px 8px', 
+                  borderRadius: '4px',
+                  verticalAlign: 'middle'
+                }}>
+                  Beta
+                </span>
+              </h4>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
+                {lang === 'nl' ? 'Log in via browser in de cloud' : 'Log in via browser in the cloud'}
+              </p>
+            </div>
+          </div>
+
+          {/* noVNC Browser Window */}
+          {showVnc && remoteSession && (
+            <div style={{
+              marginBottom: '1rem',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '2px solid rgba(236, 72, 153, 0.5)'
+            }}>
+              <div style={{
+                background: 'rgba(236, 72, 153, 0.2)',
+                padding: '0.5rem 1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+                  {lang === 'nl' ? 'AH Browser Venster' : 'AH Browser Window'}
+                </span>
+                <a 
+                  href={`${RAILWAY_SCRAPER_URL}/vnc.html`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#f472b6', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <ExternalLink size={14} />
+                  {lang === 'nl' ? 'Open in nieuw venster' : 'Open in new window'}
+                </a>
+              </div>
+              <iframe
+                src={`${RAILWAY_SCRAPER_URL}/vnc.html?autoconnect=true&resize=scale`}
+                style={{
+                  width: '100%',
+                  height: '400px',
+                  border: 'none',
+                  background: '#000'
+                }}
+                title="Remote Browser"
+              />
+            </div>
+          )}
+
+          <button
+            onClick={handleRemoteScrape}
+            disabled={isBusy}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1.25rem',
+              background: isBusy ? 'rgba(236, 72, 153, 0.3)' : 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 500,
+              fontSize: '0.9rem',
+              cursor: isBusy ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isBusy ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Monitor size={16} />}
+            {lang === 'nl' ? 'Start Remote Sync' : 'Start Remote Sync'}
+          </button>
+        </div>
+      )}
+
+      {/* ===== METHOD 4: Local Auto-Sync (if available) ===== */}
+      {available && (
+        <div style={{
+          background: 'rgba(0, 160, 226, 0.1)',
+          border: '1px solid rgba(0, 160, 226, 0.3)',
+          borderRadius: '12px',
+          padding: '1.25rem',
+          marginBottom: '1rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <ShoppingCart size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: 0, fontSize: '1rem' }}>
+                {lang === 'nl' ? 'Automatische Sync (Lokaal)' : 'Auto Sync (Local)'}
+                {hasCookies && (
+                  <span style={{ 
+                    marginLeft: '0.5rem', 
+                    fontSize: '0.75rem', 
+                    background: '#22c55e', 
+                    padding: '2px 8px', 
+                    borderRadius: '4px',
+                    verticalAlign: 'middle'
+                  }}>
+                    {lang === 'nl' ? 'Verbonden' : 'Connected'}
+                  </span>
+                )}
+              </h4>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
+                {hasCookies 
+                  ? (lang === 'nl' ? 'Account verbonden - klik om te synchen' : 'Account connected - click to sync')
+                  : (lang === 'nl' ? 'Opent browser om in te loggen' : 'Opens browser to log in')
+                }
+              </p>
+            </div>
+          </div>
+
+          {hasCookies && lastSync && (
+            <div style={{ 
+              fontSize: '0.85rem', 
+              opacity: 0.7, 
+              marginBottom: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <CheckCircle size={14} style={{ color: '#22c55e' }} />
+              {t('sync_last_sync') || 'Last sync'}: {formatDate(lastSync)}
+              {productsCount > 0 && ` · ${productsCount} ${t('sync_products') || 'products'}`}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {!hasCookies ? (
+              <button
+                onClick={handleLogin}
+                disabled={isBusy}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.25rem',
+                  background: isBusy ? 'rgba(0, 160, 226, 0.3)' : 'linear-gradient(135deg, #00a0e2 0%, #0077b3 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  cursor: isBusy ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isBusy ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ShoppingCart size={16} />}
+                {t('sync_login_button') || 'Login to Albert Heijn'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleSync}
+                  disabled={isBusy}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem',
+                    background: isBusy ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 500,
+                    fontSize: '0.9rem',
+                    cursor: isBusy ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isBusy ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={16} />}
+                  {t('sync_now_button') || 'Sync Now'}
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1rem',
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    color: '#fca5a5',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                  title={t('sync_disconnect') || 'Disconnect'}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Instructions */}
+      <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+        <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', opacity: 0.9 }}>
+          {lang === 'nl' ? 'Hoe het werkt:' : 'How it works:'}
+        </h4>
+        <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.6 }}>
+          <li>{lang === 'nl' ? 'Kies een sync methode hierboven' : 'Choose a sync method above'}</li>
+          <li>{lang === 'nl' ? 'Ga naar ah.nl en log in op je account' : 'Go to ah.nl and log into your account'}</li>
+          <li>{lang === 'nl' ? 'Ga naar "Eerder gekocht" pagina' : 'Go to "Previously purchased" page'}</li>
+          <li>{lang === 'nl' ? 'Je producten worden automatisch gesynct!' : 'Your products sync automatically!'}</li>
+        </ol>
+      </div>
     </div>
   )
 }
