@@ -1,315 +1,280 @@
-(function () {
-  // Browser API compatibility (Firefox uses 'browser', Chrome uses 'chrome')
-  const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+/**
+ * content.js - DOM Extraction Script for AH Grocery Wrapped
+ * 
+ * This script extracts product/purchase data from Albert Heijn pages.
+ * It runs in the context of the ah.nl webpage.
+ * 
+ * IMPORTANT: Selectors may need adjustment if AH updates their website.
+ * Look for TODO comments marking places that may need updates.
+ */
 
-  // Configuration - will be updated from storage
-  let API_BASE = 'https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app';
-  let userToken = null;
+(function() {
+  'use strict';
 
-  // Load settings from storage
-  browserAPI.storage.sync.get(['apiBase', 'userToken'], (result) => {
-    if (result.apiBase) API_BASE = result.apiBase;
-    if (result.userToken) userToken = result.userToken;
-  });
+  // Prevent multiple injections
+  if (window.__ahGroceryWrappedInjected) {
+    console.log('[AH Wrapped] Already injected, skipping');
+    return;
+  }
+  window.__ahGroceryWrappedInjected = true;
 
-  // Listen for messages from popup
-  browserAPI.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'scrape') {
-      userToken = request.token || null;
-      if (request.apiBase) API_BASE = request.apiBase;
-      scrapeAndSend().then(sendResponse);
-      return true; // Keep channel open for async response
-    }
-    if (request.action === 'getProductCount') {
-      const items = extractProducts();
-      sendResponse({ count: items.length });
-      return true;
-    }
-    if (request.action === 'autoScroll') {
-      autoScrollAndScrape().then(sendResponse);
-      return true;
-    }
-  });
+  console.log('[AH Wrapped] Content script loaded');
 
-  function createFloatingUI() {
-    if (document.getElementById('sustainable-shop-ui')) return;
+  // ============================================================
+  // CONFIGURATION - Adjust selectors here if AH changes their DOM
+  // ============================================================
+  
+  // TODO: Update these selectors if AH website structure changes
+  const SELECTORS = {
+    // Product card containers - common patterns on AH website
+    productCards: [
+      '[data-testhook="product-card"]',           // Main product cards
+      '.product-card',                             // Generic product card class
+      '[class*="ProductCard"]',                    // React-style class names
+      'article[data-product]',                     // Article with product data
+      '.lane-item',                                // Items in product lanes
+      '[class*="product_root"]',                   // Product root containers
+      'a[href*="/producten/product/"]',            // Product links
+    ],
     
-    const container = document.createElement('div');
-    container.id = 'sustainable-shop-ui';
-    container.innerHTML = `
-      <div style="
-        position: fixed;
-        right: 20px;
-        bottom: 20px;
-        z-index: 999999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      ">
-        <div id="ss-panel" style="
-          background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-          border-radius: 16px;
-          padding: 16px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-          color: #f3f4f6;
-          min-width: 280px;
-          display: none;
-        ">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-            <span style="font-size: 24px;">🌱</span>
-            <span style="font-weight: 600; font-size: 14px;">Sustainable Shop</span>
-          </div>
-          <div id="ss-status" style="font-size: 13px; color: #9ca3af; margin-bottom: 12px;">
-            Ready to sync your purchases
-          </div>
-          <div id="ss-count" style="font-size: 13px; color: #22c55e; margin-bottom: 12px;">
-            Products found: <span id="ss-product-count">0</span>
-          </div>
-          <button id="ss-auto-scroll" style="
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 8px;
-            background: #334155;
-            color: #f3f4f6;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-          ">
-            📜 Auto-scroll to load all
-          </button>
-          <button id="ss-sync" style="
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-          ">
-            🔄 Sync to Sustainable Shop
-          </button>
-        </div>
-        <button id="ss-toggle" style="
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
-          border: none;
-          cursor: pointer;
-          box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 28px;
-          margin-top: 12px;
-          margin-left: auto;
-        ">
-          🌱
-        </button>
-      </div>
-    `;
-    document.body.appendChild(container);
+    // Product name selectors (tried in order)
+    productName: [
+      '[data-testhook="product-title"]',
+      '.product-title',
+      '[class*="title"]',
+      'h3',
+      'h2',
+      '.product-card__title',
+    ],
+    
+    // Price selectors
+    price: [
+      '[data-testhook="product-price"]',
+      '.price',
+      '[class*="price"]',
+      '.product-price',
+    ],
+    
+    // Category/label selectors
+    category: [
+      '[data-testhook="product-category"]',
+      '.category',
+      '[class*="Category"]',
+      '.product-label',
+      '[class*="Shield"]',                         // Bonus/discount labels
+    ],
+  };
 
-    // Toggle panel
-    const toggle = document.getElementById('ss-toggle');
-    const panel = document.getElementById('ss-panel');
-    toggle.onclick = () => {
-      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-      if (panel.style.display === 'block') updateProductCount();
-    };
+  // ============================================================
+  // EXTRACTION FUNCTIONS
+  // ============================================================
 
-    // Auto-scroll button
-    document.getElementById('ss-auto-scroll').onclick = async () => {
-      const btn = document.getElementById('ss-auto-scroll');
-      btn.disabled = true;
-      btn.textContent = '⏳ Scrolling...';
-      await autoScroll();
-      btn.disabled = false;
-      btn.textContent = '📜 Auto-scroll to load all';
-      updateProductCount();
-    };
-
-    // Sync button
-    document.getElementById('ss-sync').onclick = async () => {
-      const btn = document.getElementById('ss-sync');
-      btn.disabled = true;
-      btn.textContent = '⏳ Syncing...';
-      await scrapeAndSend();
-      btn.disabled = false;
-      btn.textContent = '🔄 Sync to Sustainable Shop';
-    };
-
-    // Initial count
-    setTimeout(updateProductCount, 1000);
+  /**
+   * Find an element using multiple selector strategies
+   * @param {Element} container - Parent element to search within
+   * @param {string[]} selectors - Array of CSS selectors to try
+   * @returns {Element|null} First matching element or null
+   */
+  function findElement(container, selectors) {
+    for (const selector of selectors) {
+      try {
+        const element = container.querySelector(selector);
+        if (element) return element;
+      } catch (e) {
+        // Invalid selector, skip
+      }
+    }
+    return null;
   }
 
-  function updateProductCount() {
-    const items = extractProducts();
-    const countEl = document.getElementById('ss-product-count');
-    if (countEl) countEl.textContent = items.length;
+  /**
+   * Extract text content from an element, cleaned up
+   * @param {Element|null} element - Element to extract text from
+   * @returns {string|null} Cleaned text or null
+   */
+  function extractText(element) {
+    if (!element) return null;
+    const text = element.textContent?.trim();
+    return text || null;
   }
 
-  function extractProducts() {
-    const cards = document.querySelectorAll('a[href*="/producten/product/"]');
-    const items = [];
-    const seen = new Set();
+  /**
+   * Parse price from text (handles € symbol and comma decimals)
+   * @param {string|null} priceText - Raw price text like "€ 2,49"
+   * @returns {number|null} Parsed price as number or null
+   */
+  function parsePrice(priceText) {
+    if (!priceText) return null;
+    
+    // Remove currency symbol and whitespace
+    const cleaned = priceText
+      .replace(/[€$£\s]/g, '')
+      .replace(',', '.');  // Dutch format uses comma as decimal
+    
+    const price = parseFloat(cleaned);
+    return isNaN(price) ? null : price;
+  }
 
-    cards.forEach(a => {
-      const href = a.getAttribute('href');
-      if (!href || seen.has(href)) return;
-      seen.add(href);
+  /**
+   * Find all product card elements on the page
+   * @returns {Element[]} Array of product card elements
+   */
+  function findProductCards() {
+    const cards = new Set();
+    
+    // Try each selector pattern
+    for (const selector of SELECTORS.productCards) {
+      try {
+        const found = document.querySelectorAll(selector);
+        if (found.length > 0) {
+          console.log(`[AH Wrapped] Found ${found.length} products using: ${selector}`);
+          found.forEach(el => cards.add(el));
+        }
+      } catch (e) {
+        // Invalid selector, skip
+      }
+    }
+    
+    return Array.from(cards);
+  }
 
-      const url = new URL(href, location.origin).toString();
-      
-      // Get product name
-      let name = '';
-      const titleEl = a.querySelector('[data-testhook="product-title"]') ||
-                      a.querySelector('span[class*="title"]') ||
-                      a.closest('article')?.querySelector('h2, h3, [class*="title"]');
-      if (titleEl) {
-        name = titleEl.textContent?.trim() || '';
-      }
-      if (!name) {
-        name = a.getAttribute('aria-label') || a.textContent?.trim() || '';
-      }
+  /**
+   * Extract product data from a single card element
+   * @param {Element} card - Product card element
+   * @returns {Object} Extracted product data
+   */
+  function extractProductFromCard(card) {
+    // Get the article/card container
+    const container = card.closest('article') || 
+                      card.closest('[data-testhook="product-card"]') || 
+                      card.closest('[class*="product"]') ||
+                      card;
+    
+    // Extract name
+    const nameEl = findElement(container, SELECTORS.productName);
+    let name = extractText(nameEl);
+    
+    // Fallback: try aria-label or link text
+    if (!name) {
+      name = card.getAttribute('aria-label') || extractText(card);
+    }
+    
+    // Clean up name
+    if (name) {
       name = name.replace(/\s+/g, ' ').trim();
-
-      // Get card container
-      const card = a.closest('article') || 
-                   a.closest('[data-testhook="product-card"]') || 
-                   a.closest('[class*="product"]') ||
-                   a.parentElement?.parentElement;
-
-      // Get price
-      let price = null;
-      const priceEl = card?.querySelector('[data-testhook="product-price"]') ||
-                      card?.querySelector('[class*="price"]') ||
-                      card?.querySelector('span:has(> sup)');
-      if (priceEl) {
-        const raw = priceEl.textContent?.replace(',', '.').match(/(\d+\.?\d*)/);
-        if (raw) price = parseFloat(raw[1]);
-      }
-
-      // Get image
-      const imgEl = card?.querySelector('img[src*="static.ah.nl"]') || card?.querySelector('img');
-      const image = imgEl?.src || '';
-
-      // Get product ID from URL
-      const idMatch = href.match(/wi(\d+)/);
-      const productId = idMatch ? idMatch[1] : null;
-
-      if (name && name.length > 1) {
-        items.push({ 
-          name, 
-          url, 
-          price, 
-          image, 
-          productId,
-          source: 'ah_eerder_gekocht',
-          scrapedAt: new Date().toISOString()
-        });
-      }
-    });
-    
-    return items;
-  }
-
-  async function autoScroll() {
-    const status = document.getElementById('ss-status');
-    let lastCount = 0;
-    let sameCountTimes = 0;
-    
-    while (sameCountTimes < 3) {
-      window.scrollTo(0, document.body.scrollHeight);
-      await new Promise(r => setTimeout(r, 1500));
-      
-      const currentCount = extractProducts().length;
-      if (status) status.textContent = `Loading... ${currentCount} products found`;
-      
-      if (currentCount === lastCount) {
-        sameCountTimes++;
-      } else {
-        sameCountTimes = 0;
-        lastCount = currentCount;
-      }
     }
     
-    window.scrollTo(0, 0);
-    if (status) status.textContent = `Done! ${lastCount} products loaded`;
-  }
-
-  async function autoScrollAndScrape() {
-    await autoScroll();
-    return await scrapeAndSend();
-  }
-
-  async function scrapeAndSend() {
-    const status = document.getElementById('ss-status');
+    // Extract price
+    const priceEl = findElement(container, SELECTORS.price);
+    const priceText = extractText(priceEl);
+    const price = parsePrice(priceText);
     
-    try {
-      const items = extractProducts();
-      if (!items.length) {
-        if (status) status.textContent = '⚠️ No products found. Try scrolling first.';
-        return { success: false, error: 'No products found' };
+    // Extract category/label
+    const categoryEl = findElement(container, SELECTORS.category);
+    const category = extractText(categoryEl);
+    
+    // Try to get product URL
+    const linkEl = container.querySelector('a[href*="/producten/"]') || 
+                   (card.tagName === 'A' ? card : null);
+    const url = linkEl?.href || null;
+    
+    // Try to get product image
+    const imgEl = container.querySelector('img');
+    const imageUrl = imgEl?.src || null;
+    
+    return {
+      name,
+      price,
+      category,
+      url,
+      imageUrl
+    };
+  }
+
+  /**
+   * Main extraction function - extracts all visible products
+   * @returns {Object} Extraction result with items array
+   */
+  function extractAllProducts() {
+    console.log('[AH Wrapped] Starting extraction...');
+    
+    const cards = findProductCards();
+    console.log(`[AH Wrapped] Found ${cards.length} total product cards`);
+    
+    const items = [];
+    const seen = new Set();  // Track seen products to avoid duplicates
+    
+    for (const card of cards) {
+      const product = extractProductFromCard(card);
+      
+      // Skip products without a name
+      if (!product.name || product.name.length < 2) {
+        continue;
       }
-
-      if (status) status.textContent = `📤 Uploading ${items.length} products...`;
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (userToken) {
-        headers['Authorization'] = `Bearer ${userToken}`;
+      
+      // Skip duplicates (same name and price)
+      const key = `${product.name}-${product.price}`;
+      if (seen.has(key)) {
+        continue;
       }
-
-      const res = await fetch(`${API_BASE}/api/ingest/scrape`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ 
-          items, 
-          source: 'browser_extension', 
-          scraped_at: new Date().toISOString() 
-        })
+      seen.add(key);
+      
+      items.push({
+        name: product.name,
+        price: product.price,
+        category: product.category,
       });
-
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data?.detail || data?.error || 'Upload failed');
+    }
+    
+    console.log(`[AH Wrapped] Extracted ${items.length} unique products`);
+    
+    return {
+      success: true,
+      items,
+      metadata: {
+        extractedAt: new Date().toISOString(),
+        pageUrl: window.location.href,
+        pageTitle: document.title,
+        totalCards: cards.length,
+        uniqueProducts: items.length
       }
-
-      const stored = data.stored || items.length;
-      const purchasesMsg = data.purchasesRecorded 
-        ? ` (${data.purchasesRecorded} added to your account)` 
-        : data.userId === 'anonymous' 
-          ? ' (sign in to save to your account)' 
-          : '';
-      
-      if (status) status.textContent = `✅ Synced ${stored} products!${purchasesMsg}`;
-      
-      return { success: true, stored, total: items.length, purchasesRecorded: data.purchasesRecorded };
-    } catch (e) {
-      console.error('Sustainable Shop sync failed:', e);
-      if (status) status.textContent = `❌ Error: ${e.message}`;
-      return { success: false, error: e.message };
-    }
+    };
   }
 
-  // Initialize floating UI when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', createFloatingUI);
-  } else {
-    createFloatingUI();
-  }
+  // ============================================================
+  // MESSAGE HANDLER
+  // ============================================================
 
-  // Watch for dynamic content changes
-  const observer = new MutationObserver(() => {
-    createFloatingUI();
-    // Update count periodically when products are loaded
-    const countEl = document.getElementById('ss-product-count');
-    if (countEl && document.getElementById('ss-panel')?.style.display === 'block') {
-      updateProductCount();
+  /**
+   * Listen for messages from background script
+   */
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'extract') {
+      console.log('[AH Wrapped] Received extract request');
+      
+      // Run extraction
+      const result = extractAllProducts();
+      
+      // Log to console for debugging
+      console.log('[AH Wrapped] Extraction result:', result);
+      console.table(result.items.slice(0, 10));  // Show first 10 in table
+      
+      // Show alert to user
+      if (result.items.length > 0) {
+        alert(`✅ Extracted ${result.items.length} items!\n\nCheck the browser console (F12) for full data.`);
+      } else {
+        alert('⚠️ No products found on this page.\n\nTry navigating to:\n• Your purchase history\n• A product category page\n• Search results');
+      }
+      
+      sendResponse(result);
     }
+    
+    return true;  // Keep channel open for async
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  // Log page detection
+  if (window.location.href.includes('eerder-gekocht')) {
+    console.log('[AH Wrapped] Purchase history page detected');
+  }
+
 })();

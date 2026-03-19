@@ -1,8 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AH Grocery Wrapped</title>
   <style>
+    /* ============================================
+       POPUP STYLES - Minimal and clean design
+       ============================================ */
+    
     * {
       margin: 0;
       padding: 0;
@@ -10,254 +16,172 @@
     }
     
     body {
-      width: 320px;
+      width: 300px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-      color: #f3f4f6;
+      background: #f8fafc;
+      color: #1e293b;
     }
     
+    /* Header section */
     .header {
+      background: linear-gradient(135deg, #00a0e2 0%, #006bb3 100%);
+      color: white;
       padding: 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-bottom: 1px solid #334155;
+      text-align: center;
     }
     
-    .logo {
-      font-size: 28px;
-    }
-    
-    .title {
-      font-size: 16px;
+    .header h1 {
+      font-size: 18px;
       font-weight: 600;
+      margin-bottom: 4px;
     }
     
-    .subtitle {
-      font-size: 11px;
-      color: #9ca3af;
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
     }
     
+    /* Main content */
     .content {
       padding: 16px;
     }
     
-    .status-card {
-      background: #334155;
-      border-radius: 10px;
+    /* Status message */
+    .status {
+      background: #e2e8f0;
+      border-radius: 8px;
       padding: 12px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      text-align: center;
     }
     
-    .status-label {
-      font-size: 11px;
-      color: #9ca3af;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+    .status.success {
+      background: #dcfce7;
+      color: #166534;
     }
     
-    .status-value {
-      font-size: 14px;
-      font-weight: 500;
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
     }
     
-    .status-value.success { color: #22c55e; }
-    .status-value.warning { color: #f59e0b; }
-    .status-value.error { color: #ef4444; }
+    .status.warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
     
-    .btn {
+    /* Primary button */
+    .btn-primary {
       width: 100%;
-      padding: 12px;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #00a0e2 0%, #006bb3 100%);
+      color: white;
       border: none;
-      border-radius: 10px;
-      font-size: 14px;
+      border-radius: 8px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: transform 0.1s, opacity 0.1s;
+      transition: transform 0.1s, box-shadow 0.1s;
     }
     
-    .btn:hover:not(:disabled) {
+    .btn-primary:hover {
       transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 107, 179, 0.3);
     }
     
-    .btn:disabled {
-      opacity: 0.5;
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
+      transform: none;
     }
     
-    .btn-primary {
-      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
-      color: white;
+    /* Result display */
+    .result {
+      margin-top: 16px;
+      display: none;
     }
     
-    .btn-secondary {
-      background: #334155;
-      color: #f3f4f6;
+    .result.visible {
+      display: block;
     }
     
-    .btn-outline {
-      background: transparent;
-      border: 1px solid #334155;
-      color: #9ca3af;
-    }
-    
-    .instructions {
-      background: #0f172a;
-      border-radius: 10px;
+    .result-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
       padding: 12px;
-      margin-top: 12px;
     }
     
-    .instructions h4 {
-      font-size: 12px;
+    .result-card h3 {
+      font-size: 14px;
       margin-bottom: 8px;
-      color: #22c55e;
+      color: #334155;
     }
     
-    .instructions ol {
+    .result-card .count {
+      font-size: 32px;
+      font-weight: 700;
+      color: #00a0e2;
+    }
+    
+    .result-card .label {
       font-size: 12px;
-      color: #9ca3af;
-      padding-left: 16px;
-      line-height: 1.6;
+      color: #64748b;
     }
     
-    .instructions a {
-      color: #667eea;
+    /* Footer info */
+    .footer {
+      padding: 12px 16px;
+      background: #f1f5f9;
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .footer a {
+      color: #00a0e2;
       text-decoration: none;
     }
-    
-    .instructions a:hover {
-      text-decoration: underline;
-    }
-    
-    .settings {
-      padding: 12px 16px;
-      border-top: 1px solid #334155;
-    }
-    
-    .settings-title {
-      font-size: 11px;
-      color: #9ca3af;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-    
-    .input-group {
-      margin-bottom: 8px;
-    }
-    
-    .input-group label {
-      display: block;
-      font-size: 11px;
-      color: #9ca3af;
-      margin-bottom: 4px;
-    }
-    
-    .input-group input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      background: #0f172a;
-      color: #f3f4f6;
-      font-size: 12px;
-    }
-    
-    .input-group input:focus {
-      outline: none;
-      border-color: #22c55e;
-    }
-    
-    .hidden { display: none; }
   </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="header">
-    <span class="logo">🌱</span>
-    <div>
-      <div class="title">Sustainable Shop</div>
-      <div class="subtitle">AH Purchase Sync</div>
-    </div>
+    <h1>🛒 AH Grocery Wrapped</h1>
+    <p>Extract your purchase history</p>
   </div>
   
+  <!-- Main content -->
   <div class="content">
-    <div class="status-card">
-      <div class="status-label">Account</div>
-      <div class="status-value" id="auth-status">Not signed in</div>
+    <!-- Status message -->
+    <div id="status" class="status">
+      Navigate to ah.nl and click the button below
     </div>
     
-    <div id="auth-section" class="hidden">
-      <div class="input-group">
-        <label>Email</label>
-        <input type="email" id="auth-email" placeholder="you@example.com">
+    <!-- Main action button -->
+    <button id="extractBtn" class="btn-primary">
+      🔍 Generate Wrapped
+    </button>
+    
+    <!-- Results display -->
+    <div id="result" class="result">
+      <div class="result-card">
+        <h3>Extraction Complete</h3>
+        <div class="count" id="itemCount">0</div>
+        <div class="label">items extracted</div>
       </div>
-      <div class="input-group">
-        <label>Password</label>
-        <input type="password" id="auth-password" placeholder="••••••••">
-      </div>
-      <button class="btn btn-primary" id="sign-in-btn">Sign In</button>
-      <div id="auth-error" style="color: #ef4444; font-size: 12px; margin-top: 8px; display: none;"></div>
-    </div>
-    
-    <div id="signed-in-section" class="hidden">
-      <button class="btn btn-outline" id="sign-out-btn">Sign Out</button>
-    </div>
-    
-    <hr style="border: none; border-top: 1px solid #334155; margin: 16px 0;">
-    
-    <div class="status-card">
-      <div class="status-label">Current Page</div>
-      <div class="status-value" id="page-status">Checking...</div>
-    </div>
-    
-    <div id="ah-page-actions" class="hidden">
-      <div class="status-card">
-        <div class="status-label">Products Found</div>
-        <div class="status-value success" id="product-count">0</div>
-      </div>
-      
-      <button class="btn btn-secondary" id="scroll-btn">
-        📜 Auto-scroll to load all
-      </button>
-      
-      <button class="btn btn-primary" id="sync-btn">
-        🔄 Sync Products
-      </button>
-    </div>
-    
-    <div id="not-ah-page" class="hidden">
-      <button class="btn btn-primary" id="open-ah-btn">
-        🛒 Go to AH Purchases
-      </button>
-      
-      <div class="instructions">
-        <h4>How to use:</h4>
-        <ol>
-          <li>Click the button above to open AH</li>
-          <li>Log in to your Albert Heijn account</li>
-          <li>Wait for products to load</li>
-          <li>Click the 🌱 button on the page to sync</li>
-        </ol>
-      </div>
-    </div>
-    
-    <div id="sync-result" class="status-card hidden">
-      <div class="status-label">Last Sync</div>
-      <div class="status-value" id="sync-message">-</div>
     </div>
   </div>
   
-  <div class="footer" style="padding: 12px 16px; border-top: 1px solid #334155; text-align: center;">
-    <a href="https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app" target="_blank" style="color: #667eea; text-decoration: none; font-size: 11px;">Open Dashboard</a>
-    <span style="color: #475569; margin: 0 8px;">•</span>
-    <a href="https://github.com/MontagueJacobs/albert/blob/main/sustainable-shop-webapp/extension/PRIVACY_POLICY.md" target="_blank" style="color: #9ca3af; text-decoration: none; font-size: 11px;">Privacy Policy</a>
+  <!-- Footer -->
+  <div class="footer">
+    Open the browser console (F12) to see full data
   </div>
   
   <script src="popup.js"></script>

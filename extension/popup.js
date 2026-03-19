@@ -1,238 +1,165 @@
-// Popup script for Sustainable Shop extension
-// Compatible with Chrome and Firefox
+/**
+ * popup.js - Popup Script for AH Grocery Wrapped
+ * 
+ * Handles the popup UI and communicates with the background script
+ * to trigger data extraction from the active tab.
+ */
 
-// Browser API compatibility (Firefox uses 'browser', Chrome uses 'chrome')
-const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+// ============================================
+// DOM ELEMENTS
+// ============================================
 
-const AH_PURCHASE_URL = 'https://www.ah.nl/producten/eerder-gekocht?sortBy=purchase_date';
-const API_BASE = 'https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app';
+const statusEl = document.getElementById('status');
+const extractBtn = document.getElementById('extractBtn');
+const resultEl = document.getElementById('result');
+const itemCountEl = document.getElementById('itemCount');
 
-// Supabase config (same as the webapp)
-const SUPABASE_URL = 'https://gfxawraapyjqtmlemskl.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_GByhVPFERsx_DD2gTB2y-w_5okCNIyM';
+// ============================================
+// STATUS HELPERS
+// ============================================
 
-// Elements
-const authStatus = document.getElementById('auth-status');
-const authSection = document.getElementById('auth-section');
-const signedInSection = document.getElementById('signed-in-section');
-const authEmail = document.getElementById('auth-email');
-const authPassword = document.getElementById('auth-password');
-const signInBtn = document.getElementById('sign-in-btn');
-const signOutBtn = document.getElementById('sign-out-btn');
-const authError = document.getElementById('auth-error');
-const pageStatus = document.getElementById('page-status');
-const productCount = document.getElementById('product-count');
-const ahPageActions = document.getElementById('ah-page-actions');
-const notAhPage = document.getElementById('not-ah-page');
-const syncResult = document.getElementById('sync-result');
-const syncMessage = document.getElementById('sync-message');
-const scrollBtn = document.getElementById('scroll-btn');
-const syncBtn = document.getElementById('sync-btn');
-const openAhBtn = document.getElementById('open-ah-btn');
+/**
+ * Update the status message with appropriate styling
+ * @param {string} message - Message to display
+ * @param {'info'|'success'|'error'|'warning'} type - Message type for styling
+ */
+function setStatus(message, type = 'info') {
+  statusEl.textContent = message;
+  statusEl.className = 'status';
+  if (type !== 'info') {
+    statusEl.classList.add(type);
+  }
+}
 
-// Check auth status on load
-async function checkAuthStatus() {
-  const settings = await browserAPI.storage.sync.get(['userToken', 'userEmail']);
+/**
+ * Show the result card with item count
+ * @param {number} count - Number of items extracted
+ */
+function showResult(count) {
+  itemCountEl.textContent = count;
+  resultEl.classList.add('visible');
+}
+
+/**
+ * Hide the result card
+ */
+function hideResult() {
+  resultEl.classList.remove('visible');
+}
+
+// ============================================
+// TAB CHECKING
+// ============================================
+
+/**
+ * Check if current tab is on ah.nl
+ * @returns {Promise<{isAH: boolean, tab: chrome.tabs.Tab|null}>}
+ */
+async function checkCurrentTab() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab || !tab.url) {
+      return { isAH: false, tab: null };
+    }
+    
+    const isAH = tab.url.includes('ah.nl');
+    return { isAH, tab };
+  } catch (error) {
+    console.error('[Popup] Tab check error:', error);
+    return { isAH: false, tab: null };
+  }
+}
+
+// ============================================
+// EXTRACTION HANDLER
+// ============================================
+
+/**
+ * Main extraction handler - triggered by button click
+ */
+async function handleExtract() {
+  console.log('[Popup] Extract button clicked');
   
-  if (settings.userToken && settings.userEmail) {
-    // Verify token is still valid
-    try {
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: {
-          'Authorization': `Bearer ${settings.userToken}`,
-          'apikey': SUPABASE_ANON_KEY
-        }
-      });
+  // Disable button during extraction
+  extractBtn.disabled = true;
+  extractBtn.textContent = '⏳ Extracting...';
+  hideResult();
+  
+  try {
+    // Check if we're on ah.nl
+    const { isAH, tab } = await checkCurrentTab();
+    
+    if (!isAH) {
+      setStatus('Please navigate to ah.nl first', 'warning');
+      extractBtn.disabled = false;
+      extractBtn.textContent = '🔍 Generate Wrapped';
+      return;
+    }
+    
+    setStatus('Injecting extraction script...', 'info');
+    
+    // Inject the content script
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content.js']
+    });
+    
+    setStatus('Extracting products...', 'info');
+    
+    // Send message to content script to extract data
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'extract' });
+    
+    console.log('[Popup] Extraction response:', response);
+    
+    if (response && response.success) {
+      const count = response.items?.length || 0;
       
-      if (res.ok) {
-        showSignedIn(settings.userEmail);
-        return;
+      if (count > 0) {
+        setStatus(`Successfully extracted ${count} items!`, 'success');
+        showResult(count);
+        
+        // Log the full data structure to console
+        console.log('[AH Wrapped] Extracted data:', JSON.stringify(response, null, 2));
+      } else {
+        setStatus('No products found on this page. Try your purchase history.', 'warning');
       }
-    } catch (e) {
-      console.error('Token validation failed:', e);
-    }
-    
-    // Token invalid, clear it
-    await browserAPI.storage.sync.remove(['userToken', 'userEmail']);
-  }
-  
-  showSignedOut();
-}
-
-function showSignedIn(email) {
-  authStatus.textContent = `✅ ${email}`;
-  authStatus.classList.add('success');
-  authStatus.classList.remove('warning');
-  authSection.classList.add('hidden');
-  signedInSection.classList.remove('hidden');
-}
-
-function showSignedOut() {
-  authStatus.textContent = '⚠️ Not signed in';
-  authStatus.classList.remove('success');
-  authStatus.classList.add('warning');
-  authSection.classList.remove('hidden');
-  signedInSection.classList.add('hidden');
-}
-
-// Sign in
-signInBtn.addEventListener('click', async () => {
-  const email = authEmail.value.trim();
-  const password = authPassword.value;
-  
-  if (!email || !password) {
-    authError.textContent = 'Please enter email and password';
-    authError.style.display = 'block';
-    return;
-  }
-  
-  signInBtn.disabled = true;
-  signInBtn.textContent = 'Signing in...';
-  authError.style.display = 'none';
-  
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY
-      },
-      body: JSON.stringify({ email, password })
-    });
-    
-    const data = await res.json();
-    
-    if (!res.ok) {
-      throw new Error(data.error_description || data.msg || 'Sign in failed');
-    }
-    
-    // Save token
-    await browserAPI.storage.sync.set({
-      userToken: data.access_token,
-      userEmail: email
-    });
-    
-    showSignedIn(email);
-  } catch (e) {
-    authError.textContent = e.message;
-    authError.style.display = 'block';
-  } finally {
-    signInBtn.disabled = false;
-    signInBtn.textContent = 'Sign In';
-  }
-});
-
-// Sign out
-signOutBtn.addEventListener('click', async () => {
-  await browserAPI.storage.sync.remove(['userToken', 'userEmail']);
-  showSignedOut();
-  authEmail.value = '';
-  authPassword.value = '';
-});
-
-// Initialize auth check
-checkAuthStatus();
-
-// Check current tab
-browserAPI.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-  const tab = tabs[0];
-  const url = tab?.url || '';
-  
-  if (url.includes('ah.nl') && (
-    url.includes('eerder-gekocht') || 
-    url.includes('/producten/')
-  )) {
-    pageStatus.textContent = '✅ On AH purchases page';
-    pageStatus.classList.add('success');
-    ahPageActions.classList.remove('hidden');
-    notAhPage.classList.add('hidden');
-    
-    // Get product count from content script
-    try {
-      const response = await browserAPI.tabs.sendMessage(tab.id, { action: 'getProductCount' });
-      productCount.textContent = response?.count || 0;
-    } catch (e) {
-      productCount.textContent = 'Reload page to scan';
-      productCount.classList.remove('success');
-      productCount.classList.add('warning');
-    }
-  } else {
-    pageStatus.textContent = '⚠️ Not on AH page';
-    pageStatus.classList.add('warning');
-    ahPageActions.classList.add('hidden');
-    notAhPage.classList.remove('hidden');
-  }
-});
-
-// Open AH purchases page
-openAhBtn.addEventListener('click', () => {
-  browserAPI.tabs.create({ url: AH_PURCHASE_URL });
-  window.close();
-});
-
-// Auto-scroll button
-scrollBtn.addEventListener('click', async () => {
-  scrollBtn.disabled = true;
-  scrollBtn.textContent = '⏳ Scrolling...';
-  
-  const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
-  
-  try {
-    const response = await browserAPI.tabs.sendMessage(tab.id, { action: 'autoScroll' });
-    if (response?.success) {
-      productCount.textContent = response.total || '?';
-      syncMessage.textContent = `Loaded ${response.total} products`;
-      syncResult.classList.remove('hidden');
-    }
-  } catch (e) {
-    console.error('Scroll failed:', e);
-  }
-  
-  scrollBtn.disabled = false;
-  scrollBtn.textContent = '📜 Auto-scroll to load all';
-  
-  // Refresh product count
-  try {
-    const response = await browserAPI.tabs.sendMessage(tab.id, { action: 'getProductCount' });
-    productCount.textContent = response?.count || 0;
-  } catch (e) {}
-});
-
-// Sync button
-syncBtn.addEventListener('click', async () => {
-  syncBtn.disabled = true;
-  syncBtn.textContent = '⏳ Syncing...';
-  
-  const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
-  
-  // Get user token from storage
-  const settings = await browserAPI.storage.sync.get(['userToken']);
-  
-  try {
-    const response = await browserAPI.tabs.sendMessage(tab.id, { 
-      action: 'scrape',
-      apiBase: API_BASE,
-      token: settings.userToken
-    });
-    
-    syncResult.classList.remove('hidden');
-    
-    if (response?.success) {
-      syncMessage.textContent = `✅ Synced ${response.stored} products!`;
-      syncMessage.classList.remove('error');
-      syncMessage.classList.add('success');
     } else {
-      syncMessage.textContent = `❌ ${response?.error || 'Sync failed'}`;
-      syncMessage.classList.remove('success');
-      syncMessage.classList.add('error');
+      setStatus(response?.error || 'Extraction failed', 'error');
     }
-  } catch (e) {
-    console.error('Sync failed:', e);
-    syncResult.classList.remove('hidden');
-    syncMessage.textContent = `❌ ${e.message}`;
-    syncMessage.classList.add('error');
+    
+  } catch (error) {
+    console.error('[Popup] Extraction error:', error);
+    setStatus('Error: ' + error.message, 'error');
   }
   
-  syncBtn.disabled = false;
-  syncBtn.textContent = '🔄 Sync Products';
-});
+  // Re-enable button
+  extractBtn.disabled = false;
+  extractBtn.textContent = '🔍 Generate Wrapped';
+}
+
+// ============================================
+// INITIALIZATION
+// ============================================
+
+/**
+ * Initialize popup on load
+ */
+async function init() {
+  console.log('[Popup] Initializing...');
+  
+  // Check current tab
+  const { isAH } = await checkCurrentTab();
+  
+  if (isAH) {
+    setStatus('Ready! Click the button to extract products.', 'info');
+  } else {
+    setStatus('Navigate to ah.nl to extract products', 'warning');
+  }
+  
+  // Attach click handler
+  extractBtn.addEventListener('click', handleExtract);
+}
+
+// Run initialization
+init();
