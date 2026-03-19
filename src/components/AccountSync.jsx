@@ -52,13 +52,20 @@ function AccountSync({ onSyncCompleted }) {
         // If local not available, check Railway remote scraper
         if (!data.available && RAILWAY_SCRAPER_URL) {
           fetch(`${RAILWAY_SCRAPER_URL}/health`)
-            .then(res => res.json())
+            .then(res => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`)
+              const contentType = res.headers.get('content-type')
+              if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Not JSON response')
+              }
+              return res.json()
+            })
             .then(health => {
               console.log('[AccountSync] Railway health:', health)
-              setRemoteAvailable(health.vnc_available)
+              setRemoteAvailable(health.vnc_available || health.status === 'ok')
             })
             .catch(err => {
-              console.log('[AccountSync] Railway not available:', err)
+              console.log('[AccountSync] Railway not available:', err.message)
               setRemoteAvailable(false)
             })
         }
@@ -244,8 +251,16 @@ function AccountSync({ onSyncCompleted }) {
         headers: { 'Content-Type': 'application/json' }
       })
       
+      const contentType = res.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text()
+        console.error('Non-JSON response from Railway:', text.substring(0, 200))
+        throw new Error('Railway service returned invalid response - make sure it is deployed and running')
+      }
+      
       if (!res.ok) {
-        throw new Error('Failed to start remote scraper')
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to start remote scraper')
       }
       
       const data = await res.json()
@@ -257,6 +272,14 @@ function AccountSync({ onSyncCompleted }) {
       const pollRemoteStatus = async () => {
         try {
           const statusRes = await fetch(`${RAILWAY_SCRAPER_URL}${data.status_url}`)
+          
+          const contentType = statusRes.headers.get('content-type')
+          if (!contentType || !contentType.includes('application/json')) {
+            console.error('Non-JSON status response')
+            setTimeout(pollRemoteStatus, 3000)
+            return
+          }
+          
           const statusData = await statusRes.json()
           
           setProgress(statusData.message || 'Scraping...')
