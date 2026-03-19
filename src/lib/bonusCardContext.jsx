@@ -7,8 +7,25 @@ export function BonusCardProvider({ children }) {
   const [userInfo, setUserInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   
-  // Check localStorage on mount
+  // Check URL param and localStorage on mount
   useEffect(() => {
+    // First check URL for ?card= parameter (from bookmarklet redirect)
+    const urlParams = new URLSearchParams(window.location.search)
+    const cardFromUrl = urlParams.get('card')
+    
+    if (cardFromUrl && cardFromUrl.length >= 10) {
+      console.log('[BonusCard] Found card in URL:', cardFromUrl.slice(-4))
+      // Save to localStorage and use it
+      localStorage.setItem('ah_bonus_card', cardFromUrl)
+      setBonusCardNumber(cardFromUrl)
+      fetchUserInfo(cardFromUrl)
+      // Clean up URL (remove ?card= param)
+      const newUrl = window.location.pathname + window.location.hash
+      window.history.replaceState({}, '', newUrl)
+      return
+    }
+    
+    // Otherwise check localStorage
     const savedCard = localStorage.getItem('ah_bonus_card')
     if (savedCard) {
       setBonusCardNumber(savedCard)
