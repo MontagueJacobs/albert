@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Duurzaam Boodschappen - Bookmarklet Setup</title>
+  <title>Sustainable Shopping - Bookmarklet Setup</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -62,23 +62,45 @@
     .step-content p { color: #d1d5db; line-height: 1.6; }
     .step-content a { color: #667eea; }
     
-    .bookmarklet {
-      display: inline-block;
-      padding: 16px 32px;
-      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
-      color: white;
-      text-decoration: none;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 1.1rem;
-      cursor: grab;
-      transition: transform 0.2s, box-shadow 0.2s;
+    .bookmarklet-wrapper {
+      background: #1e293b;
+      border: 3px dashed #22c55e;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
       margin: 16px 0;
     }
     
+    .bookmarklet-label {
+      color: #22c55e;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    
+    .bookmarklet {
+      display: inline-block;
+      padding: 18px 36px;
+      background: #22c55e;
+      color: #0f172a;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1.2rem;
+      cursor: grab;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 3px solid #fff;
+      box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+    }
+    
     .bookmarklet:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(34, 197, 94, 0.3);
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 8px 30px rgba(34, 197, 94, 0.5);
+      background: #16a34a;
+    }
+    
+    .bookmarklet:active {
+      cursor: grabbing;
     }
     
     .drag-hint {
@@ -122,19 +144,22 @@
 </head>
 <body>
   <div class="container">
-    <h1>🌱 Duurzaam Boodschappen</h1>
-    <p class="subtitle">Sync je Albert Heijn aankopen met één klik</p>
+    <h1>🌱 Sustainable Shopping</h1>
+    <p class="subtitle">Sync your Albert Heijn purchases with one click</p>
     
     <div class="card">
-      <h2>📚 Simpele Setup (Geen extensie nodig!)</h2>
+      <h2>📚 Simple Setup (No extension needed!)</h2>
       
       <div class="step">
         <div class="step-number">1</div>
         <div class="step-content">
-          <p><strong>Sleep deze knop</strong> naar je bladwijzerbalk:</p>
-          <a class="bookmarklet" id="bookmarklet-link" href="#">🌱 Sync AH</a>
+          <p><strong>Drag this button</strong> to your bookmarks bar:</p>
+          <div class="bookmarklet-wrapper">
+            <div class="bookmarklet-label">⬇️ DRAG THIS TO YOUR BOOKMARKS BAR ⬇️</div>
+            <a class="bookmarklet" id="bookmarklet-link" href="#">🌱 Sync AH</a>
+          </div>
           <div class="drag-hint">
-            <strong>💡 Tip:</strong> Zie je geen bladwijzerbalk? Druk <kbd>Ctrl+Shift+B</kbd> (Windows) of <kbd>Cmd+Shift+B</kbd> (Mac)
+            <strong>💡 Tip:</strong> Don't see a bookmarks bar? Press <kbd>Ctrl+Shift+B</kbd> (Windows) or <kbd>Cmd+Shift+B</kbd> (Mac)
           </div>
         </div>
       </div>
@@ -142,29 +167,29 @@
       <div class="step">
         <div class="step-number">2</div>
         <div class="step-content">
-          <p>Ga naar <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank">ah.nl/producten/eerder-gekocht</a> en <strong>log in</strong> met je AH account</p>
+          <p>Go to <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank">ah.nl/producten/eerder-gekocht</a> and <strong>log in</strong> with your AH account</p>
         </div>
       </div>
       
       <div class="step">
         <div class="step-number">3</div>
         <div class="step-content">
-          <p><strong>Klik op de bookmarklet</strong> in je bladwijzerbalk. Klaar!</p>
+          <p><strong>Click the bookmarklet</strong> in your bookmarks bar. Done!</p>
         </div>
       </div>
       
       <div class="info-box">
         <h3>🔐 Privacy First</h3>
-        <p>Je AH inloggegevens worden NOOIT opgeslagen of verstuurd. De bookmarklet leest alleen de producten die al op de pagina staan. Je bonus kaartnummer wordt gebruikt om je aankopen te koppelen.</p>
+        <p>Your AH login credentials are NEVER stored or sent. The bookmarklet only reads the products already shown on the page. Your bonus card number is used to link your purchases to your account.</p>
       </div>
     </div>
     
     <div class="card">
-      <h2>❓ Hoe werkt het?</h2>
+      <h2>❓ How does it work?</h2>
       <p style="color: #9ca3af; line-height: 1.6;">
-        De bookmarklet scant de "Eerder gekocht" pagina voor productnamen en prijzen. 
-        Het scrollt automatisch om alle producten te laden, en stuurt ze dan naar 
-        Duurzaam Boodschappen waar we ze analyseren op duurzaamheid.
+        The bookmarklet scans your "Previously Purchased" page for product names and prices. 
+        It automatically scrolls to load all products, then sends them to 
+        Sustainable Shopping where we analyze them for sustainability scores.
       </p>
     </div>
   </div>
