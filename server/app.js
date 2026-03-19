@@ -3424,7 +3424,33 @@ app.post('/api/ingest/scrape', async (req, res) => {
         }
       }
 
-      // 2. If user is authenticated OR bonus card provided, record purchases
+      // 2. If bonus card provided, ensure user record exists in ah_bonus_users
+      if (bonusCard) {
+        try {
+          const { error: userError } = await supabase
+            .from('ah_bonus_users')
+            .upsert({
+              bonus_card_number: bonusCard,
+              last_scrape_at: new Date().toISOString(),
+              scrape_count: 1  // Will be incremented on conflict
+            }, {
+              onConflict: 'bonus_card_number',
+              ignoreDuplicates: false
+            })
+          
+          if (userError) {
+            console.error('Bonus user upsert error:', userError.message)
+          } else {
+            // Increment scrape count for existing users
+            await supabase.rpc('increment_scrape_count', { card: bonusCard }).catch(() => {})
+            console.log(`[Ingest] Bonus user ${bonusCard.slice(-4)} updated`)
+          }
+        } catch (e) {
+          console.error('Bonus user record error:', e.message)
+        }
+      }
+
+      // 3. If user is authenticated OR bonus card provided, record purchases
       // Uses upsert to prevent duplicates when scanning same products again
       if (userId || bonusCard) {
         const now = new Date().toISOString()
