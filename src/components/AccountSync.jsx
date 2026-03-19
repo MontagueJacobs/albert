@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, Trash2, Monitor, ExternalLink } from 'lucide-react'
+import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, Trash2, Monitor, ExternalLink, Bookmark, Puzzle } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useAHUser, useAHFetch } from '../lib/ahUserContext.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 
-// Railway scraper URL - set this to your Railway deployment URL
-const RAILWAY_SCRAPER_URL = import.meta.env.VITE_RAILWAY_SCRAPER_URL || ''
+// Railway scraper URL - strip trailing slash to avoid // in paths
+const RAILWAY_SCRAPER_URL = (import.meta.env.VITE_RAILWAY_SCRAPER_URL || '').replace(/\/+$/, '')
 
 /**
  * AccountSync - Simplified one-click AH account sync
@@ -345,24 +345,140 @@ function AccountSync({ onSyncCompleted }) {
   const hasCookies = cookieStatus?.hasCookies
   const isBusy = status === 'connecting' || status === 'syncing'
 
-  // Not available locally - show remote scraper option if Railway configured
+  // Not available locally - show alternative sync methods
   if (!available) {
-    // No remote scraper configured
+    // No remote scraper configured - show bookmarklet and extension options
     if (!remoteAvailable && !RAILWAY_SCRAPER_URL) {
       return (
         <div style={{
-          background: 'rgba(245, 158, 11, 0.1)',
-          border: '1px solid rgba(245, 158, 11, 0.3)',
-          borderRadius: '12px',
-          padding: '1.5rem',
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+          borderRadius: '16px',
+          padding: '2rem',
+          color: 'white',
           marginTop: '1rem'
         }}>
-          <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b' }}>
-            {t('auto_scrape_not_available_title') || 'Automatic Scraping Not Available'}
+          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem' }}>
+            {lang === 'nl' ? 'Sync Methodes' : 'Sync Methods'}
           </h3>
-          <p style={{ margin: 0, color: 'var(--text-muted, #9ca3af)' }}>
-            {t('auto_scrape_not_available_desc') || 'This feature is only available when running the app locally. On the hosted version, use the manual bookmarklet method.'}
-          </p>
+          
+          {/* Bookmarklet Option */}
+          <div style={{
+            background: 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
+            borderRadius: '12px',
+            padding: '1.25rem',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Bookmark size={20} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1rem' }}>
+                  {lang === 'nl' ? 'Bookmarklet (Aanbevolen)' : 'Bookmarklet (Recommended)'}
+                </h4>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
+                  {lang === 'nl' ? 'Eén klik sync - geen installatie' : 'One-click sync - no install needed'}
+                </p>
+              </div>
+            </div>
+            <a
+              href="/bookmarklet.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.25rem',
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                color: 'white',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '0.9rem'
+              }}
+            >
+              <ExternalLink size={16} />
+              {lang === 'nl' ? 'Bookmarklet Instellen' : 'Setup Bookmarklet'}
+            </a>
+          </div>
+
+          {/* Extension Option */}
+          <div style={{
+            background: 'rgba(139, 92, 246, 0.1)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: '12px',
+            padding: '1.25rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Puzzle size={20} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1rem' }}>
+                  {lang === 'nl' ? 'Browser Extensie' : 'Browser Extension'}
+                </h4>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
+                  {lang === 'nl' ? 'Chrome/Firefox extensie' : 'Chrome/Firefox extension'}
+                </p>
+              </div>
+            </div>
+            <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', opacity: 0.8 }}>
+              {lang === 'nl' 
+                ? 'Download de extensie map en laad hem als "unpacked extension" in Chrome.' 
+                : 'Download the extension folder and load it as an "unpacked extension" in Chrome.'}
+            </p>
+            <a
+              href="https://github.com/MontagueJacobs/albert/tree/main/sustainable-shop-webapp/extension"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.25rem',
+                background: 'rgba(139, 92, 246, 0.3)',
+                color: 'white',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '0.9rem'
+              }}
+            >
+              <ExternalLink size={16} />
+              {lang === 'nl' ? 'Download Extensie' : 'Download Extension'}
+            </a>
+          </div>
+
+          {/* Instructions */}
+          <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+            <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', opacity: 0.9 }}>
+              {lang === 'nl' ? 'Hoe het werkt:' : 'How it works:'}
+            </h4>
+            <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.6 }}>
+              <li>{lang === 'nl' ? 'Ga naar ah.nl en log in' : 'Go to ah.nl and log in'}</li>
+              <li>{lang === 'nl' ? 'Ga naar "Eerder gekocht"' : 'Go to "Previously purchased"'}</li>
+              <li>{lang === 'nl' ? 'Klik op de bookmarklet of extensie' : 'Click the bookmarklet or extension'}</li>
+              <li>{lang === 'nl' ? 'Je producten worden automatisch gesynct!' : 'Your products sync automatically!'}</li>
+            </ol>
+          </div>
         </div>
       )
     }
