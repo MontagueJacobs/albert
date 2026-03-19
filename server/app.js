@@ -3304,15 +3304,16 @@ app.get('/api/catalog/meta', async (req, res) => {
 
 // Ingest scraped items from the user's browser (extension/bookmarklet)
 // Products go to shared 'products' table (unified catalog)
-// Purchases are recorded per-user in user_purchases table
+// Purchases are recorded per-user in user_purchases table (by user_id or bonus_card)
 app.post('/api/ingest/scrape', async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : []
     if (!items.length) return res.status(400).json({ error: 'no_items' })
 
-    // Get authenticated user (optional - if not logged in, just store products)
+    // Get authenticated user OR bonus card (optional - if neither, just store products)
     const user = await getUserFromRequest(req)
     const userId = user?.id || null
+    const bonusCard = req.body?.bonus_card?.toString().trim() || null
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
     const seen = new Set()
@@ -3408,12 +3409,13 @@ app.post('/api/ingest/scrape', async (req, res) => {
         }
       }
 
-      // 2. If user is authenticated, record purchases in user_purchases table
+      // 2. If user is authenticated OR bonus card provided, record purchases
       // Uses upsert to prevent duplicates when scanning same products again
-      if (userId) {
+      if (userId || bonusCard) {
         const now = new Date().toISOString()
         const purchaseRecords = cleaned.map(p => ({
-          user_id: userId,
+          ...(userId ? { user_id: userId } : {}),
+          ...(bonusCard ? { bonus_card_number: bonusCard } : {}),
           product_id: p.id,
           product_name: p.name,
           price: p.price,
@@ -3423,11 +3425,12 @@ app.post('/api/ingest/scrape', async (req, res) => {
           last_seen_at: now   // Always updated on re-import
         }))
 
-        // Use upsert to avoid duplicates (same user + product)
+        // Use upsert to avoid duplicates (same user/bonus_card + product)
+        const conflictColumns = userId ? 'user_id,product_id' : 'bonus_card_number,product_id'
         const { error: purchaseError } = await supabase
           .from('user_purchases')
           .upsert(purchaseRecords, {
-            onConflict: 'user_id,product_id',
+            onConflict: conflictColumns,
             ignoreDuplicates: false  // Update last_seen_at on conflict
           })
         
@@ -3440,13 +3443,21 @@ app.post('/api/ingest/scrape', async (req, res) => {
       }
     }
 
+    // Build redirect URL for bookmarklet
+    const appUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'https://www.bubblebrainz.com'
+    const redirectUrl = bonusCard ? `${appUrl}/?card=${bonusCard}` : null
+
     return res.json({ 
       ok: true, 
       received: items.length, 
       stored,
       purchasesRecorded,
       queuedForEnrichment,
-      userId: userId ? 'authenticated' : 'anonymous'
+      userId: userId ? 'authenticated' : (bonusCard ? 'bonus_card' : 'anonymous'),
+      bonusCard: bonusCard ? bonusCard.slice(-4).padStart(13, '•') : null,
+      redirect_url: redirectUrl
     })
   } catch (e) {
     return res.status(500).json({ error: 'ingest_failed', detail: e.message })
