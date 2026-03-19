@@ -2353,7 +2353,8 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
         brand: enriched.brand ?? null,
         image_url: enriched.image_url ?? null,
         product_url: enriched.url ?? null,
-        ...evaluation,
+        sustainability_score: evaluation.score,
+        rating: evaluation.rating,
         name: purchase.product_name
       }
     })
@@ -2371,7 +2372,7 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
   }
 })
 
-// Get suggestions by bonus card
+// Get suggestions by bonus card (returns same format as /api/user/insights for Dashboard compatibility)
 app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
   try {
     const { cardNumber } = req.params
@@ -2390,30 +2391,37 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     
     if (!purchases || purchases.length === 0) {
       return res.json({
-        profile: {
-          total_products: 0,
-          avg_sustainability_score: 0,
-          profile_type: 'balanced',
-          profile_info: USER_PROFILE_TYPES['balanced']
-        },
-        replacements: [],
-        suggestions: []
+        total_purchases: 0,
+        average_score: 0,
+        rating: 'Start Shopping!',
+        best_purchase: null,
+        worst_purchase: null,
+        total_spent: 0
       })
     }
     
-    // Analyze user profile
-    const userProfile = analyzeUserProfile(purchases)
-    const profileInfo = USER_PROFILE_TYPES[userProfile.profileType] || USER_PROFILE_TYPES['balanced']
+    // Calculate sustainability scores on the fly (same as /api/user/insights)
+    const purchasesWithScores = purchases.map(p => ({
+      ...p,
+      sustainability_score: evaluateProduct(p.product_name).score
+    }))
     
+    const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
+    const avgScore = totalScore / purchasesWithScores.length
+    
+    const best = purchasesWithScores.reduce((max, p) => 
+      ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
+    const worst = purchasesWithScores.reduce((min, p) => 
+      ((p.sustainability_score || 0) < (min.sustainability_score || 0) ? p : min), purchasesWithScores[0])
+    
+    // Return same format as /api/user/insights for Dashboard compatibility
     res.json({
-      profile: {
-        total_products: purchases.length,
-        avg_sustainability_score: userProfile.avgScore,
-        profile_type: userProfile.profileType,
-        profile_info: profileInfo
-      },
-      replacements: [],
-      suggestions: []
+      total_purchases: purchasesWithScores.length,
+      average_score: avgScore,
+      rating: getRating(avgScore),
+      best_purchase: best.product_name,
+      worst_purchase: worst.product_name,
+      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0)
     })
   } catch (err) {
     console.error('Error fetching bonus suggestions:', err)
@@ -3395,7 +3403,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
         name: extracted.name,
         normalized_name: extracted.normalized,
         url: url || null,
-        image_url: (raw?.image || '').toString().trim() || null,
+        image_url: (raw?.image_url || raw?.image || '').toString().trim() || null,
         price: parsedPrice,
         source,
         // Auto-detected properties (only set if true, preserve existing data otherwise)
