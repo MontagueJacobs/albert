@@ -2223,17 +2223,49 @@ app.get('/api/bonus/:cardNumber/user', async (req, res) => {
       return res.status(400).json({ error: 'invalid_card', message: 'Invalid bonus card number' })
     }
     
+    // Try to get user from ah_bonus_users
     const { data: user, error } = await supabase
       .from('ah_bonus_users')
       .select('*')
       .eq('bonus_card_number', cardNumber)
       .single()
     
-    if (error || !user) {
-      return res.status(404).json({ error: 'not_found', message: 'No data found for this bonus card. Please run a scrape first.' })
+    if (user) {
+      return res.json(user)
     }
     
-    res.json(user)
+    // If no user record exists, check if they have purchases
+    // (they might have synced before the user record system was added)
+    const { data: purchases, error: purchaseError } = await supabase
+      .from('user_purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('bonus_card_number', cardNumber)
+      .limit(1)
+    
+    if (!purchaseError && purchases !== null) {
+      // User has purchases but no ah_bonus_users record - create one
+      const { data: newUser, error: createError } = await supabase
+        .from('ah_bonus_users')
+        .upsert({
+          bonus_card_number: cardNumber,
+          created_at: new Date().toISOString()
+        }, { onConflict: 'bonus_card_number' })
+        .select()
+        .single()
+      
+      if (newUser) {
+        return res.json(newUser)
+      }
+      
+      // Return synthetic user if creation failed
+      return res.json({
+        bonus_card_number: cardNumber,
+        created_at: new Date().toISOString(),
+        _synthetic: true
+      })
+    }
+    
+    return res.status(404).json({ error: 'not_found', message: 'No data found for this bonus card. Please run a scrape first.' })
   } catch (err) {
     console.error('Error fetching bonus user:', err)
     res.status(500).json({ error: 'fetch_failed', message: err.message })

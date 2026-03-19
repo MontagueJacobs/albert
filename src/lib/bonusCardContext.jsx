@@ -26,12 +26,15 @@ export function BonusCardProvider({ children }) {
         const data = await response.json()
         setUserInfo(data)
       } else {
-        // Card not found in system
-        localStorage.removeItem('ah_bonus_card')
-        setBonusCardNumber(null)
+        // User info not found, but keep the card number - purchases might still exist
+        // The user can still view their purchases even without an ah_bonus_users record
+        console.log('[BonusCard] User info not found, but keeping card for purchase lookups')
+        setUserInfo(null)
       }
     } catch (err) {
       console.error('Failed to fetch bonus user info:', err)
+      // Keep the card number even on error
+      setUserInfo(null)
     } finally {
       setLoading(false)
     }
