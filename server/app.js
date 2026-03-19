@@ -3496,9 +3496,10 @@ app.post('/api/ingest/scrape', async (req, res) => {
           product_name: p.name,
           price: p.price,
           quantity: 1,
-          source: req.body?.source || 'browser_extension',
-          purchased_at: now,  // Will be kept on conflict (original purchase date)
-          last_seen_at: now   // Always updated on re-import
+          source: req.body?.source || 'bookmarklet',
+          purchased_at: now,
+          scraped_at: now,      // Required NOT NULL column
+          last_seen_at: now
         }))
 
         console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user' : 'bonus card'} ${bonusCard?.slice(-4) || userId}`)
