@@ -649,11 +649,20 @@ function requireAHEmail(req, res, next) {
   } else {
     // Fall back to JWT auth for backwards compatibility
     getUserFromRequest(req).then(user => {
-      if (!user) {
-        return res.status(401).json({ error: 'unauthorized', message: 'Please provide your AH email or log in' })
+      if (user) {
+        req.user = user
+        return next()
       }
-      req.user = user
-      next()
+      
+      // Fall back to session-based auth
+      return getUserIdFromSession(req).then(sessionUserId => {
+        if (!sessionUserId) {
+          return res.status(401).json({ error: 'unauthorized', message: 'Please provide your AH email or log in' })
+        }
+        // Create a pseudo-user object for session-based users
+        req.user = { id: sessionUserId, session_based: true }
+        next()
+      })
     }).catch(err => {
       res.status(500).json({ error: 'auth_error', message: err.message })
     })
