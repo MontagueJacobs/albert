@@ -868,14 +868,8 @@ const ENRICHED_SCORING = {
   // Ethical certifications
   is_fairtrade: { delta: 2, icon: '🤝', label: 'Fairtrade' },
   
-  // Nutri-Score impact
-  nutri_score: {
-    'A': { delta: 2, label: 'Nutri-Score A' },
-    'B': { delta: 1, label: 'Nutri-Score B' },
-    'C': { delta: 0, label: 'Nutri-Score C' },
-    'D': { delta: -1, label: 'Nutri-Score D' },
-    'E': { delta: -2, label: 'Nutri-Score E' }
-  },
+  // NOTE: Nutri-Score is scraped and stored but NOT used for sustainability scoring
+  // Reason: Nutri-Score measures nutritional health, not environmental sustainability
   
   // Origin scoring (local = better, far = worse)
   origin_country: {
@@ -1393,20 +1387,9 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
       matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
     }
 
-    // Nutri-Score scoring (A-E)
-    if (enrichedData.nutri_score && ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]) {
-      const scoring = ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]
-      if (scoring.delta !== 0) {
-        applyDelta('enriched', `enriched_nutriscore_${enrichedData.nutri_score}`, scoring.delta)
-        matchedEnriched.push({ 
-          code: `nutriscore_${enrichedData.nutri_score}`, 
-          icon: '🅰️', 
-          label: scoring.label, 
-          delta: scoring.delta,
-          grade: enrichedData.nutri_score
-        })
-      }
-    }
+    // NOTE: Nutri-Score is NOT included in sustainability scoring
+    // It's still scraped and stored as a data point, but doesn't affect the score
+    // Reason: Nutri-Score measures nutritional health, not environmental impact
 
     // Origin country scoring (local vs imported)
     // Check monthly origin first (origin_by_month), then fall back to static origin_country
