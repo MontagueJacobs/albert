@@ -3047,7 +3047,7 @@ app.get('/api/products/:productId', async (req, res) => {
 })
 
 // Get detailed product analysis with scoring breakdown and alternatives
-app.get('/api/product/:productId/details', requireAuth, async (req, res) => {
+app.get('/api/product/:productId/details', async (req, res) => {
   try {
     const { productId } = req.params
     
