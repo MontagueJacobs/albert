@@ -649,20 +649,11 @@ function requireAHEmail(req, res, next) {
   } else {
     // Fall back to JWT auth for backwards compatibility
     getUserFromRequest(req).then(user => {
-      if (user) {
-        req.user = user
-        return next()
+      if (!user) {
+        return res.status(401).json({ error: 'unauthorized', message: 'Please provide your AH email or log in' })
       }
-      
-      // Fall back to session-based auth
-      return getUserIdFromSession(req).then(sessionUserId => {
-        if (!sessionUserId) {
-          return res.status(401).json({ error: 'unauthorized', message: 'Please provide your AH email or log in' })
-        }
-        // Create a pseudo-user object for session-based users
-        req.user = { id: sessionUserId, session_based: true }
-        next()
-      })
+      req.user = user
+      next()
     }).catch(err => {
       res.status(500).json({ error: 'auth_error', message: err.message })
     })
@@ -1232,9 +1223,6 @@ function findCatalogMatch(productName = '') {
   let bestRank = 0
   let bestMatchName = null
 
-  // Common Dutch stop words to ignore in token matching
-  const stopWords = new Set(['de', 'het', 'een', 'en', 'van', 'in', 'met', 'voor', 'op', 'te', 'aan', 'is', 'dat', 'die', 'er'])
-
   for (const entry of catalogIndex) {
     for (const candidate of entry.normalizedNames) {
       if (!candidate) continue
@@ -1246,8 +1234,7 @@ function findCatalogMatch(productName = '') {
       } else if (candidate.includes(normalized) || normalized.includes(candidate)) {
         rank = 3
       } else {
-        // Filter out stop words and very short tokens for matching
-        const tokens = normalized.split(' ').filter(t => t.length >= 3 && !stopWords.has(t))
+        const tokens = normalized.split(' ')
         if (tokens.length > 1 && tokens.every((token) => candidate.includes(token))) {
           rank = 2
         } else if (tokens.some((token) => token && candidate.includes(token))) {
