@@ -281,9 +281,7 @@
       
       let message = `${stored} producten gesynct`;
       if (bonusCard) {
-        message += '\n\n🎫 Bonuskaart: ' + bonusCard.slice(-4).padStart(13, '•');
-        // Store bonus card for future reference
-        try { localStorage.setItem('ah_bonus_card', bonusCard); } catch(e) {}
+        message += '\n\n🎫 Bonuskaart: ••••' + bonusCard.slice(-4);
       } else {
         message += '\n\n⚠️ Geen bonuskaart gevonden. Ga eerst naar ah.nl/mijn/klantenkaarten';
       }
@@ -291,23 +289,15 @@
       countEl.innerHTML = message.replace(/\n/g, '<br>');
       countEl.style.fontSize = '1rem';
       
-      // Redirect option
+      // Auto-redirect to dashboard with bonus card
       if (bonusCard && data.redirect_url) {
-        const viewBtn = document.createElement('button');
-        viewBtn.textContent = '📊 Bekijk resultaten';
-        viewBtn.style.cssText = `
-          margin-top: 16px;
-          padding: 12px 32px;
-          background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
-          color: white;
-          border: none;
-          border-radius: 10px;
-          cursor: pointer;
-          font-size: 1rem;
-          font-weight: 600;
-        `;
-        viewBtn.onclick = () => window.open(data.redirect_url, '_blank');
-        closeBtn.parentElement.insertBefore(viewBtn, closeBtn);
+        statusEl.textContent = '✅ Gelukt! Doorsturen naar dashboard...';
+        setTimeout(() => {
+          window.location.href = data.redirect_url;
+        }, 1500);
+      } else {
+        // No bonus card - show close button
+        closeBtn.style.display = 'inline-block';
       }
       
     } catch (e) {
