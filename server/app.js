@@ -659,18 +659,18 @@ function getCurrentMonthKey() {
 /**
  * Get the origin country for the current month from origin_by_month data
  * @param {Object} originByMonth - JSONB object with monthly origins (values can be strings or arrays)
- * @returns {string|null} - Country name for current month, or null if not available
+ * @returns {string[]|null} - Array of country names for current month, or null if not available
  */
-function getOriginForCurrentMonth(originByMonth) {
+function getOriginsForCurrentMonth(originByMonth) {
   if (!originByMonth || typeof originByMonth !== 'object') return null
   const monthKey = getCurrentMonthKey()
   const monthOrigin = originByMonth[monthKey]
   if (!monthOrigin) return null
   // Handle both array format (["Netherlands", "Spain"]) and string format ("Netherlands")
   if (Array.isArray(monthOrigin)) {
-    return monthOrigin[0] || null  // Return first country in the list
+    return monthOrigin.length > 0 ? monthOrigin : null
   }
-  return monthOrigin
+  return [monthOrigin]  // Wrap single country in array for consistent handling
 }
 
 // ============================================================================
@@ -1159,49 +1159,59 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
 
     // Origin country scoring (local vs imported)
     // Check monthly origin first (origin_by_month), then fall back to static origin_country
-    let effectiveOrigin = null
+    // When multiple countries are listed for a month, we SUM all their deltas
+    let effectiveOrigins = null  // Array of countries
     let isSeasonalOrigin = false
     
     if (enrichedData.origin_by_month) {
-      effectiveOrigin = getOriginForCurrentMonth(enrichedData.origin_by_month)
-      isSeasonalOrigin = effectiveOrigin !== null
+      effectiveOrigins = getOriginsForCurrentMonth(enrichedData.origin_by_month)
+      isSeasonalOrigin = effectiveOrigins !== null
     }
     
     // Fall back to static origin if no monthly origin available
-    if (!effectiveOrigin && enrichedData.origin_country) {
-      effectiveOrigin = enrichedData.origin_country
+    if (!effectiveOrigins && enrichedData.origin_country) {
+      effectiveOrigins = [enrichedData.origin_country]
     }
     
-    if (effectiveOrigin) {
-      const originScoring = ENRICHED_SCORING.origin_country[effectiveOrigin]
+    if (effectiveOrigins && effectiveOrigins.length > 0) {
       const monthLabel = isSeasonalOrigin ? ` (${getCurrentMonthKey().toUpperCase()})` : ''
       
-      if (originScoring) {
-        if (originScoring.delta !== 0) {
-          applyDelta('enriched', `enriched_origin_${originScoring.region}`, originScoring.delta)
-          matchedEnriched.push({ 
-            code: `origin_${originScoring.region}`, 
-            icon: originScoring.delta > 0 ? '📍' : '✈️', 
-            label: `Origin: ${effectiveOrigin}${monthLabel}`, 
-            delta: originScoring.delta,
-            country: effectiveOrigin,
-            region: originScoring.region,
-            isSeasonal: isSeasonalOrigin,
-            originByMonth: enrichedData.origin_by_month
-          })
+      // Sum up deltas for all origin countries
+      let totalDelta = 0
+      const countryDetails = []
+      let hasUnknownCountry = false
+      
+      for (const country of effectiveOrigins) {
+        const originScoring = ENRICHED_SCORING.origin_country[country]
+        if (originScoring) {
+          totalDelta += originScoring.delta
+          countryDetails.push({ country, delta: originScoring.delta, region: originScoring.region })
+        } else {
+          // Unknown country
+          totalDelta += -0.5
+          countryDetails.push({ country, delta: -0.5, region: 'unknown' })
+          hasUnknownCountry = true
         }
-      } else {
-        // Unknown country - apply slight negative for uncertainty  
-        applyDelta('enriched', 'enriched_origin_unknown', -0.5)
-        matchedEnriched.push({ 
-          code: 'origin_unknown', 
-          icon: '🌍', 
-          label: `Origin: ${effectiveOrigin}${monthLabel} (unknown region)`, 
-          delta: -0.5,
-          country: effectiveOrigin,
-          isSeasonal: isSeasonalOrigin
-        })
       }
+      
+      // Apply the summed delta
+      if (totalDelta !== 0) {
+        applyDelta('enriched', 'enriched_origin_sum', totalDelta)
+      }
+      
+      // Build the label showing all countries
+      const countriesLabel = effectiveOrigins.join(', ')
+      const icon = totalDelta > 0 ? '📍' : (totalDelta < 0 ? '✈️' : '🌍')
+      
+      matchedEnriched.push({ 
+        code: 'origin_multi', 
+        icon, 
+        label: `Origin: ${countriesLabel}${monthLabel}`, 
+        delta: totalDelta,
+        countries: countryDetails,
+        isSeasonal: isSeasonalOrigin,
+        originByMonth: enrichedData.origin_by_month
+      })
     } else {
       // No origin data at all - apply penalty for unknown origin
       applyDelta('enriched', 'enriched_origin_unknown', -0.5)
