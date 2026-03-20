@@ -106,8 +106,8 @@ app.get('/api/health', (req, res) => {
 
 // ============================================================================
 // AH USER CHECK ENDPOINT (Email-based user lookup)
-// Check if a user exists with the given email address
-// Checks both user_ah_credentials and users tables for simpler login
+// Note: user_ah_credentials table removed - email-based auth disabled
+// Users should use bonus card identification instead
 // ============================================================================
 app.get('/api/ah-user/check', async (req, res) => {
   try {
@@ -123,30 +123,7 @@ app.get('/api/ah-user/check', async (req, res) => {
     
     const normalizedEmail = email.toLowerCase().trim()
     
-    // First, check user_ah_credentials table (AH email)
-    const { data: ahData } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email, last_sync_at, sync_status')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (ahData) {
-      // Found in user_ah_credentials - get purchase count
-      const { count } = await supabase
-        .from('user_purchases')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', ahData.id)
-      
-      return res.json({
-        exists: true,
-        email: ahData.ah_email,
-        lastSync: ahData.last_sync_at,
-        syncStatus: ahData.sync_status,
-        purchaseCount: count || 0
-      })
-    }
-    
-    // Second, check users table (main account email)
+    // Check users table only (user_ah_credentials removed)
     const { data: userData } = await supabase
       .from('users')
       .select('id, email')
@@ -154,66 +131,25 @@ app.get('/api/ah-user/check', async (req, res) => {
       .single()
     
     if (userData) {
-      // Found in users table - check if they have linked AH credentials
-      const { data: linkedAh } = await supabase
-        .from('user_ah_credentials')
-        .select('id, ah_email, last_sync_at, sync_status')
+      // Get purchase count
+      const { count } = await supabase
+        .from('user_purchases')
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', userData.id)
-        .single()
       
-      if (linkedAh) {
-        const { count } = await supabase
-          .from('user_purchases')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', linkedAh.id)
-        
-        return res.json({
-          exists: true,
-          email: linkedAh.ah_email,
-          lastSync: linkedAh.last_sync_at,
-          syncStatus: linkedAh.sync_status,
-          purchaseCount: count || 0
-        })
-      }
-      
-      // User exists but no AH link - still allow login (can connect later)
       return res.json({
         exists: true,
         email: userData.email,
         lastSync: null,
         syncStatus: 'not_connected',
-        purchaseCount: 0
+        purchaseCount: count || 0
       })
     }
     
-    // Not found in either table - auto-create user in user_ah_credentials for thesis participants
-    // This ensures purchases can be linked correctly
-    const { data: newUser, error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert([{ 
-        ah_email: normalizedEmail, 
-        sync_status: 'pending',
-        created_at: new Date().toISOString() 
-      }])
-      .select()
-      .single()
-    
-    if (insertError) {
-      console.error('Error auto-creating user:', insertError)
-      return res.json({ 
-        exists: false, 
-        message: 'Could not create account. Please try again.' 
-      })
-    }
-    
-    console.log(`[Auth] Auto-created user ${newUser.id} for ${normalizedEmail}`)
-    return res.json({
-      exists: true,
-      email: newUser.ah_email,
-      lastSync: null,
-      syncStatus: 'pending',
-      purchaseCount: 0,
-      isNew: true
+    // User not found - recommend bonus card login
+    return res.json({ 
+      exists: false, 
+      message: 'Use the bookmarklet to sync your AH purchases with your bonus card.' 
     })
   } catch (err) {
     console.error('Error checking AH user:', err)
@@ -222,202 +158,35 @@ app.get('/api/ah-user/check', async (req, res) => {
 })
 
 // ============================================================================
-// AH USER REGISTER ENDPOINT (Create new user with AH email)
-// For new users who want to start tracking their sustainability
+// AH USER REGISTER ENDPOINT (Deprecated - use bonus card instead)
 // ============================================================================
 app.post('/api/ah-user/register', async (req, res) => {
-  try {
-    const { email } = req.body
-    
-    if (!email) {
-      return res.status(400).json({ error: 'missing_email', message: 'Email is required' })
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    if (!supabase) {
-      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
-    }
-    
-    // Check if user already exists
-    const { data: existing } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (existing) {
-      // User already exists, that's fine
-      return res.json({ 
-        success: true, 
-        email: existing.ah_email,
-        message: 'Account found. Welcome back!' 
-      })
-    }
-    
-    // Create new user
-    const { data: newUser, error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert([{
-        ah_email: normalizedEmail,
-        sync_status: 'pending',
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single()
-    
-    if (insertError) {
-      console.error('Error creating AH user:', insertError)
-      return res.status(500).json({ error: 'create_failed', message: 'Could not create account' })
-    }
-    
-    res.json({ 
-      success: true, 
-      email: newUser.ah_email,
-      message: 'Account created! You can now sync your Albert Heijn purchases.' 
-    })
-  } catch (err) {
-    console.error('Error registering AH user:', err)
-    res.status(500).json({ error: 'register_failed', message: err.message })
-  }
+  // Email-based registration disabled - recommend bonus card
+  res.json({ 
+    success: false, 
+    message: 'Email-based registration is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
+  })
 })
 
 // ============================================================================
-// PASSWORD-BASED AUTHENTICATION ENDPOINTS
-// Simple email + password login for thesis participants
+// PASSWORD-BASED AUTHENTICATION ENDPOINTS (Deprecated)
+// user_ah_credentials table removed - use bonus card instead
 // ============================================================================
 
-// Register new user with email and password
+// Register new user with email and password (disabled)
 app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { email, password } = req.body
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: 'missing_fields', message: 'Email and password are required' })
-    }
-    
-    if (password.length < 4) {
-      return res.status(400).json({ error: 'password_too_short', message: 'Password must be at least 4 characters' })
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    if (!supabase) {
-      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
-    }
-    
-    // Check if user already exists
-    const { data: existing } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (existing) {
-      return res.status(409).json({ 
-        error: 'user_exists', 
-        message: 'An account with this email already exists. Please login instead.' 
-      })
-    }
-    
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
-    
-    // Create new user with password
-    const { data: newUser, error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert([{
-        ah_email: normalizedEmail,
-        password_hash: passwordHash,
-        sync_status: 'pending',
-        created_at: new Date().toISOString()
-      }])
-      .select('id, ah_email')
-      .single()
-    
-    if (insertError) {
-      console.error('Error creating user:', insertError)
-      return res.status(500).json({ error: 'create_failed', message: 'Could not create account' })
-    }
-    
-    console.log(`[Auth] Registered new user: ${normalizedEmail}`)
-    res.json({ 
-      success: true, 
-      email: newUser.ah_email,
-      userId: newUser.id
-    })
-  } catch (err) {
-    console.error('Error registering user:', err)
-    res.status(500).json({ error: 'register_failed', message: err.message })
-  }
+  res.status(501).json({ 
+    error: 'not_supported', 
+    message: 'Email-based registration is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
+  })
 })
 
-// Login with email and password
+// Login with email and password (disabled)
 app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: 'missing_fields', message: 'Email and password are required' })
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    if (!supabase) {
-      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
-    }
-    
-    // Find user
-    const { data: user, error } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email, password_hash, sync_status, last_sync_at')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (error || !user) {
-      return res.status(401).json({ 
-        error: 'invalid_credentials', 
-        message: 'Invalid email or password' 
-      })
-    }
-    
-    // Check if password_hash exists (legacy users might not have one)
-    if (!user.password_hash) {
-      return res.status(401).json({ 
-        error: 'no_password', 
-        message: 'This account does not have a password set. Please register again.' 
-      })
-    }
-    
-    // Verify password
-    const isValid = await bcrypt.compare(password, user.password_hash)
-    
-    if (!isValid) {
-      return res.status(401).json({ 
-        error: 'invalid_credentials', 
-        message: 'Invalid email or password' 
-      })
-    }
-    
-    // Get purchase count
-    const { count } = await supabase
-      .from('user_purchases')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-    
-    console.log(`[Auth] User logged in: ${normalizedEmail}`)
-    res.json({ 
-      success: true, 
-      email: user.ah_email,
-      userId: user.id,
-      syncStatus: user.sync_status,
-      lastSync: user.last_sync_at,
-      purchaseCount: count || 0
-    })
-  } catch (err) {
-    console.error('Error logging in:', err)
-    res.status(500).json({ error: 'login_failed', message: err.message })
-  }
+  res.status(501).json({ 
+    error: 'not_supported', 
+    message: 'Email-based login is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
+  })
 })
 
 // ============================================================================
@@ -461,73 +230,26 @@ async function getUserFromRequest(req) {
   }
 }
 
-// Get or create a user ID from session ID (for anonymous users)
-// Returns the user ID (UUID) from the user_ah_credentials table
+// Get user ID from session (deprecated - user_ah_credentials table removed)
+// Now we rely on bonus card identification via URL params and /api/bonus/:cardNumber/* endpoints
 async function getUserIdFromSession(req) {
   // First check for JWT auth
   const jwtUser = await getUserFromRequest(req)
   if (jwtUser) {
-    console.log('[DEBUG] getUserIdFromSession: JWT user found:', jwtUser.id)
     return jwtUser.id
   }
   
-  // Check for session ID header
-  const sessionId = req.headers['x-session-id']
-  console.log('[DEBUG] getUserIdFromSession: sessionId header:', sessionId, 'supabase:', !!supabase)
-  if (!sessionId || !supabase) {
-    console.log('[DEBUG] getUserIdFromSession: No session ID or no supabase, returning null')
-    return null
-  }
-  
-  console.log('[DEBUG] Looking up user by session ID:', sessionId)
-  
-  try {
-    // Try to find existing user by session_id
-    const { data: existing, error: findError } = await supabase
-      .from('user_ah_credentials')
-      .select('id')
-      .eq('session_id', sessionId)
-      .maybeSingle()
-    
-    if (findError) {
-      console.error('[ERROR] Error looking up session:', findError.message)
-      return null
-    }
-    
-    if (existing) {
-      console.log('[DEBUG] Found existing user for session:', existing.id)
-      return existing.id
-    }
-    
-    // Create new anonymous user
-    const newId = crypto.randomUUID()
-    console.log('[DEBUG] Creating new session user with id:', newId)
-    const { error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert({
-        id: newId,
-        session_id: sessionId,
-        ah_email: null
-        // Don't set sync_status - let database use default
-      })
-    
-    if (insertError) {
-      console.error('[ERROR] Error creating session user:', insertError.message)
-      return null
-    }
-    
-    console.log('[DEBUG] Created new user for session:', newId)
-    return newId
-  } catch (err) {
-    console.error('[ERROR] Session lookup error:', err.message)
-    return null
-  }
+  // Session-based auth via user_ah_credentials is no longer available
+  // Users should use bonus card identification instead
+  return null
 }
 
-// Get ALL user IDs associated with this request (both JWT and session)
-// This helps when a user was previously session-based and is now JWT authenticated
+// Get ALL user IDs and bonus card associated with this request
+// Returns { userIds: string[], bonusCardNumber: string|null }
+// This helps find purchases that were stored by user_id OR bonus_card_number
 async function getAllUserIds(req) {
   const userIds = []
+  let bonusCardNumber = null
   
   // Get JWT user ID
   const jwtUser = await getUserFromRequest(req)
@@ -535,21 +257,13 @@ async function getAllUserIds(req) {
     userIds.push(jwtUser.id)
   }
   
-  // Also get session-based user ID if present
-  const sessionId = req.headers['x-session-id']
-  if (sessionId && supabase) {
-    const { data: sessionUser } = await supabase
-      .from('user_ah_credentials')
-      .select('id')
-      .eq('session_id', sessionId)
-      .maybeSingle()
-    
-    if (sessionUser && !userIds.includes(sessionUser.id)) {
-      userIds.push(sessionUser.id)
-    }
-  }
+  // Check for bonus card in request body or query
+  // (Session-based user_ah_credentials lookup removed)
+  bonusCardNumber = req.body?.bonus_card?.toString().trim() || 
+                    req.query?.card?.toString().trim() || 
+                    null
   
-  return userIds
+  return { userIds, bonusCardNumber }
 }
 
 // Middleware to require authentication (supports both JWT and session-based auth)
@@ -581,7 +295,7 @@ function requireAuth(req, res, next) {
 
 /**
  * Look up a user by their email address.
- * Checks both user_ah_credentials.ah_email AND users.email tables.
+ * With user_ah_credentials removed, only checks users table.
  * Returns the user_id if found, null otherwise.
  */
 async function getUserIdByAHEmail(ahEmail) {
@@ -590,20 +304,7 @@ async function getUserIdByAHEmail(ahEmail) {
   const normalizedEmail = ahEmail.toLowerCase().trim()
   
   try {
-    // First, check user_ah_credentials table (AH-specific email)
-    // Note: Use 'id' column as the user identifier (not 'user_id' which may be null)
-    const { data: credData, error: credError } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (!credError && credData) {
-      console.log(`[Auth] Found user ${credData.id} via user_ah_credentials for ${normalizedEmail}`)
-      return credData.id
-    }
-    
-    // Second, check users table (main account email)
+    // Check users table (main account email)
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, email')
@@ -1742,88 +1443,32 @@ app.patch('/api/user/profile', requireAuth, async (req, res) => {
   }
 })
 
-// Get user's AH credentials status (not the actual credentials)
+// Get user's AH credentials status (deprecated - table removed)
 app.get('/api/user/ah-credentials', requireAuth, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status, created_at')
-      .eq('user_id', req.user.id)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') throw error  // PGRST116 = no rows
-    res.json(data || { configured: false })
-  } catch (err) {
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
+  res.json({ configured: false, message: 'AH credentials storage removed. Use bonus card instead.' })
 })
 
-// Save user's AH credentials
+// Save user's AH credentials (deprecated - table removed)
 app.post('/api/user/ah-credentials', requireAuth, async (req, res) => {
-  try {
-    const { ah_email, cookies } = req.body
-    
-    // Encrypt cookies before storing (simple encryption, consider Supabase Vault for production)
-    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-    const iv = crypto.randomBytes(16)
-    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-    let encrypted = cipher.update(JSON.stringify(cookies), 'utf8', 'hex')
-    encrypted += cipher.final('hex')
-    const cookies_encrypted = iv.toString('hex') + ':' + encrypted
-    
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .upsert({
-        user_id: req.user.id,
-        ah_email,
-        cookies_encrypted,
-        cookies_updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' })
-      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status')
-      .single()
-    
-    if (error) throw error
-    res.json(data)
-  } catch (err) {
-    res.status(500).json({ error: 'save_failed', message: err.message })
-  }
+  res.status(501).json({ error: 'not_supported', message: 'AH credentials storage removed. Use the bookmarklet with your bonus card.' })
 })
 
-// Save user's AH email and password for scraping (encrypted)
+// Save user's AH email and password for scraping (deprecated - table removed)
 app.post('/api/user/ah-credentials/password', requireAuth, async (req, res) => {
-  try {
-    const { ah_email, ah_password } = req.body
-    
-    if (!ah_email || !ah_password) {
-      return res.status(400).json({ error: 'missing_credentials', message: 'Both email and password are required' })
-    }
-    
-    // Encrypt password before storing
-    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-    const iv = crypto.randomBytes(16)
-    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-    let encrypted = cipher.update(ah_password, 'utf8', 'hex')
-    encrypted += cipher.final('hex')
-    const password_encrypted = iv.toString('hex') + ':' + encrypted
-    
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .upsert({
-        user_id: req.user.id,
-        ah_email: ah_email,
-        ah_password_encrypted: password_encrypted,
-        cookies_updated_at: new Date().toISOString(),
-        sync_status: 'success'
-      }, { onConflict: 'user_id' })
-      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status')
-      .single()
-    
-    if (error) throw error
-    res.json({ success: true, message: 'Credentials saved. An admin will run the scrape for you.', credentials: data })
-  } catch (err) {
-    console.error('Error saving AH credentials:', err)
-    res.status(500).json({ error: 'save_failed', message: err.message })
+  res.status(501).json({ error: 'not_supported', message: 'AH credentials storage removed. Use the bookmarklet with your bonus card.' })
+})
+
+// Link bonus card number (deprecated - user_ah_credentials table removed)
+// Bonus card is now only stored in localStorage on frontend
+// and passed via URL params or request body
+app.post('/api/user/link-bonus-card', async (req, res) => {
+  const { bonusCardNumber } = req.body
+  if (!bonusCardNumber) {
+    return res.status(400).json({ error: 'missing_bonus_card', message: 'Bonus card number is required' })
   }
+  // Just acknowledge - no server-side storage needed
+  // Bonus card is stored in localStorage and passed with each request
+  res.json({ success: true, message: 'Bonus card acknowledged (stored client-side)', bonusCard: bonusCardNumber.slice(-4).padStart(13, '•') })
 })
 
 // Get user's purchase history
@@ -1923,18 +1568,29 @@ app.post('/api/user/purchases', requireAuth, async (req, res) => {
 // Get user's purchase insights/dashboard data
 app.get('/api/user/insights', requireAHEmail, async (req, res) => {
   try {
-    // Get all user IDs (JWT + session-based) to merge purchases
-    const userIds = await getAllUserIds(req)
-    console.log('[Insights] Fetching for user IDs:', userIds)
+    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
+    const { userIds, bonusCardNumber } = await getAllUserIds(req)
+    console.log('[Insights] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
     
-    if (userIds.length === 0) {
+    if (userIds.length === 0 && !bonusCardNumber) {
       return res.json({ message: 'No purchases yet!' })
     }
     
-    const { data: purchases, error } = await supabase
+    // Build query to fetch by user_id OR bonus_card_number
+    let query = supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-      .in('user_id', userIds)
+    
+    if (userIds.length > 0 && bonusCardNumber) {
+      // Query by both user_id and bonus_card_number using OR
+      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
+    } else if (userIds.length > 0) {
+      query = query.in('user_id', userIds)
+    } else if (bonusCardNumber) {
+      query = query.eq('bonus_card_number', bonusCardNumber)
+    }
+    
+    const { data: purchases, error } = await query
     
     if (error) throw error
     
@@ -2129,11 +1785,11 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     const sortBy = req.query.sortBy || 'scraped_at'  // Use scraped_at as default
     const sortOrder = req.query.sortOrder === 'asc' ? true : false
     
-    // Get all user IDs (JWT + session-based) to merge purchases
-    const userIds = await getAllUserIds(req)
-    console.log('[History] Fetching for user IDs:', userIds)
+    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
+    const { userIds, bonusCardNumber } = await getAllUserIds(req)
+    console.log('[History] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
     
-    if (userIds.length === 0) {
+    if (userIds.length === 0 && !bonusCardNumber) {
       return res.json({ 
         purchases: [], 
         total: 0,
@@ -2143,11 +1799,21 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
       })
     }
     
-    // Get user purchases - use * to get all columns
-    const { data: purchases, error, count } = await supabase
+    // Build query to fetch by user_id OR bonus_card_number
+    let query = supabase
       .from('user_purchases')
       .select('*', { count: 'exact' })
-      .in('user_id', userIds)
+    
+    if (userIds.length > 0 && bonusCardNumber) {
+      // Query by both user_id and bonus_card_number using OR
+      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
+    } else if (userIds.length > 0) {
+      query = query.in('user_id', userIds)
+    } else if (bonusCardNumber) {
+      query = query.eq('bonus_card_number', bonusCardNumber)
+    }
+    
+    const { data: purchases, error, count } = await query
       .order(sortBy, { ascending: sortOrder })
       .range(offset, offset + limit - 1)
     
@@ -2482,11 +2148,11 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
 // Get personalized suggestions based on user's purchase history
 app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
   try {
-    // Get all user IDs (JWT + session-based) to merge purchases
-    const userIds = await getAllUserIds(req)
-    console.log('[Suggestions] Fetching for user IDs:', userIds)
+    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
+    const { userIds, bonusCardNumber } = await getAllUserIds(req)
+    console.log('[Suggestions] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
     
-    if (userIds.length === 0) {
+    if (userIds.length === 0 && !bonusCardNumber) {
       return res.json({
         profile: {
           total_products: 0,
@@ -2499,11 +2165,20 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
       })
     }
     
-    // Get user's purchases to analyze their profile
-    const { data: purchases, error: purchasesError } = await supabase
+    // Build query to fetch by user_id OR bonus_card_number
+    let query = supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-      .in('user_id', userIds)
+    
+    if (userIds.length > 0 && bonusCardNumber) {
+      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
+    } else if (userIds.length > 0) {
+      query = query.in('user_id', userIds)
+    } else if (bonusCardNumber) {
+      query = query.eq('bonus_card_number', bonusCardNumber)
+    }
+    
+    const { data: purchases, error: purchasesError } = await query
     
     if (purchasesError) throw purchasesError
     
@@ -3401,11 +3076,19 @@ app.post('/api/ingest/scrape', async (req, res) => {
     if (!items.length) return res.status(400).json({ error: 'no_items' })
 
     // Get authenticated user OR bonus card (optional - if neither, just store products)
-    const user = await getUserFromRequest(req)
-    const userId = user?.id || null
-    const bonusCard = req.body?.bonus_card?.toString().trim() || null
+    // Check both JWT auth AND session-based auth
+    let user = await getUserFromRequest(req)
+    let userId = user?.id || null
     
-    console.log(`[Ingest] Received ${items.length} items, userId: ${userId ? 'yes' : 'no'}, bonusCard: ${bonusCard ? bonusCard.slice(-4) : 'none'}`)
+    // If no JWT user, try session-based auth
+    if (!userId) {
+      userId = await getUserIdFromSession(req)
+    }
+    
+    const bonusCard = req.body?.bonus_card?.toString().trim() || null
+    const sessionId = req.headers['x-session-id']
+    
+    console.log(`[Ingest] Received ${items.length} items, userId: ${userId ? 'yes' : 'no'}, bonusCard: ${bonusCard ? bonusCard.slice(-4) : 'none'}, sessionId: ${sessionId ? 'yes' : 'no'}`)
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
     const seen = new Set()
