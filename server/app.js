@@ -493,8 +493,7 @@ const SUSTAINABILITY_DB = {
     fair_trade: { score: 8, icon: '🤝' },
     plastic_free: { score: 7, icon: '♻️' },
     meat: { score: 2, icon: '🥩' },
-    processed: { score: 3, icon: '📦' },
-    imported: { score: 4, icon: '✈️' },
+    // processed and imported categories removed - origin is now determined by scraped data
     fruit: { score: 5, icon: '🍎' },
     vegetable: { score: 5, icon: '🥕' },
     dairy: { score: 5, icon: '🥛' },
@@ -518,12 +517,12 @@ const SUSTAINABILITY_DB = {
     tofu: { categories: ['plant_based'], co2: 2.0 },
     tempeh: { categories: ['plant_based'], co2: 2.0 },
     'bananen fair trade': { categories: ['fair_trade'], co2: 0.7 },
-    bananen: { categories: ['imported'], co2: 0.7 },
-    appels: { categories: ['local'], co2: 0.3 },
-    tomaten: { categories: ['local'], co2: 0.7 },
-    brood: { categories: ['local'], co2: 0.6 },
-    pasta: { categories: ['processed'], co2: 1.0 },
-    rijst: { categories: ['imported'], co2: 2.7 }
+    bananen: { categories: [], co2: 0.7 },  // Origin determined by scraped data
+    appels: { categories: [], co2: 0.3 },
+    tomaten: { categories: [], co2: 0.7 },
+    brood: { categories: [], co2: 0.6 },
+    pasta: { categories: [], co2: 1.0 },
+    rijst: { categories: [], co2: 2.7 }  // Origin determined by scraped data
   }
 }
 
@@ -1191,7 +1190,7 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
           })
         }
       } else {
-        // Unknown country - apply slight negative for uncertainty
+        // Unknown country - apply slight negative for uncertainty  
         applyDelta('enriched', 'enriched_origin_unknown', -0.5)
         matchedEnriched.push({ 
           code: 'origin_unknown', 
@@ -1202,6 +1201,15 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
           isSeasonal: isSeasonalOrigin
         })
       }
+    } else {
+      // No origin data at all - apply penalty for unknown origin
+      applyDelta('enriched', 'enriched_origin_unknown', -0.5)
+      matchedEnriched.push({ 
+        code: 'origin_unknown', 
+        icon: '❓', 
+        label: 'Origin Unknown', 
+        delta: -0.5
+      })
     }
   }
 
