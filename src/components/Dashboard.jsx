@@ -103,14 +103,15 @@ function Dashboard({ syncVersion }) {
   const { t } = useI18n()
   const { user, isAuthenticated } = useAuth()
   const { sessionId, loading: sessionLoading } = useAHUser()
-  const { bonusCardNumber, isAuthenticated: isBonusAuth, userInfo: bonusUserInfo } = useBonusCard()
+  const { bonusCardNumber, isAuthenticated: isBonusAuth, userInfo: bonusUserInfo, loading: bonusLoading } = useBonusCard()
   const authFetch = useAuthenticatedFetch()
   
-  // User is "connected" if they have JWT auth, session-based auth, OR bonus card
-  const isUserConnected = isAuthenticated || !!sessionId || isBonusAuth
+  // User is "connected" if they have JWT auth OR bonus card
+  // Note: sessionId alone is NOT sufficient anymore (user_ah_credentials table removed)
+  const isUserConnected = isAuthenticated || isBonusAuth
   
   // Debug log
-  console.log('[Dashboard] sessionId:', sessionId, 'isAuthenticated:', isAuthenticated, 'isBonusAuth:', isBonusAuth, 'isUserConnected:', isUserConnected)
+  console.log('[Dashboard] bonusCardNumber:', bonusCardNumber, 'isAuthenticated:', isAuthenticated, 'isBonusAuth:', isBonusAuth, 'isUserConnected:', isUserConnected)
   
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -126,9 +127,24 @@ function Dashboard({ syncVersion }) {
   const [selectedPurchase, setSelectedPurchase] = useState(null)
 
   const fetchInsights = useCallback(async () => {
-    console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'sessionId:', sessionId, 'bonusCardNumber:', bonusCardNumber)
-    if (sessionLoading || !isUserConnected) {
-      console.log('[Dashboard] Skipping fetch - session loading or not connected')
+    console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'bonusCardNumber:', bonusCardNumber, 'isAuthenticated:', isAuthenticated)
+    
+    // Wait for bonus loading to complete
+    if (bonusLoading) {
+      console.log('[Dashboard] Bonus card still loading, waiting...')
+      return
+    }
+    
+    // Skip if not connected (no bonus card AND no JWT auth)
+    if (!isUserConnected) {
+      console.log('[Dashboard] Skipping fetch - not connected')
+      setLoading(false)
+      return
+    }
+    
+    // Must have either bonus card or JWT auth to make API call
+    if (!bonusCardNumber && !isAuthenticated) {
+      console.log('[Dashboard] No bonus card or JWT auth, skipping API call')
       setLoading(false)
       return
     }
@@ -158,10 +174,11 @@ function Dashboard({ syncVersion }) {
     } finally {
       setLoading(false)
     }
-  }, [isUserConnected, authFetch, sessionId, sessionLoading, bonusCardNumber])
+  }, [isUserConnected, authFetch, bonusLoading, bonusCardNumber, isAuthenticated])
 
   const fetchPurchaseHistory = useCallback(async (page = 1) => {
-    if (!isUserConnected) return
+    // Must have bonus card or JWT auth
+    if (!bonusCardNumber && !isAuthenticated) return
     
     setPurchasesLoading(true)
     try {
@@ -190,7 +207,7 @@ function Dashboard({ syncVersion }) {
     } finally {
       setPurchasesLoading(false)
     }
-  }, [isUserConnected, authFetch, bonusCardNumber])
+  }, [bonusCardNumber, isAuthenticated, authFetch])
 
   useEffect(() => {
     fetchInsights()
@@ -203,8 +220,8 @@ function Dashboard({ syncVersion }) {
     }
   }, [showHistory, fetchPurchaseHistory])
 
-  // Still loading session - show spinner
-  if (sessionLoading) {
+  // Still loading bonus card context - show spinner
+  if (bonusLoading) {
     return (
       <div style={{ textAlign: 'center', padding: '3rem' }}>
         <Loader2 size={48} className="spin" style={{ color: 'var(--primary)' }} />
