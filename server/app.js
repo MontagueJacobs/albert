@@ -871,25 +871,54 @@ const ENRICHED_SCORING = {
   // NOTE: Nutri-Score is scraped and stored but NOT used for sustainability scoring
   // Reason: Nutri-Score measures nutritional health, not environmental sustainability
   
-  // Origin scoring (local = better, far = worse)
+  // Origin scoring based on transport distance:
+  // NL only: +2 (regional/local)
+  // EU countries: +1 (short transport)
+  // Near non-EU (Mediterranean/Africa): -1
+  // Far overseas: -2
   origin_country: {
-    // Local/nearby countries (best)
+    // Netherlands (regional, best)
     'Netherlands': { delta: 2, region: 'local' },
-    'Belgium': { delta: 1, region: 'nearby' },
-    'Germany': { delta: 1, region: 'nearby' },
-    'France': { delta: 0, region: 'europe' },
-    'Spain': { delta: 0, region: 'europe' },
-    'Italy': { delta: 0, region: 'europe' },
-    'Poland': { delta: 0, region: 'europe' },
-    'Greece': { delta: 0, region: 'europe' },
-    'Portugal': { delta: 0, region: 'europe' },
-    // Further away (neutral to slight negative)
+    // EU countries (+1)
+    'Belgium': { delta: 1, region: 'europe' },
+    'Germany': { delta: 1, region: 'europe' },
+    'France': { delta: 1, region: 'europe' },
+    'Spain': { delta: 1, region: 'europe' },
+    'Italy': { delta: 1, region: 'europe' },
+    'Poland': { delta: 1, region: 'europe' },
+    'Greece': { delta: 1, region: 'europe' },
+    'Portugal': { delta: 1, region: 'europe' },
+    'Austria': { delta: 1, region: 'europe' },
+    'Ireland': { delta: 1, region: 'europe' },
+    'Denmark': { delta: 1, region: 'europe' },
+    'Sweden': { delta: 1, region: 'europe' },
+    'Hungary': { delta: 1, region: 'europe' },
+    'Czech Republic': { delta: 1, region: 'europe' },
+    'Romania': { delta: 1, region: 'europe' },
+    'Bulgaria': { delta: 1, region: 'europe' },
+    'Croatia': { delta: 1, region: 'europe' },
+    'Slovenia': { delta: 1, region: 'europe' },
+    'Slovakia': { delta: 1, region: 'europe' },
+    'Lithuania': { delta: 1, region: 'europe' },
+    'Latvia': { delta: 1, region: 'europe' },
+    'Estonia': { delta: 1, region: 'europe' },
+    'Finland': { delta: 1, region: 'europe' },
+    'Luxembourg': { delta: 1, region: 'europe' },
+    'Cyprus': { delta: 1, region: 'europe' },
+    'Malta': { delta: 1, region: 'europe' },
+    // Near non-EU (Mediterranean/Middle East/Africa) - moderate transport
     'Morocco': { delta: -1, region: 'mediterranean' },
     'Turkey': { delta: -1, region: 'mediterranean' },
     'Egypt': { delta: -1, region: 'africa' },
     'South Africa': { delta: -1, region: 'africa' },
     'Kenya': { delta: -1, region: 'africa' },
-    // Long distance (negative)
+    'Israel': { delta: -1, region: 'mediterranean' },
+    'Tunisia': { delta: -1, region: 'mediterranean' },
+    'UK': { delta: -1, region: 'nearby' },
+    'United Kingdom': { delta: -1, region: 'nearby' },
+    'Norway': { delta: -1, region: 'nearby' },
+    'Switzerland': { delta: -1, region: 'nearby' },
+    // Far overseas (-2)
     'United States': { delta: -2, region: 'americas' },
     'Brazil': { delta: -2, region: 'americas' },
     'Argentina': { delta: -2, region: 'americas' },
@@ -904,6 +933,11 @@ const ENRICHED_SCORING = {
     'Thailand': { delta: -2, region: 'asia' },
     'Vietnam': { delta: -2, region: 'asia' },
     'Indonesia': { delta: -2, region: 'asia' },
+    'Philippines': { delta: -2, region: 'asia' },
+    'Malaysia': { delta: -2, region: 'asia' },
+    'Sri Lanka': { delta: -2, region: 'asia' },
+    'Pakistan': { delta: -2, region: 'asia' },
+    'Bangladesh': { delta: -2, region: 'asia' },
     'Australia': { delta: -2, region: 'oceania' },
     'New Zealand': { delta: -2, region: 'oceania' }
   }
@@ -923,13 +957,19 @@ function getCurrentMonthKey() {
 
 /**
  * Get the origin country for the current month from origin_by_month data
- * @param {Object} originByMonth - JSONB object with monthly origins
+ * @param {Object} originByMonth - JSONB object with monthly origins (values can be strings or arrays)
  * @returns {string|null} - Country name for current month, or null if not available
  */
 function getOriginForCurrentMonth(originByMonth) {
   if (!originByMonth || typeof originByMonth !== 'object') return null
   const monthKey = getCurrentMonthKey()
-  return originByMonth[monthKey] || null
+  const monthOrigin = originByMonth[monthKey]
+  if (!monthOrigin) return null
+  // Handle both array format (["Netherlands", "Spain"]) and string format ("Netherlands")
+  if (Array.isArray(monthOrigin)) {
+    return monthOrigin[0] || null  // Return first country in the list
+  }
+  return monthOrigin
 }
 
 // ============================================================================
@@ -3116,14 +3156,20 @@ app.get('/api/product/:productId/details', async (req, res) => {
             'enriched_vegan': 'Vegan',
             'enriched_vegetarian': 'Vegetarian',
             'enriched_organic': 'Organic Certified',
+            'enriched_fairtrade': 'Fairtrade Certified',
             'enriched_nutriscore_A': 'Nutri-Score A',
             'enriched_nutriscore_B': 'Nutri-Score B',
             'enriched_nutriscore_C': 'Nutri-Score C',
             'enriched_nutriscore_D': 'Nutri-Score D',
             'enriched_nutriscore_E': 'Nutri-Score E',
-            'enriched_origin_local': 'Local Origin',
-            'enriched_origin_europe': 'European Origin',
-            'enriched_origin_overseas': 'Overseas Import',
+            'enriched_origin_local': 'Regional (NL)',
+            'enriched_origin_europe': 'EU Origin',
+            'enriched_origin_nearby': 'Near Import',
+            'enriched_origin_mediterranean': 'Mediterranean Import',
+            'enriched_origin_africa': 'African Import',
+            'enriched_origin_americas': 'Overseas Import',
+            'enriched_origin_asia': 'Overseas Import',
+            'enriched_origin_oceania': 'Overseas Import',
             'enriched_origin_unknown': 'Unknown Origin'
           }
           label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
@@ -3140,13 +3186,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       })
     }
     
-    // Final score
-    breakdown.push({
-      label: 'Final Score',
-      value: evaluation.score.toString(),
-      positive: evaluation.score >= 7,
-      negative: evaluation.score < 5
-    })
+    // NOTE: Final Score removed from breakdown - it's already shown above the breakdown section
     
     // Create improvement reasons
     const improvements = []

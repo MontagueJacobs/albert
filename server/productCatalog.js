@@ -150,25 +150,27 @@ export const PRODUCT_CATALOG = [
     id: 'cucumber',
     names: ['cucumber', 'komkommer'],
     baseScore: 5,
-    categories: ['vegetable', 'local'],
+    categories: ['vegetable'],  // Removed 'local' - origin varies by season
     adjustments: [],
     suggestions: [
       '🥒 Koop onverpakt wanneer mogelijk.',
-      '🥗 Voeg toe aan salades of infused water.'
+      '🥗 Voeg toe aan salades of infused water.',
+      '📅 In het seizoen (apr-okt) komt dit product uit Nederland.'
     ],
-    notes: 'Lokale kas-komkommers zijn relatief energiezuinig, zeker in het zomerseizoen.'
+    notes: 'Kas-komkommers zijn energiezuinig in het zomerseizoen. Herkomst varieert: NL in zomer, Spanje/import in winter.'
   },
   {
     id: 'cucumber_organic',
     names: ['organic cucumber', 'biologische komkommer', 'bio komkommer'],
-    baseScore: 2,
-    categories: ['vegetable', 'local', 'organic'],
+    baseScore: 7,
+    categories: ['vegetable', 'organic'],  // Removed 'local' - origin varies by season (NL Apr-Oct, Spain/imports otherwise)
     adjustments: [],
     suggestions: [
       '🥒 Bewaar in een koele kast (niet té koud) om de versheid te verlengen.',
-      '🌱 Ondersteunt biologische teelt met minder pesticiden.'
+      '🌱 Ondersteunt biologische teelt met minder pesticiden.',
+      '📅 In het seizoen (apr-okt) komt dit product uit Nederland.'
     ],
-    notes: 'Biologische komkommers scoren extra dankzij pesticidevrije teelt.'
+    notes: 'Biologische komkommers scoren extra dankzij pesticidevrije teelt. Herkomst varieert per seizoen.'
   },
   {
     id: 'lettuce',
