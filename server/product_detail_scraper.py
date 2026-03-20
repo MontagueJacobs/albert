@@ -333,7 +333,7 @@ class AHProductDetailScraper:
                     
                     # Check for vegan in Kenmerken  
                     if not result['is_vegan']:
-                        if 'vegan' in kenmerken_lower:
+                        if 'vegan' in kenmerken_lower or 'veganistisch' in kenmerken_lower or 'geschikt voor veganisten' in kenmerken_lower:
                             result['is_vegan'] = True
                             result['is_vegetarian'] = True
                             print(f"[DEBUG] Found vegan in Kenmerken section", flush=True)
