@@ -1473,14 +1473,15 @@ function getEnrichedData(product) {
   if (!product) return null
   
   // Check if product has any enriched fields
+  // Use != null to treat undefined and null the same (both = no data)
   const hasEnrichedData = 
-    product.is_vegan !== null || 
-    product.is_vegetarian !== null || 
-    product.is_organic !== null || 
-    product.is_fairtrade !== null ||
-    product.nutri_score !== null || 
-    product.origin_country !== null ||
-    product.origin_by_month !== null
+    product.is_vegan != null || 
+    product.is_vegetarian != null || 
+    product.is_organic != null || 
+    product.is_fairtrade != null ||
+    product.nutri_score != null || 
+    product.origin_country != null ||
+    product.origin_by_month != null
   
   if (!hasEnrichedData) return null
   
@@ -2144,8 +2145,9 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     
     // Combine purchase data with enriched product data and sustainability scores
     const purchasesWithDetails = purchases.map(purchase => {
-      const enriched = enrichedProducts[purchase.product_id] || {}
-      const evaluation = hasEnrichedData 
+      const enriched = enrichedProducts[purchase.product_id]
+      // Use enriched data ONLY if this specific product has data in the products table
+      const evaluation = enriched
         ? evaluateProductWithRecord(purchase.product_name, enriched)
         : evaluateProduct(purchase.product_name)
       
@@ -3922,8 +3924,10 @@ async function processEnrichmentQueue() {
             is_vegan: result.data.is_vegan ?? null,
             is_vegetarian: result.data.is_vegetarian ?? null,
             is_organic: result.data.is_organic ?? null,
+            is_fairtrade: result.data.is_fairtrade ?? null,
             nutri_score: result.data.nutri_score ?? null,
             origin_country: result.data.origin_country ?? null,
+            origin_by_month: result.data.origin_by_month ?? null,
             brand: result.data.brand ?? null,
             unit_size: result.data.unit_size ?? null,
             allergens: result.data.allergens ?? null,
