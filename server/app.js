@@ -1223,6 +1223,9 @@ function findCatalogMatch(productName = '') {
   let bestRank = 0
   let bestMatchName = null
 
+  // Common Dutch stop words to ignore in token matching
+  const stopWords = new Set(['de', 'het', 'een', 'en', 'van', 'in', 'met', 'voor', 'op', 'te', 'aan', 'is', 'dat', 'die', 'er'])
+
   for (const entry of catalogIndex) {
     for (const candidate of entry.normalizedNames) {
       if (!candidate) continue
@@ -1234,7 +1237,8 @@ function findCatalogMatch(productName = '') {
       } else if (candidate.includes(normalized) || normalized.includes(candidate)) {
         rank = 3
       } else {
-        const tokens = normalized.split(' ')
+        // Filter out stop words and very short tokens for matching
+        const tokens = normalized.split(' ').filter(t => t.length >= 3 && !stopWords.has(t))
         if (tokens.length > 1 && tokens.every((token) => candidate.includes(token))) {
           rank = 2
         } else if (tokens.some((token) => token && candidate.includes(token))) {
