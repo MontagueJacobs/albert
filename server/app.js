@@ -532,7 +532,8 @@ const KEYWORD_RULES = [
   { code: 'keyword_bio', delta: 2, match: (name) => name.includes('bio') || name.includes('organic') },
   { code: 'keyword_fair', delta: 2, match: (name) => name.includes('fair trade') },
   { code: 'keyword_local', delta: 1, match: (name) => name.includes('lokaal') || name.includes('local') || name.includes('nederland') || name.includes('hollands') },
-  { code: 'keyword_plant', delta: 2, match: (name) => name.includes('plantaardig') || name.includes('vegan') || name.includes('vega ') || name.includes('soja') || name.includes('tofu') || name.includes('havermelk') || name.includes('terra ') },
+  // NOTE: Vegan/Vegetarian scoring is handled ONLY via enriched data (is_vegan +3, is_vegetarian +2)
+  // No keyword-based plant scoring to avoid overlap with enriched data
   // NOTE: Meat keyword penalties are applied ONLY when enriched data is NOT available AND the name doesn't indicate plant-based
   { code: 'keyword_meat', delta: -3, match: (name) => name.includes('vlees') || name.includes('beef') || name.includes('rund') || name.includes('kip') || name.includes('meat'), excludeIf: (name) => name.includes('plantaardig') || name.includes('vegan') || name.includes('terra') || name.includes('vega') },
   { code: 'keyword_plastic', delta: -1, match: (name) => name.includes('plastic') || name.includes('verpakt') }
@@ -560,9 +561,9 @@ function isLikelyOrganic(name) {
 // ============================================================================
 
 const ENRICHED_SCORING = {
-  // Dietary preferences
+  // Dietary preferences (vegan +3, vegetarian +2)
   is_vegan: { delta: 3, icon: '🌱', label: 'Vegan' },
-  is_vegetarian: { delta: 1, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
+  is_vegetarian: { delta: 2, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
   is_organic: { delta: 2, icon: '🌿', label: 'Organic/Bio' },
   
   // Ethical certifications
