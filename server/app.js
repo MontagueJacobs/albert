@@ -1274,7 +1274,7 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   let notes = null
   let matchedProduct = null
 
-  const applyCategory = (category) => {
+  const applyCategory = (category, skipScoring = false) => {
     if (!category || categorySet.has(category) || !CATEGORY_KEYS.has(category)) return
     categorySet.add(category)
     const catData = SUSTAINABILITY_DB.categories[category]
@@ -1284,6 +1284,8 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
         icon: catData.icon,
         referenceScore: catData.score
       })
+      // Skip scoring adjustment if flagged (e.g., organic category when enriched data is used)
+      if (skipScoring) return
       const delta = catData.score - 5
       if (delta) {
         workingScore += delta
@@ -1346,7 +1348,13 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
         if (category === 'meat' && skipMeatScoring) {
           continue
         }
-        applyCategory(category)
+        // Skip category scoring if enriched data is available (avoid double scoring)
+        // enriched data is more accurate than hardcoded categories
+        const skipScoring = 
+          (category === 'organic' && enrichedData?.is_organic === true) ||
+          (category === 'local' && (enrichedData?.origin_country || enrichedData?.origin_by_month)) ||
+          (category === 'fair_trade' && enrichedData?.is_fairtrade === true)
+        applyCategory(category, skipScoring)
       }
     }
 
@@ -1375,22 +1383,39 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
       )) {
         continue  // Skip meat penalty for plant-based products
       }
-      applyCategory(category)
+      // Skip category scoring if enriched data is available (avoid double scoring)
+      const skipScoring = 
+        (category === 'organic' && enrichedData?.is_organic === true) ||
+        (category === 'local' && (enrichedData?.origin_country || enrichedData?.origin_by_month)) ||
+        (category === 'fair_trade' && enrichedData?.is_fairtrade === true)
+      applyCategory(category, skipScoring)
     }
   }
 
-  // Apply keyword rules (with plant-based exclusion logic)
+  // Apply keyword rules (with exclusion logic to prevent double-scoring)
   for (const rule of KEYWORD_RULES) {
     if (rule.match(lowerProduct)) {
       // Check if this rule should be excluded for plant-based products
       if (rule.excludeIf && rule.excludeIf(lowerProduct)) {
         continue  // Skip this rule
       }
-      // Also skip meat keywords if we have enriched data showing vegan/vegetarian
+      // Skip meat keywords if we have enriched data showing vegan/vegetarian
       if (rule.code === 'keyword_meat' && (
         enrichedData?.is_vegan === true ||
         enrichedData?.is_vegetarian === true
       )) {
+        continue
+      }
+      // Skip bio/organic keyword if we have enriched is_organic data (avoid double scoring)
+      if (rule.code === 'keyword_bio' && enrichedData?.is_organic === true) {
+        continue
+      }
+      // Skip local keyword if we have enriched origin data (avoid double scoring)
+      if (rule.code === 'keyword_local' && (enrichedData?.origin_country || enrichedData?.origin_by_month)) {
+        continue
+      }
+      // Skip fair trade keyword if we have enriched is_fairtrade data (avoid double scoring)
+      if (rule.code === 'keyword_fair' && enrichedData?.is_fairtrade === true) {
         continue
       }
       applyDelta('keyword', rule.code, rule.delta)
@@ -2204,16 +2229,16 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
         purchased_at: purchaseDate,  // Normalize to purchased_at for frontend
         created_at: purchase.created_at,
         // Enriched fields (will be null if not available)
-        is_vegan: enriched.is_vegan ?? null,
-        is_vegetarian: enriched.is_vegetarian ?? null,
-        is_organic: enriched.is_organic ?? null,
-        is_fairtrade: enriched.is_fairtrade ?? null,
-        nutri_score: enriched.nutri_score ?? null,
-        origin_country: enriched.origin_country ?? null,
-        origin_by_month: enriched.origin_by_month ?? null,
-        brand: enriched.brand ?? null,
-        image_url: enriched.image_url ?? null,
-        product_url: enriched.url ?? null,
+        is_vegan: enriched?.is_vegan ?? null,
+        is_vegetarian: enriched?.is_vegetarian ?? null,
+        is_organic: enriched?.is_organic ?? null,
+        is_fairtrade: enriched?.is_fairtrade ?? null,
+        nutri_score: enriched?.nutri_score ?? null,
+        origin_country: enriched?.origin_country ?? null,
+        origin_by_month: enriched?.origin_by_month ?? null,
+        brand: enriched?.brand ?? null,
+        image_url: enriched?.image_url ?? null,
+        product_url: enriched?.url ?? null,
         // Sustainability scoring
         sustainability_score: evaluation.score,
         sustainability_rating: evaluation.rating,
