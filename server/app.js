@@ -2049,7 +2049,8 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
     // Combine purchase data with enriched product data
     const purchasesWithDetails = purchases.map(purchase => {
       const enriched = enrichedProducts[purchase.product_id] || {}
-      const evaluation = evaluateProduct(purchase.product_name)
+      // Pass enriched data to evaluateProduct for accurate scoring
+      const evaluation = evaluateProduct(purchase.product_name, enriched)
       
       return {
         id: purchase.id,
