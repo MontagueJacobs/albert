@@ -3569,7 +3569,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
     // Build redirect URL for bookmarklet
     // Use custom APP_URL env var, or default to production domain
     // (VERCEL_URL gives the preview URL, not the custom domain)
-    const appUrl = process.env.APP_URL || 'https://www.bubblebrainz.com'
+    const appUrl = process.env.APP_URL || 'https://www.bubblebrainz.com/#dashboard'
     const redirectUrl = bonusCard ? `${appUrl}/?card=${bonusCard}` : null
 
     return res.json({ 
