@@ -2,15 +2,17 @@
 """
 Batch Origin Scraper for Albert Heijn Products
 
-Scrapes product origin data (country/monthly origin) for all products in the database
+Scrapes product origin data (country/monthly origin) for products in the database
 that don't have this information yet.
 
 Usage:
-  python batch_origin_scraper.py                    # Scrape all products missing origin data
-  python batch_origin_scraper.py --limit 50         # Scrape up to 50 products
-  python batch_origin_scraper.py --delay 3          # Wait 3 seconds between requests
-  python batch_origin_scraper.py --dry-run          # Show what would be scraped without scraping
-  python batch_origin_scraper.py --headless=false   # Show browser window for debugging
+  python batch_origin_scraper.py                         # Scrape from products table (default)
+  python batch_origin_scraper.py --mode purchases        # Scrape only products in user_purchases
+  python batch_origin_scraper.py --mode all              # Scrape from products table
+  python batch_origin_scraper.py --limit 50              # Scrape up to 50 products
+  python batch_origin_scraper.py --delay 3               # Wait 3 seconds between requests
+  python batch_origin_scraper.py --dry-run               # Show what would be scraped without scraping
+  python batch_origin_scraper.py --headless=false        # Show browser window for debugging
 """
 
 import asyncio
@@ -97,6 +99,62 @@ class BatchOriginScraper:
         
         print(f"[INFO] Found {len(products)} products needing origin data", flush=True)
         return products
+    
+    def get_user_purchase_products(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Fetch products from user_purchases that need origin data.
+        
+        Returns products that:
+        - Are in user_purchases table
+        - Have a product URL (so we can scrape them)
+        - Don't have origin_country set yet in the products table
+        """
+        if not self.supabase:
+            return []
+        
+        # Get distinct product IDs from user_purchases
+        purchases_result = self.supabase.table('user_purchases') \
+            .select('product_id') \
+            .not_.is_('product_id', 'null') \
+            .execute()
+        
+        if not purchases_result.data:
+            print("[INFO] No products found in user_purchases", flush=True)
+            return []
+        
+        # Get unique product IDs
+        product_ids = list(set(p['product_id'] for p in purchases_result.data if p.get('product_id')))
+        print(f"[INFO] Found {len(product_ids)} unique products in user_purchases", flush=True)
+        
+        if not product_ids:
+            return []
+        
+        # Now get the product details for those that need origin data
+        # Process in chunks to avoid query limits
+        all_products = []
+        chunk_size = 50
+        
+        for i in range(0, len(product_ids), chunk_size):
+            chunk_ids = product_ids[i:i + chunk_size]
+            # Convert IDs to strings for the query
+            ids_str = ','.join(str(id) for id in chunk_ids)
+            
+            result = self.supabase.table('products') \
+                .select('id, name, url, origin_country, origin_by_month') \
+                .in_('id', chunk_ids) \
+                .not_.is_('url', 'null') \
+                .is_('origin_country', 'null') \
+                .execute()
+            
+            if result.data:
+                all_products.extend(result.data)
+        
+        # Limit results
+        products = all_products[:limit]
+        self.stats['total_candidates'] = len(products)
+        
+        print(f"[INFO] Found {len(products)} user purchase products needing origin data", flush=True)
+        return products
         
     def update_product_origin(self, product_id: int, origin_data: Dict[str, Any]) -> bool:
         """
@@ -156,17 +214,19 @@ class BatchOriginScraper:
             print(f"  [ERROR] Failed to update product {product_id}: {e}", flush=True)
             return False
             
-    async def run(self, limit: int = 100, dry_run: bool = False):
+    async def run(self, limit: int = 100, dry_run: bool = False, mode: str = 'all'):
         """
         Run the batch scraper.
         
         Args:
             limit: Maximum number of products to scrape
             dry_run: If True, only show what would be done without actually scraping
+            mode: 'all' for products table, 'purchases' for user_purchases only
         """
         print("=" * 60, flush=True)
         print("  Batch Origin Scraper for Albert Heijn Products", flush=True)
         print("=" * 60, flush=True)
+        print(f"  Source: {'user_purchases' if mode == 'purchases' else 'products table'}", flush=True)
         print(f"  Mode: {'DRY RUN' if dry_run else 'LIVE'}", flush=True)
         print(f"  Limit: {limit} products", flush=True)
         print(f"  Delay: {self.delay}s between requests", flush=True)
@@ -177,8 +237,11 @@ class BatchOriginScraper:
         if not self.connect_supabase():
             return
             
-        # Get products needing origin data
-        products = self.get_products_needing_origin(limit=limit)
+        # Get products needing origin data based on mode
+        if mode == 'purchases':
+            products = self.get_user_purchase_products(limit=limit)
+        else:
+            products = self.get_products_needing_origin(limit=limit)
         
         if not products:
             print("[INFO] No products need origin data - all done!", flush=True)
@@ -249,6 +312,8 @@ class BatchOriginScraper:
 
 async def main():
     parser = argparse.ArgumentParser(description='Batch Origin Scraper for AH Products')
+    parser.add_argument('--mode', '-m', type=str, default='all', choices=['all', 'purchases'],
+                        help='Source: "all" for products table, "purchases" for user_purchases only (default: all)')
     parser.add_argument('--limit', '-l', type=int, default=100, 
                         help='Maximum number of products to scrape (default: 100)')
     parser.add_argument('--delay', '-d', type=float, default=2.0,
@@ -263,7 +328,7 @@ async def main():
     headless = args.headless.lower() not in ('false', '0', 'no')
     
     scraper = BatchOriginScraper(headless=headless, delay=args.delay)
-    await scraper.run(limit=args.limit, dry_run=args.dry_run)
+    await scraper.run(limit=args.limit, dry_run=args.dry_run, mode=args.mode)
 
 
 if __name__ == '__main__':
