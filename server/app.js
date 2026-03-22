@@ -1367,9 +1367,10 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
     }
     
     // Build query to fetch by user_id OR bonus_card_number
+    // Join with products table to get enriched data for scoring
     let query = supabase
       .from('user_purchases')
-      .select('product_name, quantity, price')
+      .select('product_id, product_name, quantity, price')
     
     if (userIds.length > 0 && bonusCardNumber) {
       // Query by both user_id and bonus_card_number using OR
@@ -1387,12 +1388,29 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
     if (!purchases || purchases.length === 0) {
       return res.json({ message: 'No purchases yet!' })
     }
+
+    // Get enriched data for all purchased products
+    const productIds = purchases.map(p => p.product_id).filter(Boolean)
+    let productsMap = new Map()
+    if (productIds.length > 0) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, nutri_score')
+        .in('id', productIds)
+      if (products) {
+        productsMap = new Map(products.map(p => [p.id, p]))
+      }
+    }
     
-    // Calculate sustainability scores on the fly
-    const purchasesWithScores = purchases.map(p => ({
-      ...p,
-      sustainability_score: evaluateProduct(p.product_name).score
-    }))
+    // Calculate sustainability scores on the fly using enriched data
+    const purchasesWithScores = purchases.map(p => {
+      const product = productsMap.get(p.product_id)
+      const enrichedData = product ? getEnrichedData(product) : null
+      return {
+        ...p,
+        sustainability_score: evaluateProduct(p.product_name, enrichedData).score
+      }
+    })
     
     const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
     const avgScore = totalScore / purchasesWithScores.length
@@ -2603,71 +2621,34 @@ app.get('/api/product/:productId/details', async (req, res) => {
     // Create user-friendly breakdown
     const breakdown = []
     
-    // Base score
+    // Base score (starts at 0, all scoring comes from enriched data)
     breakdown.push({
       label: 'Base Score',
-      value: '5',
+      value: '0',
       positive: false,
       negative: false
     })
     
-    // Add adjustment explanations
+    // Add adjustment explanations (only enriched type exists now)
     for (const adj of evaluation.adjustments) {
       let label = ''
       let positive = adj.delta > 0
       let negative = adj.delta < 0
       
-      switch (adj.type) {
-        case 'catalog':
-          if (adj.code === 'catalog_base') {
-            label = 'Product Type'
-          } else {
-            label = adj.code.replace('catalog_', '').replace(/_/g, ' ')
-          }
-          break
-        case 'category':
-          label = adj.category?.replace(/_/g, ' ') || 'Category'
-          label = label.charAt(0).toUpperCase() + label.slice(1)
-          break
-        case 'keyword':
-          const keywordMap = {
-            'keyword_organic': 'Organic/Bio',
-            'keyword_local': 'Local Product',
-            'keyword_seasonal': 'Seasonal',
-            'keyword_fairtrade': 'Fairtrade',
-            'keyword_processed': 'Processed Food',
-            'keyword_plastic_packaging': 'Plastic Packaging',
-            'keyword_meat': 'Meat Product',
-            'keyword_palm_oil': 'Contains Palm Oil'
-          }
-          label = keywordMap[adj.code] || adj.code.replace('keyword_', '').replace(/_/g, ' ')
-          break
-        case 'enriched':
-          const enrichedMap = {
-            'enriched_vegan': 'Vegan',
-            'enriched_vegetarian': 'Vegetarian',
-            'enriched_organic': 'Organic Certified',
-            'enriched_fairtrade': 'Fairtrade Certified',
-            'enriched_nutriscore_A': 'Nutri-Score A',
-            'enriched_nutriscore_B': 'Nutri-Score B',
-            'enriched_nutriscore_C': 'Nutri-Score C',
-            'enriched_nutriscore_D': 'Nutri-Score D',
-            'enriched_nutriscore_E': 'Nutri-Score E',
-            'enriched_origin_local': 'Regional (NL)',
-            'enriched_origin_europe': 'EU Origin',
-            'enriched_origin_nearby': 'Near Import',
-            'enriched_origin_mediterranean': 'Mediterranean Import',
-            'enriched_origin_africa': 'African Import',
-            'enriched_origin_americas': 'Overseas Import',
-            'enriched_origin_asia': 'Overseas Import',
-            'enriched_origin_oceania': 'Overseas Import',
-            'enriched_origin_unknown': 'Unknown Origin'
-          }
-          label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
-          break
-        default:
-          label = adj.code?.replace(/_/g, ' ') || 'Unknown'
+      // All adjustments are now from enriched data (kenmerken/herkomst sections)
+      const enrichedMap = {
+        'enriched_vegan': 'Vegan',
+        'enriched_vegetarian': 'Vegetarian',
+        'enriched_organic': 'Organic Certified',
+        'enriched_fairtrade': 'Fairtrade Certified',
+        'enriched_origin_avg': adj.delta > 0 ? 'Origin (Local/EU)' : 'Origin (Distant)',
+        'enriched_nutriscore_A': 'Nutri-Score A',
+        'enriched_nutriscore_B': 'Nutri-Score B',
+        'enriched_nutriscore_C': 'Nutri-Score C',
+        'enriched_nutriscore_D': 'Nutri-Score D',
+        'enriched_nutriscore_E': 'Nutri-Score E'
       }
+      label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
       
       breakdown.push({
         label,
@@ -2679,43 +2660,33 @@ app.get('/api/product/:productId/details', async (req, res) => {
     
     // NOTE: Final Score removed from breakdown - it's already shown above the breakdown section
     
-    // Create improvement reasons
+    // Create improvement reasons from enriched data
     const improvements = []
     
-    // Positive factors
-    for (const cat of evaluation.categories) {
-      if (cat.referenceScore > 5) {
-        improvements.push({
-          reason: `${cat.icon || '📦'} ${cat.category.replace(/_/g, ' ')} category bonus`,
-          positive: true
-        })
-      }
-    }
+    // Positive factors from enriched data
     for (const adj of evaluation.adjustments.filter(a => a.delta > 0)) {
-      if (adj.type === 'keyword') {
-        improvements.push({
-          reason: `✅ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} bonus`,
-          positive: true
-        })
+      const codeMap = {
+        'enriched_organic': '🌱 Organic/Bio certified',
+        'enriched_vegan': '🌿 Vegan product',
+        'enriched_vegetarian': '🥬 Vegetarian product',
+        'enriched_fairtrade': '🤝 Fairtrade certified',
+        'enriched_origin_avg': '📍 Origin bonus'
       }
+      improvements.push({
+        reason: codeMap[adj.code] || `✅ ${adj.code.replace('enriched_', '').replace(/_/g, ' ')} bonus`,
+        positive: true
+      })
     }
     
-    // Negative factors
-    for (const cat of evaluation.categories) {
-      if (cat.referenceScore < 5) {
-        improvements.push({
-          reason: `${cat.icon || '📦'} Low sustainability for ${cat.category.replace(/_/g, ' ')}`,
-          positive: false
-        })
-      }
-    }
+    // Negative factors from enriched data
     for (const adj of evaluation.adjustments.filter(a => a.delta < 0)) {
-      if (adj.type === 'keyword') {
-        improvements.push({
-          reason: `⚠️ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} penalty`,
-          positive: false
-        })
+      const codeMap = {
+        'enriched_origin_avg': '✈️ Distant origin penalty'
       }
+      improvements.push({
+        reason: codeMap[adj.code] || `⚠️ ${adj.code.replace('enriched_', '').replace(/_/g, ' ')} penalty`,
+        positive: false
+      })
     }
     
     // Find better alternatives from catalog
@@ -2764,7 +2735,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       breakdown,
       improvements,
       alternatives,
-      categories: evaluation.categories,
+      enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
       hasEnrichedData: evaluation.hasEnrichedData
     })
