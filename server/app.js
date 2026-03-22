@@ -484,70 +484,27 @@ function extractProductFromUrl(url, originalName) {
 // Data file path - DEPRECATED: Now using Supabase for all purchases
 // const DATA_FILE = path.join(__dirname, 'purchases.json')
 
-// Sustainability database
+// LEGACY: This database is no longer used for scoring
+// Kept only for search results display (icons)
+// Actual scoring comes from enriched data (kenmerken + herkomst)
 const SUSTAINABILITY_DB = {
   categories: {
-    organic: { score: 10, icon: '🌱' },
-    local: { score: 8, icon: '🏡' },
-    plant_based: { score: 9, icon: '🥬' },
-    fair_trade: { score: 8, icon: '🤝' },
-    plastic_free: { score: 7, icon: '♻️' },
-    meat: { score: 2, icon: '🥩' },
-    // processed and imported categories removed - origin is now determined by scraped data
-    fruit: { score: 5, icon: '🍎' },
-    vegetable: { score: 5, icon: '🥕' },
-    dairy: { score: 5, icon: '🥛' },
-    grain: { score: 5, icon: '🌾' },
-    legume: { score: 5, icon: '🫘' },
-    plant_protein: { score: 5, icon: '🌿' },
-    snack: { score: 5, icon: '🍫' },
-    beverage: { score: 5, icon: '🥤' },
-    egg: { score: 5, icon: '🥚' },
-    seafood: { score: 5, icon: '🐟' }
+    organic: { icon: '🌱' },
+    local: { icon: '🏡' },
+    plant_based: { icon: '🥬' },
+    fair_trade: { icon: '🤝' },
+    fruit: { icon: '🍎' },
+    vegetable: { icon: '🥕' },
+    dairy: { icon: '🥛' },
+    grain: { icon: '🌾' },
+    legume: { icon: '🫘' },
+    beverage: { icon: '🥤' }
   },
-  products: {
-    'bio melk': { categories: ['organic', 'local'], co2: 1.2 },
-    'gewone melk': { categories: ['local'], co2: 1.5 },
-    havermelk: { categories: ['plant_based'], co2: 0.3 },
-    sojamelk: { categories: ['plant_based'], co2: 0.4 },
-    amandelmelk: { categories: ['plant_based'], co2: 0.7 },
-    rundvlees: { categories: ['meat'], co2: 27.0 },
-    kip: { categories: ['meat'], co2: 6.9 },
-    varkensvlees: { categories: ['meat'], co2: 12.1 },
-    tofu: { categories: ['plant_based'], co2: 2.0 },
-    tempeh: { categories: ['plant_based'], co2: 2.0 },
-    'bananen fair trade': { categories: ['fair_trade'], co2: 0.7 },
-    bananen: { categories: [], co2: 0.7 },  // Origin determined by scraped data
-    appels: { categories: [], co2: 0.3 },
-    tomaten: { categories: [], co2: 0.7 },
-    brood: { categories: [], co2: 0.6 },
-    pasta: { categories: [], co2: 1.0 },
-    rijst: { categories: [], co2: 2.7 }  // Origin determined by scraped data
-  }
+  products: {}  // No longer used - products come from database
 }
 
-const CATEGORY_KEYS = new Set(Object.keys(SUSTAINABILITY_DB.categories))
-
-const KEYWORD_RULES = [
-  // DEPRECATED: All keyword-based scoring removed
-  // Scoring now only comes from enriched data (kenmerken and herkomst sections)
-]
-
-// Helper to check if a product name indicates plant-based despite having meat-like words
-function isLikelyPlantBased(name) {
-  const lower = (name || '').toLowerCase()
-  const plantIndicators = ['plantaardig', 'vegan', 'veganist', 'terra', 'beyond', 'impossible', 'vega ']
-  return plantIndicators.some(indicator => lower.includes(indicator))
-}
-
-// Helper to check if a product name indicates organic/bio certification
-function isLikelyOrganic(name) {
-  const lower = (name || '').toLowerCase()
-  const organicIndicators = ['biologisch', 'biologische', ' bio ', 'bio-', 'eko-', 'organic']
-  // Also check if name starts with 'bio ' or ends with ' bio'
-  return organicIndicators.some(indicator => lower.includes(indicator)) ||
-         lower.startsWith('bio ') || lower.endsWith(' bio')
-}
+// NOTE: All keyword-based matching has been removed
+// Scoring and attributes now only come from scraped enriched data (kenmerken + herkomst sections)
 
 // ============================================================================
 // ENRICHED FIELD SCORING RULES
@@ -670,76 +627,40 @@ function getOriginsForCurrentMonth(originByMonth) {
 
 // ============================================================================
 // USER PROFILING SYSTEM
-// Analyzes purchase patterns to understand user preferences
+// Analyzes purchase patterns using enriched data (no keyword matching)
 // ============================================================================
 
 const USER_PROFILE_TYPES = {
-  'plant_forward': { 
-    label: '🌱 Plant-Forward Shopper', 
-    description: 'You prioritize plant-based foods. Great for sustainability!',
-    tips: ['Keep exploring new plant proteins', 'Try seasonal local vegetables']
-  },
-  'balanced': { 
-    label: '⚖️ Balanced Shopper', 
-    description: 'You have a varied diet with room for sustainable swaps.',
-    tips: ['Consider swapping 1-2 meat meals per week', 'Try organic versions of your favorites']
-  },
-  'meat_heavy': { 
-    label: '🥩 Protein-Focused Shopper', 
-    description: 'Your cart is protein-heavy. Small swaps can make a big difference!',
-    tips: ['Try chicken instead of beef (4x less CO2)', 'Explore legumes as protein sources']
-  },
-  'convenience': { 
-    label: '📦 Convenience Shopper', 
-    description: 'You favor processed/ready foods. Fresh alternatives can boost your score.',
-    tips: ['Try batch cooking on weekends', 'Fresh produce has higher sustainability scores']
-  },
   'eco_champion': {
     label: '🏆 Eco Champion',
     description: 'Amazing! You\'re already making excellent sustainable choices.',
     tips: ['Share your habits with friends', 'Try reducing packaging waste next']
-  }
-}
-
-// Product category detection for profiling
-const PRODUCT_CATEGORIES_PROFILE = {
-  meat: {
-    keywords: ['vlees', 'beef', 'rund', 'kip', 'varken', 'ham', 'spek', 'worst', 'gehakt', 'biefstuk', 'chicken', 'meat', 'pork', 'bacon'],
-    weight: -2
   },
-  plant_protein: {
-    keywords: ['tofu', 'tempeh', 'seitan', 'vega', 'plantaardi', 'beyond', 'impossible', 'linzen', 'kikkererwt', 'bonen'],
-    weight: 2
+  'plant_forward': { 
+    label: '🌱 Plant-Forward Shopper', 
+    description: 'You prioritize plant-based and organic foods. Great for sustainability!',
+    tips: ['Keep exploring new plant proteins', 'Try seasonal local vegetables']
   },
-  dairy: {
-    keywords: ['melk', 'kaas', 'yoghurt', 'boter', 'room', 'cheese', 'milk', 'butter'],
-    weight: 0
+  'local_supporter': {
+    label: '🏡 Local Supporter',
+    description: 'You favor locally-sourced products. Great for reducing transport emissions!',
+    tips: ['Check for seasonal Dutch produce', 'Try organic versions of local favorites']
   },
-  plant_dairy: {
-    keywords: ['havermelk', 'sojamelk', 'amandelmelk', 'kokosmelk', 'oat milk', 'soy milk', 'plantaardig'],
-    weight: 2
-  },
-  organic: {
-    keywords: ['bio', 'biologisch', 'organic', 'eko'],
-    weight: 2
-  },
-  processed: {
-    keywords: ['kant-en-klaar', 'diepvries', 'pizza', 'lasagne', 'nuggets', 'kroket', 'snack', 'chips'],
-    weight: -1
-  },
-  fresh_produce: {
-    keywords: ['appel', 'peer', 'banaan', 'tomaat', 'komkommer', 'sla', 'spinazie', 'wortel', 'groente', 'fruit'],
-    weight: 1
+  'balanced': { 
+    label: '⚖️ Balanced Shopper', 
+    description: 'You have a varied diet with room for sustainable swaps.',
+    tips: ['Look for local Dutch products', 'Try organic versions of your favorites']
   }
 }
 
 /**
  * Analyze user's purchase history to build a profile
+ * Uses enriched data fields only (no keyword matching)
  */
 function analyzeUserProfile(purchases) {
   const profile = {
     totalProducts: purchases.length,
-    categoryBreakdown: {},
+    enrichedBreakdown: { vegan: 0, vegetarian: 0, organic: 0, fairtrade: 0, local: 0, eu: 0, imported: 0 },
     scoreDistribution: { low: 0, medium: 0, high: 0 },
     avgScore: 0,
     profileType: 'balanced',
@@ -752,59 +673,66 @@ function analyzeUserProfile(purchases) {
   }
 
   let totalScore = 0
-  const categoryCounts = {}
   const lowScoreProducts = []
   const highScoreProducts = []
 
   for (const purchase of purchases) {
-    const name = (purchase.product_name || '').toLowerCase()
-    const evaluation = evaluateProduct(purchase.product_name)
+    // Get enriched data from purchase record
+    const enriched = getEnrichedData(purchase)
+    const evaluation = evaluateProduct(purchase.product_name, enriched)
     const score = evaluation.score
     totalScore += score
 
-    if (score <= 4) {
+    // Score distribution (based on new 0-10 scale)
+    if (score <= 2) {
       profile.scoreDistribution.low++
-      lowScoreProducts.push({ name: purchase.product_name, score, evaluation })
-    } else if (score <= 6) {
+      lowScoreProducts.push({ name: purchase.product_name, score, evaluation, enriched })
+    } else if (score <= 5) {
       profile.scoreDistribution.medium++
     } else {
       profile.scoreDistribution.high++
-      highScoreProducts.push({ name: purchase.product_name, score })
+      highScoreProducts.push({ name: purchase.product_name, score, enriched })
     }
 
-    for (const [category, data] of Object.entries(PRODUCT_CATEGORIES_PROFILE)) {
-      if (data.keywords.some(kw => name.includes(kw))) {
-        // Don't count as meat if it's a plant-based product
-        if (category === 'meat' && isLikelyPlantBased(name)) {
-          categoryCounts['plant_protein'] = (categoryCounts['plant_protein'] || 0) + 1
-          continue
+    // Count enriched attributes
+    if (enriched) {
+      if (enriched.is_vegan) profile.enrichedBreakdown.vegan++
+      else if (enriched.is_vegetarian) profile.enrichedBreakdown.vegetarian++
+      if (enriched.is_organic) profile.enrichedBreakdown.organic++
+      if (enriched.is_fairtrade) profile.enrichedBreakdown.fairtrade++
+      
+      // Origin breakdown
+      const origins = enriched.origin_by_month ? 
+        getOriginsForCurrentMonth(enriched.origin_by_month) : 
+        (enriched.origin_country ? [enriched.origin_country] : null)
+      
+      if (origins && origins.length > 0) {
+        const originScoring = ENRICHED_SCORING.origin_country
+        if (origins.some(c => c === 'Netherlands')) {
+          profile.enrichedBreakdown.local++
+        } else if (origins.every(c => originScoring[c]?.region === 'europe')) {
+          profile.enrichedBreakdown.eu++
+        } else {
+          profile.enrichedBreakdown.imported++
         }
-        categoryCounts[category] = (categoryCounts[category] || 0) + 1
       }
     }
   }
 
   profile.avgScore = totalScore / purchases.length
-  profile.categoryBreakdown = categoryCounts
 
-  const meatCount = categoryCounts.meat || 0
-  const plantProteinCount = categoryCounts.plant_protein || 0
-  const organicCount = categoryCounts.organic || 0
-  const processedCount = categoryCounts.processed || 0
-  const totalCount = purchases.length
+  // Determine profile type based on enriched data counts
+  const total = purchases.length
+  const veganRatio = profile.enrichedBreakdown.vegan / total
+  const organicRatio = profile.enrichedBreakdown.organic / total
+  const localRatio = profile.enrichedBreakdown.local / total
 
-  const meatRatio = meatCount / totalCount
-  const plantRatio = plantProteinCount / totalCount
-  const processedRatio = processedCount / totalCount
-
-  if (profile.avgScore >= 7.5) {
+  if (profile.avgScore >= 6) {
     profile.profileType = 'eco_champion'
-  } else if (meatRatio > 0.25) {
-    profile.profileType = 'meat_heavy'
-  } else if (plantRatio > 0.15 || organicCount > totalCount * 0.2) {
+  } else if (veganRatio > 0.15 || organicRatio > 0.2) {
     profile.profileType = 'plant_forward'
-  } else if (processedRatio > 0.3) {
-    profile.profileType = 'convenience'
+  } else if (localRatio > 0.3) {
+    profile.profileType = 'local_supporter'
   } else {
     profile.profileType = 'balanced'
   }
@@ -816,59 +744,41 @@ function analyzeUserProfile(purchases) {
 }
 
 /**
- * Find sustainable replacement suggestions from the product catalog
+ * Find sustainable replacement suggestions based on enriched data
  */
 function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
   const suggestions = []
 
-  for (const product of lowScoreProducts) {
-    const name = (product.name || '').toLowerCase()
-    let alternatives = []
+  // Score all catalog products with enriched data
+  const scoredCatalog = catalogProducts.map(p => {
+    const enriched = getEnrichedData(p)
+    const evaluation = evaluateProduct(p.name, enriched)
+    return { ...p, score: evaluation.score, enriched, evaluation }
+  }).filter(p => p.score >= 5) // Only suggest products with decent scores
 
-    // Meat → Plant protein replacements
-    if (PRODUCT_CATEGORIES_PROFILE.meat.keywords.some(kw => name.includes(kw))) {
-      alternatives = catalogProducts.filter(p => {
-        const pName = (p.name || '').toLowerCase()
-        return PRODUCT_CATEGORIES_PROFILE.plant_protein.keywords.some(kw => pName.includes(kw))
-      }).slice(0, 3)
-    }
-    // Dairy → Plant dairy replacements
-    else if (PRODUCT_CATEGORIES_PROFILE.dairy.keywords.some(kw => name.includes(kw))) {
-      alternatives = catalogProducts.filter(p => {
-        const pName = (p.name || '').toLowerCase()
-        return PRODUCT_CATEGORIES_PROFILE.plant_dairy.keywords.some(kw => pName.includes(kw))
-      }).slice(0, 3)
-    }
-    // Non-organic → Organic version
-    else if (!PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => name.includes(kw))) {
-      const baseTokens = name.split(/\s+/).filter(t => t.length > 2)
-      alternatives = catalogProducts.filter(p => {
-        const pName = (p.name || '').toLowerCase()
-        const isBio = PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => pName.includes(kw))
-        const hasSimilarTokens = baseTokens.some(t => pName.includes(t))
-        return isBio && hasSimilarTokens
-      }).slice(0, 2)
-    }
+  for (const product of lowScoreProducts) {
+    // Find higher-scoring alternatives
+    const alternatives = scoredCatalog
+      .filter(alt => alt.score > product.score + 1) // At least 2 points improvement
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
 
     if (alternatives.length > 0) {
       const bestAlt = alternatives[0]
-      const altScore = evaluateProduct(bestAlt.name).score
-      const improvement = altScore - product.score
+      const improvement = bestAlt.score - product.score
 
-      if (improvement > 0) {
-        suggestions.push({
-          original: { name: product.name, score: product.score },
-          replacement: {
-            name: bestAlt.name,
-            score: altScore,
-            url: makeAbsoluteAhUrl(bestAlt.url),
-            image_url: bestAlt.image_url,
-            price: bestAlt.price
-          },
-          improvement,
-          reason: getReplacementReason(product.name, bestAlt.name)
-        })
-      }
+      suggestions.push({
+        original: { name: product.name, score: product.score },
+        replacement: {
+          name: bestAlt.name,
+          score: bestAlt.score,
+          url: makeAbsoluteAhUrl(bestAlt.url),
+          image_url: bestAlt.image_url,
+          price: bestAlt.price
+        },
+        improvement,
+        reason: getReplacementReason(product.enriched, bestAlt.enriched)
+      })
     }
   }
 
@@ -877,23 +787,26 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
 
 /**
  * Generate a human-readable reason for a replacement suggestion
+ * Based on enriched data differences
  */
-function getReplacementReason(originalName, replacementName) {
-  const orig = originalName.toLowerCase()
-  const repl = replacementName.toLowerCase()
-
-  if (PRODUCT_CATEGORIES_PROFILE.meat.keywords.some(kw => orig.includes(kw)) &&
-      PRODUCT_CATEGORIES_PROFILE.plant_protein.keywords.some(kw => repl.includes(kw))) {
-    return '🌱 Plant-based alternative - up to 90% less CO2'
+function getReplacementReason(originalEnriched, replacementEnriched) {
+  if (!originalEnriched && replacementEnriched?.is_organic) {
+    return '🌱 Organic product - better for soil & biodiversity'
   }
-  if (PRODUCT_CATEGORIES_PROFILE.dairy.keywords.some(kw => orig.includes(kw)) &&
-      PRODUCT_CATEGORIES_PROFILE.plant_dairy.keywords.some(kw => repl.includes(kw))) {
-    return '🥛 Plant-based dairy - 75% less emissions'
+  if (!originalEnriched?.is_vegan && replacementEnriched?.is_vegan) {
+    return '🌱 Vegan option - significantly lower environmental impact'
   }
-  if (!PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => orig.includes(kw)) &&
-      PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => repl.includes(kw))) {
+  if (replacementEnriched?.is_organic && !originalEnriched?.is_organic) {
     return '🌱 Organic version - better for soil & biodiversity'
   }
+  
+  // Check if replacement is more local
+  const origOrigin = originalEnriched?.origin_country
+  const replOrigin = replacementEnriched?.origin_country
+  if (replOrigin === 'Netherlands' && origOrigin !== 'Netherlands') {
+    return '📍 Local Dutch product - reduced transport emissions'
+  }
+  
   return '✨ More sustainable choice'
 }
 
@@ -2992,9 +2905,8 @@ app.post('/api/ingest/scrape', async (req, res) => {
       }
       seenIds.add(extracted.id)
 
-      // Auto-detect dietary and organic properties from product name
-      const isPlantBased = isLikelyPlantBased(extracted.name)
-      const isOrganic = isLikelyOrganic(extracted.name)
+      // NOTE: is_vegan, is_organic, etc. are NOT set from product names
+      // These fields are populated ONLY by the enrichment scraper (kenmerken section)
 
       // Parse price - handle both number and string formats (e.g., "€2.99", "2,99")
       let parsedPrice = null
@@ -3017,9 +2929,8 @@ app.post('/api/ingest/scrape', async (req, res) => {
         image_url: (raw?.image_url || raw?.image || '').toString().trim() || null,
         price: parsedPrice,
         source,
-        // Auto-detected properties (only set if true, preserve existing data otherwise)
-        ...(isPlantBased ? { is_vegan: true, is_vegetarian: true } : {}),
-        ...(isOrganic ? { is_organic: true } : {}),
+        // NOTE: Enriched fields (is_vegan, is_organic, origin, etc.) are set by the scraper
+        // not auto-detected from product names
         updated_at: new Date().toISOString()
       })
     }
