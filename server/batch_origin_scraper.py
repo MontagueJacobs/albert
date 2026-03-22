@@ -112,42 +112,42 @@ class BatchOriginScraper:
         if not self.supabase:
             return []
         
-        # Get distinct product IDs from user_purchases
+        # Get product URLs from user_purchases (more reliable than product_id)
         purchases_result = self.supabase.table('user_purchases') \
-            .select('product_id') \
-            .not_.is_('product_id', 'null') \
+            .select('product_url') \
+            .not_.is_('product_url', 'null') \
             .execute()
         
         if not purchases_result.data:
-            print("[INFO] No products found in user_purchases", flush=True)
+            print("[INFO] No products with URLs found in user_purchases", flush=True)
             return []
         
-        # Get unique product IDs
-        product_ids = list(set(p['product_id'] for p in purchases_result.data if p.get('product_id')))
-        print(f"[INFO] Found {len(product_ids)} unique products in user_purchases", flush=True)
+        # Get unique URLs
+        product_urls = list(set(p['product_url'] for p in purchases_result.data if p.get('product_url')))
+        print(f"[INFO] Found {len(product_urls)} unique product URLs in user_purchases", flush=True)
         
-        if not product_ids:
+        if not product_urls:
             return []
         
-        # Now get the product details for those that need origin data
-        # Process in chunks to avoid query limits
+        # Debug: show sample
+        print(f"[DEBUG] Sample URLs: {product_urls[:3]}", flush=True)
+        
+        # Query products table by URL - find those missing origin data
         all_products = []
-        chunk_size = 50
+        chunk_size = 20  # Smaller chunks for URL queries
         
-        for i in range(0, len(product_ids), chunk_size):
-            chunk_ids = product_ids[i:i + chunk_size]
-            # Convert IDs to strings for the query
-            ids_str = ','.join(str(id) for id in chunk_ids)
+        for i in range(0, len(product_urls), chunk_size):
+            chunk_urls = product_urls[i:i + chunk_size]
             
             result = self.supabase.table('products') \
                 .select('id, name, url, origin_country, origin_by_month') \
-                .in_('id', chunk_ids) \
-                .not_.is_('url', 'null') \
+                .in_('url', chunk_urls) \
                 .is_('origin_country', 'null') \
                 .execute()
             
             if result.data:
                 all_products.extend(result.data)
+                print(f"[DEBUG] Found {len(result.data)} products in chunk {i//chunk_size + 1}", flush=True)
         
         # Limit results
         products = all_products[:limit]

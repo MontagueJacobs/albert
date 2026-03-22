@@ -3025,6 +3025,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
           ...(bonusCard ? { bonus_card_number: bonusCard } : {}),
           product_id: p.id,
           product_name: p.name,
+          product_url: p.url,  // Include URL for scraper to use
           price: p.price,
           quantity: 1,
           source: req.body?.source || 'bookmarklet',
@@ -4457,6 +4458,7 @@ app.post('/api/auto-scrape/login-and-sync', async (req, res) => {
               const purchases = resultData.products.map(p => ({
                 user_id: userData.id,
                 product_name: p.name,
+                product_url: p.url,
                 product_data: p,
                 purchased_at: p.date || new Date().toISOString()
               }))
@@ -4969,6 +4971,7 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
               user_id: userId,
               product_id: p.id,
               product_name: p.name,
+              product_url: p.url,
               price: p.price,
               quantity: 1,
               source: 'ah_visual_login',
