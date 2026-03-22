@@ -529,14 +529,8 @@ const SUSTAINABILITY_DB = {
 const CATEGORY_KEYS = new Set(Object.keys(SUSTAINABILITY_DB.categories))
 
 const KEYWORD_RULES = [
-  { code: 'keyword_bio', delta: 2, match: (name) => name.includes('bio') || name.includes('organic') },
-  { code: 'keyword_fair', delta: 2, match: (name) => name.includes('fair trade') },
-  { code: 'keyword_local', delta: 1, match: (name) => name.includes('lokaal') || name.includes('local') || name.includes('nederland') || name.includes('hollands') },
-  // NOTE: Vegan/Vegetarian scoring is handled ONLY via enriched data (is_vegan +3, is_vegetarian +2)
-  // No keyword-based plant scoring to avoid overlap with enriched data
-  // NOTE: Meat keyword penalties are applied ONLY when enriched data is NOT available AND the name doesn't indicate plant-based
-  { code: 'keyword_meat', delta: -3, match: (name) => name.includes('vlees') || name.includes('beef') || name.includes('rund') || name.includes('kip') || name.includes('meat'), excludeIf: (name) => name.includes('plantaardig') || name.includes('vegan') || name.includes('terra') || name.includes('vega') },
-  { code: 'keyword_plastic', delta: -1, match: (name) => name.includes('plastic') || name.includes('verpakt') }
+  // DEPRECATED: All keyword-based scoring removed
+  // Scoring now only comes from enriched data (kenmerken and herkomst sections)
 ]
 
 // Helper to check if a product name indicates plant-based despite having meat-like words
@@ -557,90 +551,91 @@ function isLikelyOrganic(name) {
 
 // ============================================================================
 // ENRICHED FIELD SCORING RULES
-// These use scraped product detail data for more accurate scoring
+// Scoring ONLY comes from scraped product detail data (kenmerken + herkomst)
+// Base score starts at 0
 // ============================================================================
 
 const ENRICHED_SCORING = {
-  // Dietary preferences (vegan +3, vegetarian +2)
+  // Dietary preferences
   is_vegan: { delta: 3, icon: '🌱', label: 'Vegan' },
-  is_vegetarian: { delta: 2, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
-  is_organic: { delta: 2, icon: '🌿', label: 'Organic/Bio' },
+  is_vegetarian: { delta: 1, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
+  is_organic: { delta: 4, icon: '🌿', label: 'Organic/Bio' },
   
-  // Ethical certifications
+  // Ethical certifications (only applies to non-EU products)
   is_fairtrade: { delta: 2, icon: '🤝', label: 'Fairtrade' },
   
   // NOTE: Nutri-Score is scraped and stored but NOT used for sustainability scoring
   // Reason: Nutri-Score measures nutritional health, not environmental sustainability
   
   // Origin scoring based on transport distance:
-  // NL only: +2 (regional/local)
-  // EU countries: +1 (short transport)
-  // Near non-EU (Mediterranean/Africa): -1
-  // Far overseas: -2
+  // NL: +3 (local)
+  // EU countries: +2
+  // Outside EU (nearby): -1
+  // Far from EU: -2
   origin_country: {
-    // Netherlands (regional, best)
-    'Netherlands': { delta: 2, region: 'local' },
-    // EU countries (+1)
-    'Belgium': { delta: 1, region: 'europe' },
-    'Germany': { delta: 1, region: 'europe' },
-    'France': { delta: 1, region: 'europe' },
-    'Spain': { delta: 1, region: 'europe' },
-    'Italy': { delta: 1, region: 'europe' },
-    'Poland': { delta: 1, region: 'europe' },
-    'Greece': { delta: 1, region: 'europe' },
-    'Portugal': { delta: 1, region: 'europe' },
-    'Austria': { delta: 1, region: 'europe' },
-    'Ireland': { delta: 1, region: 'europe' },
-    'Denmark': { delta: 1, region: 'europe' },
-    'Sweden': { delta: 1, region: 'europe' },
-    'Hungary': { delta: 1, region: 'europe' },
-    'Czech Republic': { delta: 1, region: 'europe' },
-    'Romania': { delta: 1, region: 'europe' },
-    'Bulgaria': { delta: 1, region: 'europe' },
-    'Croatia': { delta: 1, region: 'europe' },
-    'Slovenia': { delta: 1, region: 'europe' },
-    'Slovakia': { delta: 1, region: 'europe' },
-    'Lithuania': { delta: 1, region: 'europe' },
-    'Latvia': { delta: 1, region: 'europe' },
-    'Estonia': { delta: 1, region: 'europe' },
-    'Finland': { delta: 1, region: 'europe' },
-    'Luxembourg': { delta: 1, region: 'europe' },
-    'Cyprus': { delta: 1, region: 'europe' },
-    'Malta': { delta: 1, region: 'europe' },
-    // Near non-EU (Mediterranean/Middle East/Africa) - moderate transport
-    'Morocco': { delta: -1, region: 'mediterranean' },
-    'Turkey': { delta: -1, region: 'mediterranean' },
-    'Egypt': { delta: -1, region: 'africa' },
-    'South Africa': { delta: -1, region: 'africa' },
-    'Kenya': { delta: -1, region: 'africa' },
-    'Israel': { delta: -1, region: 'mediterranean' },
-    'Tunisia': { delta: -1, region: 'mediterranean' },
-    'UK': { delta: -1, region: 'nearby' },
-    'United Kingdom': { delta: -1, region: 'nearby' },
-    'Norway': { delta: -1, region: 'nearby' },
-    'Switzerland': { delta: -1, region: 'nearby' },
-    // Far overseas (-2)
-    'United States': { delta: -2, region: 'americas' },
-    'Brazil': { delta: -2, region: 'americas' },
-    'Argentina': { delta: -2, region: 'americas' },
-    'Chile': { delta: -2, region: 'americas' },
-    'Costa Rica': { delta: -2, region: 'americas' },
-    'Ecuador': { delta: -2, region: 'americas' },
-    'Colombia': { delta: -2, region: 'americas' },
-    'Peru': { delta: -2, region: 'americas' },
-    'Mexico': { delta: -2, region: 'americas' },
-    'China': { delta: -2, region: 'asia' },
-    'India': { delta: -2, region: 'asia' },
-    'Thailand': { delta: -2, region: 'asia' },
-    'Vietnam': { delta: -2, region: 'asia' },
-    'Indonesia': { delta: -2, region: 'asia' },
-    'Philippines': { delta: -2, region: 'asia' },
-    'Malaysia': { delta: -2, region: 'asia' },
-    'Sri Lanka': { delta: -2, region: 'asia' },
-    'Pakistan': { delta: -2, region: 'asia' },
-    'Bangladesh': { delta: -2, region: 'asia' },
-    'Australia': { delta: -2, region: 'oceania' },
-    'New Zealand': { delta: -2, region: 'oceania' }
+    // Netherlands (local, best)
+    'Netherlands': { delta: 3, region: 'local' },
+    // EU countries (+2)
+    'Belgium': { delta: 2, region: 'europe' },
+    'Germany': { delta: 2, region: 'europe' },
+    'France': { delta: 2, region: 'europe' },
+    'Spain': { delta: 2, region: 'europe' },
+    'Italy': { delta: 2, region: 'europe' },
+    'Poland': { delta: 2, region: 'europe' },
+    'Greece': { delta: 2, region: 'europe' },
+    'Portugal': { delta: 2, region: 'europe' },
+    'Austria': { delta: 2, region: 'europe' },
+    'Ireland': { delta: 2, region: 'europe' },
+    'Denmark': { delta: 2, region: 'europe' },
+    'Sweden': { delta: 2, region: 'europe' },
+    'Hungary': { delta: 2, region: 'europe' },
+    'Czech Republic': { delta: 2, region: 'europe' },
+    'Romania': { delta: 2, region: 'europe' },
+    'Bulgaria': { delta: 2, region: 'europe' },
+    'Croatia': { delta: 2, region: 'europe' },
+    'Slovenia': { delta: 2, region: 'europe' },
+    'Slovakia': { delta: 2, region: 'europe' },
+    'Lithuania': { delta: 2, region: 'europe' },
+    'Latvia': { delta: 2, region: 'europe' },
+    'Estonia': { delta: 2, region: 'europe' },
+    'Finland': { delta: 2, region: 'europe' },
+    'Luxembourg': { delta: 2, region: 'europe' },
+    'Cyprus': { delta: 2, region: 'europe' },
+    'Malta': { delta: 2, region: 'europe' },
+    // Outside EU (nearby) - moderate transport (-1)
+    'Morocco': { delta: -1, region: 'outside_eu' },
+    'Turkey': { delta: -1, region: 'outside_eu' },
+    'Egypt': { delta: -1, region: 'outside_eu' },
+    'South Africa': { delta: -1, region: 'outside_eu' },
+    'Kenya': { delta: -1, region: 'outside_eu' },
+    'Israel': { delta: -1, region: 'outside_eu' },
+    'Tunisia': { delta: -1, region: 'outside_eu' },
+    'UK': { delta: -1, region: 'outside_eu' },
+    'United Kingdom': { delta: -1, region: 'outside_eu' },
+    'Norway': { delta: -1, region: 'outside_eu' },
+    'Switzerland': { delta: -1, region: 'outside_eu' },
+    // Far from EU (-2)
+    'United States': { delta: -2, region: 'far' },
+    'Brazil': { delta: -2, region: 'far' },
+    'Argentina': { delta: -2, region: 'far' },
+    'Chile': { delta: -2, region: 'far' },
+    'Costa Rica': { delta: -2, region: 'far' },
+    'Ecuador': { delta: -2, region: 'far' },
+    'Colombia': { delta: -2, region: 'far' },
+    'Peru': { delta: -2, region: 'far' },
+    'Mexico': { delta: -2, region: 'far' },
+    'China': { delta: -2, region: 'far' },
+    'India': { delta: -2, region: 'far' },
+    'Thailand': { delta: -2, region: 'far' },
+    'Vietnam': { delta: -2, region: 'far' },
+    'Indonesia': { delta: -2, region: 'far' },
+    'Philippines': { delta: -2, region: 'far' },
+    'Malaysia': { delta: -2, region: 'far' },
+    'Sri Lanka': { delta: -2, region: 'far' },
+    'Pakistan': { delta: -2, region: 'far' },
+    'Bangladesh': { delta: -2, region: 'far' },
+    'Australia': { delta: -2, region: 'far' },
+    'New Zealand': { delta: -2, region: 'far' }
   }
 }
 
@@ -964,42 +959,11 @@ function findCatalogMatch(productName = '') {
 function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const input = typeof productName === 'string' ? productName : ''
   const normalized = normalizeProductName(input)
-  const lowerProduct = input.toLowerCase()
-  let workingScore = 5
+  // Base score starts at 0 - all scoring comes from enriched data only
+  let workingScore = 0
   const adjustments = []
-  const matchedCategories = []
-  const matchedKeywords = []
   const matchedEnriched = []  // Track enriched field matches
-  const categorySet = new Set()
   let suggestions = getSuggestions(input, lang)
-  let notes = null
-  let matchedProduct = null
-
-  const applyCategory = (category, skipScoring = false) => {
-    if (!category || categorySet.has(category) || !CATEGORY_KEYS.has(category)) return
-    categorySet.add(category)
-    const catData = SUSTAINABILITY_DB.categories[category]
-    if (catData) {
-      matchedCategories.push({
-        category,
-        icon: catData.icon,
-        referenceScore: catData.score
-      })
-      // Skip scoring adjustment if flagged (e.g., organic category when enriched data is used)
-      if (skipScoring) return
-      const delta = catData.score - 5
-      if (delta) {
-        workingScore += delta
-        adjustments.push({
-          type: 'category',
-          code: `category_${category}`,
-          category,
-          delta,
-          resultingScore: clamp(workingScore)
-        })
-      }
-    }
-  }
 
   const applyDelta = (type, code, delta) => {
     if (!delta) return
@@ -1012,155 +976,42 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     })
   }
 
-  const catalogMatch = findCatalogMatch(input)
-  if (catalogMatch) {
-    const { entry } = catalogMatch
-    matchedProduct = {
-      id: entry.id,
-      canonicalName: entry.names[0],
-      matchedName: catalogMatch.matchedName,
-      rank: catalogMatch.rank,
-      baseScore: entry.baseScore ?? 5
-    }
-
-    if (entry.notes) {
-      notes = entry.notes
-    }
-
-    // Note: We no longer override suggestions from catalog entries
-    // because getSuggestions() already handles i18n translations
-
-    // Only apply catalog-based scoring if the product is NOT plant-based
-    // (Avoid penalizing "plantaardige gehakt" as meat)
-    const skipMeatScoring = (enrichedData?.is_vegan === true) ||
-                            (enrichedData?.is_vegetarian === true) ||
-                            isLikelyPlantBased(input)
-
-    // Apply base score delta only if it's not a meat penalty for plant-based products
-    const baseDelta = (entry.baseScore ?? 5) - 5
-    const isMeatCatalog = Array.isArray(entry.categories) && entry.categories.includes('meat')
-    if (baseDelta && !(skipMeatScoring && isMeatCatalog)) {
-      applyDelta('catalog', 'catalog_base', baseDelta)
-    }
-
-    if (Array.isArray(entry.categories)) {
-      for (const category of entry.categories) {
-        // Skip meat category if product is known/likely plant-based
-        if (category === 'meat' && skipMeatScoring) {
-          continue
-        }
-        // Skip category scoring if enriched data is available (avoid double scoring)
-        // enriched data is more accurate than hardcoded categories
-        const skipScoring = 
-          (category === 'organic' && enrichedData?.is_organic === true) ||
-          (category === 'local' && (enrichedData?.origin_country || enrichedData?.origin_by_month)) ||
-          (category === 'fair_trade' && enrichedData?.is_fairtrade === true)
-        applyCategory(category, skipScoring)
-      }
-    }
-
-    if (Array.isArray(entry.adjustments)) {
-      for (const adj of entry.adjustments) {
-        if (!adj || typeof adj.delta !== 'number') continue
-        // Skip meat-related trait adjustments for plant-based products
-        // These traits are only relevant for actual animal products
-        const meatRelatedTraits = ['trait_high_methane', 'trait_high_emissions', 'trait_animal_welfare', 'trait_meat']
-        if (skipMeatScoring && isMeatCatalog && meatRelatedTraits.includes(adj.code)) {
-          continue
-        }
-        applyDelta('catalog', adj.code, adj.delta)
-      }
-    }
+  // Helper to check if product origin is within EU
+  const isOriginInEU = (origins) => {
+    if (!origins || origins.length === 0) return false
+    const euCountries = new Set(['Netherlands', 'Belgium', 'Germany', 'France', 'Spain', 'Italy', 
+      'Poland', 'Greece', 'Portugal', 'Austria', 'Ireland', 'Denmark', 'Sweden', 'Hungary',
+      'Czech Republic', 'Romania', 'Bulgaria', 'Croatia', 'Slovenia', 'Slovakia', 'Lithuania',
+      'Latvia', 'Estonia', 'Finland', 'Luxembourg', 'Cyprus', 'Malta'])
+    return origins.every(country => euCountries.has(country))
   }
 
-  const productData = SUSTAINABILITY_DB.products[normalized] || SUSTAINABILITY_DB.products[lowerProduct]
-  if (productData && Array.isArray(productData.categories)) {
-    for (const category of productData.categories) {
-      // Skip meat category if product is known/likely plant-based
-      if (category === 'meat' && (
-        (enrichedData?.is_vegan === true) ||
-        (enrichedData?.is_vegetarian === true) ||
-        isLikelyPlantBased(input)
-      )) {
-        continue  // Skip meat penalty for plant-based products
-      }
-      // Skip category scoring if enriched data is available (avoid double scoring)
-      const skipScoring = 
-        (category === 'organic' && enrichedData?.is_organic === true) ||
-        (category === 'local' && (enrichedData?.origin_country || enrichedData?.origin_by_month)) ||
-        (category === 'fair_trade' && enrichedData?.is_fairtrade === true)
-      applyCategory(category, skipScoring)
-    }
-  }
-
-  // Apply keyword rules (with exclusion logic to prevent double-scoring)
-  for (const rule of KEYWORD_RULES) {
-    if (rule.match(lowerProduct)) {
-      // Check if this rule should be excluded for plant-based products
-      if (rule.excludeIf && rule.excludeIf(lowerProduct)) {
-        continue  // Skip this rule
-      }
-      // Skip meat keywords if we have enriched data showing vegan/vegetarian
-      if (rule.code === 'keyword_meat' && (
-        enrichedData?.is_vegan === true ||
-        enrichedData?.is_vegetarian === true
-      )) {
-        continue
-      }
-      // Skip bio/organic keyword if we have enriched is_organic data (avoid double scoring)
-      if (rule.code === 'keyword_bio' && enrichedData?.is_organic === true) {
-        continue
-      }
-      // Skip local keyword if we have enriched origin data (avoid double scoring)
-      if (rule.code === 'keyword_local' && (enrichedData?.origin_country || enrichedData?.origin_by_month)) {
-        continue
-      }
-      // Skip fair trade keyword if we have enriched is_fairtrade data (avoid double scoring)
-      if (rule.code === 'keyword_fair' && enrichedData?.is_fairtrade === true) {
-        continue
-      }
-      applyDelta('keyword', rule.code, rule.delta)
-      matchedKeywords.push(rule.code)
-    }
-  }
-
-  // Apply enriched data scoring (from scraped product details)
+  // Scoring ONLY comes from enriched data (kenmerken and herkomst sections)
   if (enrichedData && typeof enrichedData === 'object') {
-    // Vegan scoring (highest plant-based bonus)
-    if (enrichedData.is_vegan === true) {
-      const scoring = ENRICHED_SCORING.is_vegan
-      applyDelta('enriched', 'enriched_vegan', scoring.delta)
-      matchedEnriched.push({ code: 'vegan', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
-    } 
-    // Vegetarian scoring (only if not vegan to avoid double counting)
-    else if (enrichedData.is_vegetarian === true) {
-      const scoring = ENRICHED_SCORING.is_vegetarian
-      applyDelta('enriched', 'enriched_vegetarian', scoring.delta)
-      matchedEnriched.push({ code: 'vegetarian', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
-    }
-
-    // Organic/Bio scoring
+    // Organic/Bio scoring (+4)
     if (enrichedData.is_organic === true) {
       const scoring = ENRICHED_SCORING.is_organic
       applyDelta('enriched', 'enriched_organic', scoring.delta)
       matchedEnriched.push({ code: 'organic', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
     }
 
-    // Fairtrade scoring
-    if (enrichedData.is_fairtrade === true) {
-      const scoring = ENRICHED_SCORING.is_fairtrade
-      applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
-      matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    // Vegan scoring (+3)
+    if (enrichedData.is_vegan === true) {
+      const scoring = ENRICHED_SCORING.is_vegan
+      applyDelta('enriched', 'enriched_vegan', scoring.delta)
+      matchedEnriched.push({ code: 'vegan', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    } 
+    // Vegetarian scoring (+1, only if not vegan)
+    else if (enrichedData.is_vegetarian === true) {
+      const scoring = ENRICHED_SCORING.is_vegetarian
+      applyDelta('enriched', 'enriched_vegetarian', scoring.delta)
+      matchedEnriched.push({ code: 'vegetarian', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
     }
 
-    // NOTE: Nutri-Score is NOT included in sustainability scoring
-    // It's still scraped and stored as a data point, but doesn't affect the score
-    // Reason: Nutri-Score measures nutritional health, not environmental impact
-
-    // Origin country scoring (local vs imported)
+    // Origin country scoring (from herkomst section)
     // Check monthly origin first (origin_by_month), then fall back to static origin_country
-    // When multiple countries are listed for a month, we SUM all their deltas
-    let effectiveOrigins = null  // Array of countries
+    // When multiple countries are listed, use AVERAGE of deltas
+    let effectiveOrigins = null
     let isSeasonalOrigin = false
     
     if (enrichedData.origin_by_month) {
@@ -1176,10 +1027,9 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     if (effectiveOrigins && effectiveOrigins.length > 0) {
       const monthLabel = isSeasonalOrigin ? ` (${getCurrentMonthKey().toUpperCase()})` : ''
       
-      // Sum up deltas for all origin countries
+      // Calculate AVERAGE delta for all origin countries
       let totalDelta = 0
       const countryDetails = []
-      let hasUnknownCountry = false
       
       for (const country of effectiveOrigins) {
         const originScoring = ENRICHED_SCORING.origin_country[country]
@@ -1187,40 +1037,47 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
           totalDelta += originScoring.delta
           countryDetails.push({ country, delta: originScoring.delta, region: originScoring.region })
         } else {
-          // Unknown country
-          totalDelta += -0.5
-          countryDetails.push({ country, delta: -0.5, region: 'unknown' })
-          hasUnknownCountry = true
+          // Unknown country - treat as outside_eu
+          totalDelta += -1
+          countryDetails.push({ country, delta: -1, region: 'unknown' })
         }
       }
       
-      // Apply the summed delta
-      if (totalDelta !== 0) {
-        applyDelta('enriched', 'enriched_origin_sum', totalDelta)
+      // Calculate average (rounded to 1 decimal)
+      const avgDelta = Math.round((totalDelta / effectiveOrigins.length) * 10) / 10
+      
+      // Apply the averaged delta
+      if (avgDelta !== 0) {
+        applyDelta('enriched', 'enriched_origin_avg', avgDelta)
       }
       
       // Build the label showing all countries
       const countriesLabel = effectiveOrigins.join(', ')
-      const icon = totalDelta > 0 ? '📍' : (totalDelta < 0 ? '✈️' : '🌍')
+      const icon = avgDelta > 0 ? '📍' : (avgDelta < 0 ? '✈️' : '🌍')
       
       matchedEnriched.push({ 
-        code: 'origin_multi', 
+        code: 'origin', 
         icon, 
         label: `Origin: ${countriesLabel}${monthLabel}`, 
-        delta: totalDelta,
+        delta: avgDelta,
         countries: countryDetails,
         isSeasonal: isSeasonalOrigin,
         originByMonth: enrichedData.origin_by_month
       })
+
+      // Fairtrade scoring (+2, only applies to non-EU products)
+      if (enrichedData.is_fairtrade === true && !isOriginInEU(effectiveOrigins)) {
+        const scoring = ENRICHED_SCORING.is_fairtrade
+        applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
+        matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+      }
     } else {
-      // No origin data at all - apply penalty for unknown origin
-      applyDelta('enriched', 'enriched_origin_unknown', -0.5)
-      matchedEnriched.push({ 
-        code: 'origin_unknown', 
-        icon: '❓', 
-        label: 'Origin Unknown', 
-        delta: -0.5
-      })
+      // Fairtrade without origin data - still apply (assume non-EU since we don't know)
+      if (enrichedData.is_fairtrade === true) {
+        const scoring = ENRICHED_SCORING.is_fairtrade
+        applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
+        matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+      }
     }
   }
 
@@ -1230,17 +1087,13 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   return {
     product: input,
     normalized,
-    baseScore: matchedProduct?.baseScore ?? 5,
+    baseScore: 0,
     rawScore,
     score: finalScore,
     adjustments,
-    categories: matchedCategories,
-    keywords: matchedKeywords,
-    enriched: matchedEnriched,  // Include enriched data matches
+    enriched: matchedEnriched,
     suggestions,
     rating: getRating(finalScore),
-    notes,
-    matched: matchedProduct,
     hasEnrichedData: enrichedData !== null && matchedEnriched.length > 0
   }
 }
@@ -1414,9 +1267,14 @@ function getSuggestions(productName, lang = 'nl') {
 }
 
 function getRating(avgScore) {
+  // Scale: 0-10 (base 0, max practical ~12 clamped to 10)
+  // 8+: organic + vegan + local origin
+  // 5-7: good sustainability attributes
+  // 2-4: some attributes or neutral
+  // 0-1: no enriched data or negative attributes
   if (avgScore >= 8) return "🌟 Excellent! You're making great sustainable choices!"
-  if (avgScore >= 6) return '👍 Good! Room for improvement though.'
-  if (avgScore >= 4) return '😐 Average. Consider more sustainable alternatives.'
+  if (avgScore >= 5) return '👍 Good! Room for improvement though.'
+  if (avgScore >= 2) return '😐 Average. Consider more sustainable alternatives.'
   return "⚠️ Needs work. Let's find better options!"
 }
 
