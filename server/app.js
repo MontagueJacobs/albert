@@ -2829,6 +2829,100 @@ app.get('/api/profile_suggestions', (req, res) => {
   })
 })
 
+// Debug endpoint to check user_purchases table state
+app.get('/api/debug/purchases', async (req, res) => {
+  const bonusCard = req.query.card
+  try {
+    // Check table structure
+    const { data: columns, error: colError } = await supabase
+      .from('user_purchases')
+      .select('*')
+      .limit(1)
+    
+    // Count total rows
+    const { count: totalCount } = await supabase
+      .from('user_purchases')
+      .select('*', { count: 'exact', head: true })
+    
+    // Count rows for this bonus card
+    let bonusCount = 0
+    if (bonusCard) {
+      const { count } = await supabase
+        .from('user_purchases')
+        .select('*', { count: 'exact', head: true })
+        .eq('bonus_card_number', bonusCard)
+      bonusCount = count
+    }
+    
+    // Check products table
+    const { count: productCount } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+    
+    res.json({
+      user_purchases: {
+        total_rows: totalCount,
+        bonus_card_rows: bonusCount,
+        sample_columns: columns?.[0] ? Object.keys(columns[0]) : [],
+        error: colError?.message
+      },
+      products: {
+        total_rows: productCount
+      },
+      supabase_connected: !!supabase
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Debug endpoint to test inserting into user_purchases
+app.post('/api/debug/test-insert', async (req, res) => {
+  const bonusCard = req.body.bonus_card || '4463986084997'
+  const now = new Date().toISOString()
+  
+  const testRecord = {
+    bonus_card_number: bonusCard,
+    product_id: 'test-product-' + Date.now(),
+    product_name: 'Test Product',
+    product_url: null,
+    price: 1.99,
+    quantity: 1,
+    source: 'debug_test',
+    purchased_at: now,
+    scraped_at: now,
+    last_seen_at: now
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_purchases')
+      .insert([testRecord])
+      .select()
+    
+    if (error) {
+      return res.json({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        },
+        attempted_record: testRecord
+      })
+    }
+    
+    res.json({
+      success: true,
+      inserted: data,
+      record: testRecord
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 app.get('/api/catalog/meta', async (req, res) => {
   if (req.query.refresh === 'true') {
     await refreshCatalog({ force: true })
