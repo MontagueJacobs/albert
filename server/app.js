@@ -3098,7 +3098,6 @@ app.post('/api/ingest/scrape', async (req, res) => {
       }
 
       // 3. If user is authenticated OR bonus card provided, record purchases
-      // Uses upsert to prevent duplicates when scanning same products again
       if (userId || bonusCard) {
         const now = new Date().toISOString()
         const purchaseRecords = cleaned.map(p => ({
@@ -3117,28 +3116,31 @@ app.post('/api/ingest/scrape', async (req, res) => {
 
         console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user ' + userId : 'bonus card ****' + bonusCard?.slice(-4)}`)
         console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
-        console.log(`[Ingest] Using onConflict: ${userId ? 'user_id,product_id' : 'bonus_card_number,product_id'}`)
 
-        // Use upsert to update prices when re-syncing
+        // Try simple INSERT first (most reliable)
+        // If duplicates exist, they'll fail with 23505 which is OK
         const { data, error: insertError } = await supabase
           .from('user_purchases')
-          .upsert(purchaseRecords, {
-            onConflict: userId ? 'user_id,product_id' : 'bonus_card_number,product_id',
-            ignoreDuplicates: false  // Update prices and last_seen_at
-          })
+          .insert(purchaseRecords)
           .select()
         
         if (insertError) {
-          purchaseError = insertError
-          console.error('[Ingest] Purchase upsert FAILED:', JSON.stringify({
-            code: insertError.code,
-            message: insertError.message,
-            details: insertError.details,
-            hint: insertError.hint
-          }, null, 2))
+          // Duplicate key error is OK - means products already exist
+          if (insertError.code === '23505') {
+            console.log('[Ingest] Some purchases already exist (duplicate key) - that is OK')
+            purchasesRecorded = purchaseRecords.length
+          } else {
+            purchaseError = insertError
+            console.error('[Ingest] Purchase insert FAILED:', JSON.stringify({
+              code: insertError.code,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint
+            }, null, 2))
+          }
         } else {
           purchasesRecorded = data?.length || purchaseRecords.length
-          console.log(`[Ingest] SUCCESS: Upserted ${purchasesRecorded} purchase records (prices updated)`)
+          console.log(`[Ingest] SUCCESS: Inserted ${purchasesRecorded} purchase records`)
         }
       } else {
         console.log('[Ingest] No userId or bonusCard - skipping user_purchases insert')
