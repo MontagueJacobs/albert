@@ -321,9 +321,19 @@
       
       // Success!
       const stored = data.stored || items.length;
+      const purchasesRecorded = data.purchasesRecorded || 0;
       statusEl.textContent = '✅ Gelukt!';
       
       let message = `${stored} producten gesynct`;
+      
+      // Show purchase recording result
+      if (purchasesRecorded > 0) {
+        message += `\n✅ ${purchasesRecorded} aankopen opgeslagen`;
+      } else if (data.purchaseError) {
+        console.error('[Bookmarklet] Purchase error:', data.purchaseError);
+        message += '\n⚠️ Aankopen niet opgeslagen: ' + (data.purchaseError.message || 'onbekende fout');
+      }
+      
       if (bonusCard) {
         message += '\n\n🎫 Bonuskaart: ••••' + bonusCard.slice(-4);
       } else {

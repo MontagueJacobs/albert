@@ -3021,8 +3021,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
           last_seen_at: now
         }))
 
-        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user' : 'bonus card'} ${bonusCard?.slice(-4) || userId}`)
+        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user ' + userId : 'bonus card ****' + bonusCard?.slice(-4)}`)
         console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
+        console.log(`[Ingest] Using onConflict: ${userId ? 'user_id,product_id' : 'bonus_card_number,product_id'}`)
 
         // Use upsert to update prices when re-syncing
         const { data, error: insertError } = await supabase
@@ -3045,6 +3046,8 @@ app.post('/api/ingest/scrape', async (req, res) => {
           purchasesRecorded = data?.length || purchaseRecords.length
           console.log(`[Ingest] SUCCESS: Upserted ${purchasesRecorded} purchase records (prices updated)`)
         }
+      } else {
+        console.log('[Ingest] No userId or bonusCard - skipping user_purchases insert')
       }
     }
 
