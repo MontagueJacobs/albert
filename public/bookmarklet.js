@@ -8,10 +8,22 @@
 (function() {
   'use strict';
   
-  // Get API base from script URL
+  // Get API base and optional bonus card from script URL
   const scriptTag = document.currentScript || document.querySelector('script[src*="bookmarklet.js"]');
   const srcUrl = scriptTag ? new URL(scriptTag.src) : null;
   const API_BASE = srcUrl ? srcUrl.origin : window.location.origin;
+  
+  // Try to get bonus card from:
+  // 1. Script URL parameter (?card=...)
+  // 2. Global variable (window.AH_BONUS_CARD)
+  // 3. Will fall back to extraction methods later
+  let presetBonusCard = null;
+  if (srcUrl) {
+    presetBonusCard = srcUrl.searchParams.get('card');
+  }
+  if (!presetBonusCard && typeof window.AH_BONUS_CARD === 'string') {
+    presetBonusCard = window.AH_BONUS_CARD;
+  }
   
   // Check if on AH website
   if (!window.location.href.includes('ah.nl')) {
@@ -184,6 +196,12 @@
   // ============================================
   
   async function getBonusCard() {
+    // Method 0: Use preset bonus card (from URL param or global variable)
+    if (presetBonusCard && /^\d{13}$/.test(presetBonusCard)) {
+      console.log('[Bookmarklet] Using preset bonus card:', presetBonusCard.slice(-4));
+      return presetBonusCard;
+    }
+    
     // Method 1: Check if we're on klantenkaarten page or can extract from current page
     const bonusElements = document.querySelectorAll('[class*="bonus"], [class*="card-number"], [data-testid*="card"]');
     for (const el of bonusElements) {

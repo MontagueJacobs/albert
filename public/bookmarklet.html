@@ -185,6 +185,26 @@
     </div>
     
     <div class="card">
+      <h2>🎫 Personalized Bookmarklet (Optional)</h2>
+      <p style="color: #9ca3af; line-height: 1.6; margin-bottom: 16px;">
+        If the bookmarklet can't find your bonus card automatically, enter it here to create a personalized version:
+      </p>
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <input type="text" id="bonus-card-input" placeholder="13-digit bonus card number" maxlength="13" 
+          style="flex: 1; padding: 12px 16px; border-radius: 8px; border: 2px solid #475569; background: #1e293b; color: #f3f4f6; font-size: 1rem;">
+        <button id="generate-btn" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+          Generate
+        </button>
+      </div>
+      <div id="personalized-bookmarklet" style="display: none;">
+        <div class="bookmarklet-wrapper">
+          <div class="bookmarklet-label">⬇️ YOUR PERSONALIZED BOOKMARKLET ⬇️</div>
+          <a class="bookmarklet" id="personalized-link" href="#">🌱 Sync AH</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
       <h2>❓ How does it work?</h2>
       <p style="color: #9ca3af; line-height: 1.6;">
         The bookmarklet scans your "Previously Purchased" page for product names and prices. 
@@ -207,6 +227,36 @@
     `.replace(/\s+/g, ' ').trim();
     
     document.getElementById('bookmarklet-link').href = code;
+    
+    // Handle personalized bookmarklet generation
+    document.getElementById('generate-btn').addEventListener('click', function() {
+      const cardInput = document.getElementById('bonus-card-input');
+      const card = cardInput.value.replace(/\D/g, '');
+      
+      if (card.length !== 13) {
+        alert('Please enter a valid 13-digit bonus card number');
+        return;
+      }
+      
+      const personalizedCode = `
+        javascript:(function(){
+          var s=document.createElement('script');
+          s.src='${API_BASE}/bookmarklet.js?card=${card}&t='+Date.now();
+          document.body.appendChild(s);
+        })();
+      `.replace(/\s+/g, ' ').trim();
+      
+      document.getElementById('personalized-link').href = personalizedCode;
+      document.getElementById('personalized-bookmarklet').style.display = 'block';
+    });
+    
+    // Check URL for bonus card parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const cardFromUrl = urlParams.get('card');
+    if (cardFromUrl && /^\d{13}$/.test(cardFromUrl)) {
+      document.getElementById('bonus-card-input').value = cardFromUrl;
+      document.getElementById('generate-btn').click();
+    }
   </script>
 </body>
 </html>
