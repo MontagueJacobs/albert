@@ -106,14 +106,29 @@
 
       const url = new URL(href, location.origin).toString();
       
-      // Get product name
+      // Get product name - prefer specific title element, avoid aria-label (too verbose)
       let name = '';
       const titleEl = a.querySelector('[data-testhook="product-title"]') ||
                       a.querySelector('span[class*="title"]') ||
                       a.closest('article')?.querySelector('h2, h3, [class*="title"]');
-      if (titleEl) name = titleEl.textContent?.trim() || '';
-      if (!name) name = a.getAttribute('aria-label') || '';
+      if (titleEl) {
+        name = titleEl.textContent?.trim() || '';
+      }
+      
+      // If no title found, extract clean name from URL slug
+      if (!name) {
+        const slugMatch = href.match(/\/producten\/product\/[^/]+\/([^/?#]+)/);
+        if (slugMatch && slugMatch[1]) {
+          name = slugMatch[1].replace(/-/g, ' ');
+          // Capitalize first letter of each word
+          name = name.replace(/\b[a-z]/g, c => c.toUpperCase());
+        }
+      }
+      
+      // Clean up name - remove common noise patterns
       name = name.replace(/\s+/g, ' ').trim();
+      // Remove everything after common separators (Nutri-Score, price info, etc.)
+      name = name.split(/,\s*(?:Nutri-Score|per stuk|per kg|€|\d+\s*voor|vandaag|morgen)/i)[0].trim();
 
       // Get container
       const card = a.closest('article') || 
@@ -130,9 +145,20 @@
         if (raw) price = parseFloat(raw[1]);
       }
 
-      // Get image
-      const imgEl = card?.querySelector('img[src*="static.ah.nl"]') || card?.querySelector('img');
-      const image = imgEl?.src || '';
+      // Get image - try multiple selectors
+      let image = '';
+      const imgEl = card?.querySelector('img[src*="static.ah.nl"]') || 
+                    card?.querySelector('img[src*="ah.nl"]') ||
+                    a.querySelector('img') ||
+                    card?.querySelector('img');
+      if (imgEl) {
+        // Get highest quality image URL
+        image = imgEl.src || imgEl.dataset?.src || '';
+        // Ensure full URL
+        if (image && !image.startsWith('http')) {
+          image = new URL(image, location.origin).toString();
+        }
+      }
 
       // Get product ID
       const idMatch = href.match(/wi(\d+)/);

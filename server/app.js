@@ -390,7 +390,14 @@ function makeAbsoluteAhUrl(url) {
  * @returns {{ id: string | null, name: string, normalized: string }}
  */
 function extractProductFromUrl(url, originalName) {
-  const name = (originalName || '').toString().trim()
+  const rawName = (originalName || '').toString().trim()
+  
+  // Clean up name - remove common noise patterns from AH product cards
+  let name = rawName
+    .replace(/,\s*(?:Nutri-Score|per stuk|per kg|€|\d+\s*voor|vandaag|morgen).*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  
   const normalized = normalizeProductName(name)
   
   if (!url) {
@@ -2892,18 +2899,27 @@ app.post('/api/ingest/scrape', async (req, res) => {
         }
       }
 
-      cleaned.push({
+      // Parse image URL
+      const imageUrl = (raw?.image_url || raw?.image || '').toString().trim() || null
+
+      const productRecord = {
         id: extracted.id,
         name: extracted.name,
         normalized_name: extracted.normalized,
         url: url || null,
-        image_url: (raw?.image_url || raw?.image || '').toString().trim() || null,
         price: parsedPrice,
         source,
         // NOTE: Enriched fields (is_vegan, is_organic, origin, etc.) are set by the scraper
         // not auto-detected from product names
         updated_at: new Date().toISOString()
-      })
+      }
+      
+      // Only include image_url if we have one (preserve existing on re-sync)
+      if (imageUrl) {
+        productRecord.image_url = imageUrl
+      }
+
+      cleaned.push(productRecord)
     }
 
     if (!cleaned.length) return res.status(400).json({ error: 'no_valid_items' })
@@ -3008,29 +3024,26 @@ app.post('/api/ingest/scrape', async (req, res) => {
         console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user' : 'bonus card'} ${bonusCard?.slice(-4) || userId}`)
         console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
 
-        // Try simple insert for bonus card users
+        // Use upsert to update prices when re-syncing
         const { data, error: insertError } = await supabase
           .from('user_purchases')
-          .insert(purchaseRecords)
+          .upsert(purchaseRecords, {
+            onConflict: userId ? 'user_id,product_id' : 'bonus_card_number,product_id',
+            ignoreDuplicates: false  // Update prices and last_seen_at
+          })
           .select()
         
         if (insertError) {
           purchaseError = insertError
-          console.error('[Ingest] Purchase insert FAILED:', JSON.stringify({
+          console.error('[Ingest] Purchase upsert FAILED:', JSON.stringify({
             code: insertError.code,
             message: insertError.message,
             details: insertError.details,
             hint: insertError.hint
           }, null, 2))
-          // If it's a duplicate key error, that's OK
-          if (insertError.code === '23505') {
-            console.log(`[Ingest] Duplicate key - purchases already exist`)
-            purchasesRecorded = purchaseRecords.length
-            purchaseError = null
-          }
         } else {
           purchasesRecorded = data?.length || purchaseRecords.length
-          console.log(`[Ingest] SUCCESS: Inserted ${purchasesRecorded} purchase records`)
+          console.log(`[Ingest] SUCCESS: Upserted ${purchasesRecorded} purchase records (prices updated)`)
         }
       }
     }
