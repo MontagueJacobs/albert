@@ -272,9 +272,10 @@
   <script>
     const SUPABASE_URL = 'https://gfxawraapyjqtmlemskl.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_GByhVPFERsx_DD2gTB2y-w_5okCNIyM';
+    // Use the current origin so bookmarklet works on any Vercel preview deployment
     const API_BASE = window.location.origin.includes('localhost') 
       ? 'http://localhost:3001' 
-      : 'https://albert-rm0mq7c61-montaguejacobs-projects.vercel.app';
+      : window.location.origin;
     
     let userToken = localStorage.getItem('ss_token');
     let userEmail = localStorage.getItem('ss_email');
