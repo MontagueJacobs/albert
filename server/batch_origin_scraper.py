@@ -197,6 +197,20 @@ class BatchOriginScraper:
             
             if origin_data.get('price') is not None:
                 update_payload['price'] = origin_data['price']
+            
+            # Additional product details
+            if origin_data.get('brand'):
+                update_payload['brand'] = origin_data['brand']
+            
+            if origin_data.get('unit_size'):
+                update_payload['unit_size'] = origin_data['unit_size']
+            
+            if origin_data.get('ingredients'):
+                update_payload['ingredients'] = origin_data['ingredients']
+            
+            # Allergens is a list - store as JSON array
+            if origin_data.get('allergens'):
+                update_payload['allergens'] = origin_data['allergens']
                 
             # Always mark as scraped
             update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
