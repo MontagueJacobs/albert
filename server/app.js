@@ -1938,12 +1938,12 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     // Get product IDs to fetch enriched data (separate query, more reliable)
     const productIds = [...new Set(purchases.map(p => p.product_id).filter(Boolean))]
     
-    // Fetch enriched product data
+    // Fetch enriched product data (including price fallback)
     let productsMap = new Map()
     if (productIds.length > 0) {
       const { data: products, error: prodError } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, price')
         .in('id', productIds)
       
       if (prodError) {
@@ -1967,6 +1967,8 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       } : null
       return {
         ...p,
+        // Use purchase price, fall back to product price if null
+        price: p.price ?? product?.price ?? null,
         sustainability_score: evaluateProduct(p.product_name, enrichedData).score
       }
     })
