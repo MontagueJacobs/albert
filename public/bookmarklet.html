@@ -3,9 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sustainable Shopping - Bookmarklet Setup</title>
+  <title>Sustainable Shop - Easy Setup</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
     
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -15,7 +19,10 @@
       padding: 40px 20px;
     }
     
-    .container { max-width: 600px; margin: 0 auto; }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
     
     h1 {
       font-size: 2rem;
@@ -25,7 +32,10 @@
       gap: 12px;
     }
     
-    .subtitle { color: #9ca3af; margin-bottom: 32px; }
+    .subtitle {
+      color: #9ca3af;
+      margin-bottom: 32px;
+    }
     
     .card {
       background: #334155;
@@ -43,7 +53,7 @@
     .step {
       display: flex;
       gap: 16px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     
     .step-number {
@@ -58,45 +68,32 @@
       flex-shrink: 0;
     }
     
-    .step-content { flex: 1; }
-    .step-content p { color: #d1d5db; line-height: 1.6; }
-    .step-content a { color: #667eea; }
-    
-    .bookmarklet-wrapper {
-      background: #1e293b;
-      border: 3px dashed #22c55e;
-      border-radius: 16px;
-      padding: 24px;
-      text-align: center;
-      margin: 16px 0;
+    .step-content {
+      flex: 1;
     }
     
-    .bookmarklet-label {
-      color: #22c55e;
-      font-size: 0.9rem;
-      margin-bottom: 12px;
-      font-weight: 600;
+    .step-content p {
+      color: #d1d5db;
+      line-height: 1.6;
     }
     
     .bookmarklet {
       display: inline-block;
-      padding: 18px 36px;
-      background: #22c55e;
-      color: #0f172a;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
+      color: white;
       text-decoration: none;
       border-radius: 12px;
-      font-weight: 700;
-      font-size: 1.2rem;
+      font-weight: 600;
+      font-size: 1.1rem;
       cursor: grab;
       transition: transform 0.2s, box-shadow 0.2s;
-      border: 3px solid #fff;
-      box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+      margin: 16px 0;
     }
     
     .bookmarklet:hover {
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 8px 30px rgba(34, 197, 94, 0.5);
-      background: #16a34a;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(34, 197, 94, 0.3);
     }
     
     .bookmarklet:active {
@@ -112,151 +109,274 @@
       color: #9ca3af;
     }
     
-    .drag-hint strong { color: #f59e0b; }
-    
-    kbd {
-      background: #475569;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.85em;
+    .drag-hint strong {
+      color: #f59e0b;
     }
     
-    .info-box {
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid #22c55e;
+    .auth-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #475569;
+    }
+    
+    .input-group {
+      margin-bottom: 12px;
+    }
+    
+    .input-group label {
+      display: block;
+      margin-bottom: 4px;
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+    
+    .input-group input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #475569;
       border-radius: 8px;
-      padding: 16px;
-      margin-top: 16px;
-    }
-    
-    .info-box h3 {
-      color: #22c55e;
-      margin-bottom: 8px;
+      background: #0f172a;
+      color: #f3f4f6;
       font-size: 1rem;
     }
     
-    .info-box p {
-      color: #9ca3af;
+    .input-group input:focus {
+      outline: none;
+      border-color: #22c55e;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #475569;
+      color: #f3f4f6;
+    }
+    
+    #auth-status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    
+    #auth-status.signed-in {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+    
+    #auth-status.signed-out {
+      background: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+    }
+    
+    .hidden { display: none; }
+    
+    .warning {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
       font-size: 0.9rem;
-      line-height: 1.5;
+      color: #fbbf24;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🌱 Sustainable Shopping</h1>
-    <p class="subtitle">Sync your Albert Heijn purchases with one click</p>
+    <h1>🌱 Sustainable Shop</h1>
+    <p class="subtitle">Sync your Albert Heijn purchases in one click</p>
     
     <div class="card">
-      <h2>📚 Simple Setup (No extension needed!)</h2>
+      <h2>📚 Quick Setup (No Extension Needed!)</h2>
       
       <div class="step">
         <div class="step-number">1</div>
         <div class="step-content">
-          <p><strong>Drag this button</strong> to your bookmarks bar:</p>
-          <div class="bookmarklet-wrapper">
-            <div class="bookmarklet-label">⬇️ DRAG THIS TO YOUR BOOKMARKS BAR ⬇️</div>
-            <a class="bookmarklet" id="bookmarklet-link" href="#">🌱 Sync AH</a>
-          </div>
-          <div class="drag-hint">
-            <strong>💡 Tip:</strong> Don't see a bookmarks bar? Press <kbd>Ctrl+Shift+B</kbd> (Windows) or <kbd>Cmd+Shift+B</kbd> (Mac)
-          </div>
+          <p><strong>Sign in below</strong> with your Sustainable Shop account</p>
         </div>
       </div>
       
       <div class="step">
         <div class="step-number">2</div>
         <div class="step-content">
-          <p>Go to <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank">ah.nl/producten/eerder-gekocht</a> and <strong>log in</strong> with your AH account</p>
+          <p><strong>Drag this button</strong> to your bookmarks bar:</p>
+          <a class="bookmarklet" id="bookmarklet-link" href="#">🌱 Sync AH</a>
+          <div class="drag-hint">
+            <strong>💡 Tip:</strong> If you don't see your bookmarks bar, press <kbd>Ctrl+Shift+B</kbd> (Windows) or <kbd>Cmd+Shift+B</kbd> (Mac)
+          </div>
         </div>
       </div>
       
       <div class="step">
         <div class="step-number">3</div>
         <div class="step-content">
-          <p><strong>Click the bookmarklet</strong> in your bookmarks bar. Done!</p>
+          <p>Go to <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank" style="color: #667eea;">ah.nl/producten/eerder-gekocht</a>, log in, then click the bookmarklet!</p>
         </div>
       </div>
       
-      <div class="info-box">
-        <h3>🔐 Privacy First</h3>
-        <p>Your AH login credentials are NEVER stored or sent. The bookmarklet only reads the products already shown on the page. Your bonus card number is used to link your purchases to your account.</p>
-      </div>
-    </div>
-    
-    <div class="card">
-      <h2>🎫 Personalized Bookmarklet (Optional)</h2>
-      <p style="color: #9ca3af; line-height: 1.6; margin-bottom: 16px;">
-        If the bookmarklet can't find your bonus card automatically, enter it here to create a personalized version:
-      </p>
-      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-        <input type="text" id="bonus-card-input" placeholder="13-digit bonus card number" maxlength="13" 
-          style="flex: 1; padding: 12px 16px; border-radius: 8px; border: 2px solid #475569; background: #1e293b; color: #f3f4f6; font-size: 1rem;">
-        <button id="generate-btn" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
-          Generate
-        </button>
-      </div>
-      <div id="personalized-bookmarklet" style="display: none;">
-        <div class="bookmarklet-wrapper">
-          <div class="bookmarklet-label">⬇️ YOUR PERSONALIZED BOOKMARKLET ⬇️</div>
-          <a class="bookmarklet" id="personalized-link" href="#">🌱 Sync AH</a>
+      <div class="auth-section">
+        <div id="auth-status" class="signed-out">Not signed in</div>
+        
+        <div id="sign-in-form">
+          <div class="input-group">
+            <label>Email</label>
+            <input type="email" id="email" placeholder="you@example.com">
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="password" placeholder="••••••••">
+          </div>
+          <button class="btn btn-primary" id="sign-in-btn">Sign In</button>
+          <div id="auth-error" style="color: #ef4444; margin-top: 8px; font-size: 0.9rem;"></div>
+        </div>
+        
+        <div id="signed-in-section" class="hidden">
+          <button class="btn btn-secondary" id="sign-out-btn">Sign Out</button>
         </div>
       </div>
+      
+      <div class="warning" id="not-signed-in-warning">
+        ⚠️ You must sign in before using the bookmarklet, otherwise your purchases won't be saved to your account.
+      </div>
     </div>
     
     <div class="card">
-      <h2>❓ How does it work?</h2>
-      <p style="color: #9ca3af; line-height: 1.6;">
-        The bookmarklet scans your "Previously Purchased" page for product names and prices. 
-        It automatically scrolls to load all products, then sends them to 
-        Sustainable Shopping where we analyze them for sustainability scores.
+      <h2>🔌 Alternative: Browser Extension</h2>
+      <p style="color: #9ca3af; margin-bottom: 16px;">
+        For the best experience with auto-scroll and more features, install our browser extension:
       </p>
+      <a href="https://addons.mozilla.org/firefox/addon/sustainable-shop-ah-sync/" target="_blank" class="btn btn-secondary" style="display: block; text-align: center; text-decoration: none; margin-bottom: 8px;">
+        🦊 Firefox Add-on (Coming Soon)
+      </a>
+      <a href="https://chrome.google.com/webstore/detail/sustainable-shop" target="_blank" class="btn btn-secondary" style="display: block; text-align: center; text-decoration: none;">
+        🌐 Chrome Extension (Coming Soon)
+      </a>
     </div>
   </div>
   
   <script>
-    // Build bookmarklet code
-    const API_BASE = window.location.origin;
+    const SUPABASE_URL = 'https://gfxawraapyjqtmlemskl.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_GByhVPFERsx_DD2gTB2y-w_5okCNIyM';
+    // Use the current origin so bookmarklet works on any Vercel preview deployment
+    const API_BASE = window.location.origin.includes('localhost') 
+      ? 'http://localhost:3001' 
+      : window.location.origin;
     
-    const code = `
-      javascript:(function(){
-        var s=document.createElement('script');
-        s.src='${API_BASE}/bookmarklet.js?t='+Date.now();
-        document.body.appendChild(s);
-      })();
-    `.replace(/\s+/g, ' ').trim();
+    let userToken = localStorage.getItem('ss_token');
+    let userEmail = localStorage.getItem('ss_email');
     
-    document.getElementById('bookmarklet-link').href = code;
-    
-    // Handle personalized bookmarklet generation
-    document.getElementById('generate-btn').addEventListener('click', function() {
-      const cardInput = document.getElementById('bonus-card-input');
-      const card = cardInput.value.replace(/\D/g, '');
-      
-      if (card.length !== 13) {
-        alert('Please enter a valid 13-digit bonus card number');
-        return;
-      }
-      
-      const personalizedCode = `
+    // Update bookmarklet with token
+    function updateBookmarklet() {
+      const token = userToken || '';
+      const code = `
         javascript:(function(){
           var s=document.createElement('script');
-          s.src='${API_BASE}/bookmarklet.js?card=${card}&t='+Date.now();
+          s.src='${API_BASE}/bookmarklet.js?token=${encodeURIComponent(token)}&t='+Date.now();
           document.body.appendChild(s);
         })();
       `.replace(/\s+/g, ' ').trim();
       
-      document.getElementById('personalized-link').href = personalizedCode;
-      document.getElementById('personalized-bookmarklet').style.display = 'block';
+      document.getElementById('bookmarklet-link').href = code;
+    }
+    
+    // Check auth status
+    function updateAuthUI() {
+      const status = document.getElementById('auth-status');
+      const signInForm = document.getElementById('sign-in-form');
+      const signedInSection = document.getElementById('signed-in-section');
+      const warning = document.getElementById('not-signed-in-warning');
+      
+      if (userToken && userEmail) {
+        status.textContent = `✅ Signed in as ${userEmail}`;
+        status.className = 'signed-in';
+        signInForm.classList.add('hidden');
+        signedInSection.classList.remove('hidden');
+        warning.classList.add('hidden');
+      } else {
+        status.textContent = '⚠️ Not signed in';
+        status.className = 'signed-out';
+        signInForm.classList.remove('hidden');
+        signedInSection.classList.add('hidden');
+        warning.classList.remove('hidden');
+      }
+      
+      updateBookmarklet();
+    }
+    
+    // Sign in
+    document.getElementById('sign-in-btn').addEventListener('click', async () => {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('auth-error');
+      const btn = document.getElementById('sign-in-btn');
+      
+      if (!email || !password) {
+        errorEl.textContent = 'Please enter email and password';
+        return;
+      }
+      
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+      errorEl.textContent = '';
+      
+      try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error_description || data.msg || 'Sign in failed');
+        }
+        
+        userToken = data.access_token;
+        userEmail = email;
+        localStorage.setItem('ss_token', userToken);
+        localStorage.setItem('ss_email', userEmail);
+        
+        updateAuthUI();
+      } catch (e) {
+        errorEl.textContent = e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
     });
     
-    // Check URL for bonus card parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const cardFromUrl = urlParams.get('card');
-    if (cardFromUrl && /^\d{13}$/.test(cardFromUrl)) {
-      document.getElementById('bonus-card-input').value = cardFromUrl;
-      document.getElementById('generate-btn').click();
-    }
+    // Sign out
+    document.getElementById('sign-out-btn').addEventListener('click', () => {
+      userToken = null;
+      userEmail = null;
+      localStorage.removeItem('ss_token');
+      localStorage.removeItem('ss_email');
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+      updateAuthUI();
+    });
+    
+    // Initialize
+    updateAuthUI();
   </script>
 </body>
 </html>

