@@ -106,8 +106,8 @@ app.get('/api/health', (req, res) => {
 
 // ============================================================================
 // AH USER CHECK ENDPOINT (Email-based user lookup)
-// Check if a user exists with the given email address
-// Checks both user_ah_credentials and users tables for simpler login
+// Note: user_ah_credentials table removed - email-based auth disabled
+// Users should use bonus card identification instead
 // ============================================================================
 app.get('/api/ah-user/check', async (req, res) => {
   try {
@@ -123,30 +123,7 @@ app.get('/api/ah-user/check', async (req, res) => {
     
     const normalizedEmail = email.toLowerCase().trim()
     
-    // First, check user_ah_credentials table (AH email)
-    const { data: ahData } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email, last_sync_at, sync_status')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (ahData) {
-      // Found in user_ah_credentials - get purchase count
-      const { count } = await supabase
-        .from('user_purchases')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', ahData.id)
-      
-      return res.json({
-        exists: true,
-        email: ahData.ah_email,
-        lastSync: ahData.last_sync_at,
-        syncStatus: ahData.sync_status,
-        purchaseCount: count || 0
-      })
-    }
-    
-    // Second, check users table (main account email)
+    // Check users table only (user_ah_credentials removed)
     const { data: userData } = await supabase
       .from('users')
       .select('id, email')
@@ -154,66 +131,25 @@ app.get('/api/ah-user/check', async (req, res) => {
       .single()
     
     if (userData) {
-      // Found in users table - check if they have linked AH credentials
-      const { data: linkedAh } = await supabase
-        .from('user_ah_credentials')
-        .select('id, ah_email, last_sync_at, sync_status')
+      // Get purchase count
+      const { count } = await supabase
+        .from('user_purchases')
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', userData.id)
-        .single()
       
-      if (linkedAh) {
-        const { count } = await supabase
-          .from('user_purchases')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', linkedAh.id)
-        
-        return res.json({
-          exists: true,
-          email: linkedAh.ah_email,
-          lastSync: linkedAh.last_sync_at,
-          syncStatus: linkedAh.sync_status,
-          purchaseCount: count || 0
-        })
-      }
-      
-      // User exists but no AH link - still allow login (can connect later)
       return res.json({
         exists: true,
         email: userData.email,
         lastSync: null,
         syncStatus: 'not_connected',
-        purchaseCount: 0
+        purchaseCount: count || 0
       })
     }
     
-    // Not found in either table - auto-create user in user_ah_credentials for thesis participants
-    // This ensures purchases can be linked correctly
-    const { data: newUser, error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert([{ 
-        ah_email: normalizedEmail, 
-        sync_status: 'pending',
-        created_at: new Date().toISOString() 
-      }])
-      .select()
-      .single()
-    
-    if (insertError) {
-      console.error('Error auto-creating user:', insertError)
-      return res.json({ 
-        exists: false, 
-        message: 'Could not create account. Please try again.' 
-      })
-    }
-    
-    console.log(`[Auth] Auto-created user ${newUser.id} for ${normalizedEmail}`)
-    return res.json({
-      exists: true,
-      email: newUser.ah_email,
-      lastSync: null,
-      syncStatus: 'pending',
-      purchaseCount: 0,
-      isNew: true
+    // User not found - recommend bonus card login
+    return res.json({ 
+      exists: false, 
+      message: 'Use the bookmarklet to sync your AH purchases with your bonus card.' 
     })
   } catch (err) {
     console.error('Error checking AH user:', err)
@@ -222,202 +158,35 @@ app.get('/api/ah-user/check', async (req, res) => {
 })
 
 // ============================================================================
-// AH USER REGISTER ENDPOINT (Create new user with AH email)
-// For new users who want to start tracking their sustainability
+// AH USER REGISTER ENDPOINT (Deprecated - use bonus card instead)
 // ============================================================================
 app.post('/api/ah-user/register', async (req, res) => {
-  try {
-    const { email } = req.body
-    
-    if (!email) {
-      return res.status(400).json({ error: 'missing_email', message: 'Email is required' })
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    if (!supabase) {
-      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
-    }
-    
-    // Check if user already exists
-    const { data: existing } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (existing) {
-      // User already exists, that's fine
-      return res.json({ 
-        success: true, 
-        email: existing.ah_email,
-        message: 'Account found. Welcome back!' 
-      })
-    }
-    
-    // Create new user
-    const { data: newUser, error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert([{
-        ah_email: normalizedEmail,
-        sync_status: 'pending',
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single()
-    
-    if (insertError) {
-      console.error('Error creating AH user:', insertError)
-      return res.status(500).json({ error: 'create_failed', message: 'Could not create account' })
-    }
-    
-    res.json({ 
-      success: true, 
-      email: newUser.ah_email,
-      message: 'Account created! You can now sync your Albert Heijn purchases.' 
-    })
-  } catch (err) {
-    console.error('Error registering AH user:', err)
-    res.status(500).json({ error: 'register_failed', message: err.message })
-  }
+  // Email-based registration disabled - recommend bonus card
+  res.json({ 
+    success: false, 
+    message: 'Email-based registration is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
+  })
 })
 
 // ============================================================================
-// PASSWORD-BASED AUTHENTICATION ENDPOINTS
-// Simple email + password login for thesis participants
+// PASSWORD-BASED AUTHENTICATION ENDPOINTS (Deprecated)
+// user_ah_credentials table removed - use bonus card instead
 // ============================================================================
 
-// Register new user with email and password
+// Register new user with email and password (disabled)
 app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { email, password } = req.body
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: 'missing_fields', message: 'Email and password are required' })
-    }
-    
-    if (password.length < 4) {
-      return res.status(400).json({ error: 'password_too_short', message: 'Password must be at least 4 characters' })
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    if (!supabase) {
-      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
-    }
-    
-    // Check if user already exists
-    const { data: existing } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (existing) {
-      return res.status(409).json({ 
-        error: 'user_exists', 
-        message: 'An account with this email already exists. Please login instead.' 
-      })
-    }
-    
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
-    
-    // Create new user with password
-    const { data: newUser, error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert([{
-        ah_email: normalizedEmail,
-        password_hash: passwordHash,
-        sync_status: 'pending',
-        created_at: new Date().toISOString()
-      }])
-      .select('id, ah_email')
-      .single()
-    
-    if (insertError) {
-      console.error('Error creating user:', insertError)
-      return res.status(500).json({ error: 'create_failed', message: 'Could not create account' })
-    }
-    
-    console.log(`[Auth] Registered new user: ${normalizedEmail}`)
-    res.json({ 
-      success: true, 
-      email: newUser.ah_email,
-      userId: newUser.id
-    })
-  } catch (err) {
-    console.error('Error registering user:', err)
-    res.status(500).json({ error: 'register_failed', message: err.message })
-  }
+  res.status(501).json({ 
+    error: 'not_supported', 
+    message: 'Email-based registration is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
+  })
 })
 
-// Login with email and password
+// Login with email and password (disabled)
 app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body
-    
-    if (!email || !password) {
-      return res.status(400).json({ error: 'missing_fields', message: 'Email and password are required' })
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    if (!supabase) {
-      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
-    }
-    
-    // Find user
-    const { data: user, error } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email, password_hash, sync_status, last_sync_at')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (error || !user) {
-      return res.status(401).json({ 
-        error: 'invalid_credentials', 
-        message: 'Invalid email or password' 
-      })
-    }
-    
-    // Check if password_hash exists (legacy users might not have one)
-    if (!user.password_hash) {
-      return res.status(401).json({ 
-        error: 'no_password', 
-        message: 'This account does not have a password set. Please register again.' 
-      })
-    }
-    
-    // Verify password
-    const isValid = await bcrypt.compare(password, user.password_hash)
-    
-    if (!isValid) {
-      return res.status(401).json({ 
-        error: 'invalid_credentials', 
-        message: 'Invalid email or password' 
-      })
-    }
-    
-    // Get purchase count
-    const { count } = await supabase
-      .from('user_purchases')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-    
-    console.log(`[Auth] User logged in: ${normalizedEmail}`)
-    res.json({ 
-      success: true, 
-      email: user.ah_email,
-      userId: user.id,
-      syncStatus: user.sync_status,
-      lastSync: user.last_sync_at,
-      purchaseCount: count || 0
-    })
-  } catch (err) {
-    console.error('Error logging in:', err)
-    res.status(500).json({ error: 'login_failed', message: err.message })
-  }
+  res.status(501).json({ 
+    error: 'not_supported', 
+    message: 'Email-based login is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
+  })
 })
 
 // ============================================================================
@@ -461,73 +230,26 @@ async function getUserFromRequest(req) {
   }
 }
 
-// Get or create a user ID from session ID (for anonymous users)
-// Returns the user ID (UUID) from the user_ah_credentials table
+// Get user ID from session (deprecated - user_ah_credentials table removed)
+// Now we rely on bonus card identification via URL params and /api/bonus/:cardNumber/* endpoints
 async function getUserIdFromSession(req) {
   // First check for JWT auth
   const jwtUser = await getUserFromRequest(req)
   if (jwtUser) {
-    console.log('[DEBUG] getUserIdFromSession: JWT user found:', jwtUser.id)
     return jwtUser.id
   }
   
-  // Check for session ID header
-  const sessionId = req.headers['x-session-id']
-  console.log('[DEBUG] getUserIdFromSession: sessionId header:', sessionId, 'supabase:', !!supabase)
-  if (!sessionId || !supabase) {
-    console.log('[DEBUG] getUserIdFromSession: No session ID or no supabase, returning null')
-    return null
-  }
-  
-  console.log('[DEBUG] Looking up user by session ID:', sessionId)
-  
-  try {
-    // Try to find existing user by session_id
-    const { data: existing, error: findError } = await supabase
-      .from('user_ah_credentials')
-      .select('id')
-      .eq('session_id', sessionId)
-      .maybeSingle()
-    
-    if (findError) {
-      console.error('[ERROR] Error looking up session:', findError.message)
-      return null
-    }
-    
-    if (existing) {
-      console.log('[DEBUG] Found existing user for session:', existing.id)
-      return existing.id
-    }
-    
-    // Create new anonymous user
-    const newId = crypto.randomUUID()
-    console.log('[DEBUG] Creating new session user with id:', newId)
-    const { error: insertError } = await supabase
-      .from('user_ah_credentials')
-      .insert({
-        id: newId,
-        session_id: sessionId,
-        ah_email: null
-        // Don't set sync_status - let database use default
-      })
-    
-    if (insertError) {
-      console.error('[ERROR] Error creating session user:', insertError.message)
-      return null
-    }
-    
-    console.log('[DEBUG] Created new user for session:', newId)
-    return newId
-  } catch (err) {
-    console.error('[ERROR] Session lookup error:', err.message)
-    return null
-  }
+  // Session-based auth via user_ah_credentials is no longer available
+  // Users should use bonus card identification instead
+  return null
 }
 
-// Get ALL user IDs associated with this request (both JWT and session)
-// This helps when a user was previously session-based and is now JWT authenticated
+// Get ALL user IDs and bonus card associated with this request
+// Returns { userIds: string[], bonusCardNumber: string|null }
+// This helps find purchases that were stored by user_id OR bonus_card_number
 async function getAllUserIds(req) {
   const userIds = []
+  let bonusCardNumber = null
   
   // Get JWT user ID
   const jwtUser = await getUserFromRequest(req)
@@ -535,21 +257,13 @@ async function getAllUserIds(req) {
     userIds.push(jwtUser.id)
   }
   
-  // Also get session-based user ID if present
-  const sessionId = req.headers['x-session-id']
-  if (sessionId && supabase) {
-    const { data: sessionUser } = await supabase
-      .from('user_ah_credentials')
-      .select('id')
-      .eq('session_id', sessionId)
-      .maybeSingle()
-    
-    if (sessionUser && !userIds.includes(sessionUser.id)) {
-      userIds.push(sessionUser.id)
-    }
-  }
+  // Check for bonus card in request body or query
+  // (Session-based user_ah_credentials lookup removed)
+  bonusCardNumber = req.body?.bonus_card?.toString().trim() || 
+                    req.query?.card?.toString().trim() || 
+                    null
   
-  return userIds
+  return { userIds, bonusCardNumber }
 }
 
 // Middleware to require authentication (supports both JWT and session-based auth)
@@ -581,7 +295,7 @@ function requireAuth(req, res, next) {
 
 /**
  * Look up a user by their email address.
- * Checks both user_ah_credentials.ah_email AND users.email tables.
+ * With user_ah_credentials removed, only checks users table.
  * Returns the user_id if found, null otherwise.
  */
 async function getUserIdByAHEmail(ahEmail) {
@@ -590,20 +304,7 @@ async function getUserIdByAHEmail(ahEmail) {
   const normalizedEmail = ahEmail.toLowerCase().trim()
   
   try {
-    // First, check user_ah_credentials table (AH-specific email)
-    // Note: Use 'id' column as the user identifier (not 'user_id' which may be null)
-    const { data: credData, error: credError } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email')
-      .eq('ah_email', normalizedEmail)
-      .single()
-    
-    if (!credError && credData) {
-      console.log(`[Auth] Found user ${credData.id} via user_ah_credentials for ${normalizedEmail}`)
-      return credData.id
-    }
-    
-    // Second, check users table (main account email)
+    // Check users table (main account email)
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, email')
@@ -689,7 +390,14 @@ function makeAbsoluteAhUrl(url) {
  * @returns {{ id: string | null, name: string, normalized: string }}
  */
 function extractProductFromUrl(url, originalName) {
-  const name = (originalName || '').toString().trim()
+  const rawName = (originalName || '').toString().trim()
+  
+  // Clean up name - remove common noise patterns from AH product cards
+  let name = rawName
+    .replace(/,\s*(?:Nutri-Score|per stuk|per kg|€|\d+\s*voor|vandaag|morgen).*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  
   const normalized = normalizeProductName(name)
   
   if (!url) {
@@ -783,135 +491,115 @@ function extractProductFromUrl(url, originalName) {
 // Data file path - DEPRECATED: Now using Supabase for all purchases
 // const DATA_FILE = path.join(__dirname, 'purchases.json')
 
-// Sustainability database
+// LEGACY: This database is no longer used for scoring
+// Kept only for search results display (icons)
+// Actual scoring comes from enriched data (kenmerken + herkomst)
 const SUSTAINABILITY_DB = {
   categories: {
-    organic: { score: 10, icon: '🌱' },
-    local: { score: 8, icon: '🏡' },
-    plant_based: { score: 9, icon: '🥬' },
-    fair_trade: { score: 8, icon: '🤝' },
-    plastic_free: { score: 7, icon: '♻️' },
-    meat: { score: 2, icon: '🥩' },
-    processed: { score: 3, icon: '📦' },
-    imported: { score: 4, icon: '✈️' },
-    fruit: { score: 5, icon: '🍎' },
-    vegetable: { score: 5, icon: '🥕' },
-    dairy: { score: 5, icon: '🥛' },
-    grain: { score: 5, icon: '🌾' },
-    legume: { score: 5, icon: '🫘' },
-    plant_protein: { score: 5, icon: '🌿' },
-    snack: { score: 5, icon: '🍫' },
-    beverage: { score: 5, icon: '🥤' },
-    egg: { score: 5, icon: '🥚' },
-    seafood: { score: 5, icon: '🐟' }
+    organic: { icon: '🌱' },
+    local: { icon: '🏡' },
+    plant_based: { icon: '🥬' },
+    fair_trade: { icon: '🤝' },
+    fruit: { icon: '🍎' },
+    vegetable: { icon: '🥕' },
+    dairy: { icon: '🥛' },
+    grain: { icon: '🌾' },
+    legume: { icon: '🫘' },
+    beverage: { icon: '🥤' }
   },
-  products: {
-    'bio melk': { categories: ['organic', 'local'], co2: 1.2 },
-    'gewone melk': { categories: ['local'], co2: 1.5 },
-    havermelk: { categories: ['plant_based'], co2: 0.3 },
-    sojamelk: { categories: ['plant_based'], co2: 0.4 },
-    amandelmelk: { categories: ['plant_based'], co2: 0.7 },
-    rundvlees: { categories: ['meat'], co2: 27.0 },
-    kip: { categories: ['meat'], co2: 6.9 },
-    varkensvlees: { categories: ['meat'], co2: 12.1 },
-    tofu: { categories: ['plant_based'], co2: 2.0 },
-    tempeh: { categories: ['plant_based'], co2: 2.0 },
-    'bananen fair trade': { categories: ['fair_trade'], co2: 0.7 },
-    bananen: { categories: ['imported'], co2: 0.7 },
-    appels: { categories: ['local'], co2: 0.3 },
-    tomaten: { categories: ['local'], co2: 0.7 },
-    brood: { categories: ['local'], co2: 0.6 },
-    pasta: { categories: ['processed'], co2: 1.0 },
-    rijst: { categories: ['imported'], co2: 2.7 }
-  }
+  products: {}  // No longer used - products come from database
 }
 
-const CATEGORY_KEYS = new Set(Object.keys(SUSTAINABILITY_DB.categories))
-
-const KEYWORD_RULES = [
-  { code: 'keyword_bio', delta: 2, match: (name) => name.includes('bio') || name.includes('organic') },
-  { code: 'keyword_fair', delta: 2, match: (name) => name.includes('fair trade') },
-  { code: 'keyword_local', delta: 1, match: (name) => name.includes('lokaal') || name.includes('local') || name.includes('nederland') || name.includes('hollands') },
-  { code: 'keyword_plant', delta: 2, match: (name) => name.includes('plantaardig') || name.includes('vegan') || name.includes('vega ') || name.includes('soja') || name.includes('tofu') || name.includes('havermelk') || name.includes('terra ') },
-  // NOTE: Meat keyword penalties are applied ONLY when enriched data is NOT available AND the name doesn't indicate plant-based
-  { code: 'keyword_meat', delta: -3, match: (name) => name.includes('vlees') || name.includes('beef') || name.includes('rund') || name.includes('kip') || name.includes('meat'), excludeIf: (name) => name.includes('plantaardig') || name.includes('vegan') || name.includes('terra') || name.includes('vega') },
-  { code: 'keyword_plastic', delta: -1, match: (name) => name.includes('plastic') || name.includes('verpakt') }
-]
-
-// Helper to check if a product name indicates plant-based despite having meat-like words
-function isLikelyPlantBased(name) {
-  const lower = (name || '').toLowerCase()
-  const plantIndicators = ['plantaardig', 'vegan', 'veganist', 'terra', 'beyond', 'impossible', 'vega ']
-  return plantIndicators.some(indicator => lower.includes(indicator))
-}
-
-// Helper to check if a product name indicates organic/bio certification
-function isLikelyOrganic(name) {
-  const lower = (name || '').toLowerCase()
-  const organicIndicators = ['biologisch', 'biologische', ' bio ', 'bio-', 'eko-', 'organic']
-  // Also check if name starts with 'bio ' or ends with ' bio'
-  return organicIndicators.some(indicator => lower.includes(indicator)) ||
-         lower.startsWith('bio ') || lower.endsWith(' bio')
-}
+// NOTE: All keyword-based matching has been removed
+// Scoring and attributes now only come from scraped enriched data (kenmerken + herkomst sections)
 
 // ============================================================================
 // ENRICHED FIELD SCORING RULES
-// These use scraped product detail data for more accurate scoring
+// Scoring ONLY comes from scraped product detail data (kenmerken + herkomst)
+// Base score starts at 0
 // ============================================================================
 
 const ENRICHED_SCORING = {
   // Dietary preferences
   is_vegan: { delta: 3, icon: '🌱', label: 'Vegan' },
   is_vegetarian: { delta: 1, icon: '🥗', label: 'Vegetarian' },  // Only if not vegan
-  is_organic: { delta: 2, icon: '🌿', label: 'Organic/Bio' },
+  is_organic: { delta: 4, icon: '🌿', label: 'Organic/Bio' },
   
-  // Ethical certifications
+  // Ethical certifications (only applies to non-EU products)
   is_fairtrade: { delta: 2, icon: '🤝', label: 'Fairtrade' },
   
-  // Nutri-Score impact
-  nutri_score: {
-    'A': { delta: 2, label: 'Nutri-Score A' },
-    'B': { delta: 1, label: 'Nutri-Score B' },
-    'C': { delta: 0, label: 'Nutri-Score C' },
-    'D': { delta: -1, label: 'Nutri-Score D' },
-    'E': { delta: -2, label: 'Nutri-Score E' }
-  },
+  // NOTE: Nutri-Score is scraped and stored but NOT used for sustainability scoring
+  // Reason: Nutri-Score measures nutritional health, not environmental sustainability
   
-  // Origin scoring (local = better, far = worse)
+  // Origin scoring based on transport distance:
+  // NL: +3 (local)
+  // EU countries: +2
+  // Outside EU (nearby): -1
+  // Far from EU: -2
   origin_country: {
-    // Local/nearby countries (best)
-    'Netherlands': { delta: 2, region: 'local' },
-    'Belgium': { delta: 1, region: 'nearby' },
-    'Germany': { delta: 1, region: 'nearby' },
-    'France': { delta: 0, region: 'europe' },
-    'Spain': { delta: 0, region: 'europe' },
-    'Italy': { delta: 0, region: 'europe' },
-    'Poland': { delta: 0, region: 'europe' },
-    'Greece': { delta: 0, region: 'europe' },
-    'Portugal': { delta: 0, region: 'europe' },
-    // Further away (neutral to slight negative)
-    'Morocco': { delta: -1, region: 'mediterranean' },
-    'Turkey': { delta: -1, region: 'mediterranean' },
-    'Egypt': { delta: -1, region: 'africa' },
-    'South Africa': { delta: -1, region: 'africa' },
-    'Kenya': { delta: -1, region: 'africa' },
-    // Long distance (negative)
-    'United States': { delta: -2, region: 'americas' },
-    'Brazil': { delta: -2, region: 'americas' },
-    'Argentina': { delta: -2, region: 'americas' },
-    'Chile': { delta: -2, region: 'americas' },
-    'Costa Rica': { delta: -2, region: 'americas' },
-    'Ecuador': { delta: -2, region: 'americas' },
-    'Colombia': { delta: -2, region: 'americas' },
-    'Peru': { delta: -2, region: 'americas' },
-    'Mexico': { delta: -2, region: 'americas' },
-    'China': { delta: -2, region: 'asia' },
-    'India': { delta: -2, region: 'asia' },
-    'Thailand': { delta: -2, region: 'asia' },
-    'Vietnam': { delta: -2, region: 'asia' },
-    'Indonesia': { delta: -2, region: 'asia' },
-    'Australia': { delta: -2, region: 'oceania' },
-    'New Zealand': { delta: -2, region: 'oceania' }
+    // Netherlands (local, best)
+    'Netherlands': { delta: 3, region: 'local' },
+    // EU countries (+2)
+    'Belgium': { delta: 2, region: 'europe' },
+    'Germany': { delta: 2, region: 'europe' },
+    'France': { delta: 2, region: 'europe' },
+    'Spain': { delta: 2, region: 'europe' },
+    'Italy': { delta: 2, region: 'europe' },
+    'Poland': { delta: 2, region: 'europe' },
+    'Greece': { delta: 2, region: 'europe' },
+    'Portugal': { delta: 2, region: 'europe' },
+    'Austria': { delta: 2, region: 'europe' },
+    'Ireland': { delta: 2, region: 'europe' },
+    'Denmark': { delta: 2, region: 'europe' },
+    'Sweden': { delta: 2, region: 'europe' },
+    'Hungary': { delta: 2, region: 'europe' },
+    'Czech Republic': { delta: 2, region: 'europe' },
+    'Romania': { delta: 2, region: 'europe' },
+    'Bulgaria': { delta: 2, region: 'europe' },
+    'Croatia': { delta: 2, region: 'europe' },
+    'Slovenia': { delta: 2, region: 'europe' },
+    'Slovakia': { delta: 2, region: 'europe' },
+    'Lithuania': { delta: 2, region: 'europe' },
+    'Latvia': { delta: 2, region: 'europe' },
+    'Estonia': { delta: 2, region: 'europe' },
+    'Finland': { delta: 2, region: 'europe' },
+    'Luxembourg': { delta: 2, region: 'europe' },
+    'Cyprus': { delta: 2, region: 'europe' },
+    'Malta': { delta: 2, region: 'europe' },
+    // Outside EU (nearby) - moderate transport (-1)
+    'Morocco': { delta: -1, region: 'outside_eu' },
+    'Turkey': { delta: -1, region: 'outside_eu' },
+    'Egypt': { delta: -1, region: 'outside_eu' },
+    'South Africa': { delta: -1, region: 'outside_eu' },
+    'Kenya': { delta: -1, region: 'outside_eu' },
+    'Israel': { delta: -1, region: 'outside_eu' },
+    'Tunisia': { delta: -1, region: 'outside_eu' },
+    'UK': { delta: -1, region: 'outside_eu' },
+    'United Kingdom': { delta: -1, region: 'outside_eu' },
+    'Norway': { delta: -1, region: 'outside_eu' },
+    'Switzerland': { delta: -1, region: 'outside_eu' },
+    // Far from EU (-2)
+    'United States': { delta: -2, region: 'far' },
+    'Brazil': { delta: -2, region: 'far' },
+    'Argentina': { delta: -2, region: 'far' },
+    'Chile': { delta: -2, region: 'far' },
+    'Costa Rica': { delta: -2, region: 'far' },
+    'Ecuador': { delta: -2, region: 'far' },
+    'Colombia': { delta: -2, region: 'far' },
+    'Peru': { delta: -2, region: 'far' },
+    'Mexico': { delta: -2, region: 'far' },
+    'China': { delta: -2, region: 'far' },
+    'India': { delta: -2, region: 'far' },
+    'Thailand': { delta: -2, region: 'far' },
+    'Vietnam': { delta: -2, region: 'far' },
+    'Indonesia': { delta: -2, region: 'far' },
+    'Philippines': { delta: -2, region: 'far' },
+    'Malaysia': { delta: -2, region: 'far' },
+    'Sri Lanka': { delta: -2, region: 'far' },
+    'Pakistan': { delta: -2, region: 'far' },
+    'Bangladesh': { delta: -2, region: 'far' },
+    'Australia': { delta: -2, region: 'far' },
+    'New Zealand': { delta: -2, region: 'far' }
   }
 }
 
@@ -929,87 +617,57 @@ function getCurrentMonthKey() {
 
 /**
  * Get the origin country for the current month from origin_by_month data
- * @param {Object} originByMonth - JSONB object with monthly origins
- * @returns {string|null} - Country name for current month, or null if not available
+ * @param {Object} originByMonth - JSONB object with monthly origins (values can be strings or arrays)
+ * @returns {string[]|null} - Array of country names for current month, or null if not available
  */
-function getOriginForCurrentMonth(originByMonth) {
+function getOriginsForCurrentMonth(originByMonth) {
   if (!originByMonth || typeof originByMonth !== 'object') return null
   const monthKey = getCurrentMonthKey()
-  return originByMonth[monthKey] || null
+  const monthOrigin = originByMonth[monthKey]
+  if (!monthOrigin) return null
+  // Handle both array format (["Netherlands", "Spain"]) and string format ("Netherlands")
+  if (Array.isArray(monthOrigin)) {
+    return monthOrigin.length > 0 ? monthOrigin : null
+  }
+  return [monthOrigin]  // Wrap single country in array for consistent handling
 }
 
 // ============================================================================
 // USER PROFILING SYSTEM
-// Analyzes purchase patterns to understand user preferences
+// Analyzes purchase patterns using enriched data (no keyword matching)
 // ============================================================================
 
 const USER_PROFILE_TYPES = {
-  'plant_forward': { 
-    label: '🌱 Plant-Forward Shopper', 
-    description: 'You prioritize plant-based foods. Great for sustainability!',
-    tips: ['Keep exploring new plant proteins', 'Try seasonal local vegetables']
-  },
-  'balanced': { 
-    label: '⚖️ Balanced Shopper', 
-    description: 'You have a varied diet with room for sustainable swaps.',
-    tips: ['Consider swapping 1-2 meat meals per week', 'Try organic versions of your favorites']
-  },
-  'meat_heavy': { 
-    label: '🥩 Protein-Focused Shopper', 
-    description: 'Your cart is protein-heavy. Small swaps can make a big difference!',
-    tips: ['Try chicken instead of beef (4x less CO2)', 'Explore legumes as protein sources']
-  },
-  'convenience': { 
-    label: '📦 Convenience Shopper', 
-    description: 'You favor processed/ready foods. Fresh alternatives can boost your score.',
-    tips: ['Try batch cooking on weekends', 'Fresh produce has higher sustainability scores']
-  },
   'eco_champion': {
     label: '🏆 Eco Champion',
     description: 'Amazing! You\'re already making excellent sustainable choices.',
     tips: ['Share your habits with friends', 'Try reducing packaging waste next']
-  }
-}
-
-// Product category detection for profiling
-const PRODUCT_CATEGORIES_PROFILE = {
-  meat: {
-    keywords: ['vlees', 'beef', 'rund', 'kip', 'varken', 'ham', 'spek', 'worst', 'gehakt', 'biefstuk', 'chicken', 'meat', 'pork', 'bacon'],
-    weight: -2
   },
-  plant_protein: {
-    keywords: ['tofu', 'tempeh', 'seitan', 'vega', 'plantaardi', 'beyond', 'impossible', 'linzen', 'kikkererwt', 'bonen'],
-    weight: 2
+  'plant_forward': { 
+    label: '🌱 Plant-Forward Shopper', 
+    description: 'You prioritize plant-based and organic foods. Great for sustainability!',
+    tips: ['Keep exploring new plant proteins', 'Try seasonal local vegetables']
   },
-  dairy: {
-    keywords: ['melk', 'kaas', 'yoghurt', 'boter', 'room', 'cheese', 'milk', 'butter'],
-    weight: 0
+  'local_supporter': {
+    label: '🏡 Local Supporter',
+    description: 'You favor locally-sourced products. Great for reducing transport emissions!',
+    tips: ['Check for seasonal Dutch produce', 'Try organic versions of local favorites']
   },
-  plant_dairy: {
-    keywords: ['havermelk', 'sojamelk', 'amandelmelk', 'kokosmelk', 'oat milk', 'soy milk', 'plantaardig'],
-    weight: 2
-  },
-  organic: {
-    keywords: ['bio', 'biologisch', 'organic', 'eko'],
-    weight: 2
-  },
-  processed: {
-    keywords: ['kant-en-klaar', 'diepvries', 'pizza', 'lasagne', 'nuggets', 'kroket', 'snack', 'chips'],
-    weight: -1
-  },
-  fresh_produce: {
-    keywords: ['appel', 'peer', 'banaan', 'tomaat', 'komkommer', 'sla', 'spinazie', 'wortel', 'groente', 'fruit'],
-    weight: 1
+  'balanced': { 
+    label: '⚖️ Balanced Shopper', 
+    description: 'You have a varied diet with room for sustainable swaps.',
+    tips: ['Look for local Dutch products', 'Try organic versions of your favorites']
   }
 }
 
 /**
  * Analyze user's purchase history to build a profile
+ * Uses enriched data fields only (no keyword matching)
  */
 function analyzeUserProfile(purchases) {
   const profile = {
     totalProducts: purchases.length,
-    categoryBreakdown: {},
+    enrichedBreakdown: { vegan: 0, vegetarian: 0, organic: 0, fairtrade: 0, local: 0, eu: 0, imported: 0 },
     scoreDistribution: { low: 0, medium: 0, high: 0 },
     avgScore: 0,
     profileType: 'balanced',
@@ -1022,59 +680,66 @@ function analyzeUserProfile(purchases) {
   }
 
   let totalScore = 0
-  const categoryCounts = {}
   const lowScoreProducts = []
   const highScoreProducts = []
 
   for (const purchase of purchases) {
-    const name = (purchase.product_name || '').toLowerCase()
-    const evaluation = evaluateProduct(purchase.product_name)
+    // Get enriched data from purchase record
+    const enriched = getEnrichedData(purchase)
+    const evaluation = evaluateProduct(purchase.product_name, enriched)
     const score = evaluation.score
     totalScore += score
 
-    if (score <= 4) {
+    // Score distribution (based on new 0-10 scale)
+    if (score <= 2) {
       profile.scoreDistribution.low++
-      lowScoreProducts.push({ name: purchase.product_name, score, evaluation })
-    } else if (score <= 6) {
+      lowScoreProducts.push({ name: purchase.product_name, score, evaluation, enriched })
+    } else if (score <= 5) {
       profile.scoreDistribution.medium++
     } else {
       profile.scoreDistribution.high++
-      highScoreProducts.push({ name: purchase.product_name, score })
+      highScoreProducts.push({ name: purchase.product_name, score, enriched })
     }
 
-    for (const [category, data] of Object.entries(PRODUCT_CATEGORIES_PROFILE)) {
-      if (data.keywords.some(kw => name.includes(kw))) {
-        // Don't count as meat if it's a plant-based product
-        if (category === 'meat' && isLikelyPlantBased(name)) {
-          categoryCounts['plant_protein'] = (categoryCounts['plant_protein'] || 0) + 1
-          continue
+    // Count enriched attributes
+    if (enriched) {
+      if (enriched.is_vegan) profile.enrichedBreakdown.vegan++
+      else if (enriched.is_vegetarian) profile.enrichedBreakdown.vegetarian++
+      if (enriched.is_organic) profile.enrichedBreakdown.organic++
+      if (enriched.is_fairtrade) profile.enrichedBreakdown.fairtrade++
+      
+      // Origin breakdown
+      const origins = enriched.origin_by_month ? 
+        getOriginsForCurrentMonth(enriched.origin_by_month) : 
+        (enriched.origin_country ? [enriched.origin_country] : null)
+      
+      if (origins && origins.length > 0) {
+        const originScoring = ENRICHED_SCORING.origin_country
+        if (origins.some(c => c === 'Netherlands')) {
+          profile.enrichedBreakdown.local++
+        } else if (origins.every(c => originScoring[c]?.region === 'europe')) {
+          profile.enrichedBreakdown.eu++
+        } else {
+          profile.enrichedBreakdown.imported++
         }
-        categoryCounts[category] = (categoryCounts[category] || 0) + 1
       }
     }
   }
 
   profile.avgScore = totalScore / purchases.length
-  profile.categoryBreakdown = categoryCounts
 
-  const meatCount = categoryCounts.meat || 0
-  const plantProteinCount = categoryCounts.plant_protein || 0
-  const organicCount = categoryCounts.organic || 0
-  const processedCount = categoryCounts.processed || 0
-  const totalCount = purchases.length
+  // Determine profile type based on enriched data counts
+  const total = purchases.length
+  const veganRatio = profile.enrichedBreakdown.vegan / total
+  const organicRatio = profile.enrichedBreakdown.organic / total
+  const localRatio = profile.enrichedBreakdown.local / total
 
-  const meatRatio = meatCount / totalCount
-  const plantRatio = plantProteinCount / totalCount
-  const processedRatio = processedCount / totalCount
-
-  if (profile.avgScore >= 7.5) {
+  if (profile.avgScore >= 6) {
     profile.profileType = 'eco_champion'
-  } else if (meatRatio > 0.25) {
-    profile.profileType = 'meat_heavy'
-  } else if (plantRatio > 0.15 || organicCount > totalCount * 0.2) {
+  } else if (veganRatio > 0.15 || organicRatio > 0.2) {
     profile.profileType = 'plant_forward'
-  } else if (processedRatio > 0.3) {
-    profile.profileType = 'convenience'
+  } else if (localRatio > 0.3) {
+    profile.profileType = 'local_supporter'
   } else {
     profile.profileType = 'balanced'
   }
@@ -1086,59 +751,41 @@ function analyzeUserProfile(purchases) {
 }
 
 /**
- * Find sustainable replacement suggestions from the product catalog
+ * Find sustainable replacement suggestions based on enriched data
  */
 function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
   const suggestions = []
 
-  for (const product of lowScoreProducts) {
-    const name = (product.name || '').toLowerCase()
-    let alternatives = []
+  // Score all catalog products with enriched data
+  const scoredCatalog = catalogProducts.map(p => {
+    const enriched = getEnrichedData(p)
+    const evaluation = evaluateProduct(p.name, enriched)
+    return { ...p, score: evaluation.score, enriched, evaluation }
+  }).filter(p => p.score >= 5) // Only suggest products with decent scores
 
-    // Meat → Plant protein replacements
-    if (PRODUCT_CATEGORIES_PROFILE.meat.keywords.some(kw => name.includes(kw))) {
-      alternatives = catalogProducts.filter(p => {
-        const pName = (p.name || '').toLowerCase()
-        return PRODUCT_CATEGORIES_PROFILE.plant_protein.keywords.some(kw => pName.includes(kw))
-      }).slice(0, 3)
-    }
-    // Dairy → Plant dairy replacements
-    else if (PRODUCT_CATEGORIES_PROFILE.dairy.keywords.some(kw => name.includes(kw))) {
-      alternatives = catalogProducts.filter(p => {
-        const pName = (p.name || '').toLowerCase()
-        return PRODUCT_CATEGORIES_PROFILE.plant_dairy.keywords.some(kw => pName.includes(kw))
-      }).slice(0, 3)
-    }
-    // Non-organic → Organic version
-    else if (!PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => name.includes(kw))) {
-      const baseTokens = name.split(/\s+/).filter(t => t.length > 2)
-      alternatives = catalogProducts.filter(p => {
-        const pName = (p.name || '').toLowerCase()
-        const isBio = PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => pName.includes(kw))
-        const hasSimilarTokens = baseTokens.some(t => pName.includes(t))
-        return isBio && hasSimilarTokens
-      }).slice(0, 2)
-    }
+  for (const product of lowScoreProducts) {
+    // Find higher-scoring alternatives
+    const alternatives = scoredCatalog
+      .filter(alt => alt.score > product.score + 1) // At least 2 points improvement
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
 
     if (alternatives.length > 0) {
       const bestAlt = alternatives[0]
-      const altScore = evaluateProduct(bestAlt.name).score
-      const improvement = altScore - product.score
+      const improvement = bestAlt.score - product.score
 
-      if (improvement > 0) {
-        suggestions.push({
-          original: { name: product.name, score: product.score },
-          replacement: {
-            name: bestAlt.name,
-            score: altScore,
-            url: makeAbsoluteAhUrl(bestAlt.url),
-            image_url: bestAlt.image_url,
-            price: bestAlt.price
-          },
-          improvement,
-          reason: getReplacementReason(product.name, bestAlt.name)
-        })
-      }
+      suggestions.push({
+        original: { name: product.name, score: product.score },
+        replacement: {
+          name: bestAlt.name,
+          score: bestAlt.score,
+          url: makeAbsoluteAhUrl(bestAlt.url),
+          image_url: bestAlt.image_url,
+          price: bestAlt.price
+        },
+        improvement,
+        reason: getReplacementReason(product.enriched, bestAlt.enriched)
+      })
     }
   }
 
@@ -1147,23 +794,26 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
 
 /**
  * Generate a human-readable reason for a replacement suggestion
+ * Based on enriched data differences
  */
-function getReplacementReason(originalName, replacementName) {
-  const orig = originalName.toLowerCase()
-  const repl = replacementName.toLowerCase()
-
-  if (PRODUCT_CATEGORIES_PROFILE.meat.keywords.some(kw => orig.includes(kw)) &&
-      PRODUCT_CATEGORIES_PROFILE.plant_protein.keywords.some(kw => repl.includes(kw))) {
-    return '🌱 Plant-based alternative - up to 90% less CO2'
+function getReplacementReason(originalEnriched, replacementEnriched) {
+  if (!originalEnriched && replacementEnriched?.is_organic) {
+    return '🌱 Organic product - better for soil & biodiversity'
   }
-  if (PRODUCT_CATEGORIES_PROFILE.dairy.keywords.some(kw => orig.includes(kw)) &&
-      PRODUCT_CATEGORIES_PROFILE.plant_dairy.keywords.some(kw => repl.includes(kw))) {
-    return '🥛 Plant-based dairy - 75% less emissions'
+  if (!originalEnriched?.is_vegan && replacementEnriched?.is_vegan) {
+    return '🌱 Vegan option - significantly lower environmental impact'
   }
-  if (!PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => orig.includes(kw)) &&
-      PRODUCT_CATEGORIES_PROFILE.organic.keywords.some(kw => repl.includes(kw))) {
+  if (replacementEnriched?.is_organic && !originalEnriched?.is_organic) {
     return '🌱 Organic version - better for soil & biodiversity'
   }
+  
+  // Check if replacement is more local
+  const origOrigin = originalEnriched?.origin_country
+  const replOrigin = replacementEnriched?.origin_country
+  if (replOrigin === 'Netherlands' && origOrigin !== 'Netherlands') {
+    return '📍 Local Dutch product - reduced transport emissions'
+  }
+  
   return '✨ More sustainable choice'
 }
 
@@ -1229,40 +879,11 @@ function findCatalogMatch(productName = '') {
 function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const input = typeof productName === 'string' ? productName : ''
   const normalized = normalizeProductName(input)
-  const lowerProduct = input.toLowerCase()
-  let workingScore = 5
+  // Base score starts at 0 - all scoring comes from enriched data only
+  let workingScore = 0
   const adjustments = []
-  const matchedCategories = []
-  const matchedKeywords = []
   const matchedEnriched = []  // Track enriched field matches
-  const categorySet = new Set()
   let suggestions = getSuggestions(input, lang)
-  let notes = null
-  let matchedProduct = null
-
-  const applyCategory = (category) => {
-    if (!category || categorySet.has(category) || !CATEGORY_KEYS.has(category)) return
-    categorySet.add(category)
-    const catData = SUSTAINABILITY_DB.categories[category]
-    if (catData) {
-      matchedCategories.push({
-        category,
-        icon: catData.icon,
-        referenceScore: catData.score
-      })
-      const delta = catData.score - 5
-      if (delta) {
-        workingScore += delta
-        adjustments.push({
-          type: 'category',
-          code: `category_${category}`,
-          category,
-          delta,
-          resultingScore: clamp(workingScore)
-        })
-      }
-    }
-  }
 
   const applyDelta = (type, code, delta) => {
     if (!delta) return
@@ -1275,183 +896,107 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     })
   }
 
-  const catalogMatch = findCatalogMatch(input)
-  if (catalogMatch) {
-    const { entry } = catalogMatch
-    matchedProduct = {
-      id: entry.id,
-      canonicalName: entry.names[0],
-      matchedName: catalogMatch.matchedName,
-      rank: catalogMatch.rank,
-      baseScore: entry.baseScore ?? 5
-    }
-
-    if (entry.notes) {
-      notes = entry.notes
-    }
-
-    // Note: We no longer override suggestions from catalog entries
-    // because getSuggestions() already handles i18n translations
-
-    // Only apply catalog-based scoring if the product is NOT plant-based
-    // (Avoid penalizing "plantaardige gehakt" as meat)
-    const skipMeatScoring = (enrichedData?.is_vegan === true) ||
-                            (enrichedData?.is_vegetarian === true) ||
-                            isLikelyPlantBased(input)
-
-    // Apply base score delta only if it's not a meat penalty for plant-based products
-    const baseDelta = (entry.baseScore ?? 5) - 5
-    const isMeatCatalog = Array.isArray(entry.categories) && entry.categories.includes('meat')
-    if (baseDelta && !(skipMeatScoring && isMeatCatalog)) {
-      applyDelta('catalog', 'catalog_base', baseDelta)
-    }
-
-    if (Array.isArray(entry.categories)) {
-      for (const category of entry.categories) {
-        // Skip meat category if product is known/likely plant-based
-        if (category === 'meat' && skipMeatScoring) {
-          continue
-        }
-        applyCategory(category)
-      }
-    }
-
-    if (Array.isArray(entry.adjustments)) {
-      for (const adj of entry.adjustments) {
-        if (!adj || typeof adj.delta !== 'number') continue
-        // Skip meat-related trait adjustments for plant-based products
-        // These traits are only relevant for actual animal products
-        const meatRelatedTraits = ['trait_high_methane', 'trait_high_emissions', 'trait_animal_welfare', 'trait_meat']
-        if (skipMeatScoring && isMeatCatalog && meatRelatedTraits.includes(adj.code)) {
-          continue
-        }
-        applyDelta('catalog', adj.code, adj.delta)
-      }
-    }
+  // Helper to check if product origin is within EU
+  const isOriginInEU = (origins) => {
+    if (!origins || origins.length === 0) return false
+    const euCountries = new Set(['Netherlands', 'Belgium', 'Germany', 'France', 'Spain', 'Italy', 
+      'Poland', 'Greece', 'Portugal', 'Austria', 'Ireland', 'Denmark', 'Sweden', 'Hungary',
+      'Czech Republic', 'Romania', 'Bulgaria', 'Croatia', 'Slovenia', 'Slovakia', 'Lithuania',
+      'Latvia', 'Estonia', 'Finland', 'Luxembourg', 'Cyprus', 'Malta'])
+    return origins.every(country => euCountries.has(country))
   }
 
-  const productData = SUSTAINABILITY_DB.products[normalized] || SUSTAINABILITY_DB.products[lowerProduct]
-  if (productData && Array.isArray(productData.categories)) {
-    for (const category of productData.categories) {
-      // Skip meat category if product is known/likely plant-based
-      if (category === 'meat' && (
-        (enrichedData?.is_vegan === true) ||
-        (enrichedData?.is_vegetarian === true) ||
-        isLikelyPlantBased(input)
-      )) {
-        continue  // Skip meat penalty for plant-based products
-      }
-      applyCategory(category)
-    }
-  }
-
-  // Apply keyword rules (with plant-based exclusion logic)
-  for (const rule of KEYWORD_RULES) {
-    if (rule.match(lowerProduct)) {
-      // Check if this rule should be excluded for plant-based products
-      if (rule.excludeIf && rule.excludeIf(lowerProduct)) {
-        continue  // Skip this rule
-      }
-      // Also skip meat keywords if we have enriched data showing vegan/vegetarian
-      if (rule.code === 'keyword_meat' && (
-        enrichedData?.is_vegan === true ||
-        enrichedData?.is_vegetarian === true
-      )) {
-        continue
-      }
-      applyDelta('keyword', rule.code, rule.delta)
-      matchedKeywords.push(rule.code)
-    }
-  }
-
-  // Apply enriched data scoring (from scraped product details)
+  // Scoring ONLY comes from enriched data (kenmerken and herkomst sections)
   if (enrichedData && typeof enrichedData === 'object') {
-    // Vegan scoring (highest plant-based bonus)
-    if (enrichedData.is_vegan === true) {
-      const scoring = ENRICHED_SCORING.is_vegan
-      applyDelta('enriched', 'enriched_vegan', scoring.delta)
-      matchedEnriched.push({ code: 'vegan', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
-    } 
-    // Vegetarian scoring (only if not vegan to avoid double counting)
-    else if (enrichedData.is_vegetarian === true) {
-      const scoring = ENRICHED_SCORING.is_vegetarian
-      applyDelta('enriched', 'enriched_vegetarian', scoring.delta)
-      matchedEnriched.push({ code: 'vegetarian', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
-    }
-
-    // Organic/Bio scoring
+    // Organic/Bio scoring (+4)
     if (enrichedData.is_organic === true) {
       const scoring = ENRICHED_SCORING.is_organic
       applyDelta('enriched', 'enriched_organic', scoring.delta)
       matchedEnriched.push({ code: 'organic', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
     }
 
-    // Fairtrade scoring
-    if (enrichedData.is_fairtrade === true) {
-      const scoring = ENRICHED_SCORING.is_fairtrade
-      applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
-      matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    // Vegan scoring (+3)
+    if (enrichedData.is_vegan === true) {
+      const scoring = ENRICHED_SCORING.is_vegan
+      applyDelta('enriched', 'enriched_vegan', scoring.delta)
+      matchedEnriched.push({ code: 'vegan', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+    } 
+    // Vegetarian scoring (+1, only if not vegan)
+    else if (enrichedData.is_vegetarian === true) {
+      const scoring = ENRICHED_SCORING.is_vegetarian
+      applyDelta('enriched', 'enriched_vegetarian', scoring.delta)
+      matchedEnriched.push({ code: 'vegetarian', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
     }
 
-    // Nutri-Score scoring (A-E)
-    if (enrichedData.nutri_score && ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]) {
-      const scoring = ENRICHED_SCORING.nutri_score[enrichedData.nutri_score]
-      if (scoring.delta !== 0) {
-        applyDelta('enriched', `enriched_nutriscore_${enrichedData.nutri_score}`, scoring.delta)
-        matchedEnriched.push({ 
-          code: `nutriscore_${enrichedData.nutri_score}`, 
-          icon: '🅰️', 
-          label: scoring.label, 
-          delta: scoring.delta,
-          grade: enrichedData.nutri_score
-        })
-      }
-    }
-
-    // Origin country scoring (local vs imported)
+    // Origin country scoring (from herkomst section)
     // Check monthly origin first (origin_by_month), then fall back to static origin_country
-    let effectiveOrigin = null
+    // When multiple countries are listed, use AVERAGE of deltas
+    let effectiveOrigins = null
     let isSeasonalOrigin = false
     
     if (enrichedData.origin_by_month) {
-      effectiveOrigin = getOriginForCurrentMonth(enrichedData.origin_by_month)
-      isSeasonalOrigin = effectiveOrigin !== null
+      effectiveOrigins = getOriginsForCurrentMonth(enrichedData.origin_by_month)
+      isSeasonalOrigin = effectiveOrigins !== null
     }
     
     // Fall back to static origin if no monthly origin available
-    if (!effectiveOrigin && enrichedData.origin_country) {
-      effectiveOrigin = enrichedData.origin_country
+    if (!effectiveOrigins && enrichedData.origin_country) {
+      effectiveOrigins = [enrichedData.origin_country]
     }
     
-    if (effectiveOrigin) {
-      const originScoring = ENRICHED_SCORING.origin_country[effectiveOrigin]
+    if (effectiveOrigins && effectiveOrigins.length > 0) {
       const monthLabel = isSeasonalOrigin ? ` (${getCurrentMonthKey().toUpperCase()})` : ''
       
-      if (originScoring) {
-        if (originScoring.delta !== 0) {
-          applyDelta('enriched', `enriched_origin_${originScoring.region}`, originScoring.delta)
-          matchedEnriched.push({ 
-            code: `origin_${originScoring.region}`, 
-            icon: originScoring.delta > 0 ? '📍' : '✈️', 
-            label: `Origin: ${effectiveOrigin}${monthLabel}`, 
-            delta: originScoring.delta,
-            country: effectiveOrigin,
-            region: originScoring.region,
-            isSeasonal: isSeasonalOrigin,
-            originByMonth: enrichedData.origin_by_month
-          })
+      // Calculate AVERAGE delta for all origin countries
+      let totalDelta = 0
+      const countryDetails = []
+      
+      for (const country of effectiveOrigins) {
+        const originScoring = ENRICHED_SCORING.origin_country[country]
+        if (originScoring) {
+          totalDelta += originScoring.delta
+          countryDetails.push({ country, delta: originScoring.delta, region: originScoring.region })
+        } else {
+          // Unknown country - treat as outside_eu
+          totalDelta += -1
+          countryDetails.push({ country, delta: -1, region: 'unknown' })
         }
-      } else {
-        // Unknown country - apply slight negative for uncertainty
-        applyDelta('enriched', 'enriched_origin_unknown', -0.5)
-        matchedEnriched.push({ 
-          code: 'origin_unknown', 
-          icon: '🌍', 
-          label: `Origin: ${effectiveOrigin}${monthLabel} (unknown region)`, 
-          delta: -0.5,
-          country: effectiveOrigin,
-          isSeasonal: isSeasonalOrigin
-        })
+      }
+      
+      // Calculate average (rounded to 1 decimal)
+      const avgDelta = Math.round((totalDelta / effectiveOrigins.length) * 10) / 10
+      
+      // Apply the averaged delta
+      if (avgDelta !== 0) {
+        applyDelta('enriched', 'enriched_origin_avg', avgDelta)
+      }
+      
+      // Build the label showing all countries
+      const countriesLabel = effectiveOrigins.join(', ')
+      const icon = avgDelta > 0 ? '📍' : (avgDelta < 0 ? '✈️' : '🌍')
+      
+      matchedEnriched.push({ 
+        code: 'origin', 
+        icon, 
+        label: `Origin: ${countriesLabel}${monthLabel}`, 
+        delta: avgDelta,
+        countries: countryDetails,
+        isSeasonal: isSeasonalOrigin,
+        originByMonth: enrichedData.origin_by_month
+      })
+
+      // Fairtrade scoring (+2, only applies to non-EU products)
+      if (enrichedData.is_fairtrade === true && !isOriginInEU(effectiveOrigins)) {
+        const scoring = ENRICHED_SCORING.is_fairtrade
+        applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
+        matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+      }
+    } else {
+      // Fairtrade without origin data - still apply (assume non-EU since we don't know)
+      if (enrichedData.is_fairtrade === true) {
+        const scoring = ENRICHED_SCORING.is_fairtrade
+        applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
+        matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
       }
     }
   }
@@ -1462,17 +1007,13 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   return {
     product: input,
     normalized,
-    baseScore: matchedProduct?.baseScore ?? 5,
+    baseScore: 0,
     rawScore,
     score: finalScore,
     adjustments,
-    categories: matchedCategories,
-    keywords: matchedKeywords,
-    enriched: matchedEnriched,  // Include enriched data matches
+    enriched: matchedEnriched,
     suggestions,
     rating: getRating(finalScore),
-    notes,
-    matched: matchedProduct,
     hasEnrichedData: enrichedData !== null && matchedEnriched.length > 0
   }
 }
@@ -1490,14 +1031,15 @@ function getEnrichedData(product) {
   if (!product) return null
   
   // Check if product has any enriched fields
+  // Use != null to treat undefined and null the same (both = no data)
   const hasEnrichedData = 
-    product.is_vegan !== null || 
-    product.is_vegetarian !== null || 
-    product.is_organic !== null || 
-    product.is_fairtrade !== null ||
-    product.nutri_score !== null || 
-    product.origin_country !== null ||
-    product.origin_by_month !== null
+    product.is_vegan != null || 
+    product.is_vegetarian != null || 
+    product.is_organic != null || 
+    product.is_fairtrade != null ||
+    product.nutri_score != null || 
+    product.origin_country != null ||
+    product.origin_by_month != null
   
   if (!hasEnrichedData) return null
   
@@ -1645,9 +1187,14 @@ function getSuggestions(productName, lang = 'nl') {
 }
 
 function getRating(avgScore) {
+  // Scale: 0-10 (base 0, max practical ~12 clamped to 10)
+  // 8+: organic + vegan + local origin
+  // 5-7: good sustainability attributes
+  // 2-4: some attributes or neutral
+  // 0-1: no enriched data or negative attributes
   if (avgScore >= 8) return "🌟 Excellent! You're making great sustainable choices!"
-  if (avgScore >= 6) return '👍 Good! Room for improvement though.'
-  if (avgScore >= 4) return '😐 Average. Consider more sustainable alternatives.'
+  if (avgScore >= 5) return '👍 Good! Room for improvement though.'
+  if (avgScore >= 2) return '😐 Average. Consider more sustainable alternatives.'
   return "⚠️ Needs work. Let's find better options!"
 }
 
@@ -1693,88 +1240,32 @@ app.patch('/api/user/profile', requireAuth, async (req, res) => {
   }
 })
 
-// Get user's AH credentials status (not the actual credentials)
+// Get user's AH credentials status (deprecated - table removed)
 app.get('/api/user/ah-credentials', requireAuth, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status, created_at')
-      .eq('user_id', req.user.id)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') throw error  // PGRST116 = no rows
-    res.json(data || { configured: false })
-  } catch (err) {
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
+  res.json({ configured: false, message: 'AH credentials storage removed. Use bonus card instead.' })
 })
 
-// Save user's AH credentials
+// Save user's AH credentials (deprecated - table removed)
 app.post('/api/user/ah-credentials', requireAuth, async (req, res) => {
-  try {
-    const { ah_email, cookies } = req.body
-    
-    // Encrypt cookies before storing (simple encryption, consider Supabase Vault for production)
-    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-    const iv = crypto.randomBytes(16)
-    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-    let encrypted = cipher.update(JSON.stringify(cookies), 'utf8', 'hex')
-    encrypted += cipher.final('hex')
-    const cookies_encrypted = iv.toString('hex') + ':' + encrypted
-    
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .upsert({
-        user_id: req.user.id,
-        ah_email,
-        cookies_encrypted,
-        cookies_updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' })
-      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status')
-      .single()
-    
-    if (error) throw error
-    res.json(data)
-  } catch (err) {
-    res.status(500).json({ error: 'save_failed', message: err.message })
-  }
+  res.status(501).json({ error: 'not_supported', message: 'AH credentials storage removed. Use the bookmarklet with your bonus card.' })
 })
 
-// Save user's AH email and password for scraping (encrypted)
+// Save user's AH email and password for scraping (deprecated - table removed)
 app.post('/api/user/ah-credentials/password', requireAuth, async (req, res) => {
-  try {
-    const { ah_email, ah_password } = req.body
-    
-    if (!ah_email || !ah_password) {
-      return res.status(400).json({ error: 'missing_credentials', message: 'Both email and password are required' })
-    }
-    
-    // Encrypt password before storing
-    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-    const iv = crypto.randomBytes(16)
-    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-    let encrypted = cipher.update(ah_password, 'utf8', 'hex')
-    encrypted += cipher.final('hex')
-    const password_encrypted = iv.toString('hex') + ':' + encrypted
-    
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .upsert({
-        user_id: req.user.id,
-        ah_email: ah_email,
-        ah_password_encrypted: password_encrypted,
-        cookies_updated_at: new Date().toISOString(),
-        sync_status: 'success'
-      }, { onConflict: 'user_id' })
-      .select('id, ah_email, cookies_updated_at, last_sync_at, sync_status')
-      .single()
-    
-    if (error) throw error
-    res.json({ success: true, message: 'Credentials saved. An admin will run the scrape for you.', credentials: data })
-  } catch (err) {
-    console.error('Error saving AH credentials:', err)
-    res.status(500).json({ error: 'save_failed', message: err.message })
+  res.status(501).json({ error: 'not_supported', message: 'AH credentials storage removed. Use the bookmarklet with your bonus card.' })
+})
+
+// Link bonus card number (deprecated - user_ah_credentials table removed)
+// Bonus card is now only stored in localStorage on frontend
+// and passed via URL params or request body
+app.post('/api/user/link-bonus-card', async (req, res) => {
+  const { bonusCardNumber } = req.body
+  if (!bonusCardNumber) {
+    return res.status(400).json({ error: 'missing_bonus_card', message: 'Bonus card number is required' })
   }
+  // Just acknowledge - no server-side storage needed
+  // Bonus card is stored in localStorage and passed with each request
+  res.json({ success: true, message: 'Bonus card acknowledged (stored client-side)', bonusCard: bonusCardNumber.slice(-4).padStart(13, '•') })
 })
 
 // Get user's purchase history
@@ -1874,30 +1365,59 @@ app.post('/api/user/purchases', requireAuth, async (req, res) => {
 // Get user's purchase insights/dashboard data
 app.get('/api/user/insights', requireAHEmail, async (req, res) => {
   try {
-    // Get all user IDs (JWT + session-based) to merge purchases
-    const userIds = await getAllUserIds(req)
-    console.log('[Insights] Fetching for user IDs:', userIds)
+    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
+    const { userIds, bonusCardNumber } = await getAllUserIds(req)
+    console.log('[Insights] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
     
-    if (userIds.length === 0) {
+    if (userIds.length === 0 && !bonusCardNumber) {
       return res.json({ message: 'No purchases yet!' })
     }
     
-    const { data: purchases, error } = await supabase
+    // Build query to fetch by user_id OR bonus_card_number
+    // Join with products table to get enriched data for scoring
+    let query = supabase
       .from('user_purchases')
-      .select('product_name, quantity, price')
-      .in('user_id', userIds)
+      .select('product_id, product_name, quantity, price')
+    
+    if (userIds.length > 0 && bonusCardNumber) {
+      // Query by both user_id and bonus_card_number using OR
+      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
+    } else if (userIds.length > 0) {
+      query = query.in('user_id', userIds)
+    } else if (bonusCardNumber) {
+      query = query.eq('bonus_card_number', bonusCardNumber)
+    }
+    
+    const { data: purchases, error } = await query
     
     if (error) throw error
     
     if (!purchases || purchases.length === 0) {
       return res.json({ message: 'No purchases yet!' })
     }
+
+    // Get enriched data for all purchased products
+    const productIds = purchases.map(p => p.product_id).filter(Boolean)
+    let productsMap = new Map()
+    if (productIds.length > 0) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, nutri_score')
+        .in('id', productIds)
+      if (products) {
+        productsMap = new Map(products.map(p => [p.id, p]))
+      }
+    }
     
-    // Calculate sustainability scores on the fly
-    const purchasesWithScores = purchases.map(p => ({
-      ...p,
-      sustainability_score: evaluateProduct(p.product_name).score
-    }))
+    // Calculate sustainability scores on the fly using enriched data
+    const purchasesWithScores = purchases.map(p => {
+      const product = productsMap.get(p.product_id)
+      const enrichedData = product ? getEnrichedData(product) : null
+      return {
+        ...p,
+        sustainability_score: evaluateProduct(p.product_name, enrichedData).score
+      }
+    })
     
     const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
     const avgScore = totalScore / purchasesWithScores.length
@@ -2080,11 +1600,11 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     const sortBy = req.query.sortBy || 'scraped_at'  // Use scraped_at as default
     const sortOrder = req.query.sortOrder === 'asc' ? true : false
     
-    // Get all user IDs (JWT + session-based) to merge purchases
-    const userIds = await getAllUserIds(req)
-    console.log('[History] Fetching for user IDs:', userIds)
+    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
+    const { userIds, bonusCardNumber } = await getAllUserIds(req)
+    console.log('[History] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
     
-    if (userIds.length === 0) {
+    if (userIds.length === 0 && !bonusCardNumber) {
       return res.json({ 
         purchases: [], 
         total: 0,
@@ -2094,11 +1614,21 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
       })
     }
     
-    // Get user purchases - use * to get all columns
-    const { data: purchases, error, count } = await supabase
+    // Build query to fetch by user_id OR bonus_card_number
+    let query = supabase
       .from('user_purchases')
       .select('*', { count: 'exact' })
-      .in('user_id', userIds)
+    
+    if (userIds.length > 0 && bonusCardNumber) {
+      // Query by both user_id and bonus_card_number using OR
+      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
+    } else if (userIds.length > 0) {
+      query = query.in('user_id', userIds)
+    } else if (bonusCardNumber) {
+      query = query.eq('bonus_card_number', bonusCardNumber)
+    }
+    
+    const { data: purchases, error, count } = await query
       .order(sortBy, { ascending: sortOrder })
       .range(offset, offset + limit - 1)
     
@@ -2161,8 +1691,9 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     
     // Combine purchase data with enriched product data and sustainability scores
     const purchasesWithDetails = purchases.map(purchase => {
-      const enriched = enrichedProducts[purchase.product_id] || {}
-      const evaluation = hasEnrichedData 
+      const enriched = enrichedProducts[purchase.product_id]
+      // Use enriched data ONLY if this specific product has data in the products table
+      const evaluation = enriched
         ? evaluateProductWithRecord(purchase.product_name, enriched)
         : evaluateProduct(purchase.product_name)
       
@@ -2179,16 +1710,16 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
         purchased_at: purchaseDate,  // Normalize to purchased_at for frontend
         created_at: purchase.created_at,
         // Enriched fields (will be null if not available)
-        is_vegan: enriched.is_vegan ?? null,
-        is_vegetarian: enriched.is_vegetarian ?? null,
-        is_organic: enriched.is_organic ?? null,
-        is_fairtrade: enriched.is_fairtrade ?? null,
-        nutri_score: enriched.nutri_score ?? null,
-        origin_country: enriched.origin_country ?? null,
-        origin_by_month: enriched.origin_by_month ?? null,
-        brand: enriched.brand ?? null,
-        image_url: enriched.image_url ?? null,
-        product_url: enriched.url ?? null,
+        is_vegan: enriched?.is_vegan ?? null,
+        is_vegetarian: enriched?.is_vegetarian ?? null,
+        is_organic: enriched?.is_organic ?? null,
+        is_fairtrade: enriched?.is_fairtrade ?? null,
+        nutri_score: enriched?.nutri_score ?? null,
+        origin_country: enriched?.origin_country ?? null,
+        origin_by_month: enriched?.origin_by_month ?? null,
+        brand: enriched?.brand ?? null,
+        image_url: enriched?.image_url ?? null,
+        product_url: enriched?.url ?? null,
         // Sustainability scoring
         sustainability_score: evaluation.score,
         sustainability_rating: evaluation.rating,
@@ -2223,17 +1754,49 @@ app.get('/api/bonus/:cardNumber/user', async (req, res) => {
       return res.status(400).json({ error: 'invalid_card', message: 'Invalid bonus card number' })
     }
     
+    // Try to get user from ah_bonus_users
     const { data: user, error } = await supabase
       .from('ah_bonus_users')
       .select('*')
       .eq('bonus_card_number', cardNumber)
       .single()
     
-    if (error || !user) {
-      return res.status(404).json({ error: 'not_found', message: 'No data found for this bonus card. Please run a scrape first.' })
+    if (user) {
+      return res.json(user)
     }
     
-    res.json(user)
+    // If no user record exists, check if they have purchases
+    // (they might have synced before the user record system was added)
+    const { data: purchases, error: purchaseError } = await supabase
+      .from('user_purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('bonus_card_number', cardNumber)
+      .limit(1)
+    
+    if (!purchaseError && purchases !== null) {
+      // User has purchases but no ah_bonus_users record - create one
+      const { data: newUser, error: createError } = await supabase
+        .from('ah_bonus_users')
+        .upsert({
+          bonus_card_number: cardNumber,
+          created_at: new Date().toISOString()
+        }, { onConflict: 'bonus_card_number' })
+        .select()
+        .single()
+      
+      if (newUser) {
+        return res.json(newUser)
+      }
+      
+      // Return synthetic user if creation failed
+      return res.json({
+        bonus_card_number: cardNumber,
+        created_at: new Date().toISOString(),
+        _synthetic: true
+      })
+    }
+    
+    return res.status(404).json({ error: 'not_found', message: 'No data found for this bonus card. Please run a scrape first.' })
   } catch (err) {
     console.error('Error fetching bonus user:', err)
     res.status(500).json({ error: 'fetch_failed', message: err.message })
@@ -2301,7 +1864,8 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
     // Combine purchase data with enriched product data
     const purchasesWithDetails = purchases.map(purchase => {
       const enriched = enrichedProducts[purchase.product_id] || {}
-      const evaluation = evaluateProduct(purchase.product_name)
+      // Pass enriched data to evaluateProduct for accurate scoring
+      const evaluation = evaluateProduct(purchase.product_name, enriched)
       
       return {
         id: purchase.id,
@@ -2321,7 +1885,8 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
         brand: enriched.brand ?? null,
         image_url: enriched.image_url ?? null,
         product_url: enriched.url ?? null,
-        ...evaluation,
+        sustainability_score: evaluation.score,
+        rating: evaluation.rating,
         name: purchase.product_name
       }
     })
@@ -2339,7 +1904,7 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
   }
 })
 
-// Get suggestions by bonus card
+// Get suggestions by bonus card (returns same format as /api/user/insights for Dashboard compatibility)
 app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
   try {
     const { cardNumber } = req.params
@@ -2358,30 +1923,37 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     
     if (!purchases || purchases.length === 0) {
       return res.json({
-        profile: {
-          total_products: 0,
-          avg_sustainability_score: 0,
-          profile_type: 'balanced',
-          profile_info: USER_PROFILE_TYPES['balanced']
-        },
-        replacements: [],
-        suggestions: []
+        total_purchases: 0,
+        average_score: 0,
+        rating: 'Start Shopping!',
+        best_purchase: null,
+        worst_purchase: null,
+        total_spent: 0
       })
     }
     
-    // Analyze user profile
-    const userProfile = analyzeUserProfile(purchases)
-    const profileInfo = USER_PROFILE_TYPES[userProfile.profileType] || USER_PROFILE_TYPES['balanced']
+    // Calculate sustainability scores on the fly (same as /api/user/insights)
+    const purchasesWithScores = purchases.map(p => ({
+      ...p,
+      sustainability_score: evaluateProduct(p.product_name).score
+    }))
     
+    const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
+    const avgScore = totalScore / purchasesWithScores.length
+    
+    const best = purchasesWithScores.reduce((max, p) => 
+      ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
+    const worst = purchasesWithScores.reduce((min, p) => 
+      ((p.sustainability_score || 0) < (min.sustainability_score || 0) ? p : min), purchasesWithScores[0])
+    
+    // Return same format as /api/user/insights for Dashboard compatibility
     res.json({
-      profile: {
-        total_products: purchases.length,
-        avg_sustainability_score: userProfile.avgScore,
-        profile_type: userProfile.profileType,
-        profile_info: profileInfo
-      },
-      replacements: [],
-      suggestions: []
+      total_purchases: purchasesWithScores.length,
+      average_score: avgScore,
+      rating: getRating(avgScore),
+      best_purchase: best.product_name,
+      worst_purchase: worst.product_name,
+      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0)
     })
   } catch (err) {
     console.error('Error fetching bonus suggestions:', err)
@@ -2392,11 +1964,11 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
 // Get personalized suggestions based on user's purchase history
 app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
   try {
-    // Get all user IDs (JWT + session-based) to merge purchases
-    const userIds = await getAllUserIds(req)
-    console.log('[Suggestions] Fetching for user IDs:', userIds)
+    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
+    const { userIds, bonusCardNumber } = await getAllUserIds(req)
+    console.log('[Suggestions] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
     
-    if (userIds.length === 0) {
+    if (userIds.length === 0 && !bonusCardNumber) {
       return res.json({
         profile: {
           total_products: 0,
@@ -2409,11 +1981,20 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
       })
     }
     
-    // Get user's purchases to analyze their profile
-    const { data: purchases, error: purchasesError } = await supabase
+    // Build query to fetch by user_id OR bonus_card_number
+    let query = supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-      .in('user_id', userIds)
+    
+    if (userIds.length > 0 && bonusCardNumber) {
+      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
+    } else if (userIds.length > 0) {
+      query = query.in('user_id', userIds)
+    } else if (bonusCardNumber) {
+      query = query.eq('bonus_card_number', bonusCardNumber)
+    }
+    
+    const { data: purchases, error: purchasesError } = await query
     
     if (purchasesError) throw purchasesError
     
@@ -3007,7 +2588,7 @@ app.get('/api/products/:productId', async (req, res) => {
 })
 
 // Get detailed product analysis with scoring breakdown and alternatives
-app.get('/api/product/:productId/details', requireAuth, async (req, res) => {
+app.get('/api/product/:productId/details', async (req, res) => {
   try {
     const { productId } = req.params
     
@@ -3047,65 +2628,34 @@ app.get('/api/product/:productId/details', requireAuth, async (req, res) => {
     // Create user-friendly breakdown
     const breakdown = []
     
-    // Base score
+    // Base score (starts at 0, all scoring comes from enriched data)
     breakdown.push({
       label: 'Base Score',
-      value: '5',
+      value: '0',
       positive: false,
       negative: false
     })
     
-    // Add adjustment explanations
+    // Add adjustment explanations (only enriched type exists now)
     for (const adj of evaluation.adjustments) {
       let label = ''
       let positive = adj.delta > 0
       let negative = adj.delta < 0
       
-      switch (adj.type) {
-        case 'catalog':
-          if (adj.code === 'catalog_base') {
-            label = 'Product Type'
-          } else {
-            label = adj.code.replace('catalog_', '').replace(/_/g, ' ')
-          }
-          break
-        case 'category':
-          label = adj.category?.replace(/_/g, ' ') || 'Category'
-          label = label.charAt(0).toUpperCase() + label.slice(1)
-          break
-        case 'keyword':
-          const keywordMap = {
-            'keyword_organic': 'Organic/Bio',
-            'keyword_local': 'Local Product',
-            'keyword_seasonal': 'Seasonal',
-            'keyword_fairtrade': 'Fairtrade',
-            'keyword_processed': 'Processed Food',
-            'keyword_plastic_packaging': 'Plastic Packaging',
-            'keyword_meat': 'Meat Product',
-            'keyword_palm_oil': 'Contains Palm Oil'
-          }
-          label = keywordMap[adj.code] || adj.code.replace('keyword_', '').replace(/_/g, ' ')
-          break
-        case 'enriched':
-          const enrichedMap = {
-            'enriched_vegan': 'Vegan',
-            'enriched_vegetarian': 'Vegetarian',
-            'enriched_organic': 'Organic Certified',
-            'enriched_nutriscore_A': 'Nutri-Score A',
-            'enriched_nutriscore_B': 'Nutri-Score B',
-            'enriched_nutriscore_C': 'Nutri-Score C',
-            'enriched_nutriscore_D': 'Nutri-Score D',
-            'enriched_nutriscore_E': 'Nutri-Score E',
-            'enriched_origin_local': 'Local Origin',
-            'enriched_origin_europe': 'European Origin',
-            'enriched_origin_overseas': 'Overseas Import',
-            'enriched_origin_unknown': 'Unknown Origin'
-          }
-          label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
-          break
-        default:
-          label = adj.code?.replace(/_/g, ' ') || 'Unknown'
+      // All adjustments are now from enriched data (kenmerken/herkomst sections)
+      const enrichedMap = {
+        'enriched_vegan': 'Vegan',
+        'enriched_vegetarian': 'Vegetarian',
+        'enriched_organic': 'Organic Certified',
+        'enriched_fairtrade': 'Fairtrade Certified',
+        'enriched_origin_avg': adj.delta > 0 ? 'Origin (Local/EU)' : 'Origin (Distant)',
+        'enriched_nutriscore_A': 'Nutri-Score A',
+        'enriched_nutriscore_B': 'Nutri-Score B',
+        'enriched_nutriscore_C': 'Nutri-Score C',
+        'enriched_nutriscore_D': 'Nutri-Score D',
+        'enriched_nutriscore_E': 'Nutri-Score E'
       }
+      label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
       
       breakdown.push({
         label,
@@ -3115,51 +2665,35 @@ app.get('/api/product/:productId/details', requireAuth, async (req, res) => {
       })
     }
     
-    // Final score
-    breakdown.push({
-      label: 'Final Score',
-      value: evaluation.score.toString(),
-      positive: evaluation.score >= 7,
-      negative: evaluation.score < 5
-    })
+    // NOTE: Final Score removed from breakdown - it's already shown above the breakdown section
     
-    // Create improvement reasons
+    // Create improvement reasons from enriched data
     const improvements = []
     
-    // Positive factors
-    for (const cat of evaluation.categories) {
-      if (cat.referenceScore > 5) {
-        improvements.push({
-          reason: `${cat.icon || '📦'} ${cat.category.replace(/_/g, ' ')} category bonus`,
-          positive: true
-        })
-      }
-    }
+    // Positive factors from enriched data
     for (const adj of evaluation.adjustments.filter(a => a.delta > 0)) {
-      if (adj.type === 'keyword') {
-        improvements.push({
-          reason: `✅ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} bonus`,
-          positive: true
-        })
+      const codeMap = {
+        'enriched_organic': '🌱 Organic/Bio certified',
+        'enriched_vegan': '🌿 Vegan product',
+        'enriched_vegetarian': '🥬 Vegetarian product',
+        'enriched_fairtrade': '🤝 Fairtrade certified',
+        'enriched_origin_avg': '📍 Origin bonus'
       }
+      improvements.push({
+        reason: codeMap[adj.code] || `✅ ${adj.code.replace('enriched_', '').replace(/_/g, ' ')} bonus`,
+        positive: true
+      })
     }
     
-    // Negative factors
-    for (const cat of evaluation.categories) {
-      if (cat.referenceScore < 5) {
-        improvements.push({
-          reason: `${cat.icon || '📦'} Low sustainability for ${cat.category.replace(/_/g, ' ')}`,
-          positive: false
-        })
-      }
-    }
+    // Negative factors from enriched data
     for (const adj of evaluation.adjustments.filter(a => a.delta < 0)) {
-      if (adj.type === 'keyword') {
-        improvements.push({
-          reason: `⚠️ ${adj.code.replace('keyword_', '').replace(/_/g, ' ')} penalty`,
-          positive: false
-        })
+      const codeMap = {
+        'enriched_origin_avg': '✈️ Distant origin penalty'
       }
+      improvements.push({
+        reason: codeMap[adj.code] || `⚠️ ${adj.code.replace('enriched_', '').replace(/_/g, ' ')} penalty`,
+        positive: false
+      })
     }
     
     // Find better alternatives from catalog
@@ -3208,7 +2742,7 @@ app.get('/api/product/:productId/details', requireAuth, async (req, res) => {
       breakdown,
       improvements,
       alternatives,
-      categories: evaluation.categories,
+      enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
       hasEnrichedData: evaluation.hasEnrichedData
     })
@@ -3295,6 +2829,100 @@ app.get('/api/profile_suggestions', (req, res) => {
   })
 })
 
+// Debug endpoint to check user_purchases table state
+app.get('/api/debug/purchases', async (req, res) => {
+  const bonusCard = req.query.card
+  try {
+    // Check table structure
+    const { data: columns, error: colError } = await supabase
+      .from('user_purchases')
+      .select('*')
+      .limit(1)
+    
+    // Count total rows
+    const { count: totalCount } = await supabase
+      .from('user_purchases')
+      .select('*', { count: 'exact', head: true })
+    
+    // Count rows for this bonus card
+    let bonusCount = 0
+    if (bonusCard) {
+      const { count } = await supabase
+        .from('user_purchases')
+        .select('*', { count: 'exact', head: true })
+        .eq('bonus_card_number', bonusCard)
+      bonusCount = count
+    }
+    
+    // Check products table
+    const { count: productCount } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+    
+    res.json({
+      user_purchases: {
+        total_rows: totalCount,
+        bonus_card_rows: bonusCount,
+        sample_columns: columns?.[0] ? Object.keys(columns[0]) : [],
+        error: colError?.message
+      },
+      products: {
+        total_rows: productCount
+      },
+      supabase_connected: !!supabase
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Debug endpoint to test inserting into user_purchases
+app.post('/api/debug/test-insert', async (req, res) => {
+  const bonusCard = req.body.bonus_card || '4463986084997'
+  const now = new Date().toISOString()
+  
+  const testRecord = {
+    bonus_card_number: bonusCard,
+    product_id: 'test-product-' + Date.now(),
+    product_name: 'Test Product',
+    product_url: null,
+    price: 1.99,
+    quantity: 1,
+    source: 'debug_test',
+    purchased_at: now,
+    scraped_at: now,
+    last_seen_at: now
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_purchases')
+      .insert([testRecord])
+      .select()
+    
+    if (error) {
+      return res.json({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        },
+        attempted_record: testRecord
+      })
+    }
+    
+    res.json({
+      success: true,
+      inserted: data,
+      record: testRecord
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 app.get('/api/catalog/meta', async (req, res) => {
   if (req.query.refresh === 'true') {
     await refreshCatalog({ force: true })
@@ -3304,15 +2932,26 @@ app.get('/api/catalog/meta', async (req, res) => {
 
 // Ingest scraped items from the user's browser (extension/bookmarklet)
 // Products go to shared 'products' table (unified catalog)
-// Purchases are recorded per-user in user_purchases table
+// Purchases are recorded per-user in user_purchases table (by user_id or bonus_card)
 app.post('/api/ingest/scrape', async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : []
     if (!items.length) return res.status(400).json({ error: 'no_items' })
 
-    // Get authenticated user (optional - if not logged in, just store products)
-    const user = await getUserFromRequest(req)
-    const userId = user?.id || null
+    // Get authenticated user OR bonus card (optional - if neither, just store products)
+    // Check both JWT auth AND session-based auth
+    let user = await getUserFromRequest(req)
+    let userId = user?.id || null
+    
+    // If no JWT user, try session-based auth
+    if (!userId) {
+      userId = await getUserIdFromSession(req)
+    }
+    
+    const bonusCard = req.body?.bonus_card?.toString().trim() || null
+    const sessionId = req.headers['x-session-id']
+    
+    console.log(`[Ingest] Received ${items.length} items, userId: ${userId ? 'yes' : 'no'}, bonusCard: ${bonusCard ? bonusCard.slice(-4) : 'none'}, sessionId: ${sessionId ? 'yes' : 'no'}`)
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
     const seen = new Set()
@@ -3338,9 +2977,8 @@ app.post('/api/ingest/scrape', async (req, res) => {
       }
       seenIds.add(extracted.id)
 
-      // Auto-detect dietary and organic properties from product name
-      const isPlantBased = isLikelyPlantBased(extracted.name)
-      const isOrganic = isLikelyOrganic(extracted.name)
+      // NOTE: is_vegan, is_organic, etc. are NOT set from product names
+      // These fields are populated ONLY by the enrichment scraper (kenmerken section)
 
       // Parse price - handle both number and string formats (e.g., "€2.99", "2,99")
       let parsedPrice = null
@@ -3355,19 +2993,27 @@ app.post('/api/ingest/scrape', async (req, res) => {
         }
       }
 
-      cleaned.push({
+      // Parse image URL
+      const imageUrl = (raw?.image_url || raw?.image || '').toString().trim() || null
+
+      const productRecord = {
         id: extracted.id,
         name: extracted.name,
         normalized_name: extracted.normalized,
         url: url || null,
-        image_url: (raw?.image || '').toString().trim() || null,
         price: parsedPrice,
         source,
-        // Auto-detected properties (only set if true, preserve existing data otherwise)
-        ...(isPlantBased ? { is_vegan: true, is_vegetarian: true } : {}),
-        ...(isOrganic ? { is_organic: true } : {}),
+        // NOTE: Enriched fields (is_vegan, is_organic, origin, etc.) are set by the scraper
+        // not auto-detected from product names
         updated_at: new Date().toISOString()
-      })
+      }
+      
+      // Only include image_url if we have one (preserve existing on re-sync)
+      if (imageUrl) {
+        productRecord.image_url = imageUrl
+      }
+
+      cleaned.push(productRecord)
     }
 
     if (!cleaned.length) return res.status(400).json({ error: 'no_valid_items' })
@@ -3376,14 +3022,31 @@ app.post('/api/ingest/scrape', async (req, res) => {
     let purchasesRecorded = 0
     let queuedForEnrichment = 0
     
+    if (!supabase) {
+      console.warn('[Ingest] Supabase not configured - SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing')
+      return res.status(500).json({ 
+        error: 'supabase_not_configured', 
+        detail: 'Server missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+      })
+    }
+    
+    let purchaseError = null
+    
     if (supabase) {
       // 1. Upsert products to shared 'products' table (unified catalog)
+      console.log(`[Ingest] Upserting ${cleaned.length} products to ${SUPABASE_PRODUCTS_TABLE}`)
       const { error: productError } = await supabase
         .from(SUPABASE_PRODUCTS_TABLE)
         .upsert(cleaned, { onConflict: 'id' })
       if (productError) {
-        console.error('Product upsert error:', productError)
-        return res.status(500).json({ error: 'supabase_insert_failed', detail: productError.message })
+        console.error('Product upsert error:', JSON.stringify(productError, null, 2))
+        console.error('First product sample:', JSON.stringify(cleaned[0], null, 2))
+        return res.status(500).json({ 
+          error: 'supabase_insert_failed', 
+          detail: productError.message,
+          code: productError.code,
+          hint: productError.hint
+        })
       }
       stored = cleaned.length
 
@@ -3408,45 +3071,98 @@ app.post('/api/ingest/scrape', async (req, res) => {
         }
       }
 
-      // 2. If user is authenticated, record purchases in user_purchases table
-      // Uses upsert to prevent duplicates when scanning same products again
-      if (userId) {
-        const now = new Date().toISOString()
-        const purchaseRecords = cleaned.map(p => ({
-          user_id: userId,
-          product_id: p.id,
-          product_name: p.name,
-          price: p.price,
-          quantity: 1,
-          source: req.body?.source || 'browser_extension',
-          purchased_at: now,  // Will be kept on conflict (original purchase date)
-          last_seen_at: now   // Always updated on re-import
-        }))
-
-        // Use upsert to avoid duplicates (same user + product)
-        const { error: purchaseError } = await supabase
-          .from('user_purchases')
-          .upsert(purchaseRecords, {
-            onConflict: 'user_id,product_id',
-            ignoreDuplicates: false  // Update last_seen_at on conflict
-          })
-        
-        if (purchaseError) {
-          // Log but don't fail - products were already stored
-          console.error('Purchase record error:', purchaseError.message)
-        } else {
-          purchasesRecorded = purchaseRecords.length
+      // 2. If bonus card provided, ensure user record exists in ah_bonus_users
+      if (bonusCard) {
+        try {
+          const { error: userError } = await supabase
+            .from('ah_bonus_users')
+            .upsert({
+              bonus_card_number: bonusCard,
+              last_scrape_at: new Date().toISOString(),
+              scrape_count: 1  // Will be incremented on conflict
+            }, {
+              onConflict: 'bonus_card_number',
+              ignoreDuplicates: false
+            })
+          
+          if (userError) {
+            console.error('Bonus user upsert error:', userError.message)
+          } else {
+            // Increment scrape count for existing users
+            await supabase.rpc('increment_scrape_count', { card: bonusCard }).catch(() => {})
+            console.log(`[Ingest] Bonus user ${bonusCard.slice(-4)} updated`)
+          }
+        } catch (e) {
+          console.error('Bonus user record error:', e.message)
         }
       }
+
+      // 3. If user is authenticated OR bonus card provided, record purchases
+      if (userId || bonusCard) {
+        const now = new Date().toISOString()
+        const purchaseRecords = cleaned.map(p => ({
+          ...(userId ? { user_id: userId } : {}),
+          ...(bonusCard ? { bonus_card_number: bonusCard } : {}),
+          product_id: p.id,
+          product_name: p.name,
+          product_url: p.url,  // Include URL for scraper to use
+          price: p.price,
+          quantity: 1,
+          source: req.body?.source || 'bookmarklet',
+          purchased_at: now,
+          scraped_at: now,      // Required NOT NULL column
+          last_seen_at: now
+        }))
+
+        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user ' + userId : 'bonus card ****' + bonusCard?.slice(-4)}`)
+        console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
+
+        // Try simple INSERT first (most reliable)
+        // If duplicates exist, they'll fail with 23505 which is OK
+        const { data, error: insertError } = await supabase
+          .from('user_purchases')
+          .insert(purchaseRecords)
+          .select()
+        
+        if (insertError) {
+          // Duplicate key error is OK - means products already exist
+          if (insertError.code === '23505') {
+            console.log('[Ingest] Some purchases already exist (duplicate key) - that is OK')
+            purchasesRecorded = purchaseRecords.length
+          } else {
+            purchaseError = insertError
+            console.error('[Ingest] Purchase insert FAILED:', JSON.stringify({
+              code: insertError.code,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint
+            }, null, 2))
+          }
+        } else {
+          purchasesRecorded = data?.length || purchaseRecords.length
+          console.log(`[Ingest] SUCCESS: Inserted ${purchasesRecorded} purchase records`)
+        }
+      } else {
+        console.log('[Ingest] No userId or bonusCard - skipping user_purchases insert')
+      }
     }
+
+    // Build redirect URL for bookmarklet
+    // Use custom APP_URL env var, or default to production domain
+    // Query params must come BEFORE hash fragment
+    const appBase = process.env.APP_URL || 'https://www.bubblebrainz.com'
+    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#dashboard` : null
 
     return res.json({ 
       ok: true, 
       received: items.length, 
       stored,
       purchasesRecorded,
+      purchaseError: purchaseError ? { code: purchaseError.code, message: purchaseError.message, hint: purchaseError.hint } : null,
       queuedForEnrichment,
-      userId: userId ? 'authenticated' : 'anonymous'
+      userId: userId ? 'authenticated' : (bonusCard ? 'bonus_card' : 'anonymous'),
+      bonusCard: bonusCard ? bonusCard.slice(-4).padStart(13, '•') : null,
+      redirect_url: redirectUrl
     })
   } catch (e) {
     return res.status(500).json({ error: 'ingest_failed', detail: e.message })
@@ -3829,8 +3545,10 @@ async function processEnrichmentQueue() {
             is_vegan: result.data.is_vegan ?? null,
             is_vegetarian: result.data.is_vegetarian ?? null,
             is_organic: result.data.is_organic ?? null,
+            is_fairtrade: result.data.is_fairtrade ?? null,
             nutri_score: result.data.nutri_score ?? null,
             origin_country: result.data.origin_country ?? null,
+            origin_by_month: result.data.origin_by_month ?? null,
             brand: result.data.brand ?? null,
             unit_size: result.data.unit_size ?? null,
             allergens: result.data.allergens ?? null,
@@ -3950,464 +3668,17 @@ if (!process.env.VERCEL && autoEnrichConfig.enabled) {
   console.log(`[Auto-Enrich] Enabled - checking every ${autoEnrichConfig.checkInterval / 1000}s`)
 }
 
-// Start automated scraping with user credentials
-app.post('/api/auto-scrape', async (req, res) => {
-  // Block on hosted environments (Vercel) unless Browserless is configured
-  const hasBrowserless = !!process.env.BROWSERLESS_URL
-  if (process.env.VERCEL && !hasBrowserless) {
-    return res.status(501).json({ 
-      error: 'not_supported_on_hosted',
-      message: 'Automated scraping requires BROWSERLESS_URL to be configured on hosted environments. Please use the bookmarklet method instead.'
-    })
-  }
-  
-  if (autoScrapeState.running) {
-    return res.status(409).json({ 
-      error: 'scrape_in_progress', 
-      startedAt: autoScrapeState.startedAt 
-    })
-  }
-  
-  const { email, password, save_credentials } = req.body || {}
-  
-  // Get user from auth header if provided (optional - allows saving credentials)
-  let userId = null
-  const authHeader = req.headers.authorization
-  if (authHeader && authHeader.startsWith('Bearer ') && supabase) {
-    const token = authHeader.slice(7)
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser(token)
-      if (!error && user) {
-        userId = user.id
-      }
-    } catch (e) {
-      // Auth is optional for this endpoint
-    }
-  }
-  
-  if (!email || !password) {
-    return res.status(400).json({ error: 'missing_credentials' })
-  }
-  
-  // Validate email format
-  if (!email.includes('@')) {
-    return res.status(400).json({ error: 'invalid_email' })
-  }
-  
-  // Check if script exists
-  try {
-    await fs.access(AUTO_SCRAPE_SCRIPT)
-  } catch (error) {
-    return res.status(500).json({ 
-      error: 'scrape_script_missing', 
-      details: 'auto_scraper.py not found' 
-    })
-  }
-  
-  const startedAt = new Date().toISOString()
-  autoScrapeState.running = true
-  autoScrapeState.startedAt = startedAt
-  autoScrapeState.lastRun = { status: 'running', startedAt, userId }
-  autoScrapeState.logs = []
-  autoScrapeState.progress = 'Starting automated scraper...'
-  
-  // Save credentials immediately when provided (so admin can use them even if scrape fails)
-  if (save_credentials && userId) {
-    try {
-      // Encrypt password before storing
-      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-      const iv = crypto.randomBytes(16)
-      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-      let encrypted = cipher.update(password, 'utf8', 'hex')
-      encrypted += cipher.final('hex')
-      const password_encrypted = iv.toString('hex') + ':' + encrypted
-      
-      await supabase
-        .from('user_ah_credentials')
-        .upsert({
-          user_id: userId,
-          ah_email: email,
-          ah_password_encrypted: password_encrypted,
-          cookies_updated_at: new Date().toISOString(),
-          sync_status: 'scraping'
-        }, { onConflict: 'user_id' })
-      
-      appendAutoScrapeLog('info', 'Credentials saved for future use.')
-    } catch (e) {
-      appendAutoScrapeLog('stderr', `Failed to save credentials: ${e.message}`)
-    }
-    // Also keep in memory for updating status on completion
-    autoScrapeState.pendingCredentials = { userId, email, password }
-  }
-  
-  appendAutoScrapeLog('info', 'Starting automated AH scraper...')
-  appendAutoScrapeLog('info', `Email: ${email.substring(0, 3)}***@${email.split('@')[1] || '***'}`)
-  
-  // Build command arguments
-  // NOTE: AH blocks headless browsers on login, so we use --no-headless
-  // This requires a display (X11/Xvfb on Linux, or remote browser service)
-  const scriptArgs = [
-    AUTO_SCRAPE_SCRIPT,
-    '--email', email,
-    '--password', password,
-    '--no-headless'  // AH blocks headless browsers
-  ]
-  
-  // Add Browserless URL if available (for Vercel/serverless)
-  const browserlessUrl = process.env.BROWSERLESS_URL
-  if (browserlessUrl) {
-    scriptArgs.push('--browserless-url', browserlessUrl)
-    appendAutoScrapeLog('info', 'Using remote browser service (Browserless)')
-  }
-  
-  let autoScrapeProcess
-  try {
-    autoScrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
-      cwd: __dirname,
-      env: { ...process.env, PYTHONUNBUFFERED: '1', BROWSERLESS_URL: browserlessUrl || '' }
-    })
-  } catch (error) {
-    autoScrapeState.running = false
-    autoScrapeState.startedAt = null
-    autoScrapeState.lastRun = {
-      status: 'error',
-      startedAt,
-      completedAt: new Date().toISOString(),
-      exitCode: null,
-      durationMs: 0,
-      error: error.message
-    }
-    appendAutoScrapeLog('stderr', `Failed to launch scraper: ${error.message}`)
-    return res.status(500).json({ error: 'spawn_failed', details: error.message })
-  }
-  
-  let resultData = null
-  
-  autoScrapeProcess.stdout.on('data', (data) => {
-    const text = data.toString()
-    appendAutoScrapeLog('stdout', text)
-    
-    // Try to parse result from output
-    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
-    if (resultMatch) {
-      try {
-        resultData = JSON.parse(resultMatch[1])
-      } catch (e) {
-        console.error('Failed to parse scrape result:', e)
-      }
-    }
-  })
-  
-  autoScrapeProcess.stderr.on('data', (data) => {
-    appendAutoScrapeLog('stderr', data)
-  })
-  
-  autoScrapeProcess.on('close', async (code) => {
-    const completedAt = new Date().toISOString()
-    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
-    
-    autoScrapeState.running = false
-    autoScrapeState.startedAt = null
-    
-    // Determine specific error message for credential-based scraping
-    let errorMessage = null
-    if (code !== 0) {
-      if (resultData?.error === 'login_failed') {
-        // Check logs for CAPTCHA indication
-        const logText = autoScrapeState.logs.map(l => l.message).join(' ')
-        if (logText.includes('CAPTCHA') || logText.includes('captcha')) {
-          errorMessage = 'CAPTCHA required - Albert Heijn requires manual verification. Please use the "Easy Connect" feature instead, which opens a browser window for you to log in manually.'
-        } else {
-          errorMessage = 'Login failed - please check your email and password'
-        }
-      } else if (resultData?.error) {
-        errorMessage = resultData.error
-      } else {
-        errorMessage = `Scraper exited with code ${code}`
-      }
-    }
-    
-    autoScrapeState.lastRun = {
-      status: code === 0 && resultData?.success ? 'success' : 'error',
-      startedAt,
-      completedAt,
-      durationMs,
-      error: errorMessage,
-      productsFound: resultData?.count || 0
-    }
-    
-    appendAutoScrapeLog('info', code === 0 ? 'Auto-scrape process completed.' : `Auto-scrape exited with code ${code}`)
-    
-    // If we got products, ingest them to Supabase
-    if (resultData?.success && resultData?.products?.length > 0 && supabase) {
-      appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
-      
-      try {
-        // Normalize and prepare products for ingestion using helper
-        const cleaned = resultData.products.map((item) => {
-          const rawName = (item.name || '').toString().trim()
-          const url = (item.url || '').toString().trim()
-          
-          // Use helper to extract ID and name from URL
-          const extracted = extractProductFromUrl(url, rawName)
-          if (!extracted.id) return null
-          
-          return {
-            id: extracted.id,
-            name: extracted.name,
-            normalized_name: extracted.normalized,
-            url: url || null,
-            image_url: (item.image || '').toString().trim() || null,
-            price: typeof item.price === 'number' ? item.price : null,
-            source: 'ah_auto_scrape',
-            tags: null,
-            updated_at: new Date().toISOString()
-          }
-        }).filter((item) => item && item.name && item.id)
-        
-        // Upsert to Supabase
-        const { error: upsertError } = await supabase
-          .from(SUPABASE_PRODUCTS_TABLE)
-          .upsert(cleaned, { onConflict: 'id' })
-        
-        if (upsertError) {
-          appendAutoScrapeLog('stderr', `Database upsert failed: ${upsertError.message}`)
-        } else {
-          appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in database.`)
-          autoScrapeState.lastRun.productsStored = cleaned.length
-          
-          // Update sync status to success (credentials already saved at scrape start)
-          if (autoScrapeState.pendingCredentials && supabase) {
-            const { userId } = autoScrapeState.pendingCredentials
-            try {
-              await supabase
-                .from('user_ah_credentials')
-                .update({
-                  last_sync_at: new Date().toISOString(),
-                  sync_status: 'success'
-                })
-                .eq('user_id', userId)
-              
-              appendAutoScrapeLog('info', 'Sync status updated to success.')
-              autoScrapeState.lastRun.credentialsSaved = true
-            } catch (e) {
-              appendAutoScrapeLog('stderr', `Failed to update sync status: ${e.message}`)
-            }
-            autoScrapeState.pendingCredentials = null
-          }
-        }
-      } catch (e) {
-        appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
-      }
-    }
-    
-    // Update sync status to failed if credentials were pending
-    if (autoScrapeState.pendingCredentials && supabase) {
-      const { userId } = autoScrapeState.pendingCredentials
-      try {
-        await supabase
-          .from('user_ah_credentials')
-          .update({ sync_status: 'failed' })
-          .eq('user_id', userId)
-      } catch (e) {
-        // Ignore
-      }
-    }
-    autoScrapeState.pendingCredentials = null
-  })
-  
-  return res.status(202).json({ status: 'started', startedAt })
-})
+// ============================================================================
+// CREDENTIAL-BASED SCRAPING REMOVED FOR PRIVACY/LEGAL REASONS
+// Use the bookmarklet method instead which doesn't require storing credentials
+// ============================================================================
 
-// Re-scrape using saved credentials (requires authentication)
-app.post('/api/auto-scrape/resync', requireAuth, async (req, res) => {
-  // Block on hosted environments unless Browserless is configured
-  const hasBrowserless = !!process.env.BROWSERLESS_URL
-  if (process.env.VERCEL && !hasBrowserless) {
-    return res.status(501).json({ 
-      error: 'not_supported_on_hosted',
-      message: 'Automated scraping requires BROWSERLESS_URL. Please use the bookmarklet method instead.'
-    })
-  }
-  
-  if (autoScrapeState.running) {
-    return res.status(409).json({ 
-      error: 'scrape_in_progress', 
-      startedAt: autoScrapeState.startedAt 
-    })
-  }
-  
-  // Get user's saved credentials
-  const { data: credentials, error: fetchError } = await supabase
-    .from('user_ah_credentials')
-    .select('ah_email, ah_password_encrypted')
-    .eq('user_id', req.user.id)
-    .single()
-  
-  if (fetchError || !credentials?.ah_email || !credentials?.ah_password_encrypted) {
-    return res.status(404).json({ 
-      error: 'no_saved_credentials',
-      message: 'No saved AH credentials found. Please log in with your AH account first.'
-    })
-  }
-  
-  // Decrypt password
-  let password
-  try {
-    const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-    const [ivHex, encrypted] = credentials.ah_password_encrypted.split(':')
-    const iv = Buffer.from(ivHex, 'hex')
-    const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-    password = decipher.update(encrypted, 'hex', 'utf8') + decipher.final('utf8')
-  } catch (e) {
-    return res.status(500).json({ error: 'decryption_failed', message: 'Failed to decrypt saved credentials.' })
-  }
-  
-  // Check if script exists
-  try {
-    await fs.access(AUTO_SCRAPE_SCRIPT)
-  } catch (error) {
-    return res.status(500).json({ 
-      error: 'scrape_script_missing', 
-      details: 'auto_scraper.py not found' 
-    })
-  }
-  
-  const email = credentials.ah_email
-  const startedAt = new Date().toISOString()
-  autoScrapeState.running = true
-  autoScrapeState.startedAt = startedAt
-  autoScrapeState.lastRun = { status: 'running', startedAt, userId: req.user.id }
-  autoScrapeState.logs = []
-  autoScrapeState.progress = 'Starting automated scraper with saved credentials...'
-  
-  appendAutoScrapeLog('info', 'Starting automated AH scraper (using saved credentials)...')
-  appendAutoScrapeLog('info', `Email: ${email.substring(0, 3)}***@${email.split('@')[1] || '***'}`)
-  
-  // Build command arguments
-  const scriptArgs = [
-    AUTO_SCRAPE_SCRIPT,
-    '--email', email,
-    '--password', password,
-    '--no-headless'
-  ]
-  
-  const browserlessUrl = process.env.BROWSERLESS_URL
-  if (browserlessUrl) {
-    scriptArgs.push('--browserless-url', browserlessUrl)
-    appendAutoScrapeLog('info', 'Using remote browser service (Browserless)')
-  }
-  
-  let autoScrapeProcess
-  try {
-    autoScrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
-      cwd: __dirname,
-      env: { ...process.env, PYTHONUNBUFFERED: '1', BROWSERLESS_URL: browserlessUrl || '' }
-    })
-  } catch (error) {
-    autoScrapeState.running = false
-    autoScrapeState.startedAt = null
-    autoScrapeState.lastRun = {
-      status: 'error',
-      startedAt,
-      completedAt: new Date().toISOString(),
-      exitCode: null,
-      durationMs: 0,
-      error: error.message
-    }
-    appendAutoScrapeLog('stderr', `Failed to launch scraper: ${error.message}`)
-    return res.status(500).json({ error: 'spawn_failed', details: error.message })
-  }
-  
-  let resultData = null
-  
-  autoScrapeProcess.stdout.on('data', (data) => {
-    const text = data.toString()
-    appendAutoScrapeLog('stdout', text)
-    
-    const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
-    if (resultMatch) {
-      try {
-        resultData = JSON.parse(resultMatch[1])
-      } catch (e) {
-        console.error('Failed to parse scrape result:', e)
-      }
-    }
+// POST /api/auto-scrape - REMOVED (was: credential-based scraping)
+app.post('/api/auto-scrape', async (req, res) => {
+  return res.status(410).json({ 
+    error: 'endpoint_removed',
+    message: 'Credential-based scraping has been removed. Use the bookmarklet method instead which does not require storing credentials.'
   })
-  
-  autoScrapeProcess.stderr.on('data', (data) => {
-    appendAutoScrapeLog('stderr', data)
-  })
-  
-  autoScrapeProcess.on('close', async (code) => {
-    const completedAt = new Date().toISOString()
-    const durationMs = new Date(completedAt).getTime() - new Date(startedAt).getTime()
-    
-    autoScrapeState.running = false
-    autoScrapeState.startedAt = null
-    autoScrapeState.lastRun = {
-      status: code === 0 && resultData?.success ? 'success' : 'error',
-      startedAt,
-      completedAt,
-      durationMs,
-      error: code !== 0 ? `Scraper exited with code ${code}` : (resultData?.error || null),
-      productsFound: resultData?.count || 0
-    }
-    
-    appendAutoScrapeLog('info', code === 0 ? 'Auto-scrape process completed.' : `Auto-scrape exited with code ${code}`)
-    
-    // Update last_sync_at on success/failure
-    await supabase
-      .from('user_ah_credentials')
-      .update({ 
-        last_sync_at: new Date().toISOString(),
-        sync_status: code === 0 && resultData?.success ? 'success' : 'error'
-      })
-      .eq('user_id', req.user.id)
-    
-    // If we got products, ingest them to Supabase
-    if (resultData?.success && resultData?.products?.length > 0 && supabase) {
-      appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
-      
-      try {
-        const cleaned = resultData.products.map((item) => {
-          const rawName = (item.name || '').toString().trim()
-          const url = (item.url || '').toString().trim()
-          
-          // Use helper to extract ID and name from URL
-          const extracted = extractProductFromUrl(url, rawName)
-          if (!extracted.id) return null
-          
-          return {
-            id: extracted.id,
-            name: extracted.name,
-            normalized_name: extracted.normalized,
-            url: url || null,
-            image_url: (item.image || '').toString().trim() || null,
-            price: typeof item.price === 'number' ? item.price : null,
-            source: 'ah_auto_scrape',
-            tags: null,
-            updated_at: new Date().toISOString()
-          }
-        }).filter((item) => item && item.name && item.id)
-        
-        const { error: upsertError } = await supabase
-          .from(SUPABASE_PRODUCTS_TABLE)
-          .upsert(cleaned, { onConflict: 'id' })
-        
-        if (upsertError) {
-          appendAutoScrapeLog('stderr', `Database upsert failed: ${upsertError.message}`)
-        } else {
-          appendAutoScrapeLog('info', `Successfully stored ${cleaned.length} products in database.`)
-          autoScrapeState.lastRun.productsStored = cleaned.length
-        }
-      } catch (e) {
-        appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
-      }
-    }
-  })
-  
-  return res.status(202).json({ status: 'started', startedAt, usingSavedCredentials: true })
 })
 
 // Get auto-scrape status
@@ -4491,417 +3762,6 @@ app.delete('/api/auto-scrape/cookies', async (req, res) => {
   }
 })
 
-// Auto-login state (for credential-based login)
-const autoLoginState = {
-  running: false,
-  startedAt: null,
-  logs: [],
-  userId: null,
-  email: null,
-  password: null
-}
-
-// Auto-login: User enters credentials in our form, we log in for them
-app.post('/api/auto-scrape/auto-login', async (req, res) => {
-  console.log('[AUTO-LOGIN] Endpoint hit!')
-  
-  if (process.env.VERCEL) {
-    return res.status(501).json({
-      error: 'not_supported_on_hosted',
-      message: 'Auto login requires a local server.'
-    })
-  }
-  
-  if (autoLoginState.running || cookieCaptureState.running || autoScrapeState.running) {
-    return res.status(409).json({ error: 'operation_in_progress' })
-  }
-  
-  const { email, password } = req.body || {}
-  
-  if (!email || !password) {
-    return res.status(400).json({ error: 'missing_credentials', message: 'Email and password are required' })
-  }
-  
-  try {
-    await fs.access(AUTO_SCRAPE_SCRIPT)
-  } catch (error) {
-    return res.status(500).json({ error: 'script_missing' })
-  }
-  
-  // Get user for saving credentials later
-  const user = await getUserFromRequest(req)
-  const userId = user?.id || null
-  
-  const startedAt = new Date().toISOString()
-  autoLoginState.running = true
-  autoLoginState.startedAt = startedAt
-  autoLoginState.logs = []
-  autoLoginState.userId = userId
-  autoLoginState.email = email
-  autoLoginState.password = password
-  
-  const loginProcess = spawn(PYTHON_CMD, [
-    AUTO_SCRAPE_SCRIPT,
-    '--auto-login',
-    '--ah-email', email,
-    '--ah-password', password,
-    '--save-cookies', COOKIES_FILE,
-    // On production (Railway), use headless mode since no display available
-    // On local dev, show browser for CAPTCHA solving
-    ...(process.env.NODE_ENV === 'production' ? ['--headless'] : ['--no-headless'])
-  ], {
-    cwd: __dirname,
-    env: { ...process.env, PYTHONUNBUFFERED: '1' }
-  })
-  
-  loginProcess.stdout.on('data', (data) => {
-    const text = data.toString()
-    console.log('[AUTO-LOGIN stdout]', text.trim())
-    autoLoginState.logs.push({
-      timestamp: new Date().toISOString(),
-      stream: 'stdout',
-      message: text.trim()
-    })
-  })
-  
-  loginProcess.stderr.on('data', (data) => {
-    console.log('[AUTO-LOGIN stderr]', data.toString().trim())
-    autoLoginState.logs.push({
-      timestamp: new Date().toISOString(),
-      stream: 'stderr',
-      message: data.toString().trim()
-    })
-  })
-  
-  loginProcess.on('close', async (code) => {
-    console.log(`[AUTO-LOGIN] Process exited with code ${code}`)
-    autoLoginState.running = false
-    autoLoginState.logs.push({
-      timestamp: new Date().toISOString(),
-      stream: 'info',
-      message: code === 0 ? 'Login completed successfully' : `Login exited with code ${code}`
-    })
-    
-    // Save credentials to Supabase on success
-    if (code === 0 && autoLoginState.userId && autoLoginState.email && autoLoginState.password && supabase) {
-      try {
-        console.log('[AUTO-LOGIN] Saving credentials to Supabase...')
-        const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-        const iv = crypto.randomBytes(16)
-        const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-        let encrypted = cipher.update(autoLoginState.password, 'utf8', 'hex')
-        encrypted += cipher.final('hex')
-        const password_encrypted = iv.toString('hex') + ':' + encrypted
-        
-        const { data, error } = await supabase
-          .from('user_ah_credentials')
-          .upsert({
-            user_id: autoLoginState.userId,
-            ah_email: autoLoginState.email,
-            ah_password_encrypted: password_encrypted
-          }, { onConflict: 'user_id' })
-          .select()
-        
-        if (error) {
-          console.error('[ERROR] Failed to save credentials:', error.message)
-        } else {
-          console.log('[SUCCESS] Saved AH credentials for user', autoLoginState.userId)
-          autoLoginState.logs.push({
-            timestamp: new Date().toISOString(),
-            stream: 'info',
-            message: 'Credentials saved to database'
-          })
-        }
-      } catch (e) {
-        console.error('[ERROR] Exception saving credentials:', e)
-      }
-    }
-    
-    // Clear sensitive data
-    autoLoginState.password = null
-  })
-  
-  res.status(202).json({ status: 'started', startedAt })
-})
-
-// Get auto-login status
-app.get('/api/auto-scrape/auto-login/status', (req, res) => {
-  res.json({
-    running: autoLoginState.running,
-    startedAt: autoLoginState.startedAt,
-    logs: autoLoginState.logs.slice(-50)
-  })
-})
-
-// Login-and-Sync state (combined login + scrape for seamless user onboarding)
-const loginAndSyncState = {
-  running: false,
-  phase: null, // 'login', 'scrape', 'done'
-  startedAt: null,
-  logs: [],
-  progress: null,
-  error: null,
-  result: null,
-  email: null,
-  process: null  // Store process ref for cancellation
-}
-
-// Combined login + scrape: User enters credentials, we log in AND scrape their products
-app.post('/api/auto-scrape/login-and-sync', async (req, res) => {
-  console.log('[LOGIN-AND-SYNC] Endpoint hit!')
-  
-  // This works on Railway with headless mode
-  if (loginAndSyncState.running || autoLoginState.running || autoScrapeState.running) {
-    return res.status(409).json({ error: 'operation_in_progress' })
-  }
-  
-  const { email, password } = req.body || {}
-  
-  if (!email || !password) {
-    return res.status(400).json({ error: 'missing_credentials', message: 'Email and password are required' })
-  }
-  
-  // Normalize email for consistent storage and lookup
-  const normalizedEmail = email.toLowerCase().trim()
-  
-  try {
-    await fs.access(AUTO_SCRAPE_SCRIPT)
-  } catch (error) {
-    return res.status(500).json({ error: 'script_missing' })
-  }
-  
-  const startedAt = new Date().toISOString()
-  loginAndSyncState.running = true
-  loginAndSyncState.phase = 'login'
-  loginAndSyncState.startedAt = startedAt
-  loginAndSyncState.logs = []
-  loginAndSyncState.progress = 'Starting login...'
-  loginAndSyncState.error = null
-  loginAndSyncState.result = null
-  loginAndSyncState.email = normalizedEmail
-  
-  // First: register the user in our database
-  if (supabase) {
-    try {
-      await supabase
-        .from('user_ah_credentials')
-        .upsert({ ah_email: normalizedEmail }, { onConflict: 'ah_email' })
-      console.log('[LOGIN-AND-SYNC] User registered/updated:', normalizedEmail)
-    } catch (e) {
-      console.error('[LOGIN-AND-SYNC] Failed to register user:', e)
-    }
-  }
-  
-  const cookiesFile = path.join(__dirname, `cookies_${Date.now()}.json`)
-  
-  // Run auto-login to get cookies
-  const loginProcess = spawn(PYTHON_CMD, [
-    AUTO_SCRAPE_SCRIPT,
-    '--auto-login',
-    '--ah-email', email,
-    '--ah-password', password,
-    '--save-cookies', cookiesFile,
-    '--headless'  // Always headless on server
-  ], {
-    cwd: __dirname,
-    env: { ...process.env, PYTHONUNBUFFERED: '1' }
-  })
-  
-  // Store process reference for cancellation
-  loginAndSyncState.process = loginProcess
-  
-  loginProcess.stdout.on('data', (data) => {
-    const text = data.toString()
-    console.log('[LOGIN stdout]', text.trim())
-    loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stdout', message: text.trim() })
-    
-    // Parse progress
-    if (text.includes('[INFO]')) {
-      loginAndSyncState.progress = text.replace(/\[INFO\]\s*/g, '').trim()
-    } else if (text.includes('[SUCCESS]')) {
-      loginAndSyncState.progress = text.replace(/\[SUCCESS\]\s*/g, '').trim()
-    }
-  })
-  
-  loginProcess.stderr.on('data', (data) => {
-    console.log('[LOGIN stderr]', data.toString().trim())
-    loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stderr', message: data.toString().trim() })
-  })
-  
-  loginProcess.on('close', async (code) => {
-    console.log(`[LOGIN-AND-SYNC] Login process exited with code ${code}`)
-    
-    if (code !== 0) {
-      loginAndSyncState.running = false
-      loginAndSyncState.phase = 'done'
-      loginAndSyncState.error = 'Login failed - possibly incorrect credentials or CAPTCHA required'
-      loginAndSyncState.result = { success: false, error: loginAndSyncState.error }
-      // Clean up temp cookies file
-      try { await fs.unlink(cookiesFile) } catch {}
-      return
-    }
-    
-    // Login succeeded - save credentials to database
-    if (supabase) {
-      try {
-        const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-        const iv = crypto.randomBytes(16)
-        const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-        let encrypted = cipher.update(password, 'utf8', 'hex')
-        encrypted += cipher.final('hex')
-        const password_encrypted = iv.toString('hex') + ':' + encrypted
-        
-        await supabase
-          .from('user_ah_credentials')
-          .upsert({
-            ah_email: email,
-            ah_password_encrypted: password_encrypted
-          }, { onConflict: 'ah_email' })
-        console.log('[LOGIN-AND-SYNC] Saved encrypted credentials')
-      } catch (e) {
-        console.error('[LOGIN-AND-SYNC] Failed to save credentials:', e)
-      }
-    }
-    
-    // Now start scraping with the cookies
-    loginAndSyncState.phase = 'scrape'
-    loginAndSyncState.progress = 'Login successful! Now syncing your products...'
-    
-    const scrapeProcess = spawn(PYTHON_CMD, [
-      AUTO_SCRAPE_SCRIPT,
-      '--cookies', cookiesFile,
-      '--stealth',
-      '--headless',
-      '--output', path.join(__dirname, `auto_scrape_${Date.now()}.json`)
-    ], {
-      cwd: __dirname,
-      env: { ...process.env, PYTHONUNBUFFERED: '1' }
-    })
-    
-    let scrapeStdout = ''
-    
-    scrapeProcess.stdout.on('data', (data) => {
-      const text = data.toString()
-      scrapeStdout += text
-      console.log('[SCRAPE stdout]', text.trim())
-      loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stdout', message: text.trim() })
-      
-      if (text.includes('[INFO]')) {
-        loginAndSyncState.progress = text.replace(/\[INFO\]\s*/g, '').trim()
-      } else if (text.includes('[SUCCESS]')) {
-        loginAndSyncState.progress = text.replace(/\[SUCCESS\]\s*/g, '').trim()
-      }
-    })
-    
-    scrapeProcess.stderr.on('data', (data) => {
-      console.log('[SCRAPE stderr]', data.toString().trim())
-      loginAndSyncState.logs.push({ timestamp: new Date().toISOString(), stream: 'stderr', message: data.toString().trim() })
-    })
-    
-    scrapeProcess.on('close', async (scrapeCode) => {
-      console.log(`[LOGIN-AND-SYNC] Scrape process exited with code ${scrapeCode}`)
-      
-      // Parse result
-      let productsCount = 0
-      const resultMatch = scrapeStdout.match(/\[RESULT\]\s*(\{.*\})/s)
-      if (resultMatch) {
-        try {
-          const resultData = JSON.parse(resultMatch[1])
-          productsCount = resultData.products_stored || resultData.products_found || 0
-          
-          // Store products in database
-          if (supabase && resultData.products && resultData.products.length > 0) {
-            // Get user ID for this email
-            const { data: userData } = await supabase
-              .from('user_ah_credentials')
-              .select('id')
-              .eq('ah_email', email)
-              .single()
-            
-            if (userData) {
-              // Store each product
-              const purchases = resultData.products.map(p => ({
-                user_id: userData.id,
-                product_name: p.name,
-                product_data: p,
-                purchased_at: p.date || new Date().toISOString()
-              }))
-              
-              await supabase.from('user_purchases').insert(purchases)
-              console.log(`[LOGIN-AND-SYNC] Stored ${purchases.length} products for user`)
-            }
-          }
-        } catch (e) {
-          console.error('[LOGIN-AND-SYNC] Failed to parse scrape result:', e)
-        }
-      }
-      
-      loginAndSyncState.running = false
-      loginAndSyncState.phase = 'done'
-      
-      if (scrapeCode === 0) {
-        loginAndSyncState.result = { 
-          success: true, 
-          productsStored: productsCount,
-          email: email
-        }
-        loginAndSyncState.progress = `Synced ${productsCount} products!`
-      } else {
-        loginAndSyncState.error = 'Scraping failed'
-        loginAndSyncState.result = { success: false, error: 'Scraping failed' }
-      }
-      
-      // Clean up temp cookies file
-      try { await fs.unlink(cookiesFile) } catch {}
-    })
-  })
-  
-  res.status(202).json({ status: 'started', startedAt })
-})
-
-// Get login-and-sync status
-app.get('/api/auto-scrape/login-and-sync/status', (req, res) => {
-  res.json({
-    running: loginAndSyncState.running,
-    phase: loginAndSyncState.phase,
-    startedAt: loginAndSyncState.startedAt,
-    progress: loginAndSyncState.progress,
-    error: loginAndSyncState.error,
-    result: loginAndSyncState.result,
-    logs: loginAndSyncState.logs.slice(-50)
-  })
-})
-
-// Cancel login-and-sync (reset state)
-app.post('/api/auto-scrape/login-and-sync/cancel', (req, res) => {
-  console.log('[LOGIN-AND-SYNC] Cancel requested')
-  
-  // Kill any running process
-  if (loginAndSyncState.process) {
-    try {
-      loginAndSyncState.process.kill('SIGTERM')
-      console.log('[LOGIN-AND-SYNC] Process killed')
-    } catch (e) {
-      console.log('[LOGIN-AND-SYNC] Could not kill process:', e.message)
-    }
-  }
-  
-  // Reset all states
-  loginAndSyncState.running = false
-  loginAndSyncState.phase = null
-  loginAndSyncState.startedAt = null
-  loginAndSyncState.progress = 0
-  loginAndSyncState.error = null
-  loginAndSyncState.result = null
-  loginAndSyncState.logs = []
-  loginAndSyncState.process = null
-  
-  autoLoginState.running = false
-  autoScrapeState.running = false
-  
-  res.json({ success: true, message: 'State reset' })
-})
-
 // Cookie capture state
 const cookieCaptureState = {
   running: false,
@@ -4935,54 +3795,15 @@ app.post('/api/auto-scrape/capture-cookies', async (req, res) => {
     return res.status(500).json({ error: 'script_missing' })
   }
   
-  // Get user and save credentials if provided
+  // Get user ID for tracking (no credential storage)
   const user = await getUserFromRequest(req)
   const userId = user?.id || null
-  const { email, password, save_credentials } = req.body || {}
-  
-  console.log(`[DEBUG] capture-cookies: userId=${userId}, email=${email ? 'yes' : 'no'}, password=${password ? 'yes' : 'no'}, save_credentials=${save_credentials}, supabase=${!!supabase}`)
-  
-  if (save_credentials && userId && email && password && supabase) {
-    try {
-      console.log('[CAPTURE-COOKIES] Saving credentials to Supabase...')
-      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-      const iv = crypto.randomBytes(16)
-      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-      let encrypted = cipher.update(password, 'utf8', 'hex')
-      encrypted += cipher.final('hex')
-      const password_encrypted = iv.toString('hex') + ':' + encrypted
-      
-      const { data, error } = await supabase
-        .from('user_ah_credentials')
-        .upsert({
-          user_id: userId,
-          ah_email: email,
-          ah_password_encrypted: password_encrypted
-        }, { onConflict: 'user_id' })
-        .select()
-      
-      if (error) {
-        console.error('[ERROR] Failed to save AH credentials:', error.message, error.code, error.details)
-      } else {
-        console.log(`[SUCCESS] Saved AH credentials for user ${userId}:`, data)
-      }
-    } catch (e) {
-      console.error('[ERROR] Exception saving credentials:', e)
-    }
-  } else {
-    console.log(`[DEBUG] Not saving credentials - conditions not met:`)
-    console.log(`  save_credentials=${save_credentials}`)
-    console.log(`  userId=${userId}`)
-    console.log(`  email=${email ? 'present' : 'missing'}`)
-    console.log(`  password=${password ? 'present' : 'missing'}`)
-    console.log(`  supabase=${supabase ? 'present' : 'missing'}`)
-  }
   
   const startedAt = new Date().toISOString()
   cookieCaptureState.running = true
   cookieCaptureState.startedAt = startedAt
   cookieCaptureState.logs = []
-  cookieCaptureState.userId = userId  // Store for credential saving when complete
+  cookieCaptureState.userId = userId
   
   const captureProcess = spawn(PYTHON_CMD, [
     AUTO_SCRAPE_SCRIPT,
@@ -5018,50 +3839,6 @@ app.post('/api/auto-scrape/capture-cookies', async (req, res) => {
       stream: 'info',
       message: code === 0 ? 'Cookie capture completed successfully' : `Cookie capture exited with code ${code}`
     })
-    
-    // Parse result and save captured credentials if present
-    if (code === 0 && cookieCaptureState.userId && supabase) {
-      try {
-        const allLogs = cookieCaptureState.logs.map(l => l.message).join('\n')
-        const resultMatch = allLogs.match(/\[RESULT\]\s*(\{.*\})/s)
-        if (resultMatch) {
-          const result = JSON.parse(resultMatch[1])
-          console.log('[CAPTURE-COOKIES] Parsed result:', JSON.stringify(result))
-          
-          if (result.credentials?.email && result.credentials?.password) {
-            console.log('[CAPTURE-COOKIES] Saving captured credentials to Supabase...')
-            const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-            const iv = crypto.randomBytes(16)
-            const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-            let encrypted = cipher.update(result.credentials.password, 'utf8', 'hex')
-            encrypted += cipher.final('hex')
-            const password_encrypted = iv.toString('hex') + ':' + encrypted
-            
-            const { data, error } = await supabase
-              .from('user_ah_credentials')
-              .upsert({
-                user_id: cookieCaptureState.userId,
-                ah_email: result.credentials.email,
-                ah_password_encrypted: password_encrypted
-              }, { onConflict: 'user_id' })
-              .select()
-            
-            if (error) {
-              console.error('[ERROR] Failed to save captured credentials:', error.message)
-            } else {
-              console.log('[SUCCESS] Saved captured AH credentials for user', cookieCaptureState.userId)
-              cookieCaptureState.logs.push({
-                timestamp: new Date().toISOString(),
-                stream: 'info',
-                message: 'Credentials saved successfully'
-              })
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[ERROR] Exception parsing/saving captured credentials:', e)
-      }
-    }
   })
   
   res.status(202).json({ status: 'started', startedAt })
@@ -5114,11 +3891,8 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
     userId = user?.id || null
   }
   
-  // Accept optional email/password to save credentials (like the password method)
-  const { email, password, save_credentials } = req.body || {}
-  
-  // For new email-based users without an existing record, create one
-  // We'll use the provided email to create a new user_id if needed
+  // For email-based users, look up or create user_id from email header
+  const { email } = req.body || {}
   if (!userId && email && supabase) {
     // Check if user already exists by this email
     const existingUserId = await getUserIdByAHEmail(email)
@@ -5128,33 +3902,6 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
       // Create new user - generate a UUID
       userId = crypto.randomUUID()
       appendAutoScrapeLog('info', `Created new user account for ${email}`)
-    }
-  }
-  
-  // Save credentials if provided (so user can re-scrape with cookies later)
-  // For email-based auth, always save credentials when email+password provided
-  const shouldSaveCredentials = save_credentials || (email && password && !ahEmailHeader)
-  if (shouldSaveCredentials && userId && email && password && supabase) {
-    try {
-      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-      const iv = crypto.randomBytes(16)
-      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-      let encrypted = cipher.update(password, 'utf8', 'hex')
-      encrypted += cipher.final('hex')
-      const password_encrypted = iv.toString('hex') + ':' + encrypted
-      
-      await supabase
-        .from('user_ah_credentials')
-        .upsert({
-          user_id: userId,
-          ah_email: email,
-          ah_password_encrypted: password_encrypted,
-          sync_status: 'scraping'
-        }, { onConflict: 'user_id' })
-      
-      appendAutoScrapeLog('info', `💾 Saved AH credentials for future use`)
-    } catch (e) {
-      appendAutoScrapeLog('stderr', `Failed to save credentials: ${e.message}`)
     }
   }
   
@@ -5335,6 +4082,7 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
               user_id: userId,
               product_id: p.id,
               product_name: p.name,
+              product_url: p.url,
               price: p.price,
               quantity: 1,
               source: 'ah_visual_login',
@@ -5442,43 +4190,9 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     return res.status(409).json({ error: 'scrape_in_progress' })
   }
   
-  // Get user from session ID or JWT
+  // Get user from session ID or JWT (for recording purchases, no credential storage)
   const userId = await getUserIdFromSession(req) || req.body?.user_id || null
   console.log('[DEBUG] With-cookies - userId:', userId)
-  
-  // Accept optional email/password to save credentials (for admin manual logins)
-  const { email, password, save_credentials } = req.body || {}
-  
-  console.log(`[DEBUG] with-cookies: userId=${userId}, email=${email ? 'yes' : 'no'}, password=${password ? 'yes' : 'no'}, save_credentials=${save_credentials}`)
-  
-  if (save_credentials && userId && email && password && supabase) {
-    try {
-      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-      const iv = crypto.randomBytes(16)
-      const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-      let encrypted = cipher.update(password, 'utf8', 'hex')
-      encrypted += cipher.final('hex')
-      const password_encrypted = iv.toString('hex') + ':' + encrypted
-      
-      const { data, error } = await supabase
-        .from('user_ah_credentials')
-        .upsert({
-          user_id: userId,
-          ah_email: email,
-          ah_password_encrypted: password_encrypted
-        }, { onConflict: 'user_id' })
-        .select()
-      
-      if (error) {
-        console.error('[ERROR] Failed to save AH credentials (with-cookies):', error.message)
-      } else {
-        console.log(`[INFO] Saved AH credentials for user ${userId} (via with-cookies)`)
-        appendAutoScrapeLog('info', `💾 Saved AH credentials for user`)
-      }
-    } catch (e) {
-      console.error('[ERROR] Exception saving credentials (with-cookies):', e)
-    }
-  }
   
   // Check if cookies exist
   if (!existsSync(COOKIES_FILE)) {
@@ -5500,23 +4214,8 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     appendAutoScrapeLog('info', `Recording purchases for user: ${userId}`)
   }
   
-  // Check if user already has account protection disabled
-  let accountProtectionAlreadyDisabled = false
-  if (userId && supabase) {
-    try {
-      const { data: creds } = await supabase
-        .from('user_ah_credentials')
-        .select('account_protection_disabled')
-        .eq('user_id', userId)
-        .single()
-      accountProtectionAlreadyDisabled = creds?.account_protection_disabled || false
-      if (accountProtectionAlreadyDisabled) {
-        appendAutoScrapeLog('info', 'Account protection already disabled - skipping settings page')
-      }
-    } catch (e) {
-      // Ignore errors, just proceed with checking account protection
-    }
-  }
+  // Account protection check removed - user_ah_credentials table no longer used
+  const accountProtectionAlreadyDisabled = false
   
   // Use stealth mode: headless + cookies, will signal if login needed
   const scriptArgs = [
@@ -5739,15 +4438,8 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
             }
           }
           
-          // Update user's sync status
-          await supabase
-            .from('user_ah_credentials')
-            .update({ 
-              sync_status: 'success', 
-              last_sync_at: new Date().toISOString(),
-              account_protection_disabled: true  // Mark as disabled after successful scrape
-            })
-            .eq('user_id', userId)
+          // Sync status update removed - user_ah_credentials table no longer used
+          appendAutoScrapeLog('info', '✅ Scrape completed successfully')
         }
       } catch (e) {
         appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
@@ -5762,258 +4454,17 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
 })
 
 // ============================================================================
-// ADMIN ENDPOINTS
-// For admin to manage user credentials and run scrapes on their behalf
-// Requires ADMIN_SECRET environment variable
+// ADMIN ENDPOINTS (CREDENTIAL MANAGEMENT REMOVED)
+// Credential-based admin scraping has been removed for privacy/legal reasons
 // ============================================================================
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || null
-
-// Middleware to check admin authentication
-function requireAdmin(req, res, next) {
-  const adminHeader = req.headers['x-admin-secret']
-  if (!ADMIN_SECRET) {
-    return res.status(503).json({ error: 'admin_not_configured', message: 'ADMIN_SECRET not set in environment' })
-  }
-  if (!adminHeader || adminHeader !== ADMIN_SECRET) {
-    return res.status(401).json({ error: 'unauthorized', message: 'Invalid admin secret' })
-  }
-  next()
-}
-
-// List all users with AH credentials (for admin to see who needs scraping)
-app.get('/api/admin/ah-credentials', requireAdmin, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .select('user_id, ah_email, cookies_updated_at, last_sync_at, sync_status, created_at')
-      .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    
-    // Also get user emails from auth.users if possible
-    const result = data || []
-    res.json({ 
-      count: result.length,
-      credentials: result
-    })
-  } catch (err) {
-    console.error('Error listing credentials:', err)
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
-})
-
-// Get decrypted credentials for a specific user (for admin to run scrapes)
-app.get('/api/admin/ah-credentials/:userId', requireAdmin, async (req, res) => {
-  try {
-    const { userId } = req.params
-    
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'not_found', message: 'No credentials found for this user' })
-      }
-      throw error
-    }
-    
-    // Decrypt password if available
-    let decryptedPassword = null
-    if (data.ah_password_encrypted) {
-      try {
-        const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-        const [ivHex, encryptedHex] = data.ah_password_encrypted.split(':')
-        const iv = Buffer.from(ivHex, 'hex')
-        const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
-        decrypted += decipher.final('utf8')
-        decryptedPassword = decrypted
-      } catch (e) {
-        console.error('Failed to decrypt password:', e.message)
-      }
-    }
-    
-    res.json({
-      user_id: data.user_id,
-      ah_email: data.ah_email,
-      ah_password: decryptedPassword,  // Decrypted for admin use
-      has_cookies: !!data.cookies_encrypted,
-      last_sync_at: data.last_sync_at,
-      sync_status: data.sync_status,
-      created_at: data.created_at
-    })
-  } catch (err) {
-    console.error('Error fetching credentials:', err)
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
-})
-
-// Update sync status for a user (after admin runs scrape manually)
-app.patch('/api/admin/ah-credentials/:userId', requireAdmin, async (req, res) => {
-  try {
-    const { userId } = req.params
-    const { sync_status, last_sync_at } = req.body
-    
-    const updates = {}
-    if (sync_status) updates.sync_status = sync_status
-    if (last_sync_at) updates.last_sync_at = last_sync_at
-    
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ error: 'no_updates', message: 'Provide sync_status or last_sync_at' })
-    }
-    
-    const { data, error } = await supabase
-      .from('user_ah_credentials')
-      .update(updates)
-      .eq('user_id', userId)
-      .select('user_id, ah_email, last_sync_at, sync_status')
-      .single()
-    
-    if (error) throw error
-    res.json({ success: true, credentials: data })
-  } catch (err) {
-    console.error('Error updating credentials:', err)
-    res.status(500).json({ error: 'update_failed', message: err.message })
-  }
-})
-
-// Run scrape for a specific user (using their saved credentials)
-app.post('/api/admin/scrape/:userId', requireAdmin, async (req, res) => {
-  try {
-    const { userId } = req.params
-    
-    // Get user's credentials
-    const { data: creds, error: credsError } = await supabase
-      .from('user_ah_credentials')
-      .select('ah_email, ah_password_encrypted')
-      .eq('user_id', userId)
-      .single()
-    
-    if (credsError || !creds) {
-      return res.status(404).json({ error: 'no_credentials', message: 'No credentials found for this user' })
-    }
-    
-    if (!creds.ah_password_encrypted) {
-      return res.status(400).json({ error: 'no_password', message: 'User has no password saved' })
-    }
-    
-    // Decrypt password
-    let password = null
-    try {
-      const encryptionKey = process.env.COOKIES_ENCRYPTION_KEY || 'default-key-change-in-production'
-      const [ivHex, encryptedHex] = creds.ah_password_encrypted.split(':')
-      const iv = Buffer.from(ivHex, 'hex')
-      const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(encryptionKey, 'salt', 32), iv)
-      let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
-      decrypted += decipher.final('utf8')
-      password = decrypted
-    } catch (e) {
-      return res.status(500).json({ error: 'decrypt_failed', message: 'Could not decrypt password' })
-    }
-    
-    // Check if scrape already running
-    if (autoScrapeState.running) {
-      return res.status(409).json({ error: 'scrape_in_progress', startedAt: autoScrapeState.startedAt })
-    }
-    
-    // Start the scrape (similar to /api/auto-scrape)
-    const startedAt = new Date().toISOString()
-    autoScrapeState.running = true
-    autoScrapeState.startedAt = startedAt
-    autoScrapeState.lastRun = { status: 'running', startedAt, userId }
-    autoScrapeState.logs = []
-    autoScrapeState.progress = 'Starting admin-initiated scrape...'
-    
-    // Store credentials to update on success
-    autoScrapeState.pendingCredentials = { userId, email: creds.ah_email, password }
-    
-    appendAutoScrapeLog('info', `Admin scrape started for user: ${userId}`)
-    appendAutoScrapeLog('info', `Email: ${creds.ah_email.substring(0, 3)}***@${creds.ah_email.split('@')[1] || '***'}`)
-    
-    const scriptArgs = [
-      AUTO_SCRAPE_SCRIPT,
-      '--email', creds.ah_email,
-      '--password', password,
-      '--no-headless'
-    ]
-    
-    let autoScrapeProcess
-    try {
-      autoScrapeProcess = spawn(PYTHON_CMD, scriptArgs, {
-        cwd: __dirname,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
-      })
-    } catch (error) {
-      autoScrapeState.running = false
-      autoScrapeState.startedAt = null
-      return res.status(500).json({ error: 'spawn_failed', details: error.message })
-    }
-    
-    let resultData = null
-    
-    autoScrapeProcess.stdout.on('data', (data) => {
-      const text = data.toString()
-      appendAutoScrapeLog('stdout', text)
-      
-      const resultMatch = text.match(/\[RESULT\]\s*(\{.*\})/s)
-      if (resultMatch) {
-        try {
-          resultData = JSON.parse(resultMatch[1])
-        } catch (e) {
-          console.error('Failed to parse scrape result:', e)
-        }
-      }
-    })
-    
-    autoScrapeProcess.stderr.on('data', (data) => {
-      appendAutoScrapeLog('stderr', data)
-    })
-    
-    autoScrapeProcess.on('close', async (code) => {
-      const completedAt = new Date().toISOString()
-      autoScrapeState.running = false
-      autoScrapeState.startedAt = null
-      
-      autoScrapeState.lastRun = {
-        status: code === 0 && resultData?.success ? 'success' : 'error',
-        startedAt,
-        completedAt,
-        userId,
-        productsFound: resultData?.count || 0,
-        error: resultData?.error || (code !== 0 ? `Exited with code ${code}` : null)
-      }
-      
-      // Update user's sync status
-      await supabase
-        .from('user_ah_credentials')
-        .update({ 
-          sync_status: code === 0 && resultData?.success ? 'success' : 'error',
-          last_sync_at: completedAt
-        })
-        .eq('user_id', userId)
-      
-      // Ingest products if successful (similar to regular scrape)
-      if (resultData?.success && resultData?.products?.length > 0) {
-        // ... ingestion happens automatically via the same close handler in auto-scrape
-        appendAutoScrapeLog('info', `Admin scrape completed: ${resultData.products.length} products`)
-      }
-    })
-    
-    res.status(202).json({ 
-      status: 'started', 
-      startedAt, 
-      userId,
-      email: creds.ah_email
-    })
-  } catch (err) {
-    console.error('Error starting admin scrape:', err)
-    res.status(500).json({ error: 'scrape_failed', message: err.message })
-  }
-})
+// NOTE: The following admin endpoints have been removed because they handled user credentials:
+// - GET /api/admin/ah-credentials - listed users with stored credentials
+// - GET /api/admin/ah-credentials/:userId - retrieved decrypted credentials
+// - PATCH /api/admin/ah-credentials/:userId - updated sync status
+// - POST /api/admin/scrape/:userId - ran scrapes using stored credentials
+//
+// Use the bookmarklet method instead which doesn't require storing credentials.
 
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
 // Global Express error handler - must be last middleware
