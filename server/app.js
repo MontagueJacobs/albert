@@ -2998,6 +2998,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
       // These fields are populated ONLY by the enrichment scraper (kenmerken section)
 
       // Parse price - handle both number and string formats (e.g., "€2.99", "2,99")
+      // Price should come from scraper (eerder-gekocht page) or batch enrichment
       let parsedPrice = null
       if (typeof raw?.price === 'number' && !Number.isNaN(raw.price)) {
         parsedPrice = raw.price
@@ -3007,14 +3008,6 @@ app.post('/api/ingest/scrape', async (req, res) => {
         const num = parseFloat(priceStr)
         if (!Number.isNaN(num) && num > 0) {
           parsedPrice = num
-        }
-      }
-      
-      // Fallback: Try to extract price from the product name (e.g., "€1.79" or "€2,99")
-      if (!parsedPrice && rawName) {
-        const priceInName = rawName.match(/€\s*(\d+)[,.](\d{2})/);
-        if (priceInName) {
-          parsedPrice = parseFloat(`${priceInName[1]}.${priceInName[2]}`)
         }
       }
 

@@ -970,13 +970,98 @@ class AHAutoScraper:
             pass
     
     async def extract_products(self) -> List[Dict[str, Any]]:
-        """Extract product information from the page."""
+        """Extract product information from the page, including prices and images from embedded JSON."""
         print("[INFO] Extracting products...", flush=True)
         
         products = await self.page.evaluate('''
             () => {
                 const items = [];
                 const seen = new Set();
+                
+                // First, try to extract product data from embedded Apollo/Next.js state
+                // This contains accurate price and image data
+                const productDataMap = {};
+                try {
+                    // Try window.__APOLLO_STATE__ first
+                    if (window.__APOLLO_STATE__) {
+                        const state = window.__APOLLO_STATE__;
+                        for (const key in state) {
+                            if (key.startsWith('Product:')) {
+                                const productId = key.replace('Product:', '');
+                                const product = state[key];
+                                productDataMap[productId] = {
+                                    title: product.title,
+                                    webPath: product.webPath
+                                };
+                                
+                                // Extract price from priceV2 field
+                                for (const pKey in product) {
+                                    if (pKey.startsWith('priceV2')) {
+                                        const priceData = product[pKey];
+                                        if (priceData?.now?.amount) {
+                                            productDataMap[productId].price = priceData.now.amount;
+                                        }
+                                    }
+                                    // Extract image from imagePack field
+                                    if (pKey.startsWith('imagePack')) {
+                                        const images = product[pKey];
+                                        if (Array.isArray(images) && images[0]?.small?.url) {
+                                            productDataMap[productId].image = images[0].small.url.replace(/\\\\u002F/g, '/');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Also try parsing script tags for embedded JSON if Apollo state not found
+                    if (Object.keys(productDataMap).length === 0) {
+                        const scripts = document.querySelectorAll('script');
+                        for (const script of scripts) {
+                            const text = script.textContent || '';
+                            if (text.includes('"Product:') && text.includes('"priceV2')) {
+                                try {
+                                    // Try to find and parse JSON object
+                                    const jsonMatch = text.match(/\\{[^]*"Product:\\d+"[^]*\\}/);
+                                    if (jsonMatch) {
+                                        const data = JSON.parse(jsonMatch[0]);
+                                        for (const key in data) {
+                                            if (key.startsWith('Product:')) {
+                                                const productId = key.replace('Product:', '');
+                                                const product = data[key];
+                                                productDataMap[productId] = {
+                                                    title: product.title,
+                                                    webPath: product.webPath
+                                                };
+                                                
+                                                for (const pKey in product) {
+                                                    if (pKey.startsWith('priceV2')) {
+                                                        const priceData = product[pKey];
+                                                        if (priceData?.now?.amount) {
+                                                            productDataMap[productId].price = priceData.now.amount;
+                                                        }
+                                                    }
+                                                    if (pKey.startsWith('imagePack')) {
+                                                        const images = product[pKey];
+                                                        if (Array.isArray(images) && images[0]?.small?.url) {
+                                                            let imgUrl = images[0].small.url;
+                                                            // Unescape unicode
+                                                            imgUrl = imgUrl.replace(/\\\\u002F/g, '/').replace(/\\u002F/g, '/');
+                                                            productDataMap[productId].image = imgUrl;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch(e) { /* JSON parse failed, continue */ }
+                            }
+                        }
+                    }
+                    console.log('[Scraper] Extracted Apollo data for', Object.keys(productDataMap).length, 'products');
+                } catch(e) {
+                    console.log('[Scraper] Apollo extraction error:', e.message);
+                }
                 
                 // Find all product cards/articles
                 const cards = document.querySelectorAll('article, [data-testhook="product-card"]');
@@ -989,6 +1074,11 @@ class AHAutoScraper:
                     const url = new URL(link.href, location.origin).toString();
                     if (seen.has(url)) return;
                     seen.add(url);
+                    
+                    // Extract product ID from URL (e.g., wi123456)
+                    const idMatch = url.match(/wi(\\d+)/);
+                    const productId = idMatch ? idMatch[1] : null;
+                    const apolloData = productId ? productDataMap[productId] : null;
                     
                     // Get product name - try multiple strategies
                     let name = '';
@@ -1012,7 +1102,12 @@ class AHAutoScraper:
                         name = link.getAttribute('aria-label') || '';
                     }
                     
-                    // Strategy 4: Extract from URL
+                    // Strategy 4: Use Apollo data title
+                    if (!name && apolloData?.title) {
+                        name = apolloData.title;
+                    }
+                    
+                    // Strategy 5: Extract from URL
                     if (!name) {
                         const match = url.match(/\\/product\\/wi\\d+\\/(.+)$/);
                         if (match) {
@@ -1030,20 +1125,25 @@ class AHAutoScraper:
                               .replace(/\\s+/g, ' ')
                               .trim();
                     
-                    // Get price
-                    let price = null;
-                    const priceEl = card.querySelector('[data-testhook="product-price"], [class*="price"]');
-                    if (priceEl) {
-                        const priceText = priceEl.textContent.replace(',', '.');
-                        const priceMatch = priceText.match(/(\\d+\\.\\d{2})/);
-                        if (priceMatch) {
-                            price = parseFloat(priceMatch[1]);
+                    // Get price - prefer Apollo data, fall back to DOM
+                    let price = apolloData?.price || null;
+                    if (!price) {
+                        const priceEl = card.querySelector('[data-testhook="product-price"], [class*="price"]');
+                        if (priceEl) {
+                            const priceText = priceEl.textContent.replace(',', '.');
+                            const priceMatch = priceText.match(/(\\d+\\.\\d{2})/);
+                            if (priceMatch) {
+                                price = parseFloat(priceMatch[1]);
+                            }
                         }
                     }
                     
-                    // Get image
-                    const imgEl = card.querySelector('img');
-                    const image = imgEl?.src || '';
+                    // Get image - prefer Apollo data, fall back to DOM
+                    let image = apolloData?.image || '';
+                    if (!image) {
+                        const imgEl = card.querySelector('img');
+                        image = imgEl?.src || '';
+                    }
                     
                     if (name && name.length > 2) {
                         items.push({
