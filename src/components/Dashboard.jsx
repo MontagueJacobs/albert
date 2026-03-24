@@ -193,6 +193,7 @@ function Dashboard({ syncVersion }) {
       if (res.ok) {
         const data = await res.json()
         console.log('[Dashboard] Purchase history response:', data)
+        console.log('[Dashboard] Purchases count:', data.purchases?.length, 'total:', data.total)
         setPurchases(data.purchases || [])
         setPurchaseTotal(data.total || 0)
         setPurchaseTotalPages(data.totalPages || 0)
@@ -201,6 +202,10 @@ function Dashboard({ syncVersion }) {
         console.error('[Dashboard] Purchase history fetch failed:', res.status, res.statusText)
         const errData = await res.json().catch(() => ({}))
         console.error('[Dashboard] Error details:', errData)
+        // Show error to user if invalid card
+        if (errData.error === 'invalid_card') {
+          console.error('[Dashboard] Invalid bonus card format - check localStorage')
+        }
       }
     } catch (err) {
       console.error('Failed to fetch purchase history:', err)

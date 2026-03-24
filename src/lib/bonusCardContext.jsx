@@ -13,8 +13,9 @@ export function BonusCardProvider({ children }) {
     const urlParams = new URLSearchParams(window.location.search)
     const cardFromUrl = urlParams.get('card')
     
-    if (cardFromUrl && cardFromUrl.length >= 10) {
-      console.log('[BonusCard] Found card in URL:', cardFromUrl.slice(-4))
+    // Bonus cards must be exactly 13 digits
+    if (cardFromUrl && /^\d{13}$/.test(cardFromUrl)) {
+      console.log('[BonusCard] Found valid card in URL:', cardFromUrl.slice(-4))
       // Save to localStorage and use it
       localStorage.setItem('ah_bonus_card', cardFromUrl)
       setBonusCardNumber(cardFromUrl)
@@ -25,12 +26,17 @@ export function BonusCardProvider({ children }) {
       return
     }
     
-    // Otherwise check localStorage
+    // Otherwise check localStorage - validate format
     const savedCard = localStorage.getItem('ah_bonus_card')
-    if (savedCard) {
+    if (savedCard && /^\d{13}$/.test(savedCard)) {
+      console.log('[BonusCard] Found valid card in localStorage:', savedCard.slice(-4))
       setBonusCardNumber(savedCard)
       fetchUserInfo(savedCard)
     } else {
+      if (savedCard) {
+        console.warn('[BonusCard] Invalid card format in localStorage:', savedCard?.length, 'chars - clearing')
+        localStorage.removeItem('ah_bonus_card')
+      }
       setLoading(false)
     }
   }, [])

@@ -2863,13 +2863,30 @@ app.get('/api/debug/purchases', async (req, res) => {
     
     // Count rows for this bonus card
     let bonusCount = 0
+    let samplePurchases = []
     if (bonusCard) {
-      const { count } = await supabase
+      const { count, data: purchases } = await supabase
         .from('user_purchases')
-        .select('*', { count: 'exact', head: true })
+        .select('product_name, bonus_card_number, scraped_at', { count: 'exact' })
         .eq('bonus_card_number', bonusCard)
+        .limit(5)
       bonusCount = count
+      samplePurchases = purchases || []
     }
+    
+    // Get all unique bonus cards (masked for privacy)
+    const { data: allCards } = await supabase
+      .from('user_purchases')
+      .select('bonus_card_number')
+      .not('bonus_card_number', 'is', null)
+    
+    const uniqueCards = [...new Set(allCards?.map(r => r.bonus_card_number) || [])]
+    const maskedCards = uniqueCards.map(card => ({
+      masked: card ? '•••••••••' + card.slice(-4) : 'null',
+      length: card?.length || 0,
+      matches_query: bonusCard ? (card === bonusCard) : null,
+      count: allCards?.filter(r => r.bonus_card_number === card).length || 0
+    }))
     
     // Check products table
     const { count: productCount } = await supabase
@@ -2877,12 +2894,19 @@ app.get('/api/debug/purchases', async (req, res) => {
       .select('*', { count: 'exact', head: true })
     
     res.json({
+      query_card: bonusCard ? {
+        provided: '•••••••••' + bonusCard.slice(-4),
+        length: bonusCard.length,
+        is_valid_format: /^\d{13}$/.test(bonusCard)
+      } : null,
       user_purchases: {
         total_rows: totalCount,
         bonus_card_rows: bonusCount,
+        sample_purchases: samplePurchases.map(p => ({ name: p.product_name, scraped_at: p.scraped_at })),
         sample_columns: columns?.[0] ? Object.keys(columns[0]) : [],
         error: colError?.message
       },
+      all_bonus_cards: maskedCards,
       products: {
         total_rows: productCount
       },
