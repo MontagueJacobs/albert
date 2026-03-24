@@ -113,38 +113,6 @@
       color: #f59e0b;
     }
     
-    .auth-section {
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #475569;
-    }
-    
-    .input-group {
-      margin-bottom: 12px;
-    }
-    
-    .input-group label {
-      display: block;
-      margin-bottom: 4px;
-      color: #9ca3af;
-      font-size: 0.9rem;
-    }
-    
-    .input-group input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #475569;
-      border-radius: 8px;
-      background: #0f172a;
-      color: #f3f4f6;
-      font-size: 1rem;
-    }
-    
-    .input-group input:focus {
-      outline: none;
-      border-color: #22c55e;
-    }
-    
     .btn {
       width: 100%;
       padding: 14px;
@@ -156,43 +124,9 @@
       margin-top: 8px;
     }
     
-    .btn-primary {
-      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
-      color: white;
-    }
-    
     .btn-secondary {
       background: #475569;
       color: #f3f4f6;
-    }
-    
-    #auth-status {
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-    
-    #auth-status.signed-in {
-      background: rgba(34, 197, 94, 0.2);
-      color: #22c55e;
-    }
-    
-    #auth-status.signed-out {
-      background: rgba(245, 158, 11, 0.2);
-      color: #f59e0b;
-    }
-    
-    .hidden { display: none; }
-    
-    .warning {
-      background: rgba(245, 158, 11, 0.2);
-      border: 1px solid #f59e0b;
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 16px;
-      font-size: 0.9rem;
-      color: #fbbf24;
     }
   </style>
 </head>
@@ -207,13 +141,6 @@
       <div class="step">
         <div class="step-number">1</div>
         <div class="step-content">
-          <p><strong>Sign in below</strong> with your Sustainable Shop account</p>
-        </div>
-      </div>
-      
-      <div class="step">
-        <div class="step-number">2</div>
-        <div class="step-content">
           <p><strong>Drag this button</strong> to your bookmarks bar:</p>
           <a class="bookmarklet" id="bookmarklet-link" href="#">🌱 Sync AH</a>
           <div class="drag-hint">
@@ -223,35 +150,10 @@
       </div>
       
       <div class="step">
-        <div class="step-number">3</div>
+        <div class="step-number">2</div>
         <div class="step-content">
-          <p>Go to <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank" style="color: #667eea;">ah.nl/producten/eerder-gekocht</a>, log in, then click the bookmarklet!</p>
+          <p>Go to <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank" style="color: #667eea;">ah.nl/producten/eerder-gekocht</a>, log in to Albert Heijn, then click the bookmarklet!</p>
         </div>
-      </div>
-      
-      <div class="auth-section">
-        <div id="auth-status" class="signed-out">Not signed in</div>
-        
-        <div id="sign-in-form">
-          <div class="input-group">
-            <label>Email</label>
-            <input type="email" id="email" placeholder="you@example.com">
-          </div>
-          <div class="input-group">
-            <label>Password</label>
-            <input type="password" id="password" placeholder="••••••••">
-          </div>
-          <button class="btn btn-primary" id="sign-in-btn">Sign In</button>
-          <div id="auth-error" style="color: #ef4444; margin-top: 8px; font-size: 0.9rem;"></div>
-        </div>
-        
-        <div id="signed-in-section" class="hidden">
-          <button class="btn btn-secondary" id="sign-out-btn">Sign Out</button>
-        </div>
-      </div>
-      
-      <div class="warning" id="not-signed-in-warning">
-        ⚠️ You must sign in before using the bookmarklet, otherwise your purchases won't be saved to your account.
       </div>
     </div>
     
@@ -270,113 +172,21 @@
   </div>
   
   <script>
-    const SUPABASE_URL = 'https://gfxawraapyjqtmlemskl.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_GByhVPFERsx_DD2gTB2y-w_5okCNIyM';
     // Use the current origin so bookmarklet works on any Vercel preview deployment
     const API_BASE = window.location.origin.includes('localhost') 
       ? 'http://localhost:3001' 
       : window.location.origin;
     
-    let userToken = localStorage.getItem('ss_token');
-    let userEmail = localStorage.getItem('ss_email');
+    // Generate bookmarklet code
+    const code = `
+      javascript:(function(){
+        var s=document.createElement('script');
+        s.src='${API_BASE}/bookmarklet.js?t='+Date.now();
+        document.body.appendChild(s);
+      })();
+    `.replace(/\s+/g, ' ').trim();
     
-    // Update bookmarklet with token
-    function updateBookmarklet() {
-      const token = userToken || '';
-      const code = `
-        javascript:(function(){
-          var s=document.createElement('script');
-          s.src='${API_BASE}/bookmarklet.js?token=${encodeURIComponent(token)}&t='+Date.now();
-          document.body.appendChild(s);
-        })();
-      `.replace(/\s+/g, ' ').trim();
-      
-      document.getElementById('bookmarklet-link').href = code;
-    }
-    
-    // Check auth status
-    function updateAuthUI() {
-      const status = document.getElementById('auth-status');
-      const signInForm = document.getElementById('sign-in-form');
-      const signedInSection = document.getElementById('signed-in-section');
-      const warning = document.getElementById('not-signed-in-warning');
-      
-      if (userToken && userEmail) {
-        status.textContent = `✅ Signed in as ${userEmail}`;
-        status.className = 'signed-in';
-        signInForm.classList.add('hidden');
-        signedInSection.classList.remove('hidden');
-        warning.classList.add('hidden');
-      } else {
-        status.textContent = '⚠️ Not signed in';
-        status.className = 'signed-out';
-        signInForm.classList.remove('hidden');
-        signedInSection.classList.add('hidden');
-        warning.classList.remove('hidden');
-      }
-      
-      updateBookmarklet();
-    }
-    
-    // Sign in
-    document.getElementById('sign-in-btn').addEventListener('click', async () => {
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      const errorEl = document.getElementById('auth-error');
-      const btn = document.getElementById('sign-in-btn');
-      
-      if (!email || !password) {
-        errorEl.textContent = 'Please enter email and password';
-        return;
-      }
-      
-      btn.disabled = true;
-      btn.textContent = 'Signing in...';
-      errorEl.textContent = '';
-      
-      try {
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY
-          },
-          body: JSON.stringify({ email, password })
-        });
-        
-        const data = await res.json();
-        
-        if (!res.ok) {
-          throw new Error(data.error_description || data.msg || 'Sign in failed');
-        }
-        
-        userToken = data.access_token;
-        userEmail = email;
-        localStorage.setItem('ss_token', userToken);
-        localStorage.setItem('ss_email', userEmail);
-        
-        updateAuthUI();
-      } catch (e) {
-        errorEl.textContent = e.message;
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-      }
-    });
-    
-    // Sign out
-    document.getElementById('sign-out-btn').addEventListener('click', () => {
-      userToken = null;
-      userEmail = null;
-      localStorage.removeItem('ss_token');
-      localStorage.removeItem('ss_email');
-      document.getElementById('email').value = '';
-      document.getElementById('password').value = '';
-      updateAuthUI();
-    });
-    
-    // Initialize
-    updateAuthUI();
+    document.getElementById('bookmarklet-link').href = code;
   </script>
 </body>
 </html>
