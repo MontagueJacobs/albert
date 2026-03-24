@@ -1913,10 +1913,16 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       return res.status(400).json({ error: 'invalid_card', message: 'Invalid bonus card number' })
     }
     
-    // Get user's purchases
+    // Get user's purchases with enriched product data via join
     const { data: purchases, error } = await supabase
       .from('user_purchases')
-      .select('product_name, quantity, price')
+      .select(`
+        product_name, quantity, price, product_id,
+        products:product_id (
+          is_vegan, is_vegetarian, is_organic, is_fairtrade, 
+          nutri_score, origin_country, origin_by_month
+        )
+      `)
       .eq('bonus_card_number', cardNumber)
     
     if (error) throw error
@@ -1932,11 +1938,22 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       })
     }
     
-    // Calculate sustainability scores on the fly (same as /api/user/insights)
-    const purchasesWithScores = purchases.map(p => ({
-      ...p,
-      sustainability_score: evaluateProduct(p.product_name).score
-    }))
+    // Calculate sustainability scores using enriched data from products table
+    const purchasesWithScores = purchases.map(p => {
+      const enrichedData = p.products ? {
+        is_vegan: p.products.is_vegan,
+        is_vegetarian: p.products.is_vegetarian,
+        is_organic: p.products.is_organic,
+        is_fairtrade: p.products.is_fairtrade,
+        nutri_score: p.products.nutri_score,
+        origin_country: p.products.origin_country,
+        origin_by_month: p.products.origin_by_month
+      } : null
+      return {
+        ...p,
+        sustainability_score: evaluateProduct(p.product_name, enrichedData).score
+      }
+    })
     
     const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
     const avgScore = totalScore / purchasesWithScores.length
@@ -2990,6 +3007,14 @@ app.post('/api/ingest/scrape', async (req, res) => {
         const num = parseFloat(priceStr)
         if (!Number.isNaN(num) && num > 0) {
           parsedPrice = num
+        }
+      }
+      
+      // Fallback: Try to extract price from the product name (e.g., "€1.79" or "€2,99")
+      if (!parsedPrice && rawName) {
+        const priceInName = rawName.match(/€\s*(\d+)[,.](\d{2})/);
+        if (priceInName) {
+          parsedPrice = parseFloat(`${priceInName[1]}.${priceInName[2]}`)
         }
       }
 

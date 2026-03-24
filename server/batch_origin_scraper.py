@@ -191,6 +191,15 @@ class BatchOriginScraper:
                 
             if origin_data.get('nutri_score'):
                 update_payload['nutri_score'] = origin_data['nutri_score']
+            
+            if origin_data.get('image_url'):
+                update_payload['image_url'] = origin_data['image_url']
+            
+            if origin_data.get('price') is not None:
+                update_payload['price'] = origin_data['price']
+                
+            # Always mark as scraped
+            update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
                 
             if not update_payload:
                 print(f"  [SKIP] No new data to update for product {product_id}", flush=True)

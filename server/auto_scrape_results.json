@@ -2,132 +2,154 @@
   "success": true,
   "products": [
     {
-      "name": "AH Biologisch Komkommer",
+      "name": "AH Biologisch Komkommer, Nutri-Score A, per stuk €1.79, Biologisch",
       "url": "https://www.ah.nl/producten/product/wi101130/ah-biologisch-komkommer",
-      "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_43545237393530383039?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 1
     },
     {
-      "name": "AH Rode uien",
+      "name": "AH Rode uien, Nutri-Score A, 3 stuks €1.09, Uit Nederland",
       "url": "https://www.ah.nl/producten/product/wi490280/ah-rode-uien",
-      "price": 1.093,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239383834353837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 2
     },
     {
-      "name": "AH Platte peterselie",
+      "name": "AH Platte peterselie, Nutri-Score A, 15 gram €1.29",
       "url": "https://www.ah.nl/producten/product/wi238971/ah-platte-peterselie",
-      "price": 1.2915,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303737343735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 3
     },
     {
-      "name": "AH Biologisch Knoflook",
+      "name": "AH Biologisch Knoflook, Nutri-Score A, 100 gram €1.49, Biologisch",
       "url": "https://www.ah.nl/producten/product/wi185774/ah-biologisch-knoflook",
-      "price": 1.491,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393536383837?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 4
     },
     {
-      "name": "AH Cherrytomaten",
+      "name": "AH Cherrytomaten, Nutri-Score A, 250 gram €1.19, Prijsfavoriet",
       "url": "https://www.ah.nl/producten/product/wi4137/ah-cherrytomaten",
-      "price": 1.1925,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303637303134?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 5
     },
     {
-      "name": "AH Elstar",
+      "name": "AH Elstar, Nutri-Score A, los per kilo €1.79, Alleen in de winkel, Prijsfavoriet, Vegan, Uit Nederland",
       "url": "https://www.ah.nl/producten/product/wi80583/ah-elstar",
-      "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_68377a6f6935547754525732463071734f3671524b77?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 6
     },
     {
-      "name": "AH Jonagold",
+      "name": "AH Jonagold, Nutri-Score A, los per kilo €1.79, Alleen in de winkel, Prijsfavoriet, Vegan, Uit Nederland",
       "url": "https://www.ah.nl/producten/product/wi94754/ah-jonagold",
-      "price": 1.79,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313935363538?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 7
     },
     {
-      "name": "AH Terra Plantaardige hummus naturel",
+      "name": "AH Terra Plantaardige hummus naturel, Nutri-Score C, 350 gram €2.39, Prijsfavoriet, Vegan",
       "url": "https://www.ah.nl/producten/product/wi561000/ah-terra-plantaardige-hummus-naturel",
-      "price": 2.3935,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239393538313037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 8
     },
     {
-      "name": "Oatly! Haverdrank no sugar",
+      "name": "Oatly! Haverdrank no sugar, Nutri-Score C, 1 liter €2.89, Vegan",
       "url": "https://www.ah.nl/producten/product/wi548465/oatly-haverdrank-no-sugar",
-      "price": 2.891,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313036343638?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 9
     },
     {
-      "name": "Oatly! Haverdrank bio",
+      "name": "Oatly! Haverdrank bio, Nutri-Score C, 1 liter €2.89, Vegan, Biologisch",
       "url": "https://www.ah.nl/producten/product/wi401934/oatly-haverdrank-bio",
-      "price": 2.891,
-      "image": "https://static.ah.nl/dam/product/AHI_5870767143466673523032554b375338586b69546541?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 10
     },
     {
-      "name": "AH Terra Plantaardige witte blokjes in pekel",
+      "name": "AH Terra Plantaardige witte blokjes in pekel, Nutri-Score E, 420 gram €2.75, Vegan",
       "url": "https://www.ah.nl/producten/product/wi598686/ah-terra-plantaardige-witte-blokjes-in-pekel",
-      "price": 2.7542,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323036373434?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 11
     },
     {
-      "name": "Fairtrade Original Kokosmelk",
+      "name": "Fairtrade Original Kokosmelk, Nutri-Score D, 400 milliliter €2.89, Vegan",
       "url": "https://www.ah.nl/producten/product/wi164936/fairtrade-original-kokosmelk",
-      "price": 2.894,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130303532333334?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 12
     },
     {
-      "name": "AH Extra lang lekker tijger volkoren heel",
+      "name": "AH Extra lang lekker tijger volkoren heel, Nutri-Score A, per stuk €1.23, Prijsfavoriet, Vegan",
       "url": "https://www.ah.nl/producten/product/wi523365/ah-extra-lang-lekker-tijger-volkoren-heel",
-      "price": 1.23,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130323037383237?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 13
     },
     {
-      "name": "Royal Kalamata olijven zonder pit",
+      "name": "Royal Kalamata olijven zonder pit, Nutri-Score D, 195 gram €3.09, Vegan",
       "url": "https://www.ah.nl/producten/product/wi462229/royal-kalamata-olijven-zonder-pit",
-      "price": 3.09195,
-      "image": "https://static.ah.nl/dam/product/AHI_34586444537a4d595131757633647971634536747877?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 14
     },
     {
-      "name": "AH Pinda's ongezouten",
+      "name": "AH Pinda's ongezouten, Nutri-Score A, 500 gram €1.15, Prijsfavoriet, Vegan",
       "url": "https://www.ah.nl/producten/product/wi582889/ah-pinda-s-ongezouten",
-      "price": 1.155,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313930323833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 15
     },
     {
-      "name": "Sebahat Tahin sesampasta",
+      "name": "Sebahat Tahin sesampasta, Nutri-Score D, 290 gram €3.99, Vegan",
       "url": "https://www.ah.nl/producten/product/wi198150/sebahat-tahin-sesampasta",
-      "price": 3.9929,
-      "image": "https://static.ah.nl/dam/product/AHI_43545239353732353035?revLabel=2&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 16
     },
     {
-      "name": "AH Biologisch Citroensap",
+      "name": "AH Biologisch Citroensap, Nutri-Score A, 250 milliliter €1.35, Vegan, Biologisch",
       "url": "https://www.ah.nl/producten/product/wi398477/ah-biologisch-citroensap",
-      "price": 1.3525,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313933303834?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 17
     },
     {
-      "name": "AH Terra Kikkererwten",
+      "name": "AH Terra Kikkererwten, Nutri-Score A, 400 gram €0.99, Prijsfavoriet",
       "url": "https://www.ah.nl/producten/product/wi167873/ah-terra-kikkererwten",
-      "price": 0.994,
-      "image": "https://static.ah.nl/dam/product/AHI_38597863424b726f534f4f6b32357370696331484841?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 18
     },
     {
-      "name": "AH Pindakaas naturel",
+      "name": "AH Pindakaas naturel, Nutri-Score A, 600 gram €1.47, Prijsfavoriet, Vegan",
       "url": "https://www.ah.nl/producten/product/wi461685/ah-pindakaas-naturel",
-      "price": 1.476,
-      "image": "https://static.ah.nl/dam/product/AHI_45685472746f685952734b5645636c54717a337a4a51?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 19
     },
     {
-      "name": "AH Zakje met blauwe bessen",
+      "name": "AH Zakje met blauwe bessen, Nutri-Score A, 1 kilogram €5.55, Prijsfavoriet, Vegan, Diepvries",
       "url": "https://www.ah.nl/producten/product/wi376521/ah-zakje-met-blauwe-bessen",
-      "price": 5.991,
-      "image": "https://static.ah.nl/dam/product/AHI_4354523130313835313036?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 20
     },
     {
-      "name": "AH Biologisch Cabernet sauvignon",
+      "name": "AH Biologisch Cabernet sauvignon, 0,75 liter €4.99, Biologisch",
       "url": "https://www.ah.nl/producten/product/wi167299/ah-biologisch-cabernet-sauvignon",
-      "price": 4.99,
-      "image": "https://static.ah.nl/dam/product/AHI_434d50323032313433?revLabel=3&rendition=200x200_JPG_Q85&fileType=binary"
+      "price": null,
+      "image": "",
+      "purchase_rank": 21
     }
   ],
   "count": 21,
-  "cookies_saved": 38
+  "cookies_saved": 34,
+  "sorted_by_purchase_date": true
 }

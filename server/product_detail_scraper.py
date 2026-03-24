@@ -176,6 +176,7 @@ class AHProductDetailScraper:
             'brand': None,
             'unit_size': None,
             'price': None,
+            'image_url': None,  # Product image URL
             'allergens': [],
             'ingredients': None,
             'error': None,
@@ -667,8 +668,30 @@ class AHProductDetailScraper:
             except Exception as e:
                 print(f"[WARN] Price extraction failed: {e}", flush=True)
                         
+            # ================================================================
+            # Extract Product Image
+            # ================================================================
+            try:
+                # Try multiple selectors for the product image
+                image_selectors = [
+                    '[class*="product-image"] img',
+                    '[data-testhook*="product-image"] img',
+                    'main img[src*="static.ah.nl"]',
+                    'img[src*="static.ah.nl"]'
+                ]
+                for selector in image_selectors:
+                    img_elem = await self.page.query_selector(selector)
+                    if img_elem:
+                        src = await img_elem.get_attribute('src')
+                        if src and 'static.ah.nl' in src:
+                            result['image_url'] = src
+                            print(f"[DEBUG] Found image: {src[:60]}...", flush=True)
+                            break
+            except Exception as e:
+                print(f"[WARN] Image extraction failed: {e}", flush=True)
+                        
             result['success'] = True
-            print(f"[SUCCESS] Scraped: vegan={result['is_vegan']}, organic={result['is_organic']}, nutri={result['nutri_score']}, origin={result['origin_country']}", flush=True)
+            print(f"[SUCCESS] Scraped: vegan={result['is_vegan']}, organic={result['is_organic']}, nutri={result['nutri_score']}, origin={result['origin_country']}, image={'yes' if result['image_url'] else 'no'}", flush=True)
             
         except Exception as e:
             result['error'] = str(e)
