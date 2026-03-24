@@ -1913,19 +1913,16 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       return res.status(400).json({ error: 'invalid_card', message: 'Invalid bonus card number' })
     }
     
-    // Get user's purchases with enriched product data via join
+    // Get user's purchases
     const { data: purchases, error } = await supabase
       .from('user_purchases')
-      .select(`
-        product_name, quantity, price, product_id,
-        products:product_id (
-          is_vegan, is_vegetarian, is_organic, is_fairtrade, 
-          nutri_score, origin_country, origin_by_month
-        )
-      `)
+      .select('product_name, quantity, price, product_id')
       .eq('bonus_card_number', cardNumber)
     
-    if (error) throw error
+    if (error) {
+      console.error('Supabase query error:', error)
+      throw error
+    }
     
     if (!purchases || purchases.length === 0) {
       return res.json({
@@ -1938,16 +1935,35 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       })
     }
     
+    // Get product IDs to fetch enriched data (separate query, more reliable)
+    const productIds = [...new Set(purchases.map(p => p.product_id).filter(Boolean))]
+    
+    // Fetch enriched product data
+    let productsMap = new Map()
+    if (productIds.length > 0) {
+      const { data: products, error: prodError } = await supabase
+        .from('products')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month')
+        .in('id', productIds)
+      
+      if (prodError) {
+        console.warn('Products fetch warning:', prodError.message)
+      } else if (products) {
+        productsMap = new Map(products.map(p => [p.id, p]))
+      }
+    }
+    
     // Calculate sustainability scores using enriched data from products table
     const purchasesWithScores = purchases.map(p => {
-      const enrichedData = p.products ? {
-        is_vegan: p.products.is_vegan,
-        is_vegetarian: p.products.is_vegetarian,
-        is_organic: p.products.is_organic,
-        is_fairtrade: p.products.is_fairtrade,
-        nutri_score: p.products.nutri_score,
-        origin_country: p.products.origin_country,
-        origin_by_month: p.products.origin_by_month
+      const product = productsMap.get(p.product_id)
+      const enrichedData = product ? {
+        is_vegan: product.is_vegan,
+        is_vegetarian: product.is_vegetarian,
+        is_organic: product.is_organic,
+        is_fairtrade: product.is_fairtrade,
+        nutri_score: product.nutri_score,
+        origin_country: product.origin_country,
+        origin_by_month: product.origin_by_month
       } : null
       return {
         ...p,
