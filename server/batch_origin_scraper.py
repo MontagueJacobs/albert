@@ -81,16 +81,18 @@ class BatchOriginScraper:
         Returns products that:
         - Have a url (so we can scrape them)
         - Don't have origin_country set yet
+        - Haven't already failed or been marked not_found
         """
         if not self.supabase:
             return []
             
-        # Query products missing origin data
+        # Query products missing origin data, excluding already failed ones
         # The table uses 'url' column, not 'product_url'
         result = self.supabase.table('products') \
-            .select('id, name, url, origin_country, origin_by_month') \
+            .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
             .not_.is_('url', 'null') \
             .is_('origin_country', 'null') \
+            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending') \
             .limit(limit) \
             .execute()
             
@@ -140,9 +142,10 @@ class BatchOriginScraper:
             chunk_urls = product_urls[i:i + chunk_size]
             
             result = self.supabase.table('products') \
-                .select('id, name, url, origin_country, origin_by_month') \
+                .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
                 .in_('url', chunk_urls) \
                 .is_('origin_country', 'null') \
+                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending') \
                 .execute()
             
             if result.data:
@@ -155,6 +158,31 @@ class BatchOriginScraper:
         
         print(f"[INFO] Found {len(products)} user purchase products needing origin data", flush=True)
         return products
+    
+    def mark_scrape_failed(self, product_id: str, error_type: str) -> bool:
+        """
+        Mark a product's scrape status as failed in the database.
+        
+        Args:
+            product_id: The product's ID in the database
+            error_type: The type of error (not_found, access_denied, captcha, etc.)
+        """
+        if not self.supabase:
+            return False
+            
+        try:
+            status = 'not_found' if error_type == 'not_found' else 'failed'
+            result = self.supabase.table('products') \
+                .update({
+                    'details_scrape_status': status,
+                    'details_scraped_at': __import__('datetime').datetime.now().isoformat()
+                }) \
+                .eq('id', product_id) \
+                .execute()
+            return bool(result.data)
+        except Exception as e:
+            print(f"  [ERROR] Failed to mark scrape status: {e}", flush=True)
+            return False
         
     def update_product_origin(self, product_id: int, origin_data: Dict[str, Any]) -> bool:
         """
@@ -212,8 +240,9 @@ class BatchOriginScraper:
             if origin_data.get('allergens'):
                 update_payload['allergens'] = origin_data['allergens']
                 
-            # Always mark as scraped
+            # Mark scrape status and timestamp
             update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
+            update_payload['details_scrape_status'] = 'success'
                 
             if not update_payload:
                 print(f"  [SKIP] No new data to update for product {product_id}", flush=True)
@@ -307,7 +336,10 @@ class BatchOriginScraper:
                         self.update_product_origin(product_id, result)
                     else:
                         self.stats['failed'] += 1
-                        print(f"  [FAIL] {result.get('error', 'Unknown error')}", flush=True)
+                        error_type = result.get('error', 'unknown')
+                        print(f"  [FAIL] {error_type}", flush=True)
+                        # Update scrape status in database
+                        self.mark_scrape_failed(product_id, error_type)
                         
                 except Exception as e:
                     self.stats['failed'] += 1

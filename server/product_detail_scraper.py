@@ -193,11 +193,24 @@ class AHProductDetailScraper:
                 result['error'] = 'not_found'
                 print(f"[WARN] Product not found: {url}", flush=True)
                 return result
+            
+            # Check for access denied / bot detection
+            title = await self.page.title()
+            if 'Access Denied' in title or response.status == 403:
+                result['error'] = 'access_denied'
+                print(f"[WARN] Access Denied (bot detected): {url}", flush=True)
+                return result
                 
             await asyncio.sleep(2)  # Wait for dynamic content
             
             # Get the page content for analysis
             content = await self.page.content()
+            
+            # Check for CAPTCHA or bot detection in content
+            if 'robot' in content.lower() and 'captcha' in content.lower():
+                result['error'] = 'captcha'
+                print(f"[WARN] CAPTCHA detected: {url}", flush=True)
+                return result
             
             # ================================================================
             # Extract certifications from JSON ProductProperty data only
