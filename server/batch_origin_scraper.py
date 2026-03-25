@@ -239,14 +239,15 @@ class BatchOriginScraper:
             # Allergens is a list - store as JSON array
             if origin_data.get('allergens'):
                 update_payload['allergens'] = origin_data['allergens']
+            
+            # Check if we actually extracted any meaningful data
+            if not update_payload:
+                print(f"  [SKIP] No data extracted for product {product_id}", flush=True)
+                return False
                 
-            # Mark scrape status and timestamp
+            # Only mark as success if we have actual data
             update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
             update_payload['details_scrape_status'] = 'success'
-                
-            if not update_payload:
-                print(f"  [SKIP] No new data to update for product {product_id}", flush=True)
-                return False
                 
             # Update the product
             result = self.supabase.table('products') \
