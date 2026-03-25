@@ -213,101 +213,148 @@ class AHProductDetailScraper:
                 return result
             
             # ================================================================
-            # Extract certifications from JSON ProductProperty data only
-            # (This avoids false positives from page-wide content searches)
+            # STRATEGY 1: Extract from JSON-LD schema.org structured data
+            # This is the most reliable source for price, image, brand
             # ================================================================
-            # Unescape HTML content to properly parse JSON patterns
-            unescaped_content = content.replace('\\"', '"')
-            
-            # Known ProductProperty codes:
-            # - sp_include_dieet_veganistisch: "Veganistisch" - vegan
-            # - sp_include_dieet_vegetarisch: "Vegetarisch" - vegetarian  
-            # - nutriscore: "A", "B", etc. - nutri-score
-            # - np_bio: organic/bio marker (if present)
-            # - sp_fairtrade, sp_utz, np_fairtrade, etc. - fairtrade certifications
-            
-            # Extract VEGAN from sp_include_dieet_veganistisch
             try:
-                vegan_match = re.search(r'"code":"sp_include_dieet_veganistisch","values":\[[^\]]*\]', unescaped_content, re.IGNORECASE)
-                if vegan_match:
-                    result['is_vegan'] = True
-                    result['is_vegetarian'] = True  # Vegan implies vegetarian
-                    print(f"[DEBUG] Found vegan certification in ProductProperty", flush=True)
+                # Look for JSON-LD Product schema
+                jsonld_match = re.search(r'(\{[^}]*"@type"\s*:\s*"Product"[^}]*"offers"[^}]*\})', content, re.DOTALL)
+                if jsonld_match:
+                    jsonld_text = jsonld_match.group(1)
+                    # Unescape unicode
+                    jsonld_text = jsonld_text.replace('\\u0026', '&').replace('\\u003c', '<').replace('\\u003e', '>')
+                    
+                    # Extract price from offers
+                    price_match = re.search(r'"price"\s*:\s*"([\d.]+)"', jsonld_text)
+                    if price_match:
+                        result['price'] = float(price_match.group(1))
+                        print(f"[DEBUG] JSON-LD price: {result['price']}", flush=True)
+                    
+                    # Extract image
+                    img_match = re.search(r'"image"\s*:\s*"([^"]+static\.ah\.nl[^"]+)"', jsonld_text)
+                    if img_match:
+                        result['image_url'] = img_match.group(1).replace('\\u0026', '&')
+                        print(f"[DEBUG] JSON-LD image: found", flush=True)
+                    
+                    # Extract brand
+                    brand_match = re.search(r'"brand"[^}]*"name"\s*:\s*"([^"]+)"', jsonld_text)
+                    if brand_match:
+                        result['brand'] = brand_match.group(1)
+                        print(f"[DEBUG] JSON-LD brand: {result['brand']}", flush=True)
             except Exception as e:
-                print(f"[WARN] Vegan extraction failed: {e}", flush=True)
+                print(f"[WARN] JSON-LD extraction failed: {e}", flush=True)
             
-            # Extract VEGETARIAN from sp_include_dieet_vegetarisch
-            if not result['is_vegetarian']:
-                try:
-                    veg_match = re.search(r'"code":"sp_include_dieet_vegetarisch","values":\[[^\]]*\]', unescaped_content, re.IGNORECASE)
-                    if veg_match:
-                        result['is_vegetarian'] = True
-                        print(f"[DEBUG] Found vegetarian certification in ProductProperty", flush=True)
-                except Exception as e:
-                    print(f"[WARN] Vegetarian extraction failed: {e}", flush=True)
+            # ================================================================
+            # STRATEGY 2: Extract from Next.js React Server Components data
+            # ProductProperty contains nutriscore, vegan, organic, etc.
+            # ================================================================
+            # Normalize content for pattern matching (handle various escape styles)
+            normalized = content.replace('\\\\', '\\').replace('\\"', '"').replace('\\u0022', '"')
             
-            # Extract NUTRI-SCORE from nutriscore property
+            # Extract NUTRI-SCORE from ProductProperty or icons
             try:
-                nutri_match = re.search(r'"code":"nutriscore","values":\["([A-Ea-e])"\]', unescaped_content, re.IGNORECASE)
+                # Pattern 1: ProductProperty format
+                nutri_match = re.search(r'"code"\s*:\s*"nutriscore"\s*,\s*"values"\s*:\s*\[\s*"([A-Ea-e])"\s*\]', normalized, re.IGNORECASE)
                 if nutri_match:
                     result['nutri_score'] = nutri_match.group(1).upper()
-                    print(f"[DEBUG] Found nutri-score: {result['nutri_score']}", flush=True)
+                    print(f"[DEBUG] Found nutri-score from ProductProperty: {result['nutri_score']}", flush=True)
+                else:
+                    # Pattern 2: Icon format like "NUTRISCORE_A"
+                    icon_match = re.search(r'"NUTRISCORE_([A-E])"', content, re.IGNORECASE)
+                    if icon_match:
+                        result['nutri_score'] = icon_match.group(1).upper()
+                        print(f"[DEBUG] Found nutri-score from icon: {result['nutri_score']}", flush=True)
             except Exception as e:
                 print(f"[WARN] Nutri-score extraction failed: {e}", flush=True)
             
-            # Extract ORGANIC/BIO from various possible property codes
+            # Extract ORGANIC/BIO
             try:
-                # Look for common organic property patterns
-                organic_patterns = [
-                    r'"code":"(sp_bio|np_bio|sp_biologisch|np_biologisch|bio)","values":\[[^\]]*\]',
-                    r'"code":"sp_include_[^"]*bio[^"]*","values":\[[^\]]*\]',
-                ]
-                for pattern in organic_patterns:
-                    if re.search(pattern, unescaped_content, re.IGNORECASE):
-                        result['is_organic'] = True
-                        print(f"[DEBUG] Found organic certification in ProductProperty", flush=True)
-                        break
-                
-                # Also check product title for explicit "biologisch" or "bio" label
-                # (Only use this as it's the product's actual name, not page cruft)
-                title_match = re.search(r'"title":"([^"]+)"', unescaped_content)
-                if title_match:
-                    title = title_match.group(1).lower()
-                    if 'biologisch' in title or title.startswith('bio ') or ' bio ' in title:
-                        result['is_organic'] = True
-                        print(f"[DEBUG] Found organic in product title: {title}", flush=True)
+                if re.search(r'"(np_biologisch|sp_kenmerk)"\s*,\s*"values"\s*:\s*\[[^\]]*"biologisch"[^\]]*\]', normalized, re.IGNORECASE):
+                    result['is_organic'] = True
+                    print(f"[DEBUG] Found organic certification", flush=True)
+                elif '"ORGANIC"' in content or 'EU_ORGANIC_FARMING' in content:
+                    result['is_organic'] = True
+                    print(f"[DEBUG] Found organic from icon", flush=True)
             except Exception as e:
                 print(f"[WARN] Organic extraction failed: {e}", flush=True)
             
-            # Extract FAIRTRADE from various possible property codes
+            # Extract VEGAN
             try:
-                fairtrade_patterns = [
-                    r'"code":"(sp_fairtrade|np_fairtrade|fairtrade)","values":\[[^\]]*\]',
-                    r'"code":"sp_include_[^"]*fairtrade[^"]*","values":\[[^\]]*\]',
-                    r'"code":"(sp_utz|np_utz|utz)","values":\[[^\]]*\]',
-                    r'"code":"(sp_rainforest|rainforest_alliance)","values":\[[^\]]*\]',
-                    r'"code":"(sp_max_havelaar|havelaar)","values":\[[^\]]*\]',
-                    # AH uses da_accreditation for certifications like FAIR_TRADE_MARK, UTZ, etc.
-                    r'"code":"da_accreditation","values":\["[^"]*FAIR_TRADE[^"]*"\]',
-                    r'"code":"da_accreditation","values":\["[^"]*UTZ[^"]*"\]',
-                    r'"code":"da_accreditation","values":\["[^"]*RAINFOREST[^"]*"\]',
-                ]
-                for pattern in fairtrade_patterns:
-                    if re.search(pattern, unescaped_content, re.IGNORECASE):
-                        result['is_fairtrade'] = True
-                        print(f"[DEBUG] Found fairtrade certification via pattern: {pattern[:50]}", flush=True)
-                        break
+                if re.search(r'"code"\s*:\s*"sp_include_dieet_veganistisch"', normalized, re.IGNORECASE):
+                    result['is_vegan'] = True
+                    result['is_vegetarian'] = True
+                    print(f"[DEBUG] Found vegan certification", flush=True)
+                elif '"VEGAN"' in content or '"AH_VEGAN"' in content:
+                    result['is_vegan'] = True
+                    result['is_vegetarian'] = True
+                    print(f"[DEBUG] Found vegan from icon", flush=True)
+            except Exception as e:
+                print(f"[WARN] Vegan extraction failed: {e}", flush=True)
+            
+            # Extract VEGETARIAN
+            if not result.get('is_vegetarian'):
+                try:
+                    if re.search(r'"code"\s*:\s*"sp_include_dieet_vegetarisch"', normalized, re.IGNORECASE):
+                        result['is_vegetarian'] = True
+                        print(f"[DEBUG] Found vegetarian certification", flush=True)
+                except Exception as e:
+                    print(f"[WARN] Vegetarian extraction failed: {e}", flush=True)
+            
+            # Extract FAIRTRADE
+            try:
+                if re.search(r'"(sp_fairtrade|np_fairtrade|FAIRTRADE)"', content, re.IGNORECASE):
+                    result['is_fairtrade'] = True
+                    print(f"[DEBUG] Found fairtrade certification", flush=True)
             except Exception as e:
                 print(f"[WARN] Fairtrade extraction failed: {e}", flush=True)
             
-            # Debug: Log all ProductProperty codes found on this page
+            # ================================================================
+            # STRATEGY 3: Extract monthly origin from collapsible origin table
+            # ================================================================
             try:
-                all_codes = re.findall(r'"code":"([^"]+)","values":\[([^\]]*)\]', unescaped_content)
-                if all_codes:
-                    print(f"[DEBUG] All ProductProperty codes found: {all_codes[:15]}", flush=True)  # First 15
-            except:
-                pass
+                # Look for origin data in the table format
+                origin_by_month = {}
+                months_map = {
+                    'januari': 'jan', 'februari': 'feb', 'maart': 'mar', 'april': 'apr',
+                    'mei': 'may', 'juni': 'jun', 'juli': 'jul', 'augustus': 'aug',
+                    'september': 'sep', 'oktober': 'oct', 'november': 'nov', 'december': 'dec'
+                }
+                
+                # Pattern: "Januari-0-0"...children":"Januari"}]...{"children":"\tNederland / Spanje"
+                for month_nl, month_key in months_map.items():
+                    pattern = rf'"{month_nl.capitalize()}"[^}}]*\}}\],\["\$","td"[^}}]*"children"\s*:\s*"\\t([^"]+)"'
+                    match = re.search(pattern, normalized, re.IGNORECASE)
+                    if match:
+                        origin = match.group(1).strip()
+                        origin_by_month[month_key] = origin
+                
+                if origin_by_month:
+                    result['origin_by_month'] = origin_by_month
+                    # Set current month's origin as the main origin
+                    current_month = datetime.now().strftime('%b').lower()
+                    if current_month in origin_by_month:
+                        result['origin_country'] = origin_by_month[current_month]
+                        print(f"[DEBUG] Found monthly origin data, current: {result['origin_country']}", flush=True)
+                    else:
+                        # Just use first available
+                        result['origin_country'] = list(origin_by_month.values())[0]
+                        print(f"[DEBUG] Found monthly origin data: {len(origin_by_month)} months", flush=True)
+            except Exception as e:
+                print(f"[WARN] Origin extraction failed: {e}", flush=True)
             
+            # ================================================================
+            # STRATEGY 4: Fallback DOM-based extraction for image if not found
+            # ================================================================
+            if not result.get('image_url'):
+                try:
+                    # Look for product image in React state data
+                    img_match = re.search(r'"url"\s*:\s*"(https://static\.ah\.nl/dam/product/[^"]+)"', content)
+                    if img_match:
+                        result['image_url'] = img_match.group(1).replace('\\u0026', '&')
+                        print(f"[DEBUG] Found image from React state", flush=True)
+                except Exception as e:
+                    print(f"[WARN] Image fallback extraction failed: {e}", flush=True)
+                
             # ================================================================
             # FALLBACK: Extract certifications from visible Kenmerken section
             # (In case JSON property codes don't cover all certifications)
@@ -381,10 +428,10 @@ class AHProductDetailScraper:
             
             # METHOD 1: Extract origin from JSON data embedded in page (most reliable)
             # AH stores origin in "np_lokaal" property like: "code":"np_lokaal","values":["nederland"]
-            # (unescaped_content already created above in certification extraction)
+            # (using 'normalized' variable created above in strategy 2)
             try:
                 # Look for np_lokaal property with country values
-                np_lokaal_match = re.search(r'"code":"np_lokaal","values":\["([^"]+)"\]', unescaped_content, re.IGNORECASE)
+                np_lokaal_match = re.search(r'"code":"np_lokaal","values":\["([^"]+)"\]', normalized, re.IGNORECASE)
                 if np_lokaal_match:
                     country_raw = np_lokaal_match.group(1).lower()
                     if country_raw in COUNTRY_MAPPINGS:
