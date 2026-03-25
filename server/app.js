@@ -3254,6 +3254,8 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
       return res.status(500).json({ error: purchasesError.message })
     }
 
+    console.log(`[ranking-products] Card ${bonusCard}: found ${userPurchases?.length || 0} total purchases`)
+
     // Filter for food items only from purchases
     const foodPurchases = (userPurchases || []).filter(p => isLikelyFood(p.product_name))
     
@@ -3266,26 +3268,39 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
       .sort(() => Math.random() - 0.5)
       .slice(0, 5)
     
-    // Get 5 products from products table that user hasn't purchased
-    // Prioritize products with enriched data (origin, vegan, etc.)
-    const { data: allProducts, error: productsError } = await supabase
+    // Get products from products table that user hasn't purchased
+    // Build query - only add exclusion filter if there are purchased IDs
+    let productsQuery = supabase
       .from('products')
       .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month')
-      .not('id', 'in', `(${[...purchasedIds].join(',') || 'null'})`)
-      .limit(200)
+    
+    // Only exclude purchased IDs if there are any
+    const purchasedIdArray = [...purchasedIds].filter(id => id)
+    if (purchasedIdArray.length > 0) {
+      productsQuery = productsQuery.not('id', 'in', `(${purchasedIdArray.join(',')})`)
+    }
+    
+    const { data: allProducts, error: productsError } = await productsQuery.limit(300)
+    
+    console.log(`[ranking-products] Catalog query returned ${allProducts?.length || 0} products, error: ${productsError?.message || 'none'}`)
     
     if (productsError) {
       console.error('[ranking-products] Error fetching products:', productsError)
       return res.status(500).json({ error: productsError.message })
     }
 
-    // Filter for food items and products with SOME enriched data for scoring
-    const candidateOtherProducts = (allProducts || [])
-      .filter(p => isLikelyFood(p.name))
-      .filter(p => {
-        // Must have at least one enriched attribute OR origin data for meaningful scoring
-        return p.is_vegan || p.is_vegetarian || p.is_organic || p.is_fairtrade || p.origin_country || p.origin_by_month
-      })
+    // Filter for food items only
+    const allFoodProducts = (allProducts || []).filter(p => isLikelyFood(p.name))
+    
+    // Prefer products with enriched data for more meaningful scoring
+    const enrichedProducts = allFoodProducts.filter(p => 
+      p.is_vegan || p.is_vegetarian || p.is_organic || p.is_fairtrade || p.origin_country || p.origin_by_month
+    )
+    
+    // Use enriched products first, then fill with any food products
+    const candidateOtherProducts = enrichedProducts.length >= 5 
+      ? enrichedProducts 
+      : [...enrichedProducts, ...allFoodProducts.filter(p => !enrichedProducts.includes(p))]
     
     // Randomly select 5 products from candidates
     const otherProducts = candidateOtherProducts
@@ -3330,15 +3345,24 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
       }
     })
     
-    // Combine and shuffle all 10 products
+    // Combine and shuffle all products
     const allRankingProducts = [...fromPurchases, ...fromOther].sort(() => Math.random() - 0.5)
     
-    // Check if we have enough products
-    if (allRankingProducts.length < 6) {
+    console.log(`[ranking-products] Card ${bonusCard}: purchases=${fromPurchases.length}, catalog=${fromOther.length}, total=${allRankingProducts.length}`)
+    
+    // Check if we have enough products (minimum 4 for a meaningful game)
+    if (allRankingProducts.length < 4) {
+      console.log(`[ranking-products] Not enough products. Purchases found: ${userPurchases?.length || 0}, food purchases: ${foodPurchases.length}, catalog products: ${allProducts?.length || 0}`)
       return res.status(400).json({ 
         error: 'not_enough_products',
         message: 'Not enough food products available for ranking game. Please import more purchases first.',
-        available: allRankingProducts.length
+        available: allRankingProducts.length,
+        debug: {
+          total_purchases: userPurchases?.length || 0,
+          food_purchases: foodPurchases.length,
+          catalog_products: allProducts?.length || 0,
+          food_catalog: allFoodProducts?.length || 0
+        }
       })
     }
     
