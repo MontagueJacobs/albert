@@ -271,10 +271,14 @@ class AHProductDetailScraper:
             try:
                 if re.search(r'"(np_biologisch|sp_kenmerk)"\s*,\s*"values"\s*:\s*\[[^\]]*"biologisch"[^\]]*\]', normalized, re.IGNORECASE):
                     result['is_organic'] = True
-                    print(f"[DEBUG] Found organic certification", flush=True)
+                    print(f"[DEBUG] Found organic certification from ProductProperty", flush=True)
                 elif '"ORGANIC"' in content or 'EU_ORGANIC_FARMING' in content:
                     result['is_organic'] = True
-                    print(f"[DEBUG] Found organic from icon", flush=True)
+                    print(f"[DEBUG] Found organic from icon uppercase", flush=True)
+                # SVG icon pattern: pantry-svg-src/assets/logos/product/organic* or biologisch*
+                elif 'logos/product/organic' in content.lower() or 'logos/product/biologisch' in content.lower():
+                    result['is_organic'] = True
+                    print(f"[DEBUG] Found organic from SVG icon", flush=True)
             except Exception as e:
                 print(f"[WARN] Organic extraction failed: {e}", flush=True)
             
@@ -283,11 +287,16 @@ class AHProductDetailScraper:
                 if re.search(r'"code"\s*:\s*"sp_include_dieet_veganistisch"', normalized, re.IGNORECASE):
                     result['is_vegan'] = True
                     result['is_vegetarian'] = True
-                    print(f"[DEBUG] Found vegan certification", flush=True)
+                    print(f"[DEBUG] Found vegan certification from ProductProperty", flush=True)
                 elif '"VEGAN"' in content or '"AH_VEGAN"' in content:
                     result['is_vegan'] = True
                     result['is_vegetarian'] = True
-                    print(f"[DEBUG] Found vegan from icon", flush=True)
+                    print(f"[DEBUG] Found vegan from icon uppercase", flush=True)
+                # SVG icon pattern: pantry-svg-src/assets/logos/product/vegan-*
+                elif 'logos/product/vegan-' in content.lower():
+                    result['is_vegan'] = True
+                    result['is_vegetarian'] = True
+                    print(f"[DEBUG] Found vegan from SVG icon", flush=True)
             except Exception as e:
                 print(f"[WARN] Vegan extraction failed: {e}", flush=True)
             
@@ -296,7 +305,11 @@ class AHProductDetailScraper:
                 try:
                     if re.search(r'"code"\s*:\s*"sp_include_dieet_vegetarisch"', normalized, re.IGNORECASE):
                         result['is_vegetarian'] = True
-                        print(f"[DEBUG] Found vegetarian certification", flush=True)
+                        print(f"[DEBUG] Found vegetarian certification from ProductProperty", flush=True)
+                    # SVG icon pattern: pantry-svg-src/assets/logos/product/vegetarian* or vegetarisch*
+                    elif 'logos/product/vegetari' in content.lower():
+                        result['is_vegetarian'] = True
+                        print(f"[DEBUG] Found vegetarian from SVG icon", flush=True)
                 except Exception as e:
                     print(f"[WARN] Vegetarian extraction failed: {e}", flush=True)
             
@@ -305,10 +318,23 @@ class AHProductDetailScraper:
                 if re.search(r'"(sp_fairtrade|np_fairtrade|FAIRTRADE)"', content, re.IGNORECASE):
                     result['is_fairtrade'] = True
                     print(f"[DEBUG] Found fairtrade certification", flush=True)
+                # SVG icon pattern
+                elif 'logos/product/fairtrade' in content.lower():
+                    result['is_fairtrade'] = True
+                    print(f"[DEBUG] Found fairtrade from SVG icon", flush=True)
             except Exception as e:
                 print(f"[WARN] Fairtrade extraction failed: {e}", flush=True)
             
             # ================================================================
+            # STRATEGY: Extract local origin from "dutch" icon
+            # ================================================================
+            try:
+                if 'logos/product/dutch' in content.lower() or 'LOCALLY_PRODUCED' in content:
+                    if not result['origin_country']:
+                        result['origin_country'] = 'Netherlands'
+                        print(f"[DEBUG] Found local origin (Netherlands) from dutch icon", flush=True)
+            except Exception as e:
+                print(f"[WARN] Local origin extraction failed: {e}", flush=True)
             # STRATEGY 3: Extract monthly origin from collapsible origin table
             # ================================================================
             try:
