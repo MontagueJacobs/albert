@@ -606,6 +606,91 @@ const ENRICHED_SCORING = {
 // Month abbreviations for origin_by_month lookups
 const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 
+// Dutch to English country name translations (AH uses Dutch names in origin data)
+const DUTCH_TO_ENGLISH_COUNTRY = {
+  'nederland': 'Netherlands',
+  'belgië': 'Belgium',
+  'belgie': 'Belgium',
+  'duitsland': 'Germany',
+  'frankrijk': 'France',
+  'spanje': 'Spain',
+  'italië': 'Italy',
+  'italie': 'Italy',
+  'polen': 'Poland',
+  'griekenland': 'Greece',
+  'portugal': 'Portugal',
+  'oostenrijk': 'Austria',
+  'ierland': 'Ireland',
+  'denemarken': 'Denmark',
+  'zweden': 'Sweden',
+  'hongarije': 'Hungary',
+  'tsjechië': 'Czech Republic',
+  'tsjechie': 'Czech Republic',
+  'roemenië': 'Romania',
+  'roemenie': 'Romania',
+  'bulgarije': 'Bulgaria',
+  'kroatië': 'Croatia',
+  'kroatie': 'Croatia',
+  'slovenië': 'Slovenia',
+  'slovenie': 'Slovenia',
+  'slowakije': 'Slovakia',
+  'litouwen': 'Lithuania',
+  'letland': 'Latvia',
+  'estland': 'Estonia',
+  'finland': 'Finland',
+  'luxemburg': 'Luxembourg',
+  'cyprus': 'Cyprus',
+  'malta': 'Malta',
+  'marokko': 'Morocco',
+  'turkije': 'Turkey',
+  'egypte': 'Egypt',
+  'zuid-afrika': 'South Africa',
+  'kenia': 'Kenya',
+  'israël': 'Israel',
+  'israel': 'Israel',
+  'tunesië': 'Tunisia',
+  'tunesie': 'Tunisia',
+  'verenigd koninkrijk': 'UK',
+  'noorwegen': 'Norway',
+  'zwitserland': 'Switzerland',
+  'china': 'China',
+  'india': 'India',
+  'thailand': 'Thailand',
+  'vietnam': 'Vietnam',
+  'brazilië': 'Brazil',
+  'brazilie': 'Brazil',
+  'argentinië': 'Argentina',
+  'argentinie': 'Argentina',
+  'chili': 'Chile',
+  'colombia': 'Colombia',
+  'peru': 'Peru',
+  'ecuador': 'Ecuador',
+  'costa rica': 'Costa Rica',
+  'mexico': 'Mexico',
+  'indonesië': 'Indonesia',
+  'indonesie': 'Indonesia',
+  'filipijnen': 'Philippines',
+  'maleisië': 'Malaysia',
+  'maleisie': 'Malaysia',
+  'sri lanka': 'Sri Lanka',
+  'pakistan': 'Pakistan',
+  'bangladesh': 'Bangladesh',
+  'australië': 'Australia',
+  'australie': 'Australia',
+  'nieuw-zeeland': 'New Zealand'
+}
+
+/**
+ * Translate a country name from Dutch to English
+ * @param {string} countryName - Country name (potentially in Dutch)
+ * @returns {string} - English country name
+ */
+function translateCountryName(countryName) {
+  if (!countryName || typeof countryName !== 'string') return countryName
+  const normalized = countryName.trim().toLowerCase()
+  return DUTCH_TO_ENGLISH_COUNTRY[normalized] || countryName
+}
+
 /**
  * Get the current month key for origin_by_month lookup
  * @returns {string} Current month as 3-letter lowercase key (e.g., 'jan', 'feb')
@@ -625,11 +710,18 @@ function getOriginsForCurrentMonth(originByMonth) {
   const monthKey = getCurrentMonthKey()
   const monthOrigin = originByMonth[monthKey]
   if (!monthOrigin) return null
-  // Handle both array format (["Netherlands", "Spain"]) and string format ("Netherlands")
+  
+  // Parse origin value(s) and translate from Dutch to English
+  let origins = []
   if (Array.isArray(monthOrigin)) {
-    return monthOrigin.length > 0 ? monthOrigin : null
+    origins = monthOrigin
+  } else if (typeof monthOrigin === 'string') {
+    // Handle both single country and "Country1 / Country2" format
+    origins = monthOrigin.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean)
   }
-  return [monthOrigin]  // Wrap single country in array for consistent handling
+  
+  // Translate all country names from Dutch to English
+  return origins.length > 0 ? origins.map(translateCountryName) : null
 }
 
 // ============================================================================
@@ -711,7 +803,7 @@ function analyzeUserProfile(purchases) {
       // Origin breakdown
       const origins = enriched.origin_by_month ? 
         getOriginsForCurrentMonth(enriched.origin_by_month) : 
-        (enriched.origin_country ? [enriched.origin_country] : null)
+        (enriched.origin_country ? [translateCountryName(enriched.origin_country)] : null)
       
       if (origins && origins.length > 0) {
         const originScoring = ENRICHED_SCORING.origin_country
@@ -941,7 +1033,8 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     
     // Fall back to static origin if no monthly origin available
     if (!effectiveOrigins && enrichedData.origin_country) {
-      effectiveOrigins = [enrichedData.origin_country]
+      // Translate Dutch country name to English for scoring lookup
+      effectiveOrigins = [translateCountryName(enrichedData.origin_country)]
     }
     
     if (effectiveOrigins && effectiveOrigins.length > 0) {
