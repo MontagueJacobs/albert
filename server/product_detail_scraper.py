@@ -224,8 +224,9 @@ class AHProductDetailScraper:
                     # Unescape unicode
                     jsonld_text = jsonld_text.replace('\\u0026', '&').replace('\\u003c', '<').replace('\\u003e', '>')
                     
-                    # Extract price from offers
-                    price_match = re.search(r'"price"\s*:\s*"([\d.]+)"', jsonld_text)
+                    # Extract price from offers (handle both quoted and unquoted values)
+                    # JSON can have: "price": 2.99 or "price": "2.99"
+                    price_match = re.search(r'"price"\s*:\s*"?([\d.]+)"?', jsonld_text)
                     if price_match:
                         result['price'] = float(price_match.group(1))
                         print(f"[DEBUG] JSON-LD price: {result['price']}", flush=True)
@@ -712,47 +713,53 @@ class AHProductDetailScraper:
                         break
             
             # ================================================================
-            # Extract Price
+            # Extract Price (only if not already extracted from JSON-LD Strategy 1)
             # ================================================================
-            try:
-                # Look for price elements (AH uses various price selectors)
-                price_selectors = [
-                    '[class*="price-amount"]',
-                    '[class*="product-price"]',
-                    '[data-testhook="price-amount"]',
-                    '[itemprop="price"]',
-                    '.price',
-                ]
-                
-                for selector in price_selectors:
-                    price_elem = await self.page.query_selector(selector)
-                    if price_elem:
-                        price_text = await price_elem.inner_text()
-                        # Parse price from text like "€2,99" or "2.99"
-                        price_match = re.search(r'[\d]+[.,][\d]{2}', price_text)
-                        if price_match:
-                            price_str = price_match.group().replace(',', '.')
-                            result['price'] = float(price_str)
-                            break
-                
-                # Also try JSON-LD structured data for price
-                if not result['price']:
-                    scripts = await self.page.query_selector_all('script[type="application/ld+json"]')
-                    for script in scripts:
-                        script_content = await script.inner_text()
-                        try:
-                            data = json.loads(script_content)
-                            if isinstance(data, dict):
-                                offers = data.get('offers', {})
-                                if isinstance(offers, dict):
-                                    price = offers.get('price')
-                                    if price:
-                                        result['price'] = float(price)
-                                        break
-                        except (json.JSONDecodeError, ValueError):
-                            pass
-            except Exception as e:
-                print(f"[WARN] Price extraction failed: {e}", flush=True)
+            if not result['price']:
+                try:
+                    # Look for price elements (AH uses various price selectors)
+                    price_selectors = [
+                        '[class*="price-amount"]',
+                        '[class*="product-price"]',
+                        '[data-testhook="price-amount"]',
+                        '[itemprop="price"]',
+                        '.price',
+                    ]
+                    
+                    for selector in price_selectors:
+                        price_elem = await self.page.query_selector(selector)
+                        if price_elem:
+                            price_text = await price_elem.inner_text()
+                            # Parse price from text like "€2,99" or "2.99"
+                            price_match = re.search(r'[\d]+[.,][\d]{2}', price_text)
+                            if price_match:
+                                price_str = price_match.group().replace(',', '.')
+                                result['price'] = float(price_str)
+                                print(f"[DEBUG] DOM price from {selector}: {result['price']}", flush=True)
+                                break
+                    
+                    # Also try JSON-LD structured data for price
+                    if not result['price']:
+                        scripts = await self.page.query_selector_all('script[type="application/ld+json"]')
+                        for script in scripts:
+                            script_content = await script.inner_text()
+                            try:
+                                data = json.loads(script_content)
+                                if isinstance(data, dict):
+                                    offers = data.get('offers', {})
+                                    if isinstance(offers, dict):
+                                        price = offers.get('price')
+                                        if price:
+                                            result['price'] = float(price)
+                                            print(f"[DEBUG] JSON-LD parsed price: {result['price']}", flush=True)
+                                            break
+                            except (json.JSONDecodeError, ValueError):
+                                pass
+                    
+                    if not result['price']:
+                        print(f"[WARN] No price found for this product", flush=True)
+                except Exception as e:
+                    print(f"[WARN] Price extraction failed: {e}", flush=True)
                         
             # ================================================================
             # Extract Product Image
@@ -777,7 +784,7 @@ class AHProductDetailScraper:
                 print(f"[WARN] Image extraction failed: {e}", flush=True)
                         
             result['success'] = True
-            print(f"[SUCCESS] Scraped: vegan={result['is_vegan']}, organic={result['is_organic']}, nutri={result['nutri_score']}, origin={result['origin_country']}, image={'yes' if result['image_url'] else 'no'}", flush=True)
+            print(f"[SUCCESS] Scraped: vegan={result['is_vegan']}, organic={result['is_organic']}, nutri={result['nutri_score']}, origin={result['origin_country']}, price={result['price']}, image={'yes' if result['image_url'] else 'no'}", flush=True)
             
         except Exception as e:
             result['error'] = str(e)

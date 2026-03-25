@@ -1,11 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, Trash2, Monitor, ExternalLink, Bookmark, Puzzle } from 'lucide-react'
+import { Loader2, ShoppingCart, CheckCircle, AlertCircle, RefreshCw, Trash2, ExternalLink, Bookmark } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
-import { useAHUser, useAHFetch } from '../lib/ahUserContext.jsx'
-import { useBonusCard } from '../lib/bonusCardContext.jsx'
-
-// Railway scraper URL - strip trailing slash to avoid // in paths
-const RAILWAY_SCRAPER_URL = (import.meta.env.VITE_RAILWAY_SCRAPER_URL || '').replace(/\/+$/, '')
+import { useAHFetch } from '../lib/ahUserContext.jsx'
 
 /**
  * AccountSync - Simplified one-click AH account sync
@@ -15,15 +11,10 @@ const RAILWAY_SCRAPER_URL = (import.meta.env.VITE_RAILWAY_SCRAPER_URL || '').rep
  * 2. User logs in (handles CAPTCHA themselves)
  * 3. Cookies saved, products scraped automatically
  * 4. Have cookies? Click "Sync Now" to resync
- * 
- * Remote mode (when local unavailable):
- * - Uses Railway backend with noVNC for visible browser
  */
 function AccountSync({ onSyncCompleted }) {
   const { t, lang } = useI18n()
-  const { sessionId } = useAHUser()
   const ahFetch = useAHFetch()
-  const { login: bonusLogin } = useBonusCard()
   
   const [status, setStatus] = useState('idle') // 'idle', 'connecting', 'syncing', 'success', 'error'
   const [progress, setProgress] = useState('')
@@ -32,9 +23,6 @@ function AccountSync({ onSyncCompleted }) {
   const [lastSync, setLastSync] = useState(null)
   const [productsCount, setProductsCount] = useState(0)
   const [available, setAvailable] = useState(true)
-  const [remoteAvailable, setRemoteAvailable] = useState(false)
-  const [remoteSession, setRemoteSession] = useState(null)
-  const [showVnc, setShowVnc] = useState(false)
   const pollRef = useRef(null)
 
   // Check if auto-scrape is available (local only)
@@ -49,26 +37,6 @@ function AccountSync({ onSyncCompleted }) {
         console.log('[AccountSync] Availability data:', data)
         setAvailable(data.available)
         
-        // If local not available, check Railway remote scraper
-        if (!data.available && RAILWAY_SCRAPER_URL) {
-          fetch(`${RAILWAY_SCRAPER_URL}/health`)
-            .then(res => {
-              if (!res.ok) throw new Error(`HTTP ${res.status}`)
-              const contentType = res.headers.get('content-type')
-              if (!contentType || !contentType.includes('application/json')) {
-                throw new Error('Not JSON response')
-              }
-              return res.json()
-            })
-            .then(health => {
-              console.log('[AccountSync] Railway health:', health)
-              setRemoteAvailable(health.vnc_available || health.status === 'ok')
-            })
-            .catch(err => {
-              console.log('[AccountSync] Railway not available:', err.message)
-              setRemoteAvailable(false)
-            })
-        }
       })
       .catch(err => {
         console.error('[AccountSync] Availability check failed:', err)
@@ -234,102 +202,6 @@ function AccountSync({ onSyncCompleted }) {
     }
   }, [ahFetch])
 
-  // Start remote scraper (Railway backend)
-  const handleRemoteScrape = useCallback(async () => {
-    if (!RAILWAY_SCRAPER_URL) {
-      setError('Remote scraper not configured')
-      return
-    }
-    
-    setStatus('connecting')
-    setError(null)
-    setProgress(lang === 'nl' ? 'Remote browser starten...' : 'Starting remote browser...')
-    
-    try {
-      const res = await fetch(`${RAILWAY_SCRAPER_URL}/api/scrape/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      
-      const contentType = res.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await res.text()
-        console.error('Non-JSON response from Railway:', text.substring(0, 200))
-        throw new Error('Railway service returned invalid response - make sure it is deployed and running')
-      }
-      
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Failed to start remote scraper')
-      }
-      
-      const data = await res.json()
-      setRemoteSession(data)
-      setShowVnc(true)
-      setProgress(lang === 'nl' ? 'Log in op de AH website in het browservenster hieronder' : 'Log in to the AH website in the browser window below')
-      
-      // Start polling for remote scraper status
-      const pollRemoteStatus = async () => {
-        try {
-          const statusRes = await fetch(`${RAILWAY_SCRAPER_URL}${data.status_url}`)
-          
-          const contentType = statusRes.headers.get('content-type')
-          if (!contentType || !contentType.includes('application/json')) {
-            console.error('Non-JSON status response')
-            setTimeout(pollRemoteStatus, 3000)
-            return
-          }
-          
-          const statusData = await statusRes.json()
-          
-          setProgress(statusData.message || 'Scraping...')
-          
-          if (statusData.status === 'complete') {
-            setStatus('success')
-            setProductsCount(statusData.products_scraped || 0)
-            setShowVnc(false)
-            
-            // Save bonus card to localStorage
-            if (statusData.bonus_card) {
-              localStorage.setItem('ah_bonus_card', statusData.bonus_card)
-              // Update bonus card context
-              if (bonusLogin) {
-                bonusLogin(statusData.bonus_card, {
-                  ah_email: statusData.email,
-                  last_scrape_at: new Date().toISOString()
-                })
-              }
-            }
-            
-            if (onSyncCompleted) onSyncCompleted()
-            return
-          }
-          
-          if (statusData.status === 'error' || statusData.status === 'timeout') {
-            setStatus('error')
-            setError(statusData.error || 'Scraping failed')
-            setShowVnc(false)
-            return
-          }
-          
-          // Continue polling
-          setTimeout(pollRemoteStatus, 2000)
-        } catch (err) {
-          console.error('Remote status poll error:', err)
-          setTimeout(pollRemoteStatus, 3000)
-        }
-      }
-      
-      // Start polling after a short delay
-      setTimeout(pollRemoteStatus, 3000)
-      
-    } catch (err) {
-      console.error('Remote scrape failed:', err)
-      setError(err.message)
-      setStatus('error')
-    }
-  }, [lang, bonusLogin, onSyncCompleted])
-
   const formatDate = (dateStr) => {
     if (!dateStr) return null
     try {
@@ -475,163 +347,7 @@ function AccountSync({ onSyncCompleted }) {
         </a>
       </div>
 
-      {/* ===== METHOD 2: Browser Extension ===== */}
-      <div style={{
-        background: 'rgba(139, 92, 246, 0.1)',
-        border: '1px solid rgba(139, 92, 246, 0.3)',
-        borderRadius: '12px',
-        padding: '1.25rem',
-        marginBottom: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Puzzle size={20} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <h4 style={{ margin: 0, fontSize: '1rem' }}>
-              {lang === 'nl' ? '2. Browser Extensie' : '2. Browser Extension'}
-            </h4>
-            <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
-              {lang === 'nl' ? 'Chrome/Firefox extensie' : 'Chrome/Firefox extension'}
-            </p>
-          </div>
-        </div>
-        <a
-          href="https://github.com/MontagueJacobs/albert/tree/main/sustainable-shop-webapp/extension"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1.25rem',
-            background: 'rgba(139, 92, 246, 0.3)',
-            color: 'white',
-            textDecoration: 'none',
-            borderRadius: '8px',
-            fontWeight: 500,
-            fontSize: '0.9rem'
-          }}
-        >
-          <ExternalLink size={16} />
-          {lang === 'nl' ? 'Download Extensie' : 'Download Extension'}
-        </a>
-      </div>
-
-      {/* ===== METHOD 3: Remote Browser (if configured) ===== */}
-      {RAILWAY_SCRAPER_URL && (
-        <div style={{
-          background: 'rgba(236, 72, 153, 0.1)',
-          border: '1px solid rgba(236, 72, 153, 0.3)',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          marginBottom: '1rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Monitor size={20} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <h4 style={{ margin: 0, fontSize: '1rem' }}>
-                {lang === 'nl' ? '3. Remote Browser' : '3. Remote Browser'}
-                <span style={{ 
-                  marginLeft: '0.5rem', 
-                  fontSize: '0.75rem', 
-                  background: '#ec4899', 
-                  padding: '2px 8px', 
-                  borderRadius: '4px',
-                  verticalAlign: 'middle'
-                }}>
-                  Beta
-                </span>
-              </h4>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
-                {lang === 'nl' ? 'Log in via browser in de cloud' : 'Log in via browser in the cloud'}
-              </p>
-            </div>
-          </div>
-
-          {/* noVNC Browser Window */}
-          {showVnc && remoteSession && (
-            <div style={{
-              marginBottom: '1rem',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              border: '2px solid rgba(236, 72, 153, 0.5)'
-            }}>
-              <div style={{
-                background: 'rgba(236, 72, 153, 0.2)',
-                padding: '0.5rem 1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>
-                  {lang === 'nl' ? 'AH Browser Venster' : 'AH Browser Window'}
-                </span>
-                <a 
-                  href={`${RAILWAY_SCRAPER_URL}/vnc.html`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#f472b6', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                >
-                  <ExternalLink size={14} />
-                  {lang === 'nl' ? 'Open in nieuw venster' : 'Open in new window'}
-                </a>
-              </div>
-              <iframe
-                src={`${RAILWAY_SCRAPER_URL}/vnc.html?autoconnect=true&resize=scale`}
-                style={{
-                  width: '100%',
-                  height: '400px',
-                  border: 'none',
-                  background: '#000'
-                }}
-                title="Remote Browser"
-              />
-            </div>
-          )}
-
-          <button
-            onClick={handleRemoteScrape}
-            disabled={isBusy}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.25rem',
-              background: isBusy ? 'rgba(236, 72, 153, 0.3)' : 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 500,
-              fontSize: '0.9rem',
-              cursor: isBusy ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {isBusy ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Monitor size={16} />}
-            {lang === 'nl' ? 'Start Remote Sync' : 'Start Remote Sync'}
-          </button>
-        </div>
-      )}
-
-      {/* ===== METHOD 4: Local Auto-Sync (if available) ===== */}
+      {/* ===== METHOD 2: Local Auto-Sync (if available) ===== */}
       {available && (
         <div style={{
           background: 'rgba(0, 160, 226, 0.1)',
@@ -654,7 +370,7 @@ function AccountSync({ onSyncCompleted }) {
             </div>
             <div style={{ flex: 1 }}>
               <h4 style={{ margin: 0, fontSize: '1rem' }}>
-                {lang === 'nl' ? 'Automatische Sync (Lokaal)' : 'Auto Sync (Local)'}
+                {lang === 'nl' ? '2. Automatische Sync (Lokaal)' : '2. Auto Sync (Local)'}
                 {hasCookies && (
                   <span style={{ 
                     marginLeft: '0.5rem', 
