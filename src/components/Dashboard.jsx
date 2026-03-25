@@ -436,6 +436,52 @@ function Dashboard({ syncVersion }) {
         )}
       </div>
       
+      {/* Final Questionnaire CTA */}
+      <div style={{
+        marginTop: '2rem',
+        padding: '1.5rem',
+        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15))',
+        borderRadius: '16px',
+        border: '1px solid rgba(59, 130, 246, 0.3)',
+        textAlign: 'center'
+      }}>
+        <h3 style={{ 
+          fontSize: '1.1rem', 
+          fontWeight: '600',
+          marginBottom: '0.75rem',
+          color: 'var(--text)'
+        }}>
+          📊 {t('final_survey_title') || 'Share Your Feedback'}
+        </h3>
+        <p style={{ 
+          color: 'var(--text-muted)', 
+          marginBottom: '1rem',
+          fontSize: '0.9rem'
+        }}>
+          {t('final_survey_desc') || 'Help us improve by answering a few questions about your experience.'}
+        </p>
+        <button
+          onClick={() => {
+            window.location.hash = 'questionnaire?type=post'
+          }}
+          style={{
+            padding: '0.75rem 2rem',
+            background: 'linear-gradient(135deg, #3b82f6, #667eea)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '12px',
+            fontSize: '0.95rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          {t('take_survey') || 'Take Final Survey'} →
+        </button>
+      </div>
+      
       {/* Product Detail Modal */}
       {selectedPurchase && (
         <ProductDetailModal 

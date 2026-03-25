@@ -6,6 +6,7 @@ import HowItWorks from './components/HowItWorks'
 import AccountSync from './components/AccountSync'
 import ScoreLookup from './components/ScoreLookup'
 import BonusCardLanding from './components/BonusCardLanding'
+import Questionnaire from './components/Questionnaire'
 import { AuthProvider } from './lib/authContext'
 import { AHUserProvider } from './lib/ahUserContext.jsx'
 import { BonusCardProvider, useBonusCard } from './lib/bonusCardContext.jsx'
@@ -43,7 +44,7 @@ const features = [
   }
 ]
 
-function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion }) {
+function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion, questionnaireType }) {
   const { t, lang, setLang } = useI18n()
   const { bonusCardNumber, isAuthenticated: isBonusAuth, login: bonusLogin, logout: bonusLogout } = useBonusCard()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -56,6 +57,44 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
   const navigateTo = (tab) => {
     setActiveTab(tab)
     setMenuOpen(false)
+  }
+
+  // Handle questionnaire completion
+  const handleQuestionnaireComplete = (responses) => {
+    if (questionnaireType === 'pre') {
+      // After pre-questionnaire, navigate to dashboard
+      setActiveTab('dashboard')
+      window.location.hash = 'dashboard'
+    } else {
+      // After post-questionnaire, go back home
+      setActiveTab('home')
+      window.location.hash = ''
+    }
+  }
+
+  // Questionnaire page - full screen, no menu
+  if (activeTab === 'questionnaire') {
+    return (
+      <div className="app-wrapper">
+        <header className="app-header">
+          <div className="header-logo">
+            <Leaf size={28} className="logo-icon" />
+            <span className="logo-text">Sustainable Shop</span>
+          </div>
+          <div className="header-actions">
+            <button className="lang-btn" onClick={handleToggleLanguage}>
+              {lang === 'nl' ? 'EN' : 'NL'}
+            </button>
+          </div>
+        </header>
+        <main className="page-content">
+          <Questionnaire 
+            type={questionnaireType || 'pre'} 
+            onComplete={handleQuestionnaireComplete}
+          />
+        </main>
+      </div>
+    )
   }
 
   // Homepage / Landing view
@@ -215,31 +254,50 @@ function App() {
   // Read initial tab from URL hash (e.g., #dashboard)
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.slice(1) // Remove #
-    const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'history', 'how']
-    return validTabs.includes(hash) ? hash : 'home'
+    // Handle questionnaire with params like #questionnaire?type=pre
+    const tabPart = hash.split('?')[0]
+    const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'history', 'how', 'questionnaire']
+    return validTabs.includes(tabPart) ? tabPart : 'home'
   })
+  
+  // Extract questionnaire type from URL (pre or post)
+  const [questionnaireType, setQuestionnaireType] = useState(() => {
+    const hash = window.location.hash.slice(1)
+    const params = new URLSearchParams(hash.split('?')[1] || '')
+    return params.get('type') || 'pre'
+  })
+  
   const [lang, setLang] = useState(() => getSavedLang())
   const [syncVersion, setSyncVersion] = useState(0)
 
   // Sync activeTab with URL hash
   useEffect(() => {
     // Update hash when tab changes
-    if (activeTab !== 'home') {
+    if (activeTab === 'questionnaire') {
+      window.location.hash = `questionnaire?type=${questionnaireType}`
+    } else if (activeTab !== 'home') {
       window.location.hash = activeTab
     } else {
       // Clear hash for home
       if (window.location.hash) {
-        history.replaceState(null, '', window.location.pathname)
+        history.replaceState(null, '', window.location.pathname + window.location.search)
       }
     }
-  }, [activeTab])
+  }, [activeTab, questionnaireType])
 
   // Listen for browser back/forward navigation
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
-      const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'history', 'how']
-      setActiveTab(validTabs.includes(hash) ? hash : 'home')
+      const tabPart = hash.split('?')[0]
+      const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'history', 'how', 'questionnaire']
+      setActiveTab(validTabs.includes(tabPart) ? tabPart : 'home')
+      
+      // Update questionnaire type if on questionnaire page
+      if (tabPart === 'questionnaire') {
+        const params = new URLSearchParams(hash.split('?')[1] || '')
+        setQuestionnaireType(params.get('type') || 'pre')
+      }
     }
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
@@ -274,6 +332,7 @@ function App() {
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               syncVersion={syncVersion}
+              questionnaireType={questionnaireType}
             />
           </I18nProvider>
         </BonusCardProvider>

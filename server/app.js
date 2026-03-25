@@ -3028,6 +3028,105 @@ app.get('/api/debug/purchases', async (req, res) => {
   }
 })
 
+// ==== QUESTIONNAIRE ENDPOINTS ====
+// Submit questionnaire responses (pre/post exposure surveys)
+app.post('/api/questionnaire/submit', async (req, res) => {
+  try {
+    const { bonus_card, questionnaire_type, responses } = req.body
+    
+    if (!bonus_card) {
+      return res.status(400).json({ error: 'bonus_card is required' })
+    }
+    
+    if (!questionnaire_type || !['pre', 'post'].includes(questionnaire_type)) {
+      return res.status(400).json({ error: 'questionnaire_type must be "pre" or "post"' })
+    }
+    
+    if (!responses || typeof responses !== 'object') {
+      return res.status(400).json({ error: 'responses object is required' })
+    }
+    
+    // Upsert the questionnaire response (update if exists, insert if not)
+    const { data, error } = await supabase
+      .from('questionnaire_responses')
+      .upsert({
+        bonus_card,
+        questionnaire_type,
+        responses,
+        created_at: new Date().toISOString()
+      }, {
+        onConflict: 'bonus_card,questionnaire_type'
+      })
+      .select()
+    
+    if (error) {
+      console.error('[questionnaire/submit] Error:', error)
+      return res.status(500).json({ error: error.message })
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `${questionnaire_type} questionnaire saved`,
+      data 
+    })
+  } catch (e) {
+    console.error('[questionnaire/submit] Exception:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Get questionnaire responses for a bonus card
+app.get('/api/questionnaire/:bonusCard', async (req, res) => {
+  try {
+    const { bonusCard } = req.params
+    const { type } = req.query
+    
+    let query = supabase
+      .from('questionnaire_responses')
+      .select('*')
+      .eq('bonus_card', bonusCard)
+    
+    if (type && ['pre', 'post'].includes(type)) {
+      query = query.eq('questionnaire_type', type)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+    
+    res.json({ responses: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Check if user has completed questionnaires
+app.get('/api/questionnaire/:bonusCard/status', async (req, res) => {
+  try {
+    const { bonusCard } = req.params
+    
+    const { data, error } = await supabase
+      .from('questionnaire_responses')
+      .select('questionnaire_type')
+      .eq('bonus_card', bonusCard)
+    
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+    
+    const completed = data.map(r => r.questionnaire_type)
+    
+    res.json({ 
+      pre_completed: completed.includes('pre'),
+      post_completed: completed.includes('post')
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Debug endpoint to test inserting into user_purchases
 app.post('/api/debug/test-insert', async (req, res) => {
   const bonusCard = req.body.bonus_card || '4463986084997'
@@ -3303,8 +3402,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
     // Build redirect URL for bookmarklet
     // Use custom APP_URL env var, or default to production domain
     // Query params must come BEFORE hash fragment
+    // Redirect to pre-exposure questionnaire first, then user will see dashboard
     const appBase = process.env.APP_URL || 'https://www.bubblebrainz.com'
-    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#dashboard` : null
+    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#questionnaire?type=pre` : null
 
     return res.json({ 
       ok: true, 
