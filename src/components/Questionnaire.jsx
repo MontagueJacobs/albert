@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Loader2, ChevronRight, CheckCircle, AlertCircle } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
+import CarbonRankingGame from './CarbonRankingGame.jsx'
 
 // Dummy questions for the questionnaire
 // These can be easily replaced with real questions later
@@ -305,6 +306,16 @@ function Questionnaire({ type = 'pre', onComplete, onSkip }) {
   const { lang } = useI18n()
   const { bonusCardNumber } = useBonusCard()
   const isNl = lang === 'nl'
+  
+  // Carbon ranking game - completely different UI
+  if (type === 'carbon_ranking') {
+    return (
+      <CarbonRankingGame 
+        onComplete={onComplete}
+        onBack={onSkip}
+      />
+    )
+  }
   
   const questions = type === 'pre' ? PRE_QUESTIONS : POST_QUESTIONS
   

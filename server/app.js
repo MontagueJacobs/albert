@@ -3110,7 +3110,7 @@ app.get('/api/debug/purchases', async (req, res) => {
 })
 
 // ==== QUESTIONNAIRE ENDPOINTS ====
-// Submit questionnaire responses (pre/post exposure surveys)
+// Submit questionnaire responses (pre/post exposure surveys or carbon ranking game)
 app.post('/api/questionnaire/submit', async (req, res) => {
   try {
     const { bonus_card, questionnaire_type, responses } = req.body
@@ -3119,8 +3119,8 @@ app.post('/api/questionnaire/submit', async (req, res) => {
       return res.status(400).json({ error: 'bonus_card is required' })
     }
     
-    if (!questionnaire_type || !['pre', 'post'].includes(questionnaire_type)) {
-      return res.status(400).json({ error: 'questionnaire_type must be "pre" or "post"' })
+    if (!questionnaire_type || !['pre', 'post', 'carbon_ranking'].includes(questionnaire_type)) {
+      return res.status(400).json({ error: 'questionnaire_type must be "pre", "post", or "carbon_ranking"' })
     }
     
     if (!responses || typeof responses !== 'object') {
@@ -3167,7 +3167,7 @@ app.get('/api/questionnaire/:bonusCard', async (req, res) => {
       .select('*')
       .eq('bonus_card', bonusCard)
     
-    if (type && ['pre', 'post'].includes(type)) {
+    if (type && ['pre', 'post', 'carbon_ranking'].includes(type)) {
       query = query.eq('questionnaire_type', type)
     }
     
@@ -3201,9 +3201,155 @@ app.get('/api/questionnaire/:bonusCard/status', async (req, res) => {
     
     res.json({ 
       pre_completed: completed.includes('pre'),
-      post_completed: completed.includes('post')
+      post_completed: completed.includes('post'),
+      carbon_ranking_completed: completed.includes('carbon_ranking')
     })
   } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Non-food keywords to filter out for carbon ranking game
+const NON_FOOD_KEYWORDS = [
+  // Dutch non-food items
+  'toiletpapier', 'wc-papier', 'wcpapier', 'keukenpapier', 'keukenrol',
+  'zeep', 'handzeep', 'douchegel', 'shampoo', 'conditioner', 'bodylotion',
+  'tandpasta', 'tandenborstel', 'mondwater', 'deodorant', 'scheermesjes',
+  'schoonmaak', 'allesreiniger', 'afwasmiddel', 'wasmiddel', 'wasverzachter',
+  'bleek', 'ontkalker', 'wc-blok', 'luchtverfriser', 'geurkaars',
+  'luiers', 'billendoekjes', 'maandverband', 'tampons', 'tissues',
+  'vuilniszak', 'prullenbak', 'bakpapier', 'aluminiumfolie', 'huishoudfolie',
+  'vaatdoekjes', 'sponzen', 'schuurspons', 'dweil', 'bezem',
+  'batterij', 'lamp', 'kaars', 'aansteker', 'lucifers',
+  'huisdier', 'hondenbrokken', 'kattenbrokken', 'kattenbakvulling', 'hondenvoer', 'kattenvoer',
+  // English non-food items (some products have English names)
+  'toilet paper', 'kitchen roll', 'soap', 'shampoo', 'toothpaste', 'deodorant',
+  'detergent', 'cleaner', 'dishwashing', 'laundry', 'bleach', 'diapers', 'tissues',
+  'garbage bag', 'trash bag', 'batteries', 'candle', 'pet food', 'cat litter'
+]
+
+// Check if product name is likely food
+function isLikelyFood(productName) {
+  const nameLower = (productName || '').toLowerCase()
+  return !NON_FOOD_KEYWORDS.some(keyword => nameLower.includes(keyword))
+}
+
+// Get 10 products for carbon ranking game: 5 from user's purchases, 5 from products table
+app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
+  try {
+    const { bonusCard } = req.params
+    
+    if (!bonusCard) {
+      return res.status(400).json({ error: 'Bonus card number required' })
+    }
+
+    // Get user's purchased product IDs (to exclude from "other" products)
+    const { data: userPurchases, error: purchasesError } = await supabase
+      .from('user_purchases')
+      .select('product_id, product_name')
+      .eq('bonus_card_number', bonusCard)
+    
+    if (purchasesError) {
+      console.error('[ranking-products] Error fetching purchases:', purchasesError)
+      return res.status(500).json({ error: purchasesError.message })
+    }
+
+    // Filter for food items only from purchases
+    const foodPurchases = (userPurchases || []).filter(p => isLikelyFood(p.product_name))
+    
+    // Get unique purchased product IDs
+    const purchasedIds = new Set(foodPurchases.map(p => p.product_id).filter(Boolean))
+    
+    // Randomly select up to 5 unique products from user's food purchases
+    const shuffledPurchases = foodPurchases
+      .filter((p, i, arr) => arr.findIndex(x => x.product_id === p.product_id) === i) // unique by product_id
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5)
+    
+    // Get 5 products from products table that user hasn't purchased
+    // Prioritize products with enriched data (origin, vegan, etc.)
+    const { data: allProducts, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month')
+      .not('id', 'in', `(${[...purchasedIds].join(',') || 'null'})`)
+      .limit(200)
+    
+    if (productsError) {
+      console.error('[ranking-products] Error fetching products:', productsError)
+      return res.status(500).json({ error: productsError.message })
+    }
+
+    // Filter for food items and products with SOME enriched data for scoring
+    const candidateOtherProducts = (allProducts || [])
+      .filter(p => isLikelyFood(p.name))
+      .filter(p => {
+        // Must have at least one enriched attribute OR origin data for meaningful scoring
+        return p.is_vegan || p.is_vegetarian || p.is_organic || p.is_fairtrade || p.origin_country || p.origin_by_month
+      })
+    
+    // Randomly select 5 products from candidates
+    const otherProducts = candidateOtherProducts
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5)
+    
+    // Calculate actual sustainability scores for all products
+    const fromPurchases = await Promise.all(shuffledPurchases.map(async (p) => {
+      // Get enriched data from products table
+      let enrichedData = null
+      if (p.product_id) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url')
+          .eq('id', p.product_id)
+          .single()
+        if (product) {
+          enrichedData = getEnrichedData(product)
+        }
+      }
+      const evaluation = evaluateProduct(p.product_name, enrichedData)
+      return {
+        id: p.product_id,
+        name: p.product_name,
+        image_url: enrichedData?.image_url || null,
+        source: 'purchased',
+        actual_score: evaluation.score,
+        enriched: evaluation.enriched
+      }
+    }))
+    
+    const fromOther = otherProducts.map(p => {
+      const enrichedData = getEnrichedData(p)
+      const evaluation = evaluateProduct(p.name, enrichedData)
+      return {
+        id: p.id,
+        name: p.name,
+        image_url: p.image_url,
+        source: 'catalog',
+        actual_score: evaluation.score,
+        enriched: evaluation.enriched
+      }
+    })
+    
+    // Combine and shuffle all 10 products
+    const allRankingProducts = [...fromPurchases, ...fromOther].sort(() => Math.random() - 0.5)
+    
+    // Check if we have enough products
+    if (allRankingProducts.length < 6) {
+      return res.status(400).json({ 
+        error: 'not_enough_products',
+        message: 'Not enough food products available for ranking game. Please import more purchases first.',
+        available: allRankingProducts.length
+      })
+    }
+    
+    res.json({
+      products: allRankingProducts,
+      total: allRankingProducts.length,
+      from_purchases: fromPurchases.length,
+      from_catalog: fromOther.length
+    })
+  } catch (e) {
+    console.error('[ranking-products] Exception:', e)
     res.status(500).json({ error: e.message })
   }
 })
@@ -3509,9 +3655,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
     // Build redirect URL for bookmarklet
     // Use custom APP_URL env var, or default to production domain
     // Query params must come BEFORE hash fragment
-    // Redirect to pre-exposure questionnaire first, then user will see dashboard
+    // Redirect to carbon ranking game after import
     const appBase = process.env.APP_URL || 'https://www.bubblebrainz.com'
-    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#questionnaire?type=pre` : null
+    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#questionnaire?type=carbon_ranking` : null
 
     return res.json({ 
       ok: true, 
