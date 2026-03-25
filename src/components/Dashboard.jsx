@@ -110,8 +110,15 @@ function Dashboard({ syncVersion }) {
   // Note: sessionId alone is NOT sufficient anymore (user_ah_credentials table removed)
   const isUserConnected = isAuthenticated || isBonusAuth
   
-  // Debug log
-  console.log('[Dashboard] bonusCardNumber:', bonusCardNumber, 'isAuthenticated:', isAuthenticated, 'isBonusAuth:', isBonusAuth, 'isUserConnected:', isUserConnected)
+  // Debug logging - helps identify wrong-account issues
+  console.log('[Dashboard] Current state:', {
+    bonusCardNumber: bonusCardNumber ? `...${bonusCardNumber.slice(-4)}` : null,
+    isAuthenticated,
+    isBonusAuth,
+    isUserConnected,
+    bonusLoading,
+    localStorage: typeof localStorage !== 'undefined' ? `...${(localStorage.getItem('ah_bonus_card') || '').slice(-4)}` : 'N/A'
+  })
   
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -288,6 +295,24 @@ function Dashboard({ syncVersion }) {
 
   return (
     <div>
+      {/* Bonus card indicator */}
+      {bonusCardNumber && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          padding: '0.5rem 1rem',
+          background: 'rgba(34, 197, 94, 0.1)',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          fontSize: '0.85rem',
+          color: 'var(--text-muted)'
+        }}>
+          <span style={{ color: '#22c55e' }}>🎫</span>
+          <span>Bonuskaart: ••••{bonusCardNumber.slice(-4)}</span>
+        </div>
+      )}
+      
       <div className="stats-grid">
         <div className="stat-card">
           <h3>

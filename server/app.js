@@ -90,6 +90,87 @@ function appendScrapeLog(stream, chunk) {
   }
 }
 
+// Background origin scraper state (runs after product ingestion)
+const originScraperState = {
+  running: false,
+  lastRun: null,
+  productsScraped: 0
+}
+
+/**
+ * Trigger the batch origin scraper in the background after products are ingested.
+ * This populates origin_country, price, and other details for new products.
+ * Non-blocking - runs asynchronously without waiting for completion.
+ */
+function triggerBackgroundOriginScraper() {
+  // Skip if already running or no Python available
+  if (originScraperState.running) {
+    console.log('[OriginScraper] Already running, skipping trigger')
+    return
+  }
+  
+  // Check if script exists
+  const scriptPath = path.resolve(__dirname, 'batch_origin_scraper.py')
+  if (!existsSync(scriptPath)) {
+    console.log('[OriginScraper] Script not found:', scriptPath)
+    return
+  }
+  
+  // Check if running on Vercel (no Python available)
+  if (process.env.VERCEL) {
+    console.log('[OriginScraper] Skipping on Vercel - no Python runtime')
+    return
+  }
+  
+  originScraperState.running = true
+  console.log('[OriginScraper] Starting background scrape for new products...')
+  
+  try {
+    const scraperProcess = spawn(PYTHON_CMD, [
+      scriptPath,
+      '--mode', 'purchases',
+      '--limit', '20',  // Limit to 20 products per run to avoid overload
+      '--delay', '2'
+    ], {
+      cwd: __dirname,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    
+    let productsScraped = 0
+    
+    scraperProcess.stdout.on('data', (data) => {
+      const text = data.toString()
+      console.log('[OriginScraper]', text.trim())
+      // Parse "Updated: X" from output
+      const match = text.match(/Updated:\s*(\d+)/i)
+      if (match) {
+        productsScraped = parseInt(match[1], 10)
+      }
+    })
+    
+    scraperProcess.stderr.on('data', (data) => {
+      console.error('[OriginScraper ERROR]', data.toString().trim())
+    })
+    
+    scraperProcess.on('close', (code) => {
+      originScraperState.running = false
+      originScraperState.lastRun = new Date().toISOString()
+      originScraperState.productsScraped = productsScraped
+      console.log(`[OriginScraper] Completed with exit code ${code}, scraped ${productsScraped} products`)
+    })
+    
+    scraperProcess.on('error', (err) => {
+      originScraperState.running = false
+      console.error('[OriginScraper] Process error:', err.message)
+    })
+    
+  } catch (err) {
+    originScraperState.running = false
+    console.error('[OriginScraper] Failed to spawn:', err.message)
+  }
+}
+
 app.use(cors())
 app.use(bodyParser.json({ limit: '2mb' }))
 
@@ -3127,6 +3208,26 @@ app.get('/api/questionnaire/:bonusCard/status', async (req, res) => {
   }
 })
 
+// ==== ORIGIN SCRAPER ENDPOINTS ====
+// Get origin scraper status
+app.get('/api/origin-scraper/status', (req, res) => {
+  res.json({
+    running: originScraperState.running,
+    lastRun: originScraperState.lastRun,
+    productsScraped: originScraperState.productsScraped
+  })
+})
+
+// Manually trigger the origin scraper
+app.post('/api/origin-scraper/trigger', (req, res) => {
+  if (originScraperState.running) {
+    return res.status(409).json({ error: 'already_running' })
+  }
+  
+  triggerBackgroundOriginScraper()
+  res.json({ ok: true, message: 'Origin scraper triggered' })
+})
+
 // Debug endpoint to test inserting into user_purchases
 app.post('/api/debug/test-insert', async (req, res) => {
   const bonusCard = req.body.bonus_card || '4463986084997'
@@ -3397,6 +3498,12 @@ app.post('/api/ingest/scrape', async (req, res) => {
       } else {
         console.log('[Ingest] No userId or bonusCard - skipping user_purchases insert')
       }
+    }
+
+    // Trigger background origin scraper to populate details for new products
+    // This runs asynchronously and won't delay the response
+    if (stored > 0) {
+      triggerBackgroundOriginScraper()
     }
 
     // Build redirect URL for bookmarklet

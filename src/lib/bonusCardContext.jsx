@@ -2,44 +2,95 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const BonusCardContext = createContext(null)
 
+// Helper to extract card from URL (runs synchronously)
+function getCardFromUrl() {
+  const urlParams = new URLSearchParams(window.location.search)
+  const cardFromUrl = urlParams.get('card')
+  if (cardFromUrl && /^\d{13}$/.test(cardFromUrl)) {
+    return cardFromUrl
+  }
+  return null
+}
+
+// Helper to get saved card from localStorage
+function getSavedCard() {
+  try {
+    const saved = localStorage.getItem('ah_bonus_card')
+    if (saved && /^\d{13}$/.test(saved)) {
+      return saved
+    }
+  } catch (e) {}
+  return null
+}
+
 export function BonusCardProvider({ children }) {
-  const [bonusCardNumber, setBonusCardNumber] = useState(null)
+  // Initialize state synchronously from URL first, then localStorage
+  // This ensures the correct card is available immediately on first render
+  const [bonusCardNumber, setBonusCardNumber] = useState(() => {
+    const fromUrl = getCardFromUrl()
+    const fromStorage = getSavedCard()
+    
+    // URL always takes priority - this handles redirects with new cards
+    if (fromUrl) {
+      console.log('[BonusCard] Initial state from URL:', fromUrl.slice(-4))
+      // Check if URL card differs from stored card - clear old data
+      if (fromStorage && fromStorage !== fromUrl) {
+        console.log('[BonusCard] New card from URL differs from stored card, switching')
+      }
+      // Save new card to localStorage immediately
+      try {
+        localStorage.setItem('ah_bonus_card', fromUrl)
+      } catch (e) {}
+      return fromUrl
+    }
+    
+    // No URL param, use localStorage
+    if (fromStorage) {
+      console.log('[BonusCard] Initial state from localStorage:', fromStorage.slice(-4))
+      return fromStorage
+    }
+    
+    console.log('[BonusCard] No card found in URL or localStorage')
+    return null
+  })
   const [userInfo, setUserInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   
-  // Check URL param and localStorage on mount
+  // Clean URL and fetch user info on mount
   useEffect(() => {
-    // First check URL for ?card= parameter (from bookmarklet redirect)
-    const urlParams = new URLSearchParams(window.location.search)
-    const cardFromUrl = urlParams.get('card')
-    
-    // Bonus cards must be exactly 13 digits
-    if (cardFromUrl && /^\d{13}$/.test(cardFromUrl)) {
-      console.log('[BonusCard] Found valid card in URL:', cardFromUrl.slice(-4))
-      // Save to localStorage and use it
-      localStorage.setItem('ah_bonus_card', cardFromUrl)
-      setBonusCardNumber(cardFromUrl)
-      fetchUserInfo(cardFromUrl)
-      // Clean up URL (remove ?card= param)
+    // If card came from URL, clean up the URL
+    const cardFromUrl = getCardFromUrl()
+    if (cardFromUrl) {
+      console.log('[BonusCard] Cleaning URL, card:', cardFromUrl.slice(-4))
+      // Clean up URL (remove ?card= param but keep hash)
       const newUrl = window.location.pathname + window.location.hash
       window.history.replaceState({}, '', newUrl)
-      return
     }
     
-    // Otherwise check localStorage - validate format
-    const savedCard = localStorage.getItem('ah_bonus_card')
-    if (savedCard && /^\d{13}$/.test(savedCard)) {
-      console.log('[BonusCard] Found valid card in localStorage:', savedCard.slice(-4))
-      setBonusCardNumber(savedCard)
-      fetchUserInfo(savedCard)
+    // Fetch user info if we have a card
+    if (bonusCardNumber) {
+      console.log('[BonusCard] Fetching user info for card:', bonusCardNumber.slice(-4))
+      fetchUserInfo(bonusCardNumber)
     } else {
-      if (savedCard) {
-        console.warn('[BonusCard] Invalid card format in localStorage:', savedCard?.length, 'chars - clearing')
-        localStorage.removeItem('ah_bonus_card')
-      }
       setLoading(false)
     }
-  }, [])
+  }, []) // Only run once on mount - card is already set synchronously
+  
+  // Watch for URL changes (e.g., if user navigates back with a ?card= param)
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const cardFromUrl = getCardFromUrl()
+      if (cardFromUrl && cardFromUrl !== bonusCardNumber) {
+        console.log('[BonusCard] URL change detected, new card:', cardFromUrl.slice(-4))
+        setBonusCardNumber(cardFromUrl)
+        localStorage.setItem('ah_bonus_card', cardFromUrl)
+        fetchUserInfo(cardFromUrl)
+      }
+    }
+    
+    window.addEventListener('popstate', handleUrlChange)
+    return () => window.removeEventListener('popstate', handleUrlChange)
+  }, [bonusCardNumber])
   
   const fetchUserInfo = async (cardNumber) => {
     setLoading(true)

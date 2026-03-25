@@ -231,30 +231,67 @@
   }
   
   // ============================================
-  // AUTO SCROLL
+  // AUTO SCROLL - Loads all lazy-loaded products
   // ============================================
   
   async function autoScroll() {
     let lastCount = 0;
     let sameCountTimes = 0;
+    let iterations = 0;
+    const maxIterations = 50; // Safety limit
+    const scrollStep = window.innerHeight * 0.8; // Scroll ~80% of viewport at a time
     
-    while (sameCountTimes < 3) {
-      window.scrollTo(0, document.body.scrollHeight);
-      await new Promise(r => setTimeout(r, 1500));
+    statusEl.textContent = 'Scrollen om alle producten te laden...';
+    
+    while (sameCountTimes < 3 && iterations < maxIterations) {
+      iterations++;
       
+      // Scroll down in increments (more reliable for lazy loading)
+      const currentScroll = window.scrollY;
+      const maxScroll = document.body.scrollHeight - window.innerHeight;
+      
+      if (currentScroll < maxScroll) {
+        // Scroll down by one viewport height
+        window.scrollBy({ top: scrollStep, behavior: 'smooth' });
+        await new Promise(r => setTimeout(r, 800)); // Wait for scroll animation
+      }
+      
+      // Also try scrolling to absolute bottom to trigger any remaining loads
+      window.scrollTo(0, document.body.scrollHeight);
+      await new Promise(r => setTimeout(r, 1200)); // Wait for content to load
+      
+      // Count products
       const items = extractProducts();
       countEl.textContent = `${items.length} producten gevonden`;
-      progressEl.style.width = Math.min(20 + (sameCountTimes * 10), 50) + '%';
+      
+      // Calculate progress (10-50% during scrolling phase)
+      const scrollProgress = Math.min(currentScroll / maxScroll, 1);
+      progressEl.style.width = (10 + scrollProgress * 40) + '%';
+      
+      statusEl.textContent = `Laden... (${items.length} producten)`;
       
       if (items.length === lastCount) {
         sameCountTimes++;
+        // If count hasn't changed, we might be at the end
+        if (sameCountTimes === 1) {
+          statusEl.textContent = 'Controleren of alles geladen is...';
+        }
       } else {
         sameCountTimes = 0;
         lastCount = items.length;
       }
+      
+      // If we're at max scroll and count hasn't changed, we're probably done
+      if (currentScroll >= maxScroll - 100 && items.length === lastCount) {
+        sameCountTimes++;
+      }
     }
     
-    window.scrollTo(0, 0);
+    // Scroll back to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    progressEl.style.width = '55%';
+    
+    console.log(`[Bookmarklet] Auto-scroll complete: ${lastCount} products found in ${iterations} iterations`);
   }
   
   // ============================================
