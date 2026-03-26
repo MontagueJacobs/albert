@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sustainable Shop - Easy Setup</title>
+  <title>Duurzaam Boodschappen - Bookmarklet Setup</title>
   <style>
     * {
       margin: 0;
@@ -20,7 +20,7 @@
     }
     
     .container {
-      max-width: 600px;
+      max-width: 700px;
       margin: 0 auto;
     }
     
@@ -47,7 +47,101 @@
     .card h2 {
       font-size: 1.25rem;
       margin-bottom: 16px;
-      color: #22c55e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .card.ah h2 { color: #22c55e; }
+    .card.jumbo h2 { color: #fbbf24; }
+    
+    .store-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    @media (max-width: 600px) {
+      .store-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .store-card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    
+    .store-card.ah { border-color: rgba(34, 197, 94, 0.3); }
+    .store-card.jumbo { border-color: rgba(251, 191, 36, 0.3); }
+    
+    .store-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+    }
+    
+    .store-card.ah h3 { color: #22c55e; }
+    .store-card.jumbo h3 { color: #fbbf24; }
+    
+    .bookmarklet {
+      display: inline-block;
+      padding: 14px 28px;
+      color: white;
+      text-decoration: none;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: grab;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin: 8px 0;
+    }
+    
+    .bookmarklet.ah {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    }
+    
+    .bookmarklet.jumbo {
+      background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+      color: #1e293b;
+    }
+    
+    .bookmarklet:hover {
+      transform: translateY(-2px);
+    }
+    
+    .bookmarklet.ah:hover {
+      box-shadow: 0 8px 25px rgba(34, 197, 94, 0.35);
+    }
+    
+    .bookmarklet.jumbo:hover {
+      box-shadow: 0 8px 25px rgba(251, 191, 36, 0.35);
+    }
+    
+    .bookmarklet:active {
+      cursor: grabbing;
+    }
+    
+    .store-link {
+      display: block;
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+    
+    .store-link a {
+      color: inherit;
+      text-decoration: underline;
+    }
+    
+    .instructions {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 20px;
     }
     
     .step {
@@ -56,15 +150,20 @@
       margin-bottom: 16px;
     }
     
+    .step:last-child {
+      margin-bottom: 0;
+    }
+    
     .step-number {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: bold;
+      font-size: 0.85rem;
       flex-shrink: 0;
     }
     
@@ -77,94 +176,111 @@
       line-height: 1.6;
     }
     
-    .bookmarklet {
-      display: inline-block;
-      padding: 16px 32px;
-      background: linear-gradient(135deg, #22c55e 0%, #667eea 100%);
-      color: white;
-      text-decoration: none;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 1.1rem;
-      cursor: grab;
-      transition: transform 0.2s, box-shadow 0.2s;
-      margin: 16px 0;
-    }
-    
-    .bookmarklet:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(34, 197, 94, 0.3);
-    }
-    
-    .bookmarklet:active {
-      cursor: grabbing;
-    }
-    
     .drag-hint {
-      background: #0f172a;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
       border-radius: 8px;
       padding: 12px;
-      margin-top: 12px;
+      margin-top: 16px;
       font-size: 0.9rem;
-      color: #9ca3af;
+      color: #fcd34d;
     }
     
-    .drag-hint strong {
-      color: #f59e0b;
+    kbd {
+      background: #475569;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85em;
+    }
+    
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #9ca3af;
+      text-decoration: none;
+      margin-top: 24px;
+    }
+    
+    .back-link:hover {
+      color: #f3f4f6;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🌱 Sustainable Shop</h1>
-    <p class="subtitle">Sync your Albert Heijn purchases in one click</p>
+    <h1>🌱 Duurzaam Boodschappen</h1>
+    <p class="subtitle">Importeer je supermarkt aankopen met één klik</p>
     
     <div class="card">
-      <h2>📚 Quick Setup (No Extension Needed!)</h2>
+      <h2>📚 Stap 1: Sleep een bookmarklet naar je bladwijzerbalk</h2>
       
-      <div class="step">
-        <div class="step-number">1</div>
-        <div class="step-content">
-          <p><strong>Drag this button</strong> to your bookmarks bar:</p>
-          <a class="bookmarklet" id="bookmarklet-link" href="#">🌱 Sync AH</a>
-          <div class="drag-hint">
-            <strong>💡 Tip:</strong> If you don't see your bookmarks bar, press <kbd>Ctrl+Shift+B</kbd> (Windows) or <kbd>Cmd+Shift+B</kbd> (Mac)
+      <div class="store-grid">
+        <div class="store-card ah">
+          <h3>🛒 Albert Heijn</h3>
+          <a class="bookmarklet ah" id="ah-bookmarklet" href="#">🌱 AH → Duurzaam</a>
+          <div class="store-link">
+            Gebruik op <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank">ah.nl/eerder-gekocht</a>
+          </div>
+        </div>
+        
+        <div class="store-card jumbo">
+          <h3>🍊 Jumbo</h3>
+          <a class="bookmarklet jumbo" id="jumbo-bookmarklet" href="#">🍊 Jumbo → Duurzaam</a>
+          <div class="store-link">
+            Gebruik op <a href="https://www.jumbo.com/bestellingen" target="_blank">jumbo.com/bestellingen</a>
           </div>
         </div>
       </div>
       
-      <div class="step">
-        <div class="step-number">2</div>
-        <div class="step-content">
-          <p>Go to <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank" style="color: #667eea;">ah.nl/producten/eerder-gekocht</a>, log in to Albert Heijn, then click the bookmarklet!</p>
-        </div>
-      </div>
-      
-      <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 16px; margin-top: 24px;">
-        <h3 style="color: #fbbf24; font-size: 1rem; margin-bottom: 8px;">🍊 Ook Jumbo klant?</h3>
-        <p style="color: #d1d5db;">
-          <a href="/jumbo-bookmarklet.html" style="color: #fbbf24;">Installeer de Jumbo bookmarklet</a> om ook je Jumbo aankopen te importeren!
-        </p>
+      <div class="drag-hint">
+        <strong>💡 Tip:</strong> Geen bladwijzerbalk? Druk <kbd>Ctrl+Shift+B</kbd> (Windows) of <kbd>⌘+Shift+B</kbd> (Mac)
       </div>
     </div>
+    
+    <div class="card">
+      <h2>🚀 Stap 2: Gebruik de bookmarklet</h2>
+      
+      <div class="instructions">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <p>Ga naar de website van je supermarkt en <strong>log in</strong></p>
+          </div>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <p>Ga naar je <strong>bestelgeschiedenis</strong> of <strong>eerder gekocht</strong> pagina</p>
+          </div>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <p>Klik op de bookmarklet in je bladwijzerbalk - <strong>klaar!</strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <a href="/" class="back-link">← Terug naar Dashboard</a>
   </div>
   
   <script>
-    // Use the current origin so bookmarklet works on any Vercel preview deployment
     const API_BASE = window.location.origin.includes('localhost') 
       ? 'http://localhost:3001' 
       : window.location.origin;
     
-    // Generate bookmarklet code
-    const code = `
-      javascript:(function(){
-        var s=document.createElement('script');
-        s.src='${API_BASE}/bookmarklet.js?t='+Date.now();
-        document.body.appendChild(s);
-      })();
-    `.replace(/\s+/g, ' ').trim();
+    // AH bookmarklet
+    const ahCode = `javascript:(function(){var s=document.createElement('script');s.src='${API_BASE}/bookmarklet.js?t='+Date.now();document.body.appendChild(s);})();`;
+    document.getElementById('ah-bookmarklet').href = ahCode;
     
-    document.getElementById('bookmarklet-link').href = code;
+    // Jumbo bookmarklet
+    const jumboCode = `javascript:(function(){var s=document.createElement('script');s.src='${API_BASE}/jumbo-bookmarklet.js?t='+Date.now();document.body.appendChild(s);})();`;
+    document.getElementById('jumbo-bookmarklet').href = jumboCode;
   </script>
 </body>
 </html>
