@@ -21,6 +21,14 @@ import {
   normalizeProductName
 } from './catalogLoader.js'
 
+import {
+  getCO2Emissions,
+  co2ToScore,
+  getCO2Rating,
+  getCategoryLabel,
+  evaluateProductCO2
+} from './co2Emissions.js'
+
 // Ensure .env is loaded from the webapp root regardless of cwd
 dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env') })
 
@@ -1108,58 +1116,81 @@ function findCatalogMatch(productName = '') {
 function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const input = typeof productName === 'string' ? productName : ''
   const normalized = normalizeProductName(input)
-  // Base score starts at 0 - all scoring comes from enriched data only
-  let workingScore = 0
-  const adjustments = []
-  const matchedEnriched = []  // Track enriched field matches
   let suggestions = getSuggestions(input, lang)
-
-  const applyDelta = (type, code, delta) => {
-    if (!delta) return
-    workingScore += delta
+  
+  // =========================================================================
+  // CO2-BASED SCORING
+  // Score is determined ONLY by CO2 emissions per kg of food
+  // Enriched data (organic, vegan, origin) is kept as supplementary info
+  // =========================================================================
+  
+  const co2Data = getCO2Emissions(input)
+  const co2Score = co2ToScore(co2Data.co2PerKg)
+  const co2Rating = getCO2Rating(co2Score)
+  
+  // Build the reasons/enriched array
+  const matchedEnriched = []
+  const adjustments = []
+  
+  // Primary: CO2 category (this determines the score)
+  if (co2Data.matched) {
+    matchedEnriched.push({
+      code: 'co2_category',
+      icon: co2Rating.emoji,
+      label: getCategoryLabel(co2Data.category),
+      co2PerKg: co2Data.co2PerKg,
+      isPrimary: true
+    })
+    
     adjustments.push({
-      type,
-      code,
-      delta,
-      resultingScore: clamp(workingScore)
+      type: 'co2',
+      code: 'co2_emissions',
+      co2PerKg: co2Data.co2PerKg,
+      category: co2Data.category,
+      resultingScore: co2Score
     })
   }
-
-  // Helper to check if product origin is within EU
-  const isOriginInEU = (origins) => {
-    if (!origins || origins.length === 0) return false
-    const euCountries = new Set(['Netherlands', 'Belgium', 'Germany', 'France', 'Spain', 'Italy', 
-      'Poland', 'Greece', 'Portugal', 'Austria', 'Ireland', 'Denmark', 'Sweden', 'Hungary',
-      'Czech Republic', 'Romania', 'Bulgaria', 'Croatia', 'Slovenia', 'Slovakia', 'Lithuania',
-      'Latvia', 'Estonia', 'Finland', 'Luxembourg', 'Cyprus', 'Malta'])
-    return origins.every(country => euCountries.has(country))
-  }
-
-  // Scoring ONLY comes from enriched data (kenmerken and herkomst sections)
+  
+  // Supplementary info from enriched data (doesn't affect score)
   if (enrichedData && typeof enrichedData === 'object') {
-    // Organic/Bio scoring (+4)
+    // Organic/Bio
     if (enrichedData.is_organic === true) {
-      const scoring = ENRICHED_SCORING.is_organic
-      applyDelta('enriched', 'enriched_organic', scoring.delta)
-      matchedEnriched.push({ code: 'organic', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+      matchedEnriched.push({ 
+        code: 'organic', 
+        icon: '🌿', 
+        label: 'Biologisch',
+        supplementary: true 
+      })
     }
 
-    // Vegan scoring (+3)
+    // Vegan
     if (enrichedData.is_vegan === true) {
-      const scoring = ENRICHED_SCORING.is_vegan
-      applyDelta('enriched', 'enriched_vegan', scoring.delta)
-      matchedEnriched.push({ code: 'vegan', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
-    } 
-    // Vegetarian scoring (+1, only if not vegan)
-    else if (enrichedData.is_vegetarian === true) {
-      const scoring = ENRICHED_SCORING.is_vegetarian
-      applyDelta('enriched', 'enriched_vegetarian', scoring.delta)
-      matchedEnriched.push({ code: 'vegetarian', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
+      matchedEnriched.push({ 
+        code: 'vegan', 
+        icon: '🌱', 
+        label: 'Vegan',
+        supplementary: true 
+      })
+    } else if (enrichedData.is_vegetarian === true) {
+      matchedEnriched.push({ 
+        code: 'vegetarian', 
+        icon: '🥗', 
+        label: 'Vegetarisch',
+        supplementary: true 
+      })
+    }
+    
+    // Fairtrade
+    if (enrichedData.is_fairtrade === true) {
+      matchedEnriched.push({ 
+        code: 'fairtrade', 
+        icon: '🤝', 
+        label: 'Fairtrade',
+        supplementary: true 
+      })
     }
 
-    // Origin country scoring (from herkomst section)
-    // Check monthly origin first (origin_by_month), then fall back to static origin_country
-    // When multiple countries are listed, use AVERAGE of deltas
+    // Origin country (supplementary - CO2 data already includes transport)
     let effectiveOrigins = null
     let isSeasonalOrigin = false
     
@@ -1168,83 +1199,46 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
       isSeasonalOrigin = effectiveOrigins !== null
     }
     
-    // Fall back to static origin if no monthly origin available
     if (!effectiveOrigins && enrichedData.origin_country) {
-      // Translate Dutch country name to English for scoring lookup
       effectiveOrigins = [translateCountryName(enrichedData.origin_country)]
     }
     
     if (effectiveOrigins && effectiveOrigins.length > 0) {
       const monthLabel = isSeasonalOrigin ? ` (${getCurrentMonthKey().toUpperCase()})` : ''
-      
-      // Calculate AVERAGE delta for all origin countries
-      let totalDelta = 0
-      const countryDetails = []
-      
-      for (const country of effectiveOrigins) {
-        const originScoring = ENRICHED_SCORING.origin_country[country]
-        if (originScoring) {
-          totalDelta += originScoring.delta
-          countryDetails.push({ country, delta: originScoring.delta, region: originScoring.region })
-        } else {
-          // Unknown country - treat as outside_eu
-          totalDelta += -1
-          countryDetails.push({ country, delta: -1, region: 'unknown' })
-        }
-      }
-      
-      // Calculate average (rounded to 1 decimal)
-      const avgDelta = Math.round((totalDelta / effectiveOrigins.length) * 10) / 10
-      
-      // Apply the averaged delta
-      if (avgDelta !== 0) {
-        applyDelta('enriched', 'enriched_origin_avg', avgDelta)
-      }
-      
-      // Build the label showing all countries
       const countriesLabel = effectiveOrigins.join(', ')
-      const icon = avgDelta > 0 ? '📍' : (avgDelta < 0 ? '✈️' : '🌍')
       
       matchedEnriched.push({ 
         code: 'origin', 
-        icon, 
-        label: `Origin: ${countriesLabel}${monthLabel}`, 
-        delta: avgDelta,
-        countries: countryDetails,
+        icon: '📍', 
+        label: `Herkomst: ${countriesLabel}${monthLabel}`,
+        supplementary: true,
         isSeasonal: isSeasonalOrigin,
-        originByMonth: enrichedData.origin_by_month
+        countries: effectiveOrigins
       })
-
-      // Fairtrade scoring (+2, only applies to non-EU products)
-      if (enrichedData.is_fairtrade === true && !isOriginInEU(effectiveOrigins)) {
-        const scoring = ENRICHED_SCORING.is_fairtrade
-        applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
-        matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
-      }
-    } else {
-      // Fairtrade without origin data - still apply (assume non-EU since we don't know)
-      if (enrichedData.is_fairtrade === true) {
-        const scoring = ENRICHED_SCORING.is_fairtrade
-        applyDelta('enriched', 'enriched_fairtrade', scoring.delta)
-        matchedEnriched.push({ code: 'fairtrade', icon: scoring.icon, label: scoring.label, delta: scoring.delta })
-      }
     }
   }
 
-  const rawScore = clamp(workingScore)
-  const finalScore = roundClamp(workingScore)
-
+  // Final score is based on CO2 (or null/5 if no data)
+  const finalScore = co2Score !== null ? co2Score : 5  // Default to middle if unknown
+  
   return {
     product: input,
     normalized,
     baseScore: 0,
-    rawScore,
+    rawScore: finalScore,
     score: finalScore,
     adjustments,
     enriched: matchedEnriched,
     suggestions,
-    rating: getRating(finalScore),
-    hasEnrichedData: enrichedData !== null && matchedEnriched.length > 0
+    rating: co2Rating.label,
+    ratingEmoji: co2Rating.emoji,
+    ratingColor: co2Rating.color,
+    // CO2 specific fields
+    co2PerKg: co2Data.co2PerKg,
+    co2Category: co2Data.category,
+    co2CategoryLabel: getCategoryLabel(co2Data.category),
+    co2Matched: co2Data.matched,
+    hasEnrichedData: enrichedData !== null && matchedEnriched.some(m => m.supplementary)
   }
 }
 
@@ -1417,15 +1411,17 @@ function getSuggestions(productName, lang = 'nl') {
 }
 
 function getRating(avgScore) {
-  // Scale: 0-10 (base 0, max practical ~12 clamped to 10)
-  // 8+: organic + vegan + local origin
-  // 5-7: good sustainability attributes
-  // 2-4: some attributes or neutral
-  // 0-1: no enriched data or negative attributes
-  if (avgScore >= 8) return "🌟 Excellent! You're making great sustainable choices!"
-  if (avgScore >= 5) return '👍 Good! Room for improvement though.'
-  if (avgScore >= 2) return '😐 Average. Consider more sustainable alternatives.'
-  return "⚠️ Needs work. Let's find better options!"
+  // CO2-based scale: 0-10 where higher = more sustainable (lower CO2)
+  // 9-10: < 2 kg CO2/kg (vegetables, fruits, legumes)
+  // 7-8: 2-6 kg CO2/kg (milk, eggs, grains)
+  // 5-6: 6-15 kg CO2/kg (chicken, fish, pork)
+  // 3-4: 15-40 kg CO2/kg (cheese, chocolate, coffee)
+  // 0-2: > 40 kg CO2/kg (beef, lamb)
+  if (avgScore >= 9) return "🌿 Excellent! Very low carbon footprint!"
+  if (avgScore >= 7) return "🌱 Good! Low environmental impact."
+  if (avgScore >= 5) return "🌍 Average. Consider lower-emission alternatives."
+  if (avgScore >= 3) return "⚠️ High emissions. Try plant-based options."
+  return "🔴 Very high carbon footprint."
 }
 
 function minutes(ms) {
@@ -2893,13 +2889,22 @@ app.get('/api/product/:productId/details', async (req, res) => {
     // Create user-friendly breakdown
     const breakdown = []
     
-    // Base score (starts at 0, all scoring comes from enriched data)
-    breakdown.push({
-      label: 'Base Score',
-      value: '0',
-      positive: false,
-      negative: false
-    })
+    // CO2 emissions as primary scoring factor
+    if (evaluation.co2Matched && evaluation.co2PerKg !== null) {
+      breakdown.push({
+        label: `CO₂: ${evaluation.co2CategoryLabel || evaluation.co2Category}`,
+        value: `${evaluation.co2PerKg.toFixed(1)} kg CO₂/kg`,
+        positive: evaluation.co2PerKg < 5,
+        negative: evaluation.co2PerKg > 20
+      })
+    } else {
+      breakdown.push({
+        label: 'CO₂ Category',
+        value: 'Unknown',
+        positive: false,
+        negative: false
+      })
+    }
     
     // Add adjustment explanations (only enriched type exists now)
     for (const adj of evaluation.adjustments) {
@@ -2932,33 +2937,63 @@ app.get('/api/product/:productId/details', async (req, res) => {
     
     // NOTE: Final Score removed from breakdown - it's already shown above the breakdown section
     
-    // Create improvement reasons from enriched data
+    // Create improvement reasons - CO2 as primary factor
     const improvements = []
     
-    // Positive factors from enriched data
-    for (const adj of evaluation.adjustments.filter(a => a.delta > 0)) {
-      const codeMap = {
-        'enriched_organic': '🌱 Organic/Bio certified',
-        'enriched_vegan': '🌿 Vegan product',
-        'enriched_vegetarian': '🥬 Vegetarian product',
-        'enriched_fairtrade': '🤝 Fairtrade certified',
-        'enriched_origin_avg': '📍 Origin bonus'
+    // Add CO2-based reason first (primary scoring factor)
+    if (evaluation.co2Matched && evaluation.co2PerKg !== null) {
+      const co2 = evaluation.co2PerKg
+      const categoryLabel = evaluation.co2CategoryLabel || evaluation.co2Category
+      
+      if (co2 < 2) {
+        improvements.push({
+          reason: `🌿 Very low carbon footprint (${categoryLabel}: ${co2.toFixed(1)} kg CO₂/kg)`,
+          positive: true
+        })
+      } else if (co2 < 6) {
+        improvements.push({
+          reason: `🌱 Low carbon footprint (${categoryLabel}: ${co2.toFixed(1)} kg CO₂/kg)`,
+          positive: true
+        })
+      } else if (co2 < 15) {
+        improvements.push({
+          reason: `🌍 Moderate carbon footprint (${categoryLabel}: ${co2.toFixed(1)} kg CO₂/kg)`,
+          positive: false
+        })
+      } else if (co2 < 40) {
+        improvements.push({
+          reason: `⚠️ High carbon footprint (${categoryLabel}: ${co2.toFixed(1)} kg CO₂/kg)`,
+          positive: false
+        })
+      } else {
+        improvements.push({
+          reason: `🔴 Very high carbon footprint (${categoryLabel}: ${co2.toFixed(1)} kg CO₂/kg)`,
+          positive: false
+        })
       }
+    } else {
       improvements.push({
-        reason: codeMap[adj.code] || `✅ ${adj.code.replace('enriched_', '').replace(/_/g, ' ')} bonus`,
-        positive: true
+        reason: '❓ CO₂ category unknown - using default score',
+        positive: false
       })
     }
     
-    // Negative factors from enriched data
-    for (const adj of evaluation.adjustments.filter(a => a.delta < 0)) {
+    // Additional factors from enriched data (supplementary info)
+    for (const adj of evaluation.adjustments.filter(a => a.delta !== 0)) {
       const codeMap = {
-        'enriched_origin_avg': '✈️ Distant origin penalty'
+        'enriched_organic': adj.delta > 0 ? '🌱 Organic/Bio certified' : null,
+        'enriched_vegan': adj.delta > 0 ? '🌿 Vegan product' : null,
+        'enriched_vegetarian': adj.delta > 0 ? '🥬 Vegetarian product' : null,
+        'enriched_fairtrade': adj.delta > 0 ? '🤝 Fairtrade certified' : null,
+        'enriched_origin_avg': adj.delta > 0 ? '📍 Local/EU origin' : '✈️ Distant origin'
       }
-      improvements.push({
-        reason: codeMap[adj.code] || `⚠️ ${adj.code.replace('enriched_', '').replace(/_/g, ' ')} penalty`,
-        positive: false
-      })
+      const reason = codeMap[adj.code]
+      if (reason) {
+        improvements.push({
+          reason,
+          positive: adj.delta > 0
+        })
+      }
     }
     
     // Find better alternatives from catalog
@@ -3009,7 +3044,12 @@ app.get('/api/product/:productId/details', async (req, res) => {
       alternatives,
       enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
-      hasEnrichedData: evaluation.hasEnrichedData
+      hasEnrichedData: evaluation.hasEnrichedData,
+      // CO2 data
+      co2PerKg: evaluation.co2PerKg,
+      co2Category: evaluation.co2Category,
+      co2CategoryLabel: evaluation.co2CategoryLabel,
+      co2Matched: evaluation.co2Matched
     })
   } catch (err) {
     console.error('[product/details] Error:', err)

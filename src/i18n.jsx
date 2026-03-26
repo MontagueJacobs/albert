@@ -40,42 +40,42 @@ const TRANSLATIONS = {
     add_error: 'Fout bij toevoegen aankoop',
     added_title: 'Toegevoegd!',
     added_quantity: 'Aantal',
-    score_label: 'Score',
+    score_label: 'CO₂ Score',
     score_suffix: '/10',
-    suggestions_heading: '💡 Duurzamere alternatieven:',
+    suggestions_heading: '💡 Alternatieven met lagere CO₂:',
     profile_title: 'Jouw profiel',
     total_products: 'Unieke producten',
-    avg_score: 'Gemiddelde duurzaamheidsscore',
+    avg_score: 'Gemiddelde CO₂-score',
     top_suggestions: 'Top aanbevelingen',
     swap_suggestions: 'Slimme alternatieven',
     loading: 'Laden van profiel en aanbevelingen...',
     error: 'Fout:',
     no_suggestions: 'Geen aanbevelingen beschikbaar',
-    tips_title: 'Tips voor meer duurzaamheid:',
+    tips_title: 'Tips voor lagere CO₂-voetafdruk:',
     tips: [
-      '🌱 Kies vaker voor biologische producten',
-      '🥬 Probeer meer plantaardige alternatieven',
+      '🌱 Kies vaker voor plantaardige producten',
+      '🥬 Verminder rood vlees consumptie',
       '🏡 Koop lokale en seizoensproducten',
-      '♻️ Vermijd overmatige verpakkingen',
-      '🤝 Zoek naar Fair Trade certificering'
+      '🥜 Probeer peulvruchten als eiwitbron',
+      '🧀 Kies zuivel met mate'
     ],
     total_purchases: 'Totaal aankopen',
-    avg_score_label: 'Gemiddelde score',
+    avg_score_label: 'Gem. CO₂ score',
     total_spent: 'Totaal uitgegeven',
-    your_rating: 'Je rating',
-    rating_best_worst: 'Beste & Slechtste Aankopen',
-    best_purchase: 'Beste',
-    worst_purchase: 'Kan beter',
-    how_title: 'Hoe bepalen we de duurzaamheidsscore?',
-    how_intro: 'Onze aanbevelingen combineren je aankoopgeschiedenis met duurzaamheidsscores en prijzen om betere keuzes te vinden.',
+    your_rating: 'Je CO₂ rating',
+    rating_best_worst: 'Laagste & Hoogste CO₂',
+    best_purchase: 'Laagste CO₂',
+    worst_purchase: 'Hoogste CO₂',
+    how_title: 'Hoe bepalen we de CO₂-score?',
+    how_intro: 'Onze scores zijn gebaseerd op CO₂-emissies per kg voedsel, volgens onderzoeksdata van Our World in Data.',
     how_sections: [
       {
-        title: '1. Basisdata',
-        body: 'We starten met je eerder gekochte Albert Heijn producten en verrijken ze met duurzaamheidslabels (bio, lokaal, plantaardig, Fair Trade) en CO₂-indicatoren.'
+        title: '1. CO₂-emissiedata',
+        body: 'We gebruiken wetenschappelijke data over CO₂-uitstoot per voedselcategorie (kg CO₂-eq per kg product). Fruit en groenten scoren het best, rundvlees het slechtst.'
       },
       {
         title: '2. Scoreberekening',
-        body: 'Elke categorie krijgt een startswaarde rond 5. Biologisch, lokaal en plantaardig verhogen de score, terwijl vlees of sterk bewerkt eten de score verlaagt. Trefwoorden zoals “bio” of “fair trade” geven extra punten.'
+        body: 'Producten met minder dan 1 kg CO₂/kg krijgen score 10. Score daalt naarmate CO₂-uitstoot stijgt. Rundvlees (60+ kg CO₂/kg) scoort 0-2.'
       },
       {
         title: '3. Frequentie & prijs',
@@ -91,7 +91,7 @@ const TRANSLATIONS = {
       }
     ],
     sync_title: 'Albert Heijn account synchroniseren',
-    sync_description: 'Synchroniseer je Albert Heijn aankopen om je duurzaamheidsprofiel bij te werken.',
+    sync_description: 'Synchroniseer je Albert Heijn aankopen om je CO₂-profiel bij te werken.',
     sync_mode_auto: 'Automatisch',
     sync_mode_manual: 'Handmatig (Bookmarklet)',
     sync_show_guide: 'Toon handleiding',
@@ -328,42 +328,42 @@ const TRANSLATIONS = {
     add_error: 'Error adding purchase',
     added_title: 'Added!',
     added_quantity: 'Quantity',
-    score_label: 'Score',
+    score_label: 'CO₂ Score',
     score_suffix: '/10',
-    suggestions_heading: '💡 More sustainable alternatives:',
+    suggestions_heading: '💡 Lower CO₂ alternatives:',
     profile_title: 'Your profile',
     total_products: 'Unique products',
-    avg_score: 'Average sustainability score',
+    avg_score: 'Average CO₂ score',
     top_suggestions: 'Top suggestions',
     swap_suggestions: 'Swap Suggestions',
     loading: 'Loading profile & suggestions...',
     error: 'Error:',
     no_suggestions: 'No suggestions available',
-    tips_title: 'Tips for more sustainable shopping:',
+    tips_title: 'Tips for lower carbon footprint:',
     tips: [
-      '🌱 Choose organic products more often',
-      '🥬 Try more plant-based alternatives',
+      '🌱 Choose more plant-based products',
+      '🥬 Reduce red meat consumption',
       '🏡 Buy local and seasonal produce',
-      '♻️ Avoid excessive packaging',
-      '🤝 Look for Fair Trade certification'
+      '🥜 Try legumes as protein source',
+      '🧀 Consume dairy in moderation'
     ],
     total_purchases: 'Total purchases',
-    avg_score_label: 'Average score',
+    avg_score_label: 'Avg CO₂ score',
     total_spent: 'Total spent',
-    your_rating: 'Your rating',
-    rating_best_worst: 'Best & Worst Purchases',
-    best_purchase: 'Best',
-    worst_purchase: 'Could improve',
-    how_title: 'How do we judge product sustainability?',
-    how_intro: 'Our recommender blends your purchase history with sustainability scores and typical prices to highlight smarter swaps.',
+    your_rating: 'Your CO₂ rating',
+    rating_best_worst: 'Lowest & Highest CO₂',
+    best_purchase: 'Lowest CO₂',
+    worst_purchase: 'Highest CO₂',
+    how_title: 'How do we calculate CO₂ scores?',
+    how_intro: 'Our scores are based on CO₂ emissions per kg of food, using research data from Our World in Data.',
     how_sections: [
       {
-        title: '1. Base data',
-        body: 'We begin with your previously purchased Albert Heijn items and enrich them with sustainability labels (organic, local, plant-based, Fair Trade) and CO₂ indicators.'
+        title: '1. CO₂ emissions data',
+        body: 'We use scientific data on CO₂ emissions per food category (kg CO₂-eq per kg product). Fruits and vegetables score best, beef scores worst.'
       },
       {
         title: '2. Scoring',
-        body: 'Every item starts near 5. Organic, local and plant-based signals boost the score, while meat or highly processed goods lower it. Keywords such as “bio” or “fair trade” add bonus points.'
+        body: 'Products with less than 1 kg CO₂/kg get score 10. Score decreases as CO₂ emissions increase. Beef (60+ kg CO₂/kg) scores 0-2.'
       },
       {
         title: '3. Frequency & price',
@@ -379,7 +379,7 @@ const TRANSLATIONS = {
       }
     ],
     sync_title: 'Sync your Albert Heijn account',
-    sync_description: 'Sync your Albert Heijn purchases to update your sustainability profile.',
+    sync_description: 'Sync your Albert Heijn purchases to update your CO₂ profile.',
     sync_mode_auto: 'Automatic',
     sync_mode_manual: 'Manual (Bookmarklet)',
     sync_show_guide: 'Show guide',

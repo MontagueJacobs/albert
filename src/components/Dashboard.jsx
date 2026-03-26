@@ -285,10 +285,12 @@ function Dashboard({ syncVersion }) {
 
   const getRatingEmoji = (rating) => {
     if (!rating) return ''
-    if (rating.includes('Excellent')) return '🌟'
-    if (rating.includes('Good')) return '👍'
-    if (rating.includes('Average')) return '😐'
-    return '⚠️'
+    // CO2-based ratings
+    if (rating.includes('Excellent') || rating.includes('🌿')) return '🌿'
+    if (rating.includes('Good') || rating.includes('🌱')) return '🌱'
+    if (rating.includes('Average') || rating.includes('🌍')) return '🌍'
+    if (rating.includes('High') || rating.includes('⚠️')) return '⚠️'
+    return '🔴'
   }
 
   const ratingLabel = (insights.rating || '').split('!')[0]

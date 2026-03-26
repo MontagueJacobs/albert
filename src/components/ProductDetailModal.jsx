@@ -208,11 +208,12 @@ function ProductDetailModal({ purchase, onClose }) {
   }
 
   const getScoreLabel = (score) => {
-    if (score >= 8) return 'Excellent'
-    if (score >= 7) return 'Good'
-    if (score >= 5) return 'Average'
-    if (score >= 3) return 'Below Average'
-    return 'Poor'
+    // CO2-based scoring labels
+    if (score >= 9) return 'Very Low CO₂'
+    if (score >= 7) return 'Low CO₂'
+    if (score >= 5) return 'Moderate CO₂'
+    if (score >= 3) return 'High CO₂'
+    return 'Very High CO₂'
   }
 
   useEffect(() => {
@@ -397,12 +398,28 @@ function ProductDetailModal({ purchase, onClose }) {
                   color: 'var(--text-muted)',
                   marginTop: '0.25rem'
                 }}>
-                  Sustainability Score
+                  CO₂ Score
                 </span>
+                {/* CO2 Details */}
+                {details.co2Matched && details.co2PerKg !== null && (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.5rem 0.75rem',
+                    background: 'rgba(0,0,0,0.2)',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    color: 'var(--text)'
+                  }}>
+                    <div style={{ fontWeight: '500' }}>{details.co2CategoryLabel || details.co2Category}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      {details.co2PerKg.toFixed(1)} kg CO₂ per kg
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Score Breakdown */}
-              <div style={styles.sectionTitle}>Score Breakdown</div>
+              {/* CO2 Impact Breakdown */}
+              <div style={styles.sectionTitle}>CO₂ Impact</div>
               <div style={styles.scoreBreakdown}>
                 {details.breakdown?.map((item, i) => (
                   <div key={i} style={styles.scoreItem}>
