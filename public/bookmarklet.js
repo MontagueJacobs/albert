@@ -197,27 +197,44 @@
   // BONUS CARD EXTRACTION
   // ============================================
   
-  // AH bonus cards typically start with certain prefixes
-  // Common patterns: 4463, 2621, etc. (13 digits total starting with 2 or 4)
-  const BONUS_CARD_REGEX = /\b([24]\d{12})\b/g;
+  // AH bonus cards are 13 digits, may be formatted with spaces
+  // Examples: 4463986084997, 4463 9860 84997, 2621...
   
   function isValidBonusCard(card) {
     if (!card || typeof card !== 'string') return false;
-    // Must be exactly 13 digits starting with 2 or 4
-    return /^[24]\d{12}$/.test(card);
+    // Remove spaces, dashes, dots
+    const cleaned = card.replace(/[\s\-\.]/g, '');
+    // Must be exactly 13 digits
+    return /^\d{13}$/.test(cleaned);
+  }
+  
+  function cleanCardNumber(text) {
+    // Remove spaces, dashes, dots and return just digits
+    return text.replace(/[\s\-\.]/g, '');
   }
   
   function extractBonusCards(text) {
-    const cards = [];
-    let match;
-    while ((match = BONUS_CARD_REGEX.exec(text)) !== null) {
-      if (isValidBonusCard(match[1])) {
-        cards.push(match[1]);
-      }
+    const cards = new Set();
+    
+    // Method A: Look for 13 consecutive digits
+    const consecutiveMatch = text.match(/\d{13}/g);
+    if (consecutiveMatch) {
+      consecutiveMatch.forEach(c => cards.add(c));
     }
-    // Reset regex state
-    BONUS_CARD_REGEX.lastIndex = 0;
-    return [...new Set(cards)]; // Remove duplicates
+    
+    // Method B: Look for formatted numbers like "4463 9860 84997" or "4463-9860-84997"
+    // Pattern: groups of digits separated by spaces/dashes that total 13 digits
+    const formattedMatches = text.match(/\d[\d\s\-\.]{11,16}\d/g);
+    if (formattedMatches) {
+      formattedMatches.forEach(m => {
+        const cleaned = cleanCardNumber(m);
+        if (cleaned.length === 13) {
+          cards.add(cleaned);
+        }
+      });
+    }
+    
+    return [...cards];
   }
   
   async function getBonusCard() {
@@ -237,32 +254,54 @@
       
       if (res.ok) {
         const html = await res.text();
-        const cards = extractBonusCards(html);
-        log(`Method 1: Found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
         
-        if (cards.length === 1) {
-          foundCard = cards[0];
-          source = 'klantenkaarten_fetch';
-        } else if (cards.length > 1) {
-          // Multiple cards found - look for one in a specific element
-          log('Method 1: Multiple cards, looking for specific element');
-          // Parse and look for card number in specific context
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const cardEl = doc.querySelector('[data-testid="bonus-card-number"], .bonus-card-number, [class*="cardNumber"]');
-          if (cardEl) {
-            const cardText = cardEl.textContent;
-            const specificCards = extractBonusCards(cardText);
-            if (specificCards.length === 1) {
-              foundCard = specificCards[0];
-              source = 'klantenkaarten_specific_element';
+        // Parse the HTML to look for specific structures
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // AH uses a table with "Kaartnummer" label - find that row
+        const labels = doc.querySelectorAll('span, td, th, div');
+        for (const label of labels) {
+          if (label.textContent?.trim() === 'Kaartnummer') {
+            // Found the label, now look for sibling/parent with the number
+            const parent = label.closest('tr, div, [class*="table"], [class*="row"]');
+            if (parent) {
+              const parentText = parent.textContent || '';
+              const cards = extractBonusCards(parentText);
+              log('Method 1: Found Kaartnummer row, extracted:', cards);
+              if (cards.length > 0) {
+                foundCard = cards[0];
+                source = 'klantenkaarten_kaartnummer_row';
+                break;
+              }
             }
           }
-          // Fallback: use first card
-          if (!foundCard) {
+        }
+        
+        // Fallback: search entire page
+        if (!foundCard) {
+          const cards = extractBonusCards(html);
+          log(`Method 1: Fallback scan found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
+          
+          if (cards.length === 1) {
             foundCard = cards[0];
-            source = 'klantenkaarten_first_of_multiple';
-            log('Method 1: WARNING - using first of multiple cards');
+            source = 'klantenkaarten_fetch';
+          } else if (cards.length > 1) {
+            // Try to find specifically near "bonus" or "kaart" text
+            const cardEl = doc.querySelector('[data-testid="bonus-card-number"], .bonus-card-number, [class*="cardNumber"]');
+            if (cardEl) {
+              const specificCards = extractBonusCards(cardEl.textContent || '');
+              if (specificCards.length === 1) {
+                foundCard = specificCards[0];
+                source = 'klantenkaarten_specific_element';
+              }
+            }
+            // Still no card - use first one
+            if (!foundCard && cards.length > 0) {
+              foundCard = cards[0];
+              source = 'klantenkaarten_first_of_multiple';
+              log('Method 1: WARNING - using first of multiple cards');
+            }
           }
         }
       } else {
@@ -275,38 +314,58 @@
     // Method 2: Check current page DOM (if on a relevant AH page)
     if (!foundCard) {
       log('Method 2: Checking current page DOM');
-      // Look for specific AH bonus card elements
-      const selectors = [
-        '[data-testid="bonus-card-number"]',
-        '[data-testid*="bonuskaart"]',
-        '.bonus-card-number',
-        '[class*="bonusCardNumber"]',
-        '[class*="bonus-card"] [class*="number"]'
-      ];
       
-      for (const selector of selectors) {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          const cards = extractBonusCards(el.textContent || '');
-          if (cards.length === 1) {
-            foundCard = cards[0];
-            source = `dom_selector:${selector}`;
-            log(`Method 2: Found card via ${selector}`);
-            break;
+      // First check for Kaartnummer label on current page
+      const labels = document.querySelectorAll('span, td, th, div');
+      for (const label of labels) {
+        if (label.textContent?.trim() === 'Kaartnummer') {
+          const parent = label.closest('tr, div, [class*="table"], [class*="row"]');
+          if (parent) {
+            const cards = extractBonusCards(parent.textContent || '');
+            if (cards.length > 0) {
+              foundCard = cards[0];
+              source = 'dom_kaartnummer_row';
+              log('Method 2: Found via Kaartnummer row');
+              break;
+            }
           }
         }
-        if (foundCard) break;
+      }
+      
+      // Fallback: Look for specific AH bonus card elements
+      if (!foundCard) {
+        const selectors = [
+          '[data-testid="bonus-card-number"]',
+          '[data-testid*="bonuskaart"]',
+          '.bonus-card-number',
+          '[class*="bonusCardNumber"]',
+          '[class*="bonus-card"] [class*="number"]'
+        ];
+        
+        for (const selector of selectors) {
+          const elements = document.querySelectorAll(selector);
+          for (const el of elements) {
+            const cards = extractBonusCards(el.textContent || '');
+            if (cards.length > 0) {
+              foundCard = cards[0];
+              source = `dom_selector:${selector}`;
+              log(`Method 2: Found card via ${selector}`);
+              break;
+            }
+          }
+          if (foundCard) break;
+        }
       }
     }
     
     // Method 3: Check URL params on current page (AH sometimes includes it)
     if (!foundCard) {
-      log('Method 2b: Checking URL params');
+      log('Method 3: Checking URL params');
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const cardParam = urlParams.get('bonuskaart') || urlParams.get('card');
         if (isValidBonusCard(cardParam)) {
-          foundCard = cardParam;
+          foundCard = cleanCardNumber(cardParam);
           source = 'url_param';
         }
       } catch (e) {}
