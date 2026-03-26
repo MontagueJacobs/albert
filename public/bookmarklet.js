@@ -229,8 +229,8 @@
     // Method 1: Try to fetch FRESH from klantenkaarten page (most reliable)
     try {
       statusEl.textContent = 'Bonuskaart ophalen van AH...';
-      log('Method 1: Fetching from /mijn/klantenkaarten');
-      const res = await fetch('https://www.ah.nl/mijn/klantenkaarten', { 
+      log('Method 1: Fetching from /klantenkaarten');
+      const res = await fetch('https://www.ah.nl/klantenkaarten', { 
         credentials: 'include',
         cache: 'no-store'  // Don't use cached response
       });
