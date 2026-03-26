@@ -26,7 +26,8 @@ import {
   co2ToScore,
   getCO2Rating,
   getCategoryLabel,
-  evaluateProductCO2
+  evaluateProductCO2,
+  isNonFood
 } from './co2Emissions.js'
 
 // Ensure .env is loaded from the webapp root regardless of cwd
@@ -1125,6 +1126,30 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   // =========================================================================
   
   const co2Data = getCO2Emissions(input)
+  
+  // Handle non-food items
+  if (co2Data.isNonFood) {
+    return {
+      product: input,
+      normalized,
+      baseScore: 0,
+      rawScore: null,
+      score: null,
+      adjustments: [],
+      enriched: [],
+      suggestions: [],
+      rating: 'Geen voedingsmiddel',
+      ratingEmoji: '🚫',
+      ratingColor: '#6b7280',
+      co2PerKg: null,
+      co2Category: '__non_food__',
+      co2CategoryLabel: 'Geen Voedingsmiddel',
+      co2Matched: false,
+      isNonFood: true,
+      hasEnrichedData: false
+    }
+  }
+  
   const co2Score = co2ToScore(co2Data.co2PerKg)
   const co2Rating = getCO2Rating(co2Score)
   

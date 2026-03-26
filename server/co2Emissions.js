@@ -73,7 +73,23 @@ const CO2_EMISSIONS_DATA = {
   'coffee': 28.53,
   'dark_chocolate': 46.65,
   'wine': 1.79,
-  'soy_milk': 0.98
+  'beer': 1.20,
+  'spirits': 2.50,
+  'tea': 1.00,
+  'soft_drinks': 0.80,
+  'soy_milk': 0.98,
+  
+  // Processed / Mixed categories (estimated averages)
+  'sauces_condiments': 2.00,
+  'ready_meals': 4.50,        // Weighted average of mixed ingredients
+  'soup': 2.00,
+  'candy_sweets': 1.80,       // Sugar-based
+  'ice_cream': 3.50,          // Dairy-based
+  'baked_goods': 1.80,        // Flour + sugar based
+  'spreads': 2.50,            // Varies widely
+  'desserts': 3.00,           // Dairy-based
+  'baby_food': 3.00,          // Dairy-based average
+  'snacks': 2.50              // Mixed snack average
 }
 
 // Dutch to English category keyword mappings
@@ -103,7 +119,8 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'braadworst', 'knakworst', 'frankfurter', 'salami', 'chorizo',
     'karbonade', 'schnitzel', 'varkenshaas', 'spareribs', 'procureur',
     'lever', 'pate', 'gehaktbal', 'frikandel', 'frikadel',
-    'pork', 'sausage', 'cervelaat', 'osseworst'
+    'pork', 'sausage', 'cervelaat', 'osseworst', 'rookvlees',
+    'filet americain', 'casselerrib'
   ],
   
   // Poultry
@@ -135,11 +152,11 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'blauwe kaas', 'blue cheese', 'manchego', 'pecorino'
   ],
   'milk': [
-    'melk', 'milk', 'room', 'cream', 'slagroom', 'koffiemelk',
+    'melk', 'milk', 'slagroom', 'koffiemelk',
     'yoghurt', 'yogurt', 'kwark', 'vla', 'custard',
     'karnemelk', 'buttermilk', 'creme fraiche', 'zure room',
     'boter', 'butter', 'margarine', 'roomboter',
-    'zuivel'  // Generic dairy
+    'zuivel', 'drinkyoghurt', 'optimel', 'chocomel'
   ],
   'eggs': [
     'ei', 'eieren', 'eggs', 'omelet', 'roerei', 'gebakken ei',
@@ -159,9 +176,9 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'brood', 'bread', 'toast', 'croissant', 'stokbrood', 'baguette',
     'wrap', 'tortilla', 'pita', 'naan', 'bagel',
     'pasta', 'spaghetti', 'macaroni', 'penne', 'fusilli', 'tagliatelle',
-    'lasagne', 'ravioli', 'gnocchi', 'couscous',
-    'meel', 'flour', 'bloem', 'zelfrijzend',
-    'crackers', 'beschuit', 'ontbijtkoek', 'koek', 'biscuit'
+    'lasagne', 'ravioli', 'gnocchi', 'couscous', 'tortelloni', 'tortellini',
+    'meel', 'flour', 'tarwebloem', 'zelfrijzend bakmeel',
+    'crackers', 'beschuit'
   ],
   'barley': ['gerst', 'barley', 'gort'],
   'maize': ['mais', 'corn', 'polenta', 'tortilla chips', 'nachos'],
@@ -192,7 +209,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'sinaasappel', 'orange', 'citroen', 'lemon', 'limoen', 'lime',
     'grapefruit', 'mandarijn', 'tangerine', 'clementine', 'pompelmoes'
   ],
-  'bananas': ['banaan', 'banana', 'plantain'],
+  'bananas': ['banaan', 'bananen', 'banana', 'plantain'],
   'apples': ['appel', 'apple', 'peer', 'pear'],
   'other_fruit': [
     'mango', 'ananas', 'pineapple', 'meloen', 'melon', 'watermeloen',
@@ -203,7 +220,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   ],
   
   // Vegetables
-  'tomatoes': ['tomaat', 'tomato', 'tomatenpuree', 'passata', 'ketchup'],
+  'tomatoes': ['tomaat', 'tomato', 'tomatenpuree', 'passata'],
   'brassicas': [
     'broccoli', 'bloemkool', 'cauliflower', 'kool', 'cabbage',
     'spruitjes', 'brussels sprouts', 'boerenkool', 'kale',
@@ -226,7 +243,8 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'paprika', 'pepper', 'courgette', 'zucchini', 'aubergine', 'eggplant',
     'pompoen', 'pumpkin', 'asperge', 'asparagus', 'champignon', 'mushroom',
     'venkel', 'fennel', 'artisjok', 'artichoke', 'avocado',
-    'mais', 'corn', 'maïskolf', 'groente', 'vegetable', 'groentemix'
+    'maïskolf', 'groente', 'vegetable', 'groentemix',
+    'selderij', 'bleekselderij'
   ],
   
   // Sugar
@@ -235,9 +253,96 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Beverages & Other
   'coffee': ['koffie', 'coffee', 'espresso', 'cappuccino', 'latte'],
-  'dark_chocolate': ['chocola', 'chocolate', 'cacao', 'cocoa'],
-  'wine': ['wijn', 'wine'],
-  'soy_milk': ['sojamelk', 'soy milk', 'sojadrink', 'havermelk', 'oat milk', 'amandelmelk', 'almond milk', 'plantaardig']
+  'dark_chocolate': ['chocola', 'chocolate', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella'],
+  'wine': ['wijn', 'wine', 'prosecco', 'champagne', 'port', 'sherry'],
+  'beer': ['bier', 'pils', 'radler', 'witbier', 'ipa', 'weizen', 'heineken', 'amstel', 'grolsch', 'hertog jan', 'palm', 'jupiler', 'duvel'],
+  'spirits': ['jenever', 'vodka', 'rum', 'whisky', 'whiskey', 'gin', 'likeur', 'baileys', 'tequila', 'cognac', 'glühwein', 'advocaat'],
+  'tea': ['thee', 'tea', 'rooibos', 'kamille', 'munt thee', 'groene thee', 'earl grey'],
+  'soft_drinks': [
+    'frisdrank', 'cola', 'sinas', 'limonade', 'cassis', 'rivella',
+    'energy drink', 'red bull', 'tonic', 'bitter lemon', 'fanta', 'sprite',
+    'pepsi', '7up', '7-up', 'fernandes', 'raak', 'roosvicee',
+    'dubbelfris', 'ice tea', 'fuze', 'spa', 'mineraalwater', 'bronwater',
+    'sourcy', 'bar le duc', 'chaudfontaine'
+  ],
+  'soy_milk': ['sojamelk', 'soy milk', 'sojadrink', 'havermelk', 'oat milk', 'amandelmelk', 'almond milk', 'plantaardig melk', 'rijstmelk', 'kokomelk', 'alpro'],
+  
+  // Sauces, Condiments & Spices
+  'sauces_condiments': [
+    'saus', 'sauce', 'mayonaise', 'mayo', 'mosterd', 'mustard',
+    'fritessaus', 'barbecuesaus', 'ketchup', 'currysaus',
+    'satésaus', 'pesto', 'jus', 'dressing', 'vinaigrette',
+    'piccalilly', 'tzatziki', 'hoisin', 'tabasco', 'sriracha',
+    'sambal', 'chilisaus', 'cocktailsaus', 'oestersaus', 'sojasaus',
+    'ketjap', 'worcestershire', 'bearnaise', 'tartaar saus',
+    'azijn', 'balsamico', 'kruiden', 'specerijen',
+    'kaneel', 'nootmuskaat', 'komijn', 'kerrie', 'paprikapoeder',
+    'oregano', 'basilicum', 'tijm', 'rozemarijn', 'zout'
+  ],
+  
+  // Ready meals & Soups
+  'ready_meals': [
+    'maaltijd', 'magnetron', 'pizza', 'nasi', 'bami',
+    'noodles', 'ramen', 'dim sum', 'loempia', 'spring roll',
+    'bapao', 'tosti', 'wereldgerecht', 'stamppot',
+    'ovenschotel', 'wokgroente', 'roerbak',
+    'maaltijdsalade', 'bentobox'
+  ],
+  'soup': [
+    'soep', 'soup', 'bouillon', 'cup-a-soup', 'soepstengel'
+  ],
+  
+  // Baked goods & Baking ingredients
+  'baked_goods': [
+    'stroopwafel', 'speculaas', 'brownie', 'muffin', 'cake',
+    'donut', 'pannenkoek', 'poffertjes', 'wafel', 'waffle',
+    'petit beurre', 'digestive', 'taart', 'vlaai',
+    'punt', 'tompouce', 'eclair', 'moorkop', 'appelflap',
+    'saucijzenbroodje', 'worstenbroodje', 'frikandelbroodje',
+    'panko', 'paneermeel', 'maizena', 'gelatine', 'bakpoeder',
+    'vanillesuiker', 'gist', 'tapioca', 'koekje', 'koekjes', 'koek',
+    'biscuit', 'gevulde koek', 'ontbijtkoek'
+  ],
+  
+  // Candy & Sweets
+  'candy_sweets': [
+    'drop', 'snoep', 'zuurtjes', 'toffee', 'kauwgom',
+    'haribo', 'mentos', 'tic tac', 'pepermunt', 'winegum',
+    'lollipop', 'marshmallow', 'lakritze', 'fruittella'
+  ],
+  
+  // Ice cream
+  'ice_cream': [
+    'ijs', 'ijsje', 'magnum', 'cornetto', 'raket',
+    'sorbet', 'gelato', 'ijstaart'
+  ],
+  
+  // Desserts
+  'desserts': [
+    'pudding', 'panna cotta', 'tiramisu', 'mousse',
+    'griesmeelpudding', 'toetje', 'dessert', 'crème', 'creme dessert'
+  ],
+  
+  // Spreads
+  'spreads': [
+    'jam', 'confituur', 'marmelade', 'honing', 'honey',
+    'stroop', 'sandwichspread', 'smeerkaas', 'leverworst'
+  ],
+  
+  // Snacks
+  'snacks': [
+    'chips', 'nootjes', 'borrelnoot', 'popcorn', 'pretzel',
+    'kroepoek', 'fuet', 'zoute sticks', 'paprika chips',
+    'biologisch chips', 'pringles', 'doritos', 'cheetos',
+    'bittergarnituur', 'bitterballen', 'kaassoufflé',
+    'kroket', 'nasischijf', 'snack', 'ringz', 'wokkels'
+  ],
+  
+  // Baby food
+  'baby_food': [
+    'baby', 'flesvoeding', 'nutrilon', 'bambix', 'olvarit',
+    'babyvoeding', 'opvolgmelk'
+  ]
 }
 
 // Score thresholds (kg CO2/kg to 0-10 score)
@@ -261,17 +366,128 @@ const SCORE_THRESHOLDS = [
  * @param {string} productName - The product name (in Dutch or English)
  * @returns {string|null} - Category key or null if not matched
  */
+// Non-food items that should be excluded from CO2 scoring
+const NON_FOOD_KEYWORDS = [
+  // Household cleaning
+  'afwasmiddel', 'allesreiniger', 'schoonmaak', 'wasmiddel', 'wasverzachter',
+  'vlekken', 'toiletpapier', 'keukenpapier', 'zakdoekjes', 'vaatwas',
+  'handzeep', 'douchegel', 'shampoo', 'conditioner', 'deodorant',
+  'tandpasta', 'tandenborstel', 'mondwater', 'scheermesje', 'maandverband',
+  'luier', 'batterij', 'vuilniszak', 'aluminiumfolie', 'bakpapier',
+  'huishoudfolie', 'waxinelicht', 'dreft', 'persil', 'robijn',
+  'swiffer', 'bleek', 'ontkalker', 'wc-blok', 'vaatdoek',
+  'spons', 'handschoen', 'prullenbak', 'stofzuig',
+  // Health
+  'vitamine', 'paracetamol', 'ibuprofen', 'pleister', 'hoestdrank',
+  'keelpastille', 'neusspray', 'davitamon', 'magnesium', 'ijzertablet',
+  'zonnebrand', 'bodylotion', 'gezichtscreme',
+  // Pet food
+  'hondenvoer', 'hondenbrok', 'hondenstick', 'kattenvoer', 'kattenbrok',
+  'kattensnack', 'whiskas', 'pedigree', 'vogelvoer', 'dierenvoer'
+]
+
+/**
+ * Check if product is a non-food item (should be excluded from CO2 scoring)
+ */
+function isNonFood(productName) {
+  if (!productName) return false
+  const lower = productName.toLowerCase()
+  return NON_FOOD_KEYWORDS.some(kw => lower.includes(kw))
+}
+
+// Fallback category mapping: broad food-type keywords → generic CO2 category
+const FALLBACK_CATEGORIES = [
+  // Meat / animal keywords
+  { keywords: ['vlees', 'meat', 'filet', 'biefstuk', 'steak'], category: 'pig_meat' },
+  // Dairy keywords  
+  { keywords: ['zuivel', 'dairy', 'room', 'cream'], category: 'milk' },
+  // Fruit keywords
+  { keywords: ['fruit', 'vruchten', 'fruitsalade', 'vruchtensap'], category: 'other_fruit' },
+  // Vegetable keywords
+  { keywords: ['groente', 'groenten', 'vegetable', 'salade', 'sla'], category: 'other_vegetables' },
+  // Grain/bread keywords
+  { keywords: ['graan', 'grain', 'ontbijt', 'breakfast', 'cereal', 'muesli'], category: 'wheat_rye' },
+  // Oil keywords
+  { keywords: ['olie', 'oil'], category: 'olive_oil' },
+  // Juice/drink keywords
+  { keywords: ['sap', 'juice', 'drank', 'drink', 'smoothie', 'vruchtendrank'], category: 'soft_drinks' },
+  // Fish keywords
+  { keywords: ['vis', 'fish', 'zeevruchten', 'seafood'], category: 'fish_farmed' },
+  // Legume keywords
+  { keywords: ['bonen', 'linzen', 'peulvrucht', 'pulse'], category: 'other_pulses' },
+  // Nut keywords
+  { keywords: ['noten', 'noot', 'nut'], category: 'nuts' },
+  // Snack fallback
+  { keywords: ['snack', 'tussendoor', 'borrel'], category: 'snacks' },
+  // Sugar/sweet fallback
+  { keywords: ['zoet', 'sweet', 'suiker', 'sugar', 'snoep', 'candy'], category: 'beet_sugar' },
+]
+
+// Category priority - higher priority wins when keywords from multiple categories match
+// Processed/composite categories should beat raw ingredient categories
+const CATEGORY_PRIORITY = {
+  // Highest priority: processed food categories (product type > ingredient)
+  'ready_meals': 10,
+  'soup': 10,
+  'snacks': 9,
+  'baked_goods': 9,
+  'candy_sweets': 9,
+  'ice_cream': 9,
+  'desserts': 9,
+  'sauces_condiments': 8,
+  'spreads': 8,
+  'baby_food': 8,
+  // Medium: specific food types
+  'beer': 7,
+  'spirits': 7,
+  'tea': 7,
+  'soft_drinks': 7,
+  'coffee': 7,
+  'wine': 7,
+  'dark_chocolate': 7,
+  // Default priority for raw ingredients/foods
+  // (everything else gets priority 5)
+}
+
+function getCategoryPriority(category) {
+  return CATEGORY_PRIORITY[category] || 5
+}
+
 function getCO2Category(productName) {
   if (!productName) return null
   const lower = productName.toLowerCase()
   
-  // Check each category's keywords
+  // First: exclude non-food items
+  if (isNonFood(productName)) return '__non_food__'
+  
+  // Second: try exact keyword matches (most specific)
+  let bestMatch = null
+  let bestMatchLength = 0
+  let bestPriority = 0
+  
   for (const [category, keywords] of Object.entries(PRODUCT_CATEGORY_KEYWORDS)) {
     for (const keyword of keywords) {
       // Match whole words or word boundaries
       const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i')
       if (regex.test(lower)) {
-        return category
+        const priority = getCategoryPriority(category)
+        // Prefer higher priority categories, then longer keyword matches
+        if (priority > bestPriority || (priority === bestPriority && keyword.length > bestMatchLength)) {
+          bestMatch = category
+          bestMatchLength = keyword.length
+          bestPriority = priority
+        }
+      }
+    }
+  }
+  
+  if (bestMatch) return bestMatch
+  
+  // Third: try fallback broad categories
+  for (const fb of FALLBACK_CATEGORIES) {
+    for (const kw of fb.keywords) {
+      if (lower.includes(kw)) {
+        return fb.category
       }
     }
   }
@@ -287,18 +503,30 @@ function getCO2Category(productName) {
 function getCO2Emissions(productName) {
   const category = getCO2Category(productName)
   
+  // Non-food items
+  if (category === '__non_food__') {
+    return {
+      co2PerKg: null,
+      category: '__non_food__',
+      matched: false,
+      isNonFood: true
+    }
+  }
+  
   if (!category || !CO2_EMISSIONS_DATA[category]) {
     return {
       co2PerKg: null,
       category: null,
-      matched: false
+      matched: false,
+      isNonFood: false
     }
   }
   
   return {
     co2PerKg: CO2_EMISSIONS_DATA[category],
     category,
-    matched: true
+    matched: true,
+    isNonFood: false
   }
 }
 
@@ -382,7 +610,23 @@ const CATEGORY_LABELS = {
   'dark_chocolate': 'Chocolade',
   'wine': 'Wijn',
   'soy_milk': 'Plantaardige Melk',
-  'cassava': 'Cassave'
+  'cassava': 'Cassave',
+  // New categories
+  'beer': 'Bier',
+  'spirits': 'Sterke Drank',
+  'tea': 'Thee',
+  'soft_drinks': 'Frisdranken',
+  'sauces_condiments': 'Sauzen & Kruiden',
+  'ready_meals': 'Kant-en-klaar',
+  'soup': 'Soep',
+  'candy_sweets': 'Snoep & Drop',
+  'ice_cream': 'IJs',
+  'baked_goods': 'Gebak & Koek',
+  'desserts': 'Desserts',
+  'spreads': 'Broodbeleg',
+  'baby_food': 'Babyvoeding',
+  'snacks': 'Snacks',
+  '__non_food__': 'Geen Voedingsmiddel'
 }
 
 function getCategoryLabel(category) {
@@ -474,10 +718,12 @@ export {
   CO2_EMISSIONS_DATA,
   PRODUCT_CATEGORY_KEYWORDS,
   CATEGORY_LABELS,
+  NON_FOOD_KEYWORDS,
   getCO2Category,
   getCO2Emissions,
   co2ToScore,
   getCO2Rating,
   getCategoryLabel,
-  evaluateProductCO2
+  evaluateProductCO2,
+  isNonFood
 }
