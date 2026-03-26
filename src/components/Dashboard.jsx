@@ -253,7 +253,7 @@ function Dashboard({ syncVersion }) {
         </p>
         <button 
           className="btn btn-primary btn-lg"
-          onClick={() => window.location.hash = 'sync'}
+          onClick={() => window.location.href = '/bookmarklet.html'}
         >
           <RefreshCw size={20} />
           {t('sync_account') || 'Sync Account'}

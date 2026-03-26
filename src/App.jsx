@@ -30,10 +30,11 @@ const features = [
   },
   {
     id: 'sync',
-    emoji: '🔄',
+    emoji: '�',
     titleKey: 'tab_sync',
     descKey: 'feature_sync_desc',
-    color: '#f59e0b'
+    color: '#f59e0b',
+    href: '/bookmarklet.html'
   },
   {
     id: 'history',
@@ -149,7 +150,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             bonusLogin(cardNumber, userInfo)
             navigateTo('dashboard')
           }}
-          onStartScrape={() => navigateTo('sync')}
+          onStartScrape={() => window.location.href = '/bookmarklet.html'}
         />
 
         {/* Feature Cards - shown below landing */}
@@ -160,7 +161,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
               <button
                 key={feature.id}
                 className="feature-card"
-                onClick={() => navigateTo(feature.id)}
+                onClick={() => feature.href ? window.location.href = feature.href : navigateTo(feature.id)}
                 style={{ '--card-accent': feature.color }}
               >
                 <span className="feature-emoji">{feature.emoji}</span>
