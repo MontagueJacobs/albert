@@ -2906,33 +2906,26 @@ app.get('/api/product/:productId/details', async (req, res) => {
       })
     }
     
-    // Add adjustment explanations (only enriched type exists now)
-    for (const adj of evaluation.adjustments) {
-      let label = ''
-      let positive = adj.delta > 0
-      let negative = adj.delta < 0
-      
-      // All adjustments are now from enriched data (kenmerken/herkomst sections)
-      const enrichedMap = {
-        'enriched_vegan': 'Vegan',
-        'enriched_vegetarian': 'Vegetarian',
-        'enriched_organic': 'Organic Certified',
-        'enriched_fairtrade': 'Fairtrade Certified',
-        'enriched_origin_avg': adj.delta > 0 ? 'Origin (Local/EU)' : 'Origin (Distant)',
-        'enriched_nutriscore_A': 'Nutri-Score A',
-        'enriched_nutriscore_B': 'Nutri-Score B',
-        'enriched_nutriscore_C': 'Nutri-Score C',
-        'enriched_nutriscore_D': 'Nutri-Score D',
-        'enriched_nutriscore_E': 'Nutri-Score E'
+    // Add supplementary info to breakdown (from enriched data)
+    if (evaluation.enriched && Array.isArray(evaluation.enriched)) {
+      for (const item of evaluation.enriched) {
+        if (!item.supplementary) continue
+        
+        const labelMap = {
+          'organic': 'Organic/Bio',
+          'vegan': 'Vegan',
+          'vegetarian': 'Vegetarian',
+          'fairtrade': 'Fairtrade',
+          'origin': item.countries ? `Origin: ${item.countries.join(', ')}` : 'Origin'
+        }
+        
+        breakdown.push({
+          label: labelMap[item.code] || item.label || item.code,
+          value: '✓',
+          positive: true,
+          negative: false
+        })
       }
-      label = enrichedMap[adj.code] || adj.code.replace('enriched_', '').replace(/_/g, ' ')
-      
-      breakdown.push({
-        label,
-        value: (adj.delta > 0 ? '+' : '') + adj.delta.toFixed(1),
-        positive,
-        negative
-      })
     }
     
     // NOTE: Final Score removed from breakdown - it's already shown above the breakdown section
@@ -2979,20 +2972,25 @@ app.get('/api/product/:productId/details', async (req, res) => {
     }
     
     // Additional factors from enriched data (supplementary info)
-    for (const adj of evaluation.adjustments.filter(a => a.delta !== 0)) {
-      const codeMap = {
-        'enriched_organic': adj.delta > 0 ? '🌱 Organic/Bio certified' : null,
-        'enriched_vegan': adj.delta > 0 ? '🌿 Vegan product' : null,
-        'enriched_vegetarian': adj.delta > 0 ? '🥬 Vegetarian product' : null,
-        'enriched_fairtrade': adj.delta > 0 ? '🤝 Fairtrade certified' : null,
-        'enriched_origin_avg': adj.delta > 0 ? '📍 Local/EU origin' : '✈️ Distant origin'
-      }
-      const reason = codeMap[adj.code]
-      if (reason) {
-        improvements.push({
-          reason,
-          positive: adj.delta > 0
-        })
+    // These are now in the 'enriched' array, not 'adjustments'
+    if (evaluation.enriched && Array.isArray(evaluation.enriched)) {
+      for (const item of evaluation.enriched) {
+        if (!item.supplementary) continue
+        
+        const codeMap = {
+          'organic': '🌱 Organic/Bio certified',
+          'vegan': '🌿 Vegan product',
+          'vegetarian': '🥬 Vegetarian product',
+          'fairtrade': '🤝 Fairtrade certified',
+          'origin': item.countries ? `📍 Origin: ${item.countries.join(', ')}` : null
+        }
+        const reason = codeMap[item.code]
+        if (reason) {
+          improvements.push({
+            reason,
+            positive: true
+          })
+        }
       }
     }
     
