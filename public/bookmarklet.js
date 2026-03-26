@@ -13,16 +13,18 @@
   const srcUrl = scriptTag ? new URL(scriptTag.src) : null;
   const API_BASE = srcUrl ? srcUrl.origin : window.location.origin;
   
-  // Try to get bonus card from:
-  // 1. Script URL parameter (?card=...)
-  // 2. Global variable (window.AH_BONUS_CARD)
-  // 3. Will fall back to extraction methods later
-  let presetBonusCard = null;
-  if (srcUrl) {
-    presetBonusCard = srcUrl.searchParams.get('card');
-  }
-  if (!presetBonusCard && typeof window.AH_BONUS_CARD === 'string') {
-    presetBonusCard = window.AH_BONUS_CARD;
+  // IMPORTANT: We no longer trust preset/URL-embedded bonus cards
+  // This prevents issues where users share bookmarklets with their card baked in
+  // The card MUST come from the user's actual AH session
+  
+  // Logging helper
+  function log(msg, data) {
+    const timestamp = new Date().toISOString().slice(11, 23);
+    if (data !== undefined) {
+      console.log(`[Bookmarklet ${timestamp}] ${msg}`, data);
+    } else {
+      console.log(`[Bookmarklet ${timestamp}] ${msg}`);
+    }
   }
   
   // Check if on AH website
@@ -195,39 +197,129 @@
   // BONUS CARD EXTRACTION
   // ============================================
   
+  // AH bonus cards typically start with certain prefixes
+  // Common patterns: 4463, 2621, etc. (13 digits total starting with 2 or 4)
+  const BONUS_CARD_REGEX = /\b([24]\d{12})\b/g;
+  
+  function isValidBonusCard(card) {
+    if (!card || typeof card !== 'string') return false;
+    // Must be exactly 13 digits starting with 2 or 4
+    return /^[24]\d{12}$/.test(card);
+  }
+  
+  function extractBonusCards(text) {
+    const cards = [];
+    let match;
+    while ((match = BONUS_CARD_REGEX.exec(text)) !== null) {
+      if (isValidBonusCard(match[1])) {
+        cards.push(match[1]);
+      }
+    }
+    // Reset regex state
+    BONUS_CARD_REGEX.lastIndex = 0;
+    return [...new Set(cards)]; // Remove duplicates
+  }
+  
   async function getBonusCard() {
-    // Method 0: Use preset bonus card (from URL param or global variable)
-    if (presetBonusCard && /^\d{13}$/.test(presetBonusCard)) {
-      console.log('[Bookmarklet] Using preset bonus card:', presetBonusCard.slice(-4));
-      return presetBonusCard;
-    }
+    let foundCard = null;
+    let source = null;
     
-    // Method 1: Check if we're on klantenkaarten page or can extract from current page
-    const bonusElements = document.querySelectorAll('[class*="bonus"], [class*="card-number"], [data-testid*="card"]');
-    for (const el of bonusElements) {
-      const text = el.textContent || '';
-      const match = text.match(/\d{13}/);
-      if (match) return match[0];
-    }
+    log('Starting bonus card extraction...');
     
-    // Method 2: Try to fetch from klantenkaarten page
+    // Method 1: Try to fetch FRESH from klantenkaarten page (most reliable)
     try {
-      statusEl.textContent = 'Bonuskaart ophalen...';
-      const res = await fetch('https://www.ah.nl/mijn/klantenkaarten', { credentials: 'include' });
-      const html = await res.text();
-      const match = html.match(/\d{13}/);
-      if (match) return match[0];
+      statusEl.textContent = 'Bonuskaart ophalen van AH...';
+      log('Method 1: Fetching from /mijn/klantenkaarten');
+      const res = await fetch('https://www.ah.nl/mijn/klantenkaarten', { 
+        credentials: 'include',
+        cache: 'no-store'  // Don't use cached response
+      });
+      
+      if (res.ok) {
+        const html = await res.text();
+        const cards = extractBonusCards(html);
+        log(`Method 1: Found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
+        
+        if (cards.length === 1) {
+          foundCard = cards[0];
+          source = 'klantenkaarten_fetch';
+        } else if (cards.length > 1) {
+          // Multiple cards found - look for one in a specific element
+          log('Method 1: Multiple cards, looking for specific element');
+          // Parse and look for card number in specific context
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const cardEl = doc.querySelector('[data-testid="bonus-card-number"], .bonus-card-number, [class*="cardNumber"]');
+          if (cardEl) {
+            const cardText = cardEl.textContent;
+            const specificCards = extractBonusCards(cardText);
+            if (specificCards.length === 1) {
+              foundCard = specificCards[0];
+              source = 'klantenkaarten_specific_element';
+            }
+          }
+          // Fallback: use first card
+          if (!foundCard) {
+            foundCard = cards[0];
+            source = 'klantenkaarten_first_of_multiple';
+            log('Method 1: WARNING - using first of multiple cards');
+          }
+        }
+      } else {
+        log(`Method 1: Fetch failed with status ${res.status}`);
+      }
     } catch (e) {
-      console.log('[Bookmarklet] Could not fetch bonus card:', e);
+      log('Method 1: Fetch error:', e.message);
     }
     
-    // Method 3: Check localStorage/sessionStorage
-    try {
-      const stored = localStorage.getItem('ah_bonus_card') || sessionStorage.getItem('ah_bonus_card');
-      if (stored && /^\d{13}$/.test(stored)) return stored;
-    } catch (e) {}
+    // Method 2: Check current page DOM (if on a relevant AH page)
+    if (!foundCard) {
+      log('Method 2: Checking current page DOM');
+      // Look for specific AH bonus card elements
+      const selectors = [
+        '[data-testid="bonus-card-number"]',
+        '[data-testid*="bonuskaart"]',
+        '.bonus-card-number',
+        '[class*="bonusCardNumber"]',
+        '[class*="bonus-card"] [class*="number"]'
+      ];
+      
+      for (const selector of selectors) {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const cards = extractBonusCards(el.textContent || '');
+          if (cards.length === 1) {
+            foundCard = cards[0];
+            source = `dom_selector:${selector}`;
+            log(`Method 2: Found card via ${selector}`);
+            break;
+          }
+        }
+        if (foundCard) break;
+      }
+    }
     
-    return null;
+    // Method 3: Check URL params on current page (AH sometimes includes it)
+    if (!foundCard) {
+      log('Method 2b: Checking URL params');
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const cardParam = urlParams.get('bonuskaart') || urlParams.get('card');
+        if (isValidBonusCard(cardParam)) {
+          foundCard = cardParam;
+          source = 'url_param';
+        }
+      } catch (e) {}
+    }
+    
+    // Log final result
+    if (foundCard) {
+      log(`SUCCESS: Found bonus card ****${foundCard.slice(-4)} via ${source}`);
+    } else {
+      log('FAILED: No bonus card found by any method');
+    }
+    
+    return foundCard;
   }
   
   // ============================================
@@ -337,7 +429,17 @@
       // Add bonus card if found
       if (bonusCard) {
         payload.bonus_card = bonusCard;
+        log(`Sending ${items.length} products with bonus card ****${bonusCard.slice(-4)}`);
+      } else {
+        log(`WARNING: Sending ${items.length} products WITHOUT bonus card - purchases won't be recorded!`);
       }
+      
+      log('API request payload:', { 
+        itemCount: items.length, 
+        source: payload.source,
+        bonusCard: bonusCard ? '****' + bonusCard.slice(-4) : 'NONE',
+        sampleItem: items[0] ? { name: items[0].name, url: items[0].url?.slice(0, 50) } : null
+      });
       
       const res = await fetch(`${API_BASE}/api/ingest/scrape`, {
         method: 'POST',
@@ -347,6 +449,14 @@
       
       const data = await res.json();
       progressEl.style.width = '100%';
+      
+      log('API response:', { 
+        ok: res.ok, 
+        stored: data.stored, 
+        purchasesRecorded: data.purchasesRecorded,
+        purchaseError: data.purchaseError,
+        bonusCard: data.bonusCard
+      });
       
       if (!res.ok) {
         // Show both error code and detail if available

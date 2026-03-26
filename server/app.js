@@ -3456,7 +3456,10 @@ app.post('/api/origin-scraper/trigger', (req, res) => {
 
 // Debug endpoint to test inserting into user_purchases
 app.post('/api/debug/test-insert', async (req, res) => {
-  const bonusCard = req.body.bonus_card || '4463986084997'
+  const bonusCard = req.body.bonus_card
+  if (!bonusCard) {
+    return res.status(400).json({ error: 'bonus_card required - do not use defaults to avoid data contamination' })
+  }
   const now = new Date().toISOString()
   
   const testRecord = {
@@ -3530,7 +3533,18 @@ app.post('/api/ingest/scrape', async (req, res) => {
     const sessionId = req.headers['x-session-id']
     const requestStore = req.body?.store?.toString().trim() || 'ah'  // 'ah' or 'jumbo'
     
-    console.log(`[Ingest] Received ${items.length} items, store: ${requestStore}, userId: ${userId ? 'yes' : 'no'}, bonusCard: ${bonusCard ? bonusCard.slice(-4) : 'none'}, sessionId: ${sessionId ? 'yes' : 'no'}`)
+    // Enhanced logging for debugging bonus card issues
+    const isDev = process.env.NODE_ENV !== 'production'
+    const cardDisplay = bonusCard 
+      ? (isDev ? bonusCard : '****' + bonusCard.slice(-4))
+      : 'NONE'
+    
+    console.log(`[Ingest] ===== NEW REQUEST =====`)
+    console.log(`[Ingest] Items: ${items.length}, Store: ${requestStore}`)
+    console.log(`[Ingest] User ID: ${userId ? userId : 'none'}`)
+    console.log(`[Ingest] Bonus Card: ${cardDisplay}`)
+    console.log(`[Ingest] Session ID: ${sessionId ? sessionId.slice(0, 8) + '...' : 'none'}`)
+    console.log(`[Ingest] Source IP: ${req.ip || req.connection?.remoteAddress || 'unknown'}`)
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
     const seen = new Set()
@@ -3695,8 +3709,11 @@ app.post('/api/ingest/scrape', async (req, res) => {
           last_seen_at: now
         }))
 
-        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user ' + userId : 'bonus card ****' + bonusCard?.slice(-4)}`)
-        console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
+        const cardForLog = isDev ? bonusCard : (bonusCard ? '****' + bonusCard.slice(-4) : null)
+        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user ' + userId : 'bonus card ' + cardForLog}`)
+        if (isDev) {
+          console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
+        }
 
         // Try simple INSERT first (most reliable)
         // If duplicates exist, they'll fail with 23505 which is OK
