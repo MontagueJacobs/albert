@@ -470,22 +470,23 @@ function makeAbsoluteAhUrl(url) {
  * @param {string} originalName - The original product name from scraper
  * @returns {{ id: string | null, name: string, normalized: string }}
  */
-function extractProductFromUrl(url, originalName) {
+function extractProductFromUrl(url, originalName, store = 'ah') {
   const rawName = (originalName || '').toString().trim()
   
-  // Clean up name - remove common noise patterns from AH product cards
+  // Clean up name - remove common noise patterns from product cards
   let name = rawName
     .replace(/,\s*(?:Nutri-Score|per stuk|per kg|€|\d+\s*voor|vandaag|morgen).*/i, '')
     .replace(/\s+/g, ' ')
     .trim()
   
   const normalized = normalizeProductName(name)
+  const storePrefix = store === 'jumbo' ? 'jumbo' : 'ah'
   
   if (!url) {
     // No URL - use name as fallback
     if (normalized && normalized.length > 2) {
       return {
-        id: `ah-${normalized.replace(/\s+/g, '-').toLowerCase()}`,
+        id: `${storePrefix}-${normalized.replace(/\s+/g, '-').toLowerCase()}`,
         name,
         normalized
       }
@@ -496,6 +497,61 @@ function extractProductFromUrl(url, originalName) {
   try {
     const u = new URL(url)
     
+    // JUMBO-specific URL patterns
+    if (store === 'jumbo' || url.includes('jumbo.com')) {
+      // Pattern: /producten/product-name-123456
+      const jumboMatch1 = u.pathname.match(/\/producten?\/([^/?#]+?)(?:-(\d{5,}))?$/i)
+      if (jumboMatch1) {
+        const slug = jumboMatch1[1].toLowerCase()
+        const productId = jumboMatch1[2]
+        const cleanSlug = slug.replace(/-\d+$/, '') // Remove trailing ID from slug
+        let displayName = cleanSlug.replace(/-/g, ' ')
+        displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+        return {
+          id: productId ? `jumbo-${productId}` : `jumbo-${cleanSlug}`.substring(0, 100),
+          name: name || displayName,
+          normalized: normalizeProductName(cleanSlug.replace(/-/g, ' '))
+        }
+      }
+      
+      // Pattern: /product/123456 or URLs with numeric product IDs
+      const jumboMatch2 = u.pathname.match(/\/(?:product|artikel)\/(\d{5,})/i)
+      if (jumboMatch2) {
+        return {
+          id: `jumbo-${jumboMatch2[1]}`,
+          name: name || `Jumbo Product ${jumboMatch2[1]}`,
+          normalized
+        }
+      }
+      
+      // Pattern: Jumbo bonnetje JSON receipt items (may have SKU in URL params)
+      const skuParam = u.searchParams.get('sku') || u.searchParams.get('productId')
+      if (skuParam) {
+        return {
+          id: `jumbo-${skuParam}`,
+          name,
+          normalized
+        }
+      }
+      
+      // Fallback for Jumbo: use slug from path
+      const pathParts = u.pathname.split('/').filter(p => p.length > 2)
+      if (pathParts.length > 0) {
+        const lastPart = pathParts[pathParts.length - 1]
+        const cleanSlug = lastPart.toLowerCase().replace(/[^a-z0-9-]/g, '')
+        if (cleanSlug.length > 3) {
+          let displayName = cleanSlug.replace(/-/g, ' ')
+          displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
+          return {
+            id: `jumbo-${cleanSlug}`.substring(0, 100),
+            name: name || displayName,
+            normalized: normalizeProductName(cleanSlug.replace(/-/g, ' '))
+          }
+        }
+      }
+    }
+    
+    // AH-specific URL patterns (default)
     // Strategy 1: /producten/product/<wi...>/<slug> format
     const match1 = u.pathname.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
     if (match1 && match1[1]) {
@@ -3472,8 +3528,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
     
     const bonusCard = req.body?.bonus_card?.toString().trim() || null
     const sessionId = req.headers['x-session-id']
+    const requestStore = req.body?.store?.toString().trim() || 'ah'  // 'ah' or 'jumbo'
     
-    console.log(`[Ingest] Received ${items.length} items, userId: ${userId ? 'yes' : 'no'}, bonusCard: ${bonusCard ? bonusCard.slice(-4) : 'none'}, sessionId: ${sessionId ? 'yes' : 'no'}`)
+    console.log(`[Ingest] Received ${items.length} items, store: ${requestStore}, userId: ${userId ? 'yes' : 'no'}, bonusCard: ${bonusCard ? bonusCard.slice(-4) : 'none'}, sessionId: ${sessionId ? 'yes' : 'no'}`)
 
     // Normalize and de-duplicate by URL if present, else by normalized name + source
     const seen = new Set()
@@ -3483,10 +3540,11 @@ app.post('/api/ingest/scrape', async (req, res) => {
       const rawName = (raw?.name || '').toString().trim()
       if (!rawName) continue
       const url = (raw?.url || '').toString().trim()
-      const source = (raw?.source || 'ah_bonus').toString().trim()
+      const source = (raw?.source || (requestStore === 'jumbo' ? 'jumbo_bonus' : 'ah_bonus')).toString().trim()
+      const itemStore = raw?.store || requestStore  // Per-item store or request-level store
       
       // Use helper to extract ID and name from URL
-      const extracted = extractProductFromUrl(url, rawName)
+      const extracted = extractProductFromUrl(url, rawName, itemStore)
       if (!extracted.id) continue
       
       const key = url || `${extracted.normalized}::${source}`

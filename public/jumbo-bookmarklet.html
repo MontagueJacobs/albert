@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duurzaam Boodschappen - Jumbo Setup</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #f3f4f6;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .store-badge {
+      background: linear-gradient(135deg, #fbbf24, #f97316);
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      color: #9ca3af;
+      margin-bottom: 32px;
+    }
+    
+    .card {
+      background: #334155;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .card h2 {
+      font-size: 1.25rem;
+      margin-bottom: 16px;
+      color: #fbbf24;
+    }
+    
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .step-number {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    
+    .step-content {
+      flex: 1;
+    }
+    
+    .step-content p {
+      color: #d1d5db;
+      line-height: 1.6;
+    }
+    
+    .bookmarklet {
+      display: inline-block;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+      color: #1e293b;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1.1rem;
+      cursor: grab;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin: 16px 0;
+    }
+    
+    .bookmarklet:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(251, 191, 36, 0.3);
+    }
+    
+    .bookmarklet:active {
+      cursor: grabbing;
+    }
+    
+    .note {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.9rem;
+      color: #fcd34d;
+    }
+    
+    .note strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+    
+    .links {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #475569;
+    }
+    
+    .links a {
+      color: #fbbf24;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 24px;
+    }
+    
+    .links a:hover {
+      text-decoration: underline;
+    }
+    
+    code {
+      background: #1e293b;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    
+    .other-store {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    
+    .other-store h3 {
+      color: #22c55e;
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+    
+    .other-store a {
+      color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌱 Duurzaam Boodschappen <span class="store-badge">🍊 Jumbo</span></h1>
+    <p class="subtitle">Importeer je Jumbo aankopen met één klik</p>
+    
+    <div class="card">
+      <h2>📱 Installatie</h2>
+      
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <p><strong>Sleep</strong> onderstaande knop naar je bladwijzerbalk:</p>
+        </div>
+      </div>
+      
+      <p style="text-align: center;">
+        <a class="bookmarklet" id="jumbo-bookmarklet" href="#">
+          🍊 Jumbo → Duurzaam
+        </a>
+      </p>
+      
+      <div class="note">
+        <strong>💡 Geen bladwijzerbalk?</strong>
+        Druk <code>Ctrl+Shift+B</code> (Windows) of <code>⌘+Shift+B</code> (Mac) om deze te tonen.
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>🛒 Gebruik</h2>
+      
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <p>Ga naar <a href="https://www.jumbo.com/bestellingen" target="_blank" style="color: #fbbf24;">jumbo.com/bestellingen</a> en log in</p>
+        </div>
+      </div>
+      
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <p>Klik op de bladwijzer <strong>"🍊 Jumbo → Duurzaam"</strong></p>
+        </div>
+      </div>
+      
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <p>Je bonnetjes worden automatisch geïmporteerd!</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>ℹ️ Tips</h2>
+      <ul style="color: #d1d5db; padding-left: 20px; line-height: 1.8;">
+        <li>Open een specifiek bonnetje voor meer details</li>
+        <li>De bookmarklet werkt ook op individuele bonnetje-pagina's</li>
+        <li>Je kunt meerdere keren importeren - duplicaten worden genegeerd</li>
+      </ul>
+      
+      <div class="other-store">
+        <h3>🛒 Ook Albert Heijn klant?</h3>
+        <p style="color: #d1d5db;">
+          <a href="/bookmarklet.html">Installeer de AH bookmarklet</a> om ook je Albert Heijn aankopen te importeren!
+        </p>
+      </div>
+    </div>
+    
+    <div class="links">
+      <a href="/">← Terug naar Dashboard</a>
+      <a href="/bookmarklet.html">AH Bookmarklet</a>
+    </div>
+  </div>
+  
+  <script>
+    // Build the bookmarklet
+    const apiBase = window.location.origin;
+    const bookmarkletCode = `javascript:(function(){var s=document.createElement('script');s.src='${apiBase}/jumbo-bookmarklet.js?t='+Date.now();document.body.appendChild(s);})();`;
+    
+    document.getElementById('jumbo-bookmarklet').href = bookmarkletCode;
+  </script>
+</body>
+</html>
