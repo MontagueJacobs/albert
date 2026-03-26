@@ -306,12 +306,9 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
       const isCorrect = userRank === actualRank
       const difference = Math.abs(userRank - actualRank)
       
-      // Award points based on how close the guess is
-      // Perfect match = 1 point, 1 off = 0.5 points, 2+ off = 0 points
+      // Award points only for exact position matches
       if (isCorrect) {
         score += 1
-      } else if (difference === 1) {
-        score += 0.5
       }
       
       return {
