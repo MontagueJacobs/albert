@@ -421,6 +421,63 @@ function ProductDetailModal({ purchase, onClose }) {
                 )}
               </div>
 
+              {/* Top Ingredient CO2 Contributors */}
+              {details.ingredientBreakdown && details.ingredientBreakdown.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={styles.sectionTitle}>Top CO₂ Ingredients</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {[...details.ingredientBreakdown]
+                      .sort((a, b) => (b.co2PerKg * b.weightFraction) - (a.co2PerKg * a.weightFraction))
+                      .slice(0, 3)
+                      .map((ing, i) => {
+                        const contribution = ing.co2PerKg * ing.weightFraction
+                        const maxContribution = details.ingredientBreakdown.reduce(
+                          (max, x) => Math.max(max, x.co2PerKg * x.weightFraction), 0
+                        )
+                        const barWidth = maxContribution > 0 ? (contribution / maxContribution) * 100 : 0
+                        return (
+                          <div key={i} style={{
+                            background: 'rgba(0,0,0,0.15)',
+                            borderRadius: '8px',
+                            padding: '0.5rem 0.75rem',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              position: 'absolute',
+                              top: 0, left: 0, bottom: 0,
+                              width: `${barWidth}%`,
+                              background: ing.co2PerKg >= 15 ? 'rgba(239, 68, 68, 0.15)'
+                                : ing.co2PerKg >= 5 ? 'rgba(234, 179, 8, 0.15)'
+                                : 'rgba(34, 197, 94, 0.15)',
+                              borderRadius: '8px',
+                              transition: 'width 0.3s'
+                            }} />
+                            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <span style={{ fontWeight: '600', fontSize: '0.85rem', textTransform: 'capitalize' }}>
+                                  {ing.name}
+                                </span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                                  ~{Math.round(ing.weightFraction * 100)}%
+                                </span>
+                              </div>
+                              <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
+                                <div style={{ fontWeight: '600' }}>
+                                  {contribution.toFixed(1)} kg CO₂
+                                </div>
+                                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                  {ing.co2PerKg.toFixed(1)} /kg
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              )}
+
               {/* CO2 Impact Breakdown */}
               <div style={styles.sectionTitle}>CO₂ Impact</div>
               <div style={styles.scoreBreakdown}>

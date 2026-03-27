@@ -1269,6 +1269,7 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     co2CategoryLabel: getCategoryLabel(co2Data.category),
     co2Matched: co2Data.matched,
     co2Method: co2Data.method || 'name',  // 'ingredients' or 'name'
+    ingredientBreakdown: co2Data.ingredientBreakdown || null,
     hasEnrichedData: enrichedData !== null && matchedEnriched.some(m => m.supplementary)
   }
 }
@@ -3312,7 +3313,9 @@ app.get('/api/product/:productId/details', async (req, res) => {
       co2PerKg: evaluation.co2PerKg,
       co2Category: evaluation.co2Category,
       co2CategoryLabel: evaluation.co2CategoryLabel,
-      co2Matched: evaluation.co2Matched
+      co2Matched: evaluation.co2Matched,
+      co2Method: evaluation.co2Method,
+      ingredientBreakdown: evaluation.ingredientBreakdown || null
     })
   } catch (err) {
     console.error('[product/details] Error:', err)

@@ -383,7 +383,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   // Oils
   'palm_oil': ['palmolie', 'palm oil', 'palmvet'],
   'soybean_oil': ['sojaolie', 'soybean oil', 'soja-olie'],
-  'olive_oil': ['olijfolie', 'olive oil'],
+  'olive_oil': ['olijfolie', 'olive oil', 'olijven', 'olijf', 'kalamata', 'zwarte olijven', 'groene olijven'],
   'rapeseed_oil': ['raapzaadolie', 'koolzaadolie', 'rapeseed oil', 'canola'],
   'sunflower_oil': ['zonnebloemolie', 'sunflower oil'],
   
@@ -415,7 +415,8 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   'nuts': [
     'noten', 'nuts', 'amandelen', 'almonds', 'walnoten', 'walnuts',
     'cashew', 'hazelnoten', 'hazelnuts', 'pistache', 'pistachio',
-    'pecannoten', 'macadamia', 'paranoten'
+    'pecannoten', 'macadamia', 'paranoten',
+    'sesam', 'sesamzaad', 'tahin', 'tahini', 'sesampasta'
   ],
   'tofu': [
     'tofu', 'tahoe', 'tempeh', 'seitan',
@@ -517,7 +518,13 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   // Beverages & Other
   'coffee': ['koffie', 'coffee', 'espresso', 'cappuccino', 'latte'],
   'dark_chocolate': ['chocola', 'chocolate', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella'],
-  'wine': ['wijn', 'wine', 'prosecco', 'champagne', 'port', 'sherry'],
+  'wine': [
+    'wijn', 'wine', 'prosecco', 'champagne', 'port', 'sherry',
+    'cabernet', 'sauvignon', 'merlot', 'syrah', 'shiraz', 'pinot',
+    'chardonnay', 'tempranillo', 'malbec', 'riesling', 'grenache',
+    'carménère', 'carmenere', 'rioja', 'bordeaux', 'burgundy',
+    'chablis', 'chianti', 'barolo', 'sangiovese', 'zinfandel'
+  ],
   'beer': ['bier', 'pils', 'radler', 'witbier', 'ipa', 'weizen', 'heineken', 'amstel', 'grolsch', 'hertog jan', 'palm', 'jupiler', 'duvel'],
   'spirits': ['jenever', 'vodka', 'rum', 'whisky', 'whiskey', 'gin', 'likeur', 'baileys', 'tequila', 'cognac', 'glühwein', 'advocaat'],
   'tea': ['thee', 'tea', 'rooibos', 'kamille', 'munt thee', 'groene thee', 'earl grey'],
@@ -733,7 +740,10 @@ function getCategoryPriority(category) {
 
 function getCO2Category(productName) {
   if (!productName) return null
-  const lower = productName.toLowerCase()
+  // Decode URI-encoded characters (e.g. Carme%CC%81ne%CC%80re → Carménère)
+  let decoded = productName
+  try { decoded = decodeURIComponent(productName) } catch(e) { /* not URI-encoded */ }
+  const lower = decoded.toLowerCase()
   
   // First: exclude non-food items
   if (isNonFood(productName)) return '__non_food__'

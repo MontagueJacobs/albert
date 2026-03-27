@@ -335,16 +335,9 @@ class AHProductDetailScraper:
             except Exception as e:
                 print(f"[WARN] Fairtrade extraction failed: {e}", flush=True)
             
-            # ================================================================
-            # STRATEGY: Extract local origin from "dutch" icon
-            # ================================================================
-            try:
-                if 'logos/product/dutch' in content.lower() or 'LOCALLY_PRODUCED' in content:
-                    if not result['origin_country']:
-                        result['origin_country'] = 'Netherlands'
-                        print(f"[DEBUG] Found local origin (Netherlands) from dutch icon", flush=True)
-            except Exception as e:
-                print(f"[WARN] Local origin extraction failed: {e}", flush=True)
+            # NOTE: Dutch icon check moved AFTER np_lokaal and Herkomst methods
+            # to avoid false-positive NL assignments. See below after METHOD 2.
+            
             # STRATEGY 3: Extract monthly origin from collapsible origin table
             # ================================================================
             try:
@@ -383,13 +376,47 @@ class AHProductDetailScraper:
             # ================================================================
             if not result.get('image_url'):
                 try:
-                    # Look for product image in React state data
+                    # Look for product image in React state data (broader pattern)
                     img_match = re.search(r'"url"\s*:\s*"(https://static\.ah\.nl/dam/product/[^"]+)"', content)
+                    if not img_match:
+                        # Try broader static.ah.nl pattern (covers /image/ paths too)
+                        img_match = re.search(r'"(?:url|image|src)"\s*:\s*"(https://static\.ah\.nl/[^"]*(?:product|image)[^"]*)"', content, re.IGNORECASE)
                     if img_match:
                         result['image_url'] = img_match.group(1).replace('\\u0026', '&')
                         print(f"[DEBUG] Found image from React state", flush=True)
                 except Exception as e:
                     print(f"[WARN] Image fallback extraction failed: {e}", flush=True)
+            
+            # STRATEGY 4b: Try DOM-based image extraction from actual <img> elements
+            if not result.get('image_url'):
+                try:
+                    dom_image = await self.page.evaluate('''() => {
+                        // Look for the main product image (usually the largest image on the page)
+                        const imgs = Array.from(document.querySelectorAll('img'));
+                        for (const img of imgs) {
+                            const src = img.src || img.getAttribute('data-src') || '';
+                            // AH product images are on static.ah.nl
+                            if (src.includes('static.ah.nl') && (src.includes('product') || src.includes('dam'))) {
+                                return src;
+                            }
+                        }
+                        // Also check picture/source elements
+                        const sources = Array.from(document.querySelectorAll('picture source'));
+                        for (const s of sources) {
+                            const srcset = s.srcset || '';
+                            if (srcset.includes('static.ah.nl') && (srcset.includes('product') || srcset.includes('dam'))) {
+                                // Get the first URL from srcset
+                                const match = srcset.match(/https?:\\/\\/static\\.ah\\.nl[^\\s,]+/);
+                                if (match) return match[0];
+                            }
+                        }
+                        return null;
+                    }''')
+                    if dom_image:
+                        result['image_url'] = dom_image
+                        print(f"[DEBUG] Found image from DOM img elements", flush=True)
+                except Exception as e:
+                    print(f"[WARN] DOM image extraction failed: {e}", flush=True)
                 
             # ================================================================
             # FALLBACK: Extract certifications from visible Kenmerken section
@@ -563,6 +590,19 @@ class AHProductDetailScraper:
                                             print(f"[DEBUG] Found origin via 'Geproduceerd in': {result['origin_country']}", flush=True)
                                             break
                                     
+                                    # Handle "Vervaardigd in [country]" format
+                                    vervaardigd_match = re.search(r'vervaardigd in\s+([a-zA-Z\s\-]+)', line_lower)
+                                    if vervaardigd_match:
+                                        country_raw = vervaardigd_match.group(1).strip().rstrip('.')
+                                        if country_raw in COUNTRY_MAPPINGS:
+                                            result['origin_country'] = COUNTRY_MAPPINGS[country_raw]
+                                            print(f"[DEBUG] Found origin via 'Vervaardigd in': {result['origin_country']}", flush=True)
+                                            break
+                                        elif len(country_raw) > 2:
+                                            result['origin_country'] = country_raw.title()
+                                            print(f"[DEBUG] Found origin via 'Vervaardigd in': {result['origin_country']}", flush=True)
+                                            break
+                                    
                                     # Also check for country names directly
                                     for country_name, english_name in COUNTRY_MAPPINGS.items():
                                         if country_name in line_lower and 'maand' not in line_lower:
@@ -580,6 +620,8 @@ class AHProductDetailScraper:
                     r'herkomst[:\s]*([^<\n,]+)',
                     r'land van herkomst[:\s]*([^<\n,]+)',
                     r'oorsprong[:\s]*([^<\n,]+)',
+                    r'geproduceerd in\s+([a-zA-Z\s\-]+)',
+                    r'vervaardigd in\s+([a-zA-Z\s\-]+)',
                 ]
                 
                 for pattern in origin_patterns:
@@ -608,6 +650,26 @@ class AHProductDetailScraper:
                         
                         if result['origin_country']:
                             break
+            
+            # ================================================================
+            # STRATEGY: Dutch icon check (low priority — only if no origin found yet)
+            # Moved here from earlier to prevent false-positive NL assignments
+            # ================================================================
+            if not result['origin_country']:
+                try:
+                    if 'logos/product/dutch' in content.lower() or 'LOCALLY_PRODUCED' in content:
+                        result['origin_country'] = 'Netherlands'
+                        print(f"[DEBUG] Found local origin (Netherlands) from dutch icon", flush=True)
+                except Exception as e:
+                    print(f"[WARN] Local origin extraction failed: {e}", flush=True)
+            
+            # ================================================================
+            # STRATEGY: Infer EU origin from organic/bio certification
+            # Products with EU bio logo are at least from the EU
+            # ================================================================
+            if not result['origin_country'] and result.get('is_organic'):
+                result['origin_country'] = 'EU'
+                print(f"[DEBUG] Inferred EU origin from organic/bio certification", flush=True)
                     
             # ================================================================
             # Extract Brand
