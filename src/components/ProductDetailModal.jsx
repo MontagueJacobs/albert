@@ -478,40 +478,9 @@ function ProductDetailModal({ purchase, onClose }) {
                 </div>
               )}
 
-              {/* CO2 Impact Breakdown */}
-              <div style={styles.sectionTitle}>CO₂ Impact</div>
-              <div style={styles.scoreBreakdown}>
-                {details.breakdown?.map((item, i) => (
-                  <div key={i} style={styles.scoreItem}>
-                    <span style={styles.scoreLabel}>{item.label}</span>
-                    <span style={{ 
-                      ...styles.scoreValue, 
-                      color: item.positive ? '#22c55e' : item.negative ? '#ef4444' : 'var(--text)' 
-                    }}>
-                      {item.positive ? <TrendingUp size={14} /> : item.negative ? <TrendingDown size={14} /> : <Minus size={14} />}
-                      {' '}{item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+              )}
 
-            {/* Improvements */}
-            {details.improvements && details.improvements.length > 0 && (
-              <div style={styles.section}>
-                <div style={styles.sectionTitle}>Why this score?</div>
-                {details.improvements.map((imp, i) => (
-                  <div key={i} style={{
-                    ...styles.improvement,
-                    background: imp.positive ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                    color: imp.positive ? '#22c55e' : '#ef4444'
-                  }}>
-                    {imp.positive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                    {imp.reason}
-                  </div>
-                ))}
-              </div>
-            )}
+            </div>
 
             {/* Better Alternatives */}
             {details.alternatives && details.alternatives.length > 0 && (
