@@ -409,7 +409,14 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'cashew', 'hazelnoten', 'hazelnuts', 'pistache', 'pistachio',
     'pecannoten', 'macadamia', 'paranoten'
   ],
-  'tofu': ['tofu', 'tahoe', 'tempeh', 'seitan'],
+  'tofu': [
+    'tofu', 'tahoe', 'tempeh', 'seitan',
+    'plantaardig', 'plantaardige', 'plant-based', 'vegan schnitzel',
+    'vegan burger', 'vegan gehakt', 'vegaburger', 'vegetarische schnitzel',
+    'beyond meat', 'impossible', 'vivera', 'garden gourmet', 'terra',
+    'vega stuk', 'vega schnitzel', 'vega burger', 'vega gehakt',
+    'sojaprotein', 'soja-eiwit', 'tarwe-eiwit', 'erwtenprotein'
+  ],
   
   // Fruits
   'berries_grapes': [
@@ -434,7 +441,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'appel', 'appels', 'appelen', 'apple',
     'peer', 'peren', 'pear',
     'jonagold', 'elstar', 'braeburn', 'fuji', 'gala',
-    'golden delicious', 'granny smith', 'goudrenet', 'goudrenetten',
+    'golden delicious', 'granny smith', 'goudrenet', 'goudrenetten', 'goudreinette', 'goudreinetten',
     'conference', 'stoofpeer', 'stoofperen'
   ],
   'other_fruit': [
@@ -475,7 +482,8 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   'root_vegetables': [
     'wortel', 'carrot', 'pastinaak', 'parsnip', 'knolselderij',
     'celeriac', 'biet', 'beet', 'radijs', 'radish', 'raap', 'turnip',
-    'gember', 'gemberwortel', 'ginger'
+    'gember', 'gemberwortel', 'ginger',
+    'winterpeen', 'winterwortel'
   ],
   'other_vegetables': [
     'sla', 'lettuce', 'salade', 'salad', 'komkommer', 'cucumber',
@@ -746,30 +754,328 @@ function getCO2Category(productName) {
   return null
 }
 
+// ============================================================================
+// INGREDIENT-BASED CO2 SCORING
+// ============================================================================
+// EU law requires ingredients listed in descending order by weight.
+// We parse the ingredient list, match each ingredient to a CO2 category,
+// and compute a weighted-average CO2 using estimated ingredient proportions.
+
 /**
- * Get CO2 emissions for a product
- * @param {string} productName - Product name
- * @returns {Object} - { co2PerKg, category, matched }
+ * Parse an ingredient string into individual ingredient entries.
+ * Dutch ingredient lists use commas to separate, with parentheses for sub-ingredients.
+ * Example: "TARWEBLOEM, water, 13% tomaten, mozzarella (MELK), basilicum, olijfolie"
+ * 
+ * @param {string} ingredientText - Raw ingredient text from the product page
+ * @returns {Array<{name: string, percentage: number|null, position: number}>}
  */
-function getCO2Emissions(productName) {
-  const category = getCO2Category(productName)
+function parseIngredients(ingredientText) {
+  if (!ingredientText || typeof ingredientText !== 'string') return []
   
-  // Non-food items
-  if (category === '__non_food__') {
+  // Remove leading label like "Ingrediënten: " or "Ingredients: "
+  let text = ingredientText
+    .replace(/^ingredi[ëe]nten\s*[:;]/i, '')
+    .replace(/^ingredients\s*[:;]/i, '')
+    .trim()
+  
+  // Remove trailing allergen/nutritional notes 
+  // (often starts with "Kan bevatten:", "Bevat:", "Allergenen:")
+  text = text
+    .replace(/\s*(Kan bevatten|Bevat|Allergenen|Allergie-info|Voedingswaarde)\s*[:].*/si, '')
+    .trim()
+  
+  // Remove trailing period
+  text = text.replace(/\.\s*$/, '')
+  
+  // Split by commas, but not commas inside parentheses/brackets
+  const parts = []
+  let depth = 0
+  let current = ''
+  
+  for (const ch of text) {
+    if (ch === '(' || ch === '[') {
+      depth++
+      current += ch
+    } else if (ch === ')' || ch === ']') {
+      depth = Math.max(0, depth - 1)
+      current += ch
+    } else if (ch === ',' && depth === 0) {
+      parts.push(current.trim())
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  if (current.trim()) parts.push(current.trim())
+  
+  // Parse each part: extract percentage if present, clean up the name
+  // Some Dutch labels use sections like "Deeg 55% (TARWEBLOEM, EIEREN, water)"
+  // where the real ingredients are inside parentheses. We expand these.
+  const GENERIC_SECTIONS = new Set([
+    'deeg', 'vulling', 'saus', 'coating', 'glazuur', 'crème', 'creme',
+    'ragout', 'marinade', 'broodkruim', 'panering', 'topping', 'beleg',
+    'garnering', 'deksel', 'bodem', 'massa'
+  ])
+  
+  const ingredients = []
+  for (let i = 0; i < parts.length; i++) {
+    let part = parts[i]
+    if (!part) continue
+    
+    // Extract percentage: "13% tomaten" or "tomaten 13%" or "tomaten (13%)"
+    let percentage = null
+    const pctMatch = part.match(/(\d+[\.,]?\d*)\s*%/) 
+    if (pctMatch) {
+      percentage = parseFloat(pctMatch[1].replace(',', '.'))
+      part = part.replace(pctMatch[0], '').trim()
+    }
+    
+    // Check if this is a generic section with sub-ingredients in parentheses
+    // e.g. "Deeg (TARWEBLOEM, EIEREN, water)" → expand sub-ingredients
+    const parenMatch = part.match(/^(\w[\w\s-]*?)\s*\((.+)\)\s*$/)
+    if (parenMatch) {
+      const sectionName = parenMatch[1].trim().toLowerCase()
+      const subIngredientText = parenMatch[2]
+      
+      if (GENERIC_SECTIONS.has(sectionName)) {
+        // Expand: split sub-ingredients by comma and add them individually
+        const subParts = subIngredientText.split(',').map(s => s.trim()).filter(Boolean)
+        const sectionWeight = percentage || null
+        
+        for (let j = 0; j < subParts.length; j++) {
+          let subPart = subParts[j]
+          // Extract sub-percentage if any
+          let subPct = null
+          const subPctMatch = subPart.match(/(\d+[\.,]?\d*)\s*%/)
+          if (subPctMatch) {
+            subPct = parseFloat(subPctMatch[1].replace(',', '.'))
+            subPart = subPart.replace(subPctMatch[0], '').trim()
+          }
+          
+          const subName = subPart
+            .replace(/\([^)]*\)/g, '')
+            .replace(/\[[^\]]*\]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase()
+          
+          if (subName.length < 2) continue
+          
+          // If section had a percentage and sub-ingredient has one, combine
+          // Otherwise estimate based on position within section
+          let effectivePct = subPct
+          if (sectionWeight && !subPct) {
+            // Estimate: first sub-ingredient gets most of section weight
+            const decay = Math.pow(0.6, j)
+            effectivePct = null // Will be estimated by position later
+          }
+          
+          ingredients.push({
+            name: subName,
+            percentage: effectivePct,
+            position: ingredients.length
+          })
+        }
+        continue // Skip adding the generic section itself
+      }
+    }
+    
+    // Remove sub-ingredient parenthetical notes: "mozzarella (MELK, zout)" → "mozzarella"
+    const name = part
+      .replace(/\([^)]*\)/g, '')   // Remove parenthetical sub-ingredients
+      .replace(/\[[^\]]*\]/g, '')  // Remove bracketed notes
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+    
+    if (name.length < 2) continue  // Skip single-letter entries
+    
+    ingredients.push({
+      name,
+      percentage,
+      position: i  // 0-based position (first = most by weight)
+    })
+  }
+  
+  return ingredients
+}
+
+/**
+ * Estimate weight proportions for ingredients based on EU labeling rules.
+ * EU law: ingredients are listed in descending order by weight.
+ * If specific percentages are given, use those. Otherwise estimate using 
+ * a decreasing geometric series (each ingredient is ~60-70% of the previous).
+ * 
+ * @param {Array} ingredients - Parsed ingredients from parseIngredients()
+ * @returns {Array<{name: string, category: string|null, co2PerKg: number|null, weightFraction: number}>}
+ */
+function estimateIngredientWeights(ingredients) {
+  if (!ingredients || ingredients.length === 0) return []
+  
+  const n = ingredients.length
+  
+  // First pass: collect known percentages and match CO2 categories
+  const enriched = ingredients.map(ing => {
+    const category = getCO2Category(ing.name)
+    const co2PerKg = (category && category !== '__non_food__' && CO2_EMISSIONS_DATA[category]) 
+      ? CO2_EMISSIONS_DATA[category] 
+      : null
+    return {
+      ...ing,
+      category,
+      co2PerKg
+    }
+  })
+  
+  // Calculate weight fractions
+  // Strategy: use declared percentages where available, 
+  // then distribute remaining weight proportionally by position
+  let totalDeclared = 0
+  for (const ing of enriched) {
+    if (ing.percentage != null) {
+      totalDeclared += ing.percentage
+    }
+  }
+  
+  // Use a geometric decay for undeclared ingredients (ratio ~0.65)
+  // First ingredient gets the most weight, each subsequent gets less
+  const DECAY = 0.65
+  const undeclaredIngredients = enriched.filter(ing => ing.percentage == null)
+  const remainingWeight = Math.max(0, 100 - totalDeclared)
+  
+  // Calculate geometric weights for undeclared ingredients
+  let geometricTotal = 0
+  const geometricWeights = []
+  for (let i = 0; i < undeclaredIngredients.length; i++) {
+    const w = Math.pow(DECAY, i)
+    geometricWeights.push(w)
+    geometricTotal += w
+  }
+  
+  // Assign weight fractions
+  let undeclaredIdx = 0
+  return enriched.map(ing => {
+    let weightFraction
+    if (ing.percentage != null) {
+      weightFraction = ing.percentage / 100
+    } else {
+      weightFraction = geometricTotal > 0 
+        ? (geometricWeights[undeclaredIdx] / geometricTotal) * (remainingWeight / 100)
+        : 0
+      undeclaredIdx++
+    }
+    return {
+      ...ing,
+      weightFraction
+    }
+  })
+}
+
+/**
+ * Calculate a weighted-average CO2/kg from an ingredient list.
+ * Only considers the top N ingredients (default 10) for efficiency and relevance.
+ * 
+ * @param {string} ingredientText - Raw ingredient text from the product page
+ * @param {number} maxIngredients - Max ingredients to consider (default 10)
+ * @returns {Object} - { co2PerKg, category, matched, method: 'ingredients', ingredients: [...] }
+ */
+function getCO2FromIngredients(ingredientText, maxIngredients = 10) {
+  const parsed = parseIngredients(ingredientText)
+  if (parsed.length === 0) {
+    return { co2PerKg: null, category: null, matched: false, method: 'ingredients' }
+  }
+  
+  // Only use top N ingredients (most important by weight)
+  const topIngredients = parsed.slice(0, maxIngredients)
+  const weighted = estimateIngredientWeights(topIngredients)
+  
+  // Calculate weighted average CO2
+  let totalCO2 = 0
+  let totalWeight = 0
+  let dominantCategory = null
+  let dominantWeight = 0
+  
+  for (const ing of weighted) {
+    if (ing.co2PerKg != null && ing.weightFraction > 0) {
+      totalCO2 += ing.co2PerKg * ing.weightFraction
+      totalWeight += ing.weightFraction
+      
+      // Track the category with highest weight contribution
+      if (ing.weightFraction > dominantWeight) {
+        dominantWeight = ing.weightFraction
+        dominantCategory = ing.category
+      }
+    }
+  }
+  
+  if (totalWeight === 0) {
+    return { co2PerKg: null, category: null, matched: false, method: 'ingredients' }
+  }
+  
+  // Weighted average (normalize by matched weight, not total)
+  const avgCO2 = totalCO2 / totalWeight
+  
+  return {
+    co2PerKg: Math.round(avgCO2 * 100) / 100,
+    category: dominantCategory, // Report the dominant ingredient's category
+    matched: true,
+    method: 'ingredients',
+    ingredientBreakdown: weighted
+      .filter(i => i.co2PerKg != null)
+      .map(i => ({
+        name: i.name,
+        category: i.category,
+        co2PerKg: i.co2PerKg,
+        weightFraction: Math.round(i.weightFraction * 1000) / 1000
+      })),
+    matchedIngredients: weighted.filter(i => i.co2PerKg != null).length,
+    totalIngredients: weighted.length
+  }
+}
+
+/**
+ * Get CO2 emissions for a product - with ingredient-based fallback/override.
+ * Priority: 
+ *   1. If ingredients are available → use weighted ingredient analysis
+ *   2. Otherwise → use product name keyword matching
+ * 
+ * @param {string} productName - Product name
+ * @param {string|null} ingredientText - Optional ingredient list text
+ * @returns {Object} - { co2PerKg, category, matched, method }
+ */
+function getCO2Emissions(productName, ingredientText = null) {
+  // First: exclude non-food items by name
+  if (isNonFood(productName)) {
     return {
       co2PerKg: null,
       category: '__non_food__',
       matched: false,
-      isNonFood: true
+      isNonFood: true,
+      method: 'non_food'
     }
   }
+  
+  // Try ingredient-based scoring first (most accurate)
+  if (ingredientText && typeof ingredientText === 'string' && ingredientText.length > 5) {
+    const ingredientResult = getCO2FromIngredients(ingredientText)
+    if (ingredientResult.matched) {
+      return {
+        ...ingredientResult,
+        isNonFood: false
+      }
+    }
+  }
+  
+  // Fall back to product name matching
+  const category = getCO2Category(productName)
   
   if (!category || !CO2_EMISSIONS_DATA[category]) {
     return {
       co2PerKg: null,
       category: null,
       matched: false,
-      isNonFood: false
+      isNonFood: false,
+      method: 'name'
     }
   }
   
@@ -777,7 +1083,8 @@ function getCO2Emissions(productName) {
     co2PerKg: CO2_EMISSIONS_DATA[category],
     category,
     matched: true,
-    isNonFood: false
+    isNonFood: false,
+    method: 'name'
   }
 }
 
@@ -843,7 +1150,7 @@ const CATEGORY_LABELS = {
   'other_pulses': 'Peulvruchten',
   'peas': 'Erwten',
   'nuts': 'Noten',
-  'tofu': 'Tofu & Tempeh',
+  'tofu': 'Tofu & Plantaardig',
   'berries_grapes': 'Bessen & Druiven',
   'citrus_fruit': 'Citrusfruit',
   'bananas': 'Bananen',
@@ -887,11 +1194,12 @@ function getCategoryLabel(category) {
 /**
  * Full evaluation of a product's CO2 footprint
  * @param {string} productName - Product name
- * @param {Object} enrichedData - Optional enriched data with is_vegan, is_organic, etc.
+ * @param {Object} enrichedData - Optional enriched data with is_vegan, is_organic, ingredients, etc.
  * @returns {Object} - Full evaluation result
  */
 function evaluateProductCO2(productName, enrichedData = null) {
-  const co2Data = getCO2Emissions(productName)
+  const ingredientText = enrichedData?.ingredients || null
+  const co2Data = getCO2Emissions(productName, ingredientText)
   const score = co2ToScore(co2Data.co2PerKg)
   const rating = getCO2Rating(score)
   
@@ -1002,6 +1310,8 @@ export {
   CATEGORY_DEFAULT_WEIGHTS,
   getCO2Category,
   getCO2Emissions,
+  getCO2FromIngredients,
+  parseIngredients,
   co2ToScore,
   getCO2Rating,
   getCategoryLabel,
