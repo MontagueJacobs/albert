@@ -1014,6 +1014,20 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
     }
   }
   
+  // Propagate descending order through ceilings:
+  // Each undeclared ingredient's ceiling ≤ previous ingredient's ceiling.
+  // This ensures the iterative allocation respects EU ordering law AND
+  // nutritional caps propagate forward (e.g., oil capped at 1.5% means
+  // everything after oil is also ≤ 1.5%).
+  for (let i = 1; i < enriched.length; i++) {
+    if (enriched[i].percentage == null) {
+      const prevCeiling = enriched[i - 1].percentage != null 
+        ? enriched[i - 1].percentage 
+        : ceilings[i - 1]
+      ceilings[i] = Math.min(ceilings[i], prevCeiling)
+    }
+  }
+  
   // Calculate weight fractions
   let totalDeclared = 0
   for (const ing of enriched) {
@@ -1024,8 +1038,9 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
   
   const remainingWeight = Math.max(0, 100 - totalDeclared)
   
-  // Assign undeclared ingredients using geometric decay, but capped by ceilings
-  // First, compute raw geometric weights for undeclared ingredients
+  // Assign undeclared ingredients using iterative geometric decay with capping.
+  // When a cap reduces an ingredient's share, the excess flows back to uncapped
+  // ingredients (especially the first/largest ones like water).
   const DECAY = 0.65
   const undeclaredIndices = []
   for (let i = 0; i < enriched.length; i++) {
@@ -1034,45 +1049,61 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
     }
   }
   
-  // Assign raw geometric weights, then cap and redistribute
   const rawWeights = new Array(n).fill(0)
   
-  // Initial geometric assignment for undeclared ingredients
-  let geoWeights = []
-  for (let j = 0; j < undeclaredIndices.length; j++) {
-    geoWeights.push(Math.pow(DECAY, j))
-  }
-  const geoTotal = geoWeights.reduce((s, w) => s + w, 0)
-  
-  // Scale to fit remaining weight, then apply ceilings
-  for (let j = 0; j < undeclaredIndices.length; j++) {
-    const idx = undeclaredIndices[j]
-    let weight = geoTotal > 0 ? (geoWeights[j] / geoTotal) * remainingWeight : 0
-    // Apply ceiling constraint
-    weight = Math.min(weight, ceilings[idx])
-    rawWeights[idx] = weight
-  }
-  
-  // Set declared ingredients
+  // Set declared ingredients first
   for (let i = 0; i < enriched.length; i++) {
     if (enriched[i].percentage != null) {
       rawWeights[i] = enriched[i].percentage
     }
   }
   
-  // Enforce descending order: each undeclared ingredient ≤ previous ingredient
-  for (let i = 1; i < n; i++) {
-    if (enriched[i].percentage == null && rawWeights[i] > rawWeights[i - 1]) {
-      rawWeights[i] = rawWeights[i - 1]
+  // Iterative allocation: distribute remaining weight using geometric decay,
+  // cap at ceilings, redistribute excess. Converges in a few iterations.
+  const allocated = new Array(undeclaredIndices.length).fill(0)
+  const fixed = new Array(undeclaredIndices.length).fill(false) // true if hit cap
+  let budget = remainingWeight
+  
+  for (let iter = 0; iter < 10 && budget > 0.01; iter++) {
+    // Compute geometric weights for unfixed ingredients
+    const unfixedJs = []
+    for (let j = 0; j < undeclaredIndices.length; j++) {
+      if (!fixed[j]) unfixedJs.push(j)
     }
+    if (unfixedJs.length === 0) break
+    
+    // Use original list position (j) for decay to respect ingredient ordering
+    const geoW = unfixedJs.map(j => Math.pow(DECAY, j))
+    const geoT = geoW.reduce((s, w) => s + w, 0)
+    
+    let excess = 0
+    for (let k = 0; k < unfixedJs.length; k++) {
+      const j = unfixedJs[k]
+      const idx = undeclaredIndices[j]
+      const share = geoT > 0 ? (geoW[k] / geoT) * budget : 0
+      const maxAllowed = ceilings[idx]
+      
+      if (allocated[j] + share > maxAllowed) {
+        excess += (allocated[j] + share) - maxAllowed
+        allocated[j] = maxAllowed
+        fixed[j] = true
+      } else {
+        allocated[j] += share
+      }
+    }
+    budget = excess
   }
   
-  // Normalize to sum to ≤ 100%
-  const totalRaw = rawWeights.reduce((s, w) => s + w, 0)
+  // Write allocated values to rawWeights
+  for (let j = 0; j < undeclaredIndices.length; j++) {
+    rawWeights[undeclaredIndices[j]] = allocated[j]
+  }
   
+  // Convert raw percentages to fractions (0-1 scale)
+  // Don't normalize — declared percentages stay exactly as declared
   return enriched.map((ing, i) => ({
     ...ing,
-    weightFraction: totalRaw > 0 ? rawWeights[i] / totalRaw : 0
+    weightFraction: rawWeights[i] / 100
   }))
 }
 
