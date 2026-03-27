@@ -334,11 +334,40 @@ function Dashboard({ syncVersion }) {
 
         <div className="stat-card">
           <h3>
+            <Leaf size={18} style={{ display: 'inline', marginRight: '5px' }} />
+            {t('avg_co2_per_kg')}
+          </h3>
+          <div className="value">
+            {insights.avg_co2_per_kg != null 
+              ? <>{insights.avg_co2_per_kg.toFixed(2)} <span style={{ fontSize: '0.7em', color: 'var(--text-muted)' }}>kg CO₂/kg</span></>
+              : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <h3>
             <DollarSign size={18} style={{ display: 'inline', marginRight: '5px' }} />
             {t('total_spent')}
           </h3>
           <div className="value">€{(insights.total_spent || 0).toFixed(2)}</div>
         </div>
+
+        {insights.total_co2_kg != null && (
+          <div className="stat-card">
+            <h3>
+              <TrendingUp size={18} style={{ display: 'inline', marginRight: '5px' }} />
+              {t('total_co2')}
+            </h3>
+            <div className="value">
+              {insights.total_co2_kg.toFixed(1)} <span style={{ fontSize: '0.7em', color: 'var(--text-muted)' }}>kg CO₂</span>
+            </div>
+            {insights.total_weight_kg != null && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                ~{insights.total_weight_kg.toFixed(1)} kg {t('total_food_weight')}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="stat-card">
           <h3>

@@ -61,6 +61,9 @@ const TRANSLATIONS = {
     ],
     total_purchases: 'Totaal aankopen',
     avg_score_label: 'Gem. CO₂ score',
+    avg_co2_per_kg: 'Gem. CO₂/kg',
+    total_co2: 'Totale CO₂',
+    total_food_weight: 'voedsel',
     total_spent: 'Totaal uitgegeven',
     your_rating: 'Je CO₂ rating',
     // Baseline comparison
@@ -359,6 +362,9 @@ const TRANSLATIONS = {
     ],
     total_purchases: 'Total purchases',
     avg_score_label: 'Avg CO₂ score',
+    avg_co2_per_kg: 'Avg CO₂/kg',
+    total_co2: 'Total CO₂',
+    total_food_weight: 'food',
     total_spent: 'Total spent',
     your_rating: 'Your CO₂ rating',
     // Baseline comparison

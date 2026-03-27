@@ -639,17 +639,45 @@ class AHProductDetailScraper:
             ]
             
             try:
-                # Look in title first
-                title_elem = await self.page.query_selector('h1')
-                if title_elem:
-                    title = await title_elem.inner_text()
-                    for pattern in unit_patterns:
-                        match = re.search(pattern, title, re.IGNORECASE)
-                        if match:
-                            result['unit_size'] = match.group(1).strip()
-                            break
-            except:
-                pass
+                # Primary method: look in the "Inhoud en gewicht" section
+                # AH uses data-testid="pdp-content-and-weight-contents" for weight info
+                weight_elem = await self.page.query_selector('[data-testid="pdp-content-and-weight-contents"]')
+                if weight_elem:
+                    weight_text = await weight_elem.inner_text()
+                    print(f"[DEBUG] Found weight section: {weight_text[:100]}", flush=True)
+                    # Look for explicit netto inhoud / net weight patterns
+                    netto_match = re.search(
+                        r'(?:netto\s*inhoud|inhoud|volume|gewicht)[:\s]*(\d+(?:[,.]\d+)?\s*(?:g|kg|ml|l|cl|dl))',
+                        weight_text, re.IGNORECASE
+                    )
+                    if netto_match:
+                        result['unit_size'] = netto_match.group(1).strip()
+                        print(f"[DEBUG] Extracted unit_size from weight section: {result['unit_size']}", flush=True)
+                    else:
+                        # Fall back to general unit pattern in the weight section text
+                        for pattern in unit_patterns:
+                            match = re.search(pattern, weight_text, re.IGNORECASE)
+                            if match:
+                                result['unit_size'] = match.group(1).strip()
+                                print(f"[DEBUG] Extracted unit_size from weight section (fallback): {result['unit_size']}", flush=True)
+                                break
+            except Exception as e:
+                print(f"[WARN] Weight section extraction failed: {e}", flush=True)
+            
+            # Fallback: look in title if weight section didn't yield results
+            if not result['unit_size']:
+                try:
+                    title_elem = await self.page.query_selector('h1')
+                    if title_elem:
+                        title = await title_elem.inner_text()
+                        for pattern in unit_patterns:
+                            match = re.search(pattern, title, re.IGNORECASE)
+                            if match:
+                                result['unit_size'] = match.group(1).strip()
+                                print(f"[DEBUG] Extracted unit_size from title: {result['unit_size']}", flush=True)
+                                break
+                except:
+                    pass
                 
             # ================================================================
             # Extract Allergens

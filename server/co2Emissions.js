@@ -77,6 +77,150 @@ const DIETARY_BASELINES = {
   }
 }
 
+/**
+ * Parse a unit_size string (e.g. "500 g", "1.5 l", "150 ml", "2 stuks") into grams.
+ * For liquids, assumes ~1 g/ml density (reasonable for beverages, milk, juice, sauces).
+ * Returns null if parsing fails.
+ * @param {string} unitSize - e.g. "500 g", "1,5 kg", "750 ml", "1 l", "2 stuks"
+ * @returns {number|null} - weight in grams, or null
+ */
+function parseWeightGrams(unitSize) {
+  if (!unitSize || typeof unitSize !== 'string') return null
+  
+  const s = unitSize.trim().toLowerCase().replace(',', '.')
+  
+  // Match number + unit patterns
+  const match = s.match(/(\d+(?:\.\d+)?)\s*(kg|g|l|ml|cl|dl|stuks?|st)\b/)
+  if (!match) return null
+  
+  const value = parseFloat(match[1])
+  const unit = match[2]
+  
+  if (isNaN(value) || value <= 0) return null
+  
+  switch (unit) {
+    case 'kg': return value * 1000
+    case 'g': return value
+    case 'l': return value * 1000    // ~1g/ml for most food liquids
+    case 'dl': return value * 100
+    case 'cl': return value * 10
+    case 'ml': return value
+    case 'stuk':
+    case 'stuks':
+    case 'st':
+      return null  // Can't determine weight from piece count alone
+    default:
+      return null
+  }
+}
+
+/**
+ * Default weights (in grams) per CO2 category.
+ * Used when a product has no unit_size data (e.g., unpackaged fresh produce).
+ * Values represent a typical single-purchase unit at a Dutch supermarket.
+ */
+const CATEGORY_DEFAULT_WEIGHTS = {
+  // Fresh produce (sold loose or in small packs)
+  'tomatoes': 500,
+  'onions_leeks': 500,
+  'root_vegetables': 500,
+  'brassicas': 500,
+  'other_vegetables': 300,
+  'citrus_fruit': 500,
+  'apples': 500,
+  'bananas': 500,
+  'berries_grapes': 300,
+  'other_fruit': 300,
+  'potatoes': 1000,
+  
+  // Meat (typical portions)
+  'beef_herd': 400,
+  'beef_dairy': 400,
+  'lamb_mutton': 400,
+  'pig_meat': 500,
+  'poultry_meat': 500,
+  
+  // Seafood
+  'shrimps_farmed': 200,
+  'fish_farmed': 300,
+  
+  // Dairy
+  'cheese': 400,
+  'milk': 1000,         // 1L
+  'eggs': 600,          // 10 stuks
+  
+  // Oils
+  'olive_oil': 500,
+  'sunflower_oil': 1000,
+  'rapeseed_oil': 1000,
+  'soybean_oil': 1000,
+  'palm_oil': 500,
+  
+  // Grains/cereals
+  'rice': 1000,
+  'wheat_rye': 800,     // bread
+  'oatmeal': 500,
+  'maize': 500,
+  'barley': 500,
+  
+  // Legumes/nuts
+  'tofu': 400,
+  'peas': 450,
+  'other_pulses': 400,
+  'groundnuts': 250,
+  'nuts': 200,
+  'soymilk': 1000,
+  
+  // Sugars
+  'cane_sugar': 1000,
+  'beet_sugar': 1000,
+  'dark_chocolate': 200,
+  
+  // Beverages
+  'coffee': 500,
+  'wine': 750,
+  'beer': 500,          // single or half-liter can
+  'spirits': 700,
+  'tea': 100,
+  'soft_drinks': 1500,
+  
+  // Processed
+  'sauces_condiments': 500,
+  'ready_meals': 400,
+  'soup': 500,
+  'candy_sweets': 300,
+  'ice_cream': 500,
+  'baked_goods': 400,
+  'desserts': 400,
+  'spreads': 400,
+  'snacks': 250,
+  'baby_food': 400
+}
+
+/**
+ * Get the weight in grams for a product, using:
+ * 1. Parsed unit_size from product data (most accurate)
+ * 2. Category default weight (fallback for loose produce etc.)
+ * @param {string|null} unitSize - unit_size string from DB, e.g. "500 g"
+ * @param {string|null} co2Category - matched CO2 category key
+ * @returns {{ weightGrams: number|null, source: string }}
+ */
+function getProductWeight(unitSize, co2Category) {
+  // Try parsing the unit_size first
+  const parsed = parseWeightGrams(unitSize)
+  if (parsed !== null) {
+    return { weightGrams: parsed, source: 'unit_size' }
+  }
+  
+  // Fall back to category default
+  if (co2Category && CATEGORY_DEFAULT_WEIGHTS[co2Category]) {
+    return { weightGrams: CATEGORY_DEFAULT_WEIGHTS[co2Category], source: 'category_default' }
+  }
+  
+  // No weight data at all — use a generic fallback (400g ≈ average grocery item)
+  return { weightGrams: 400, source: 'generic_default' }
+}
+
 // CO2 emissions data (kg CO2 eq per kg of food)
 // Sourced from Our World in Data 2018 global averages
 const CO2_EMISSIONS_DATA = {
@@ -816,6 +960,7 @@ export {
   CATEGORY_LABELS,
   NON_FOOD_KEYWORDS,
   DIETARY_BASELINES,
+  CATEGORY_DEFAULT_WEIGHTS,
   getCO2Category,
   getCO2Emissions,
   co2ToScore,
@@ -823,5 +968,7 @@ export {
   getCategoryLabel,
   evaluateProductCO2,
   isNonFood,
-  compareToBaseline
+  compareToBaseline,
+  parseWeightGrams,
+  getProductWeight
 }

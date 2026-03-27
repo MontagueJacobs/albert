@@ -29,7 +29,8 @@ import {
   evaluateProductCO2,
   isNonFood,
   compareToBaseline,
-  DIETARY_BASELINES
+  DIETARY_BASELINES,
+  getProductWeight
 } from './co2Emissions.js'
 
 // Ensure .env is loaded from the webapp root regardless of cwd
@@ -1655,7 +1656,7 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
     if (productIds.length > 0) {
       const { data: products } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, nutri_score')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, nutri_score, unit_size')
         .in('id', productIds)
       if (products) {
         productsMap = new Map(products.map(p => [p.id, p]))
@@ -1667,22 +1668,34 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
       const product = productsMap.get(p.product_id)
       const enrichedData = product ? getEnrichedData(product) : null
       const evaluation = evaluateProduct(p.product_name, enrichedData)
+      const weight = getProductWeight(product?.unit_size, evaluation.co2Category)
       return {
         ...p,
         sustainability_score: evaluation.score,
         co2PerKg: evaluation.co2PerKg,
-        isNonFood: evaluation.isNonFood || false
+        co2Category: evaluation.co2Category,
+        isNonFood: evaluation.isNonFood || false,
+        weightGrams: weight.weightGrams,
+        weightSource: weight.source
       }
     })
     
     const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
     const avgScore = totalScore / purchasesWithScores.length
     
-    // Calculate average CO2/kg (only for food items with matched CO2 data)
+    // Calculate WEIGHT-WEIGHTED average CO2/kg (only for food items with matched CO2 data)
+    // Formula: sum(co2PerKg_i * weight_i) / sum(weight_i)
     const foodItems = purchasesWithScores.filter(p => !p.isNonFood && p.co2PerKg != null)
-    const avgCO2PerKg = foodItems.length > 0
-      ? foodItems.reduce((sum, p) => sum + p.co2PerKg, 0) / foodItems.length
-      : null
+    let avgCO2PerKg = null
+    let totalWeightKg = null
+    let totalCO2 = null
+    if (foodItems.length > 0) {
+      const sumWeightedCO2 = foodItems.reduce((sum, p) => sum + (p.co2PerKg * (p.weightGrams || 400)), 0)
+      const sumWeight = foodItems.reduce((sum, p) => sum + (p.weightGrams || 400), 0)
+      avgCO2PerKg = sumWeightedCO2 / sumWeight
+      totalWeightKg = sumWeight / 1000
+      totalCO2 = sumWeightedCO2 / 1000  // total kg CO2 for all items
+    }
     
     const best = purchasesWithScores.reduce((max, p) => 
       ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
@@ -1700,6 +1713,8 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
       worst_purchase: worst.product_name,
       total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
       avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
+      total_co2_kg: totalCO2 ? Math.round(totalCO2 * 100) / 100 : null,
+      total_weight_kg: totalWeightKg ? Math.round(totalWeightKg * 100) / 100 : null,
       food_items_matched: foodItems.length,
       baseline_comparison: baselineComparison
     })
@@ -2211,7 +2226,7 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     if (productIds.length > 0) {
       const { data: products, error: prodError } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, price')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, price, unit_size')
         .in('id', productIds)
       
       if (prodError) {
@@ -2234,24 +2249,36 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
         origin_by_month: product.origin_by_month
       } : null
       const evaluation = evaluateProduct(p.product_name, enrichedData)
+      const weight = getProductWeight(product?.unit_size, evaluation.co2Category)
       return {
         ...p,
         // Use purchase price, fall back to product price if null
         price: p.price ?? product?.price ?? null,
         sustainability_score: evaluation.score,
         co2PerKg: evaluation.co2PerKg,
-        isNonFood: evaluation.isNonFood || false
+        co2Category: evaluation.co2Category,
+        isNonFood: evaluation.isNonFood || false,
+        weightGrams: weight.weightGrams,
+        weightSource: weight.source
       }
     })
     
     const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
     const avgScore = totalScore / purchasesWithScores.length
     
-    // Calculate average CO2/kg (only for food items with matched CO2 data)
+    // Calculate WEIGHT-WEIGHTED average CO2/kg (only for food items with matched CO2 data)
+    // Formula: sum(co2PerKg_i * weight_i) / sum(weight_i)
     const foodItems = purchasesWithScores.filter(p => !p.isNonFood && p.co2PerKg != null)
-    const avgCO2PerKg = foodItems.length > 0
-      ? foodItems.reduce((sum, p) => sum + p.co2PerKg, 0) / foodItems.length
-      : null
+    let avgCO2PerKg = null
+    let totalWeightKg = null
+    let totalCO2 = null
+    if (foodItems.length > 0) {
+      const sumWeightedCO2 = foodItems.reduce((sum, p) => sum + (p.co2PerKg * (p.weightGrams || 400)), 0)
+      const sumWeight = foodItems.reduce((sum, p) => sum + (p.weightGrams || 400), 0)
+      avgCO2PerKg = sumWeightedCO2 / sumWeight
+      totalWeightKg = sumWeight / 1000
+      totalCO2 = sumWeightedCO2 / 1000  // total kg CO2 for all items
+    }
     
     const best = purchasesWithScores.reduce((max, p) => 
       ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
@@ -2270,6 +2297,8 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       worst_purchase: worst.product_name,
       total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
       avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
+      total_co2_kg: totalCO2 ? Math.round(totalCO2 * 100) / 100 : null,
+      total_weight_kg: totalWeightKg ? Math.round(totalWeightKg * 100) / 100 : null,
       food_items_matched: foodItems.length,
       baseline_comparison: baselineComparison
     })
