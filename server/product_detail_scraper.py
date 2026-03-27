@@ -179,6 +179,7 @@ class AHProductDetailScraper:
             'image_url': None,  # Product image URL
             'allergens': [],
             'ingredients': None,
+            'nutrition_text': None,
             'error': None,
             'scraped_at': datetime.now().isoformat()
         }
@@ -809,6 +810,37 @@ class AHProductDetailScraper:
                         ingredients_raw = re.sub(r'\s+', ' ', ingredients_raw).strip()
                         if len(ingredients_raw) > 10:
                             result['ingredients'] = ingredients_raw[:2000]  # Limit length
+                        break
+            
+            # ================================================================
+            # Extract Voedingswaarde (Nutritional info) for CO2 weight estimation
+            # We need fat and salt values to cap ingredient weight estimates.
+            # ================================================================
+            try:
+                # Try to find a voedingswaarde/nutrition section by selector
+                nutrition_elem = await self.page.query_selector(
+                    '[class*="nutrition"], [class*="voedingswaarde"], '
+                    '[itemprop="nutrition"], [data-testhook*="nutrition"]'
+                )
+                if nutrition_elem:
+                    result['nutrition_text'] = (await nutrition_elem.inner_text()).strip()[:1000]
+            except:
+                pass
+            
+            # Fallback: extract from page content using regex
+            if not result.get('nutrition_text'):
+                nutrition_patterns = [
+                    r'voedingswaarde\s*(?:per\s+\d+\s*(?:g|ml))?\s*(.+?)(?=ingredi[ëe]nten|allergi|bewaar|bereid|$)',
+                    r'voedingswaarde\s*(.+?)(?=<)',
+                ]
+                for pattern in nutrition_patterns:
+                    match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+                    if match:
+                        nutrition_raw = match.group(0).strip()
+                        nutrition_raw = re.sub(r'<[^>]+>', ' ', nutrition_raw)
+                        nutrition_raw = re.sub(r'\s+', ' ', nutrition_raw).strip()
+                        if len(nutrition_raw) > 20:
+                            result['nutrition_text'] = nutrition_raw[:1000]
                         break
             
             # ================================================================

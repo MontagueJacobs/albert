@@ -829,6 +829,17 @@ function parseIngredients(ingredientText) {
     .replace(/\s*\.?\s*waarvan toegevoegde\b.*/si, '')
     .trim()
   
+  // Remove product claims that aren't ingredients:
+  // "Vrij van melk en soja" (Free from milk and soy)
+  // "*Van biologische landbouw" (From organic agriculture)
+  // "**Op basis van ..." footnotes
+  text = text
+    .replace(/\s*\.?\s*vrij van\b.*/si, '')  // "Vrij van melk en soja."
+    .replace(/\s*\.?\s*\*+\s*van\s+(biologische|duurzame|gecertificeerde)\b.*/si, '') // "*Van biologische landbouw"
+    .replace(/\s*\.?\s*\*+\s*[A-Z].*/s, '')  // Generic footnote markers "*From..."
+    .replace(/\s*\.?\s*bevat geen\b.*/si, '')  // "Bevat geen ..."
+    .trim()
+  
   // Remove trailing period
   text = text.replace(/\.\s*$/, '')
   
@@ -929,6 +940,7 @@ function parseIngredients(ingredientText) {
     const name = part
       .replace(/\([^)]*\)/g, '')   // Remove parenthetical sub-ingredients
       .replace(/\[[^\]]*\]/g, '')  // Remove bracketed notes
+      .replace(/[*#†‡§]+/g, '')   // Remove footnote markers: "HAVER*" → "HAVER"
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase()
@@ -993,8 +1005,37 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
   // Oil/fat ingredients can't exceed the total fat content
   // Salt can't exceed the declared salt content
   const OIL_CATEGORIES = new Set(['olive_oil', 'rapeseed_oil', 'sunflower_oil', 'soybean_oil', 'palm_oil'])
-  const OIL_KEYWORDS = ['olie', 'oil', 'vet', 'fat', 'boter', 'butter']
-  const SALT_KEYWORDS = ['zout', 'salt', 'zeezout', 'joodzout']
+  const OIL_KEYWORDS = ['olie', 'oil', 'boter', 'butter', 'margarine']
+  const SALT_KEYWORDS = ['zout', 'salt', 'zeezout', 'joodzout', 'natriumchloride']
+  
+  // Trace ingredients: always present in tiny amounts (< 2%), regardless of product
+  // These get a hard ceiling even without nutritional data
+  const TRACE_KEYWORDS = [
+    'vitamine', 'vitamin', 'riboflavine', 'thiamine', 'niacine', 'foliumzuur',
+    'kaliumjodide', 'niacinamide', 'pyridoxine', 'cobalamine', 'biotine',
+    'aroma', 'kleurstof', 'emulgator', 'verdikkingsmiddel', 'stabilisator',
+    'antioxidant', 'conserveermiddel', 'zuurteregelaar', 'gist',
+    'lecithine', 'pectine', 'carrageen', 'xanthaangom', 'guargom',
+    'e1', 'e2', 'e3', 'e4', 'e5',  // E-numbers
+  ]
+  const SALT_MAX_DEFAULT = 3  // Salt is rarely > 3% in any food
+  const TRACE_MAX = 2         // Trace ingredients are always < 2%
+  
+  // Apply trace-ingredient caps (these work even without nutritional data)
+  for (let i = 0; i < enriched.length; i++) {
+    if (enriched[i].percentage != null) continue // Skip declared percentages
+    const lower = enriched[i].name.toLowerCase()
+    
+    // Cap salt at SALT_MAX_DEFAULT (unless nutritional data gives a tighter bound)
+    if (SALT_KEYWORDS.some(k => lower.includes(k))) {
+      ceilings[i] = Math.min(ceilings[i], SALT_MAX_DEFAULT)
+    }
+    
+    // Cap trace ingredients 
+    if (TRACE_KEYWORDS.some(k => lower.includes(k))) {
+      ceilings[i] = Math.min(ceilings[i], TRACE_MAX)
+    }
+  }
   
   if (nutritionHints) {
     for (let i = 0; i < enriched.length; i++) {
@@ -1005,7 +1046,7 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
           ceilings[i] = Math.min(ceilings[i], nutritionHints.fatPct)
         }
       }
-      // Cap salt at declared salt percentage
+      // Cap salt at declared salt percentage (tighter than default)
       if (nutritionHints.saltPct != null) {
         if (SALT_KEYWORDS.some(k => lower.includes(k))) {
           ceilings[i] = Math.min(ceilings[i], nutritionHints.saltPct)
@@ -1117,8 +1158,8 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
 function extractNutritionHints(text) {
   if (!text) return null
   
-  // Find the "Voedingswaarde" section
-  const voedingMatch = text.match(/voedingswaarde/i)
+  // Find the "Voedingswaarde" / "Nutritional" / "Nutrition" section
+  const voedingMatch = text.match(/voedingswaarde|nutrition/i)
   if (!voedingMatch) return null
   
   // Extract from the voedingswaarde section onwards
@@ -1153,9 +1194,10 @@ function extractNutritionHints(text) {
  * @param {number} maxIngredients - Max ingredients to consider (default 10)
  * @returns {Object} - { co2PerKg, category, matched, method: 'ingredients', ingredients: [...] }
  */
-function getCO2FromIngredients(ingredientText, maxIngredients = 10) {
-  // Extract nutritional hints BEFORE parsing strips the voedingswaarde section
-  const nutritionHints = extractNutritionHints(ingredientText)
+function getCO2FromIngredients(ingredientText, nutritionText = null, maxIngredients = 10) {
+  // Extract nutritional hints from dedicated nutrition text field, OR from
+  // the ingredient text itself (some scraped text includes voedingswaarde)
+  const nutritionHints = extractNutritionHints(nutritionText) || extractNutritionHints(ingredientText)
   
   const parsed = parseIngredients(ingredientText)
   if (parsed.length === 0) {
@@ -1236,7 +1278,7 @@ const NAME_OVERRIDE_CATEGORIES = new Set([
   'cheese',                         // Aging, high milk-to-cheese ratio
 ])
 
-function getCO2Emissions(productName, ingredientText = null) {
+function getCO2Emissions(productName, ingredientText = null, nutritionText = null) {
   // First: exclude non-food items by name
   if (isNonFood(productName)) {
     return {
@@ -1263,7 +1305,7 @@ function getCO2Emissions(productName, ingredientText = null) {
   
   // Try ingredient-based scoring (most accurate for composite products)
   if (ingredientText && typeof ingredientText === 'string' && ingredientText.length > 5) {
-    const ingredientResult = getCO2FromIngredients(ingredientText)
+    const ingredientResult = getCO2FromIngredients(ingredientText, nutritionText)
     if (ingredientResult.matched) {
       return {
         ...ingredientResult,
