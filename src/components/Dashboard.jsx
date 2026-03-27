@@ -351,6 +351,90 @@ function Dashboard({ syncVersion }) {
         </div>
       </div>
 
+      {/* CO2 Baseline Comparison */}
+      {insights.baseline_comparison && (
+        <div style={{
+          ...styles.card,
+          background: insights.baseline_comparison.percentBetter >= 0
+            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(16, 185, 129, 0.04))'
+            : 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(220, 38, 38, 0.04))',
+          border: `1px solid ${insights.baseline_comparison.percentBetter >= 0 ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+        }}>
+          <h3 style={styles.heading}>
+            🇳🇱 {t('baseline_title')}
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'center' }}>
+            {/* User vs Baseline visual */}
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: insights.baseline_comparison.percentBetter >= 0 ? '#22c55e' : '#ef4444' }}>
+                {insights.baseline_comparison.percentBetter >= 0 ? '↓' : '↑'} {Math.abs(insights.baseline_comparison.percentBetter)}%
+              </div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                {insights.baseline_comparison.percentBetter >= 0 
+                  ? t('baseline_better')
+                  : t('baseline_worse')}
+              </div>
+            </div>
+            
+            {/* CO2/kg comparison bars */}
+            <div>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                  <span>{t('baseline_you')}</span>
+                  <span>{insights.baseline_comparison.userAvgCO2PerKg?.toFixed(2)} kg CO₂/kg</span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.min(100, (insights.baseline_comparison.userAvgCO2PerKg / Math.max(insights.baseline_comparison.baseline, insights.baseline_comparison.userAvgCO2PerKg)) * 100)}%`,
+                    height: '100%',
+                    background: insights.baseline_comparison.percentBetter >= 0 ? '#22c55e' : '#ef4444',
+                    borderRadius: '4px',
+                    transition: 'width 0.5s ease'
+                  }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                  <span>{t('baseline_avg_nl')}</span>
+                  <span>{insights.baseline_comparison.baseline?.toFixed(2)} kg CO₂/kg</span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.min(100, (insights.baseline_comparison.baseline / Math.max(insights.baseline_comparison.baseline, insights.baseline_comparison.userAvgCO2PerKg)) * 100)}%`,
+                    height: '100%',
+                    background: '#6b7280',
+                    borderRadius: '4px',
+                    transition: 'width 0.5s ease'
+                  }} />
+                </div>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'right' }}>
+                {t('baseline_source')}
+              </div>
+            </div>
+          </div>
+          
+          {/* Annual projection */}
+          {insights.baseline_comparison.userProjectedAnnual && (
+            <div style={{ 
+              marginTop: '1rem', 
+              paddingTop: '0.75rem', 
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: '0.85rem',
+              color: 'var(--text-muted)'
+            }}>
+              <span>{t('baseline_projected_annual')}</span>
+              <span style={{ fontWeight: '600', color: 'var(--text)' }}>
+                ~{(insights.baseline_comparison.userProjectedAnnual / 1000).toFixed(1)} {t('baseline_tonnes')} 
+                <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}> ({t('baseline_nl_avg')}: {(insights.baseline_comparison.baselineAnnual / 1000).toFixed(1)}t)</span>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {insights.best_purchase && (
         <div style={styles.card}>
           <h3 style={styles.heading}>{t('rating_best_worst')}</h3>

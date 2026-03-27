@@ -9,6 +9,74 @@
  * processing, transport, retail, packaging, and losses.
  */
 
+/**
+ * EU & Netherlands Dietary Baseline
+ * 
+ * Calculated by combining:
+ * 1. FAOSTAT dietary composition (kcal/person/day, 2021) via OWID API
+ *    Source: https://ourworldindata.org/grapher/dietary-composition-by-country
+ * 2. Caloric density (kcal/kg) per food category (USDA FoodData Central)
+ * 3. CO2 emissions per kg from our CO2_EMISSIONS_DATA
+ * 
+ * Formula: For each food category:
+ *   kg/day = kcal/day ÷ kcal_per_kg
+ *   CO2/day = kg/day × CO2_per_kg
+ *   Total = sum across all categories
+ * 
+ * These baselines allow comparing a user's grocery CO2 against the average consumer.
+ */
+const DIETARY_BASELINES = {
+  eu27: {
+    label: 'EU-27 Average',
+    year: 2021,
+    co2PerDay: 6.73,         // kg CO2-eq/person/day from food
+    co2PerYear: 2456,        // kg CO2-eq/person/year from food
+    co2PerKg: 2.71,          // weighted avg kg CO2-eq per kg of food consumed
+    foodKgPerDay: 2.48,      // kg of food consumed per person per day
+    // Breakdown by food group (% of total food CO2)
+    breakdown: {
+      dairy: 32.3,           // Milk products
+      beef: 14.3,            // Beef & buffalo meat
+      alcohol: 9.0,          // Alcoholic beverages
+      pork: 8.7,             // Pig meat
+      cereals: 5.5,          // Wheat, barley, maize, rice, other cereals
+      sugar: 4.7,            // Sugar & sweeteners
+      fats: 7.4,             // Animal fats + vegetable oils
+      fruit: 3.5,            // Fruit
+      poultry: 3.4,          // Poultry meat
+      seafood: 3.4,          // Fish & seafood
+      vegetables: 2.3,       // Vegetables
+      eggs: 2.1,             // Eggs
+      other_meat: 1.4,       // Sheep, goat, other meat
+      other: 2.0             // Nuts, pulses, oilcrops, misc
+    }
+  },
+  netherlands: {
+    label: 'Netherlands Average',
+    year: 2021,
+    co2PerDay: 7.68,         // kg CO2-eq/person/day from food
+    co2PerYear: 2802,        // kg CO2-eq/person/year from food
+    co2PerKg: 2.86,          // weighted avg kg CO2-eq per kg of food consumed
+    foodKgPerDay: 2.68,      // kg of food consumed per person per day
+    breakdown: {
+      dairy: 38.8,
+      beef: 18.9,
+      pork: 6.2,
+      alcohol: 4.9,
+      fats: 6.3,
+      sugar: 4.4,
+      fruit: 4.2,
+      cereals: 4.7,
+      eggs: 2.9,
+      seafood: 2.5,
+      vegetables: 2.1,
+      poultry: 1.6,
+      other_meat: 1.2,
+      other: 1.3
+    }
+  }
+}
+
 // CO2 emissions data (kg CO2 eq per kg of food)
 // Sourced from Our World in Data 2018 global averages
 const CO2_EMISSIONS_DATA = {
@@ -713,17 +781,47 @@ function evaluateProductCO2(productName, enrichedData = null) {
   }
 }
 
+/**
+ * Compare a user's average CO2/kg against dietary baselines.
+ * @param {number} userAvgCO2PerKg - User's weighted average CO2 per kg of food
+ * @param {string} region - 'eu27' or 'netherlands' (default: 'netherlands')
+ * @returns {object} Comparison result with percentage difference and label
+ */
+function compareToBaseline(userAvgCO2PerKg, region = 'netherlands') {
+  const baseline = DIETARY_BASELINES[region]
+  if (!baseline || !userAvgCO2PerKg || userAvgCO2PerKg <= 0) {
+    return { baseline: null, difference: null, percentBetter: null }
+  }
+  
+  const difference = baseline.co2PerKg - userAvgCO2PerKg  // positive = user is better
+  const percentBetter = (difference / baseline.co2PerKg) * 100
+  
+  return {
+    baseline: baseline.co2PerKg,
+    baselineLabel: baseline.label,
+    baselineYear: baseline.year,
+    userAvgCO2PerKg,
+    difference: Math.round(difference * 100) / 100,
+    percentBetter: Math.round(percentBetter * 10) / 10,
+    // Annual projection: if user bought all food like this, what would their yearly CO2 be?
+    userProjectedAnnual: Math.round(userAvgCO2PerKg * baseline.foodKgPerDay * 365),
+    baselineAnnual: baseline.co2PerYear
+  }
+}
+
 // Export for use in app.js (ES modules)
 export {
   CO2_EMISSIONS_DATA,
   PRODUCT_CATEGORY_KEYWORDS,
   CATEGORY_LABELS,
   NON_FOOD_KEYWORDS,
+  DIETARY_BASELINES,
   getCO2Category,
   getCO2Emissions,
   co2ToScore,
   getCO2Rating,
   getCategoryLabel,
   evaluateProductCO2,
-  isNonFood
+  isNonFood,
+  compareToBaseline
 }

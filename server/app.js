@@ -27,7 +27,9 @@ import {
   getCO2Rating,
   getCategoryLabel,
   evaluateProductCO2,
-  isNonFood
+  isNonFood,
+  compareToBaseline,
+  DIETARY_BASELINES
 } from './co2Emissions.js'
 
 // Ensure .env is loaded from the webapp root regardless of cwd
@@ -1664,19 +1666,31 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
     const purchasesWithScores = purchases.map(p => {
       const product = productsMap.get(p.product_id)
       const enrichedData = product ? getEnrichedData(product) : null
+      const evaluation = evaluateProduct(p.product_name, enrichedData)
       return {
         ...p,
-        sustainability_score: evaluateProduct(p.product_name, enrichedData).score
+        sustainability_score: evaluation.score,
+        co2PerKg: evaluation.co2PerKg,
+        isNonFood: evaluation.isNonFood || false
       }
     })
     
     const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
     const avgScore = totalScore / purchasesWithScores.length
     
+    // Calculate average CO2/kg (only for food items with matched CO2 data)
+    const foodItems = purchasesWithScores.filter(p => !p.isNonFood && p.co2PerKg != null)
+    const avgCO2PerKg = foodItems.length > 0
+      ? foodItems.reduce((sum, p) => sum + p.co2PerKg, 0) / foodItems.length
+      : null
+    
     const best = purchasesWithScores.reduce((max, p) => 
       ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
     const worst = purchasesWithScores.reduce((min, p) => 
       ((p.sustainability_score || 0) < (min.sustainability_score || 0) ? p : min), purchasesWithScores[0])
+    
+    // Compare user's avg CO2/kg against NL dietary baseline
+    const baselineComparison = avgCO2PerKg ? compareToBaseline(avgCO2PerKg, 'netherlands') : null
     
     res.json({
       total_purchases: purchasesWithScores.length,
@@ -1684,7 +1698,10 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
       rating: getRating(avgScore),
       best_purchase: best.product_name,
       worst_purchase: worst.product_name,
-      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0)
+      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
+      avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
+      food_items_matched: foodItems.length,
+      baseline_comparison: baselineComparison
     })
   } catch (err) {
     console.error('Error fetching user insights:', err)
@@ -2216,21 +2233,33 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
         origin_country: product.origin_country,
         origin_by_month: product.origin_by_month
       } : null
+      const evaluation = evaluateProduct(p.product_name, enrichedData)
       return {
         ...p,
         // Use purchase price, fall back to product price if null
         price: p.price ?? product?.price ?? null,
-        sustainability_score: evaluateProduct(p.product_name, enrichedData).score
+        sustainability_score: evaluation.score,
+        co2PerKg: evaluation.co2PerKg,
+        isNonFood: evaluation.isNonFood || false
       }
     })
     
     const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
     const avgScore = totalScore / purchasesWithScores.length
     
+    // Calculate average CO2/kg (only for food items with matched CO2 data)
+    const foodItems = purchasesWithScores.filter(p => !p.isNonFood && p.co2PerKg != null)
+    const avgCO2PerKg = foodItems.length > 0
+      ? foodItems.reduce((sum, p) => sum + p.co2PerKg, 0) / foodItems.length
+      : null
+    
     const best = purchasesWithScores.reduce((max, p) => 
       ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
     const worst = purchasesWithScores.reduce((min, p) => 
       ((p.sustainability_score || 0) < (min.sustainability_score || 0) ? p : min), purchasesWithScores[0])
+    
+    // Compare user's avg CO2/kg against NL dietary baseline
+    const baselineComparison = avgCO2PerKg ? compareToBaseline(avgCO2PerKg, 'netherlands') : null
     
     // Return same format as /api/user/insights for Dashboard compatibility
     res.json({
@@ -2239,7 +2268,10 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       rating: getRating(avgScore),
       best_purchase: best.product_name,
       worst_purchase: worst.product_name,
-      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0)
+      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
+      avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
+      food_items_matched: foodItems.length,
+      baseline_comparison: baselineComparison
     })
   } catch (err) {
     console.error('Error fetching bonus suggestions:', err)
