@@ -3694,6 +3694,7 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
         image_url: enrichedData?.image_url || null,
         source: 'purchased',
         actual_score: evaluation.score,
+        co2PerKg: evaluation.co2PerKg,
         enriched: evaluation.enriched
       }
     }))
@@ -3707,12 +3708,15 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
         image_url: p.image_url,
         source: 'catalog',
         actual_score: evaluation.score,
+        co2PerKg: evaluation.co2PerKg,
         enriched: evaluation.enriched
       }
     })
     
-    // Combine and shuffle all products
-    const allRankingProducts = [...fromPurchases, ...fromOther].sort(() => Math.random() - 0.5)
+    // Combine, filter out products without CO2 data, and shuffle
+    const allRankingProducts = [...fromPurchases, ...fromOther]
+      .filter(p => p.co2PerKg != null && p.co2PerKg > 0)
+      .sort(() => Math.random() - 0.5)
     
     console.log(`[ranking-products] Card ${bonusCard}: purchases=${fromPurchases.length}, catalog=${fromOther.length}, total=${allRankingProducts.length}`)
     

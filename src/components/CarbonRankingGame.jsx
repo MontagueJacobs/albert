@@ -293,10 +293,13 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
   }
 
   const calculateScore = () => {
-    // Sort products by actual score (highest = worst for environment) 
-    // Note: In our system, LOWER scores = WORSE for environment
-    // So we sort ascending (lowest first = worst carbon footprint)
-    const correctOrder = [...products].sort((a, b) => a.actual_score - b.actual_score)
+    // Sort products by CO2/kg (highest CO2 = worst for environment)
+    // Products with null CO2 go to the end (least certain)
+    const correctOrder = [...products].sort((a, b) => {
+      const aCO2 = a.co2PerKg ?? -1
+      const bCO2 = b.co2PerKg ?? -1
+      return bCO2 - aCO2  // Descending: highest CO2 first
+    })
     
     let score = 0
     const maxScore = products.length
@@ -353,6 +356,7 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
               user_rank: r.userRank,
               actual_rank: r.actualRank,
               actual_score: r.actual_score,
+              co2PerKg: r.co2PerKg,
               is_correct: r.isCorrect
             }))
           }
@@ -418,8 +422,8 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
         <div style={styles.instructions}>
           <strong>{isNl ? '🎯 Opdracht:' : '🎯 Task:'}</strong><br />
           {isNl 
-            ? 'Sorteer deze producten van HOOGSTE naar LAAGSTE CO₂-uitstoot. Sleep producten omhoog of omlaag met de pijltjes. Het product bovenaan heeft volgens jou de hoogste milieu-impact.'
-            : 'Sort these products from HIGHEST to LOWEST carbon footprint. Move products up or down using the arrows. The product at the top should have the highest environmental impact according to you.'}
+            ? 'Sorteer deze producten van HOOGSTE naar LAAGSTE CO₂-uitstoot (kg CO₂ per kg product). Gebruik de pijltjes om producten te verplaatsen. Het product bovenaan heeft volgens jou de meeste CO₂-uitstoot.'
+            : 'Sort these products from HIGHEST to LOWEST CO₂ emissions (kg CO₂ per kg of product). Use the arrows to move products. The product at the top should have the highest CO₂ footprint.'}
         </div>
       )}
 
@@ -440,7 +444,7 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
           </div>
           
           <h3 style={{ color: 'var(--text)', marginBottom: '1rem', fontSize: '1rem' }}>
-            {isNl ? 'Vergelijking met werkelijke scores:' : 'Comparison with actual scores:'}
+            {isNl ? 'Vergelijking met werkelijke CO₂-uitstoot:' : 'Comparison with actual CO₂ emissions:'}
           </h3>
         </div>
       )}
@@ -520,8 +524,10 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
                   </span>
                 )}
                 <br />
-                <span style={{ fontSize: '0.7rem' }}>
-                  Score: {product.actual_score}
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  {product.co2PerKg != null 
+                    ? `${product.co2PerKg} kg CO₂/kg`
+                    : (isNl ? 'Onbekend' : 'Unknown')}
                 </span>
               </div>
             )}
