@@ -636,12 +636,14 @@ function Dashboard({ syncVersion }) {
 // Helper component for individual purchase items
 function PurchaseItem({ purchase, onClick }) {
   const getScoreColor = (score) => {
+    if (score == null) return '#6b7280'
     if (score >= 7) return '#22c55e'
     if (score >= 5) return '#eab308'
     return '#ef4444'
   }
 
   const getScoreBg = (score) => {
+    if (score == null) return 'rgba(107, 114, 128, 0.1)'
     if (score >= 7) return 'rgba(34, 197, 94, 0.2)'
     if (score >= 5) return 'rgba(234, 179, 8, 0.2)'
     return 'rgba(239, 68, 68, 0.2)'
@@ -804,7 +806,7 @@ function PurchaseItem({ purchase, onClick }) {
           fontWeight: '700', 
           color: getScoreColor(purchase.sustainability_score) 
         }}>
-          {purchase.sustainability_score}
+          {purchase.sustainability_score != null ? purchase.sustainability_score : '—'}
         </span>
         <span style={{ 
           fontSize: '0.65rem', 

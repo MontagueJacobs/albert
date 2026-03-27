@@ -604,6 +604,12 @@ code {
   color: white;
 }
 
+.score-na {
+  background: #6b7280;
+  color: white;
+  opacity: 0.7;
+}
+
 /* ============ SUGGESTIONS ============ */
 .suggestions {
   background: var(--bg-hover);

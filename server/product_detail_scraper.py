@@ -284,20 +284,26 @@ class AHProductDetailScraper:
                 print(f"[WARN] Organic extraction failed: {e}", flush=True)
             
             # Extract VEGAN
+            # IMPORTANT: Only match vegan in product-specific data, NOT the entire page.
+            # The page HTML contains "VEGAN" in category filters, related products, etc.
             try:
+                # Method 1: ProductProperty JSON - most reliable (product's own diet property)
                 if re.search(r'"code"\s*:\s*"sp_include_dieet_veganistisch"', normalized, re.IGNORECASE):
                     result['is_vegan'] = True
                     result['is_vegetarian'] = True
                     print(f"[DEBUG] Found vegan certification from ProductProperty", flush=True)
-                elif '"VEGAN"' in content or '"AH_VEGAN"' in content:
+                # Method 2: Product icon in the product's own icon/shield section
+                # Look for vegan icon near the product's own properties (not in related products)
+                # The product's own icons appear within ProductProperty or shield data
+                elif re.search(r'"(productProperties|shields)"[^}]*"VEGAN"', normalized, re.IGNORECASE):
                     result['is_vegan'] = True
                     result['is_vegetarian'] = True
-                    print(f"[DEBUG] Found vegan from icon uppercase", flush=True)
-                # SVG icon pattern: pantry-svg-src/assets/logos/product/vegan-*
-                elif 'logos/product/vegan-' in content.lower():
+                    print(f"[DEBUG] Found vegan from product properties/shields", flush=True)
+                # Method 3: SVG icon specifically in the product's icon block (not page-wide)
+                elif re.search(r'"icons?"[^}]{0,200}logos/product/vegan-', content.lower()):
                     result['is_vegan'] = True
                     result['is_vegetarian'] = True
-                    print(f"[DEBUG] Found vegan from SVG icon", flush=True)
+                    print(f"[DEBUG] Found vegan from product SVG icon", flush=True)
             except Exception as e:
                 print(f"[WARN] Vegan extraction failed: {e}", flush=True)
             
@@ -307,10 +313,13 @@ class AHProductDetailScraper:
                     if re.search(r'"code"\s*:\s*"sp_include_dieet_vegetarisch"', normalized, re.IGNORECASE):
                         result['is_vegetarian'] = True
                         print(f"[DEBUG] Found vegetarian certification from ProductProperty", flush=True)
-                    # SVG icon pattern: pantry-svg-src/assets/logos/product/vegetarian* or vegetarisch*
-                    elif 'logos/product/vegetari' in content.lower():
+                    # Product-specific icon/shield containing vegetarian reference
+                    elif re.search(r'"(productProperties|shields)"[^}]*"VEGETARI', normalized, re.IGNORECASE):
                         result['is_vegetarian'] = True
-                        print(f"[DEBUG] Found vegetarian from SVG icon", flush=True)
+                        print(f"[DEBUG] Found vegetarian from product properties/shields", flush=True)
+                    elif re.search(r'"icons?"[^}]{0,200}logos/product/vegetari', content.lower()):
+                        result['is_vegetarian'] = True
+                        print(f"[DEBUG] Found vegetarian from product SVG icon", flush=True)
                 except Exception as e:
                     print(f"[WARN] Vegetarian extraction failed: {e}", flush=True)
             

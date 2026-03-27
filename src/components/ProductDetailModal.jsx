@@ -196,18 +196,21 @@ function ProductDetailModal({ purchase, onClose }) {
   const [error, setError] = useState(null)
 
   const getScoreColor = (score) => {
+    if (score == null) return '#6b7280'
     if (score >= 7) return '#22c55e'
     if (score >= 5) return '#eab308'
     return '#ef4444'
   }
 
   const getScoreBg = (score) => {
+    if (score == null) return 'rgba(107, 114, 128, 0.1)'
     if (score >= 7) return 'rgba(34, 197, 94, 0.15)'
     if (score >= 5) return 'rgba(234, 179, 8, 0.15)'
     return 'rgba(239, 68, 68, 0.15)'
   }
 
   const getScoreLabel = (score) => {
+    if (score == null) return 'N/A'
     // CO2-based scoring labels
     if (score >= 9) return 'Very Low CO₂'
     if (score >= 7) return 'Low CO₂'
@@ -384,7 +387,7 @@ function ProductDetailModal({ purchase, onClose }) {
                   fontWeight: '700', 
                   color: getScoreColor(details.score) 
                 }}>
-                  {details.score}
+                  {details.score != null ? details.score : '—'}
                 </span>
                 <span style={{ 
                   fontSize: '1rem', 
@@ -398,7 +401,7 @@ function ProductDetailModal({ purchase, onClose }) {
                   color: 'var(--text-muted)',
                   marginTop: '0.25rem'
                 }}>
-                  CO₂ Score
+                  {details.isNonFood ? 'Geen voedingsmiddel' : details.score != null ? 'CO₂ Score' : 'Geen CO₂ data'}
                 </span>
                 {/* CO2 Details */}
                 {details.co2Matched && details.co2PerKg !== null && (

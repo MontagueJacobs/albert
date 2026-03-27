@@ -1248,8 +1248,8 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     }
   }
 
-  // Final score is based on CO2 (or null/5 if no data)
-  const finalScore = co2Score !== null ? co2Score : 5  // Default to middle if unknown
+  // Final score is based on CO2 (null if unknown / non-food)
+  const finalScore = co2Score  // null for unmatched → shown as N/A in UI
   
   return {
     product: input,
@@ -1685,8 +1685,10 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
       }
     })
     
-    const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
-    const avgScore = totalScore / purchasesWithScores.length
+    // Only include scored food items in score averages (exclude non-food & unmatched)
+    const scoredItems = purchasesWithScores.filter(p => p.sustainability_score != null)
+    const totalScore = scoredItems.reduce((sum, p) => sum + p.sustainability_score, 0)
+    const avgScore = scoredItems.length > 0 ? totalScore / scoredItems.length : null
     
     // Calculate WEIGHT-WEIGHTED average CO2/kg (only for food items with matched CO2 data)
     // Formula: sum(co2PerKg_i * weight_i) / sum(weight_i)
@@ -1702,10 +1704,13 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
       totalCO2 = sumWeightedCO2 / 1000  // total kg CO2 for all items
     }
     
-    const best = purchasesWithScores.reduce((max, p) => 
-      ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
-    const worst = purchasesWithScores.reduce((min, p) => 
-      ((p.sustainability_score || 0) < (min.sustainability_score || 0) ? p : min), purchasesWithScores[0])
+    // Best/worst only from scored food items
+    const best = scoredItems.length > 0
+      ? scoredItems.reduce((max, p) => (p.sustainability_score > max.sustainability_score ? p : max), scoredItems[0])
+      : purchasesWithScores[0]
+    const worst = scoredItems.length > 0
+      ? scoredItems.reduce((min, p) => (p.sustainability_score < min.sustainability_score ? p : min), scoredItems[0])
+      : purchasesWithScores[0]
     
     // Compare user's avg CO2/kg against NL dietary baseline
     const baselineComparison = avgCO2PerKg ? compareToBaseline(avgCO2PerKg, 'netherlands') : null
@@ -1713,9 +1718,9 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
     res.json({
       total_purchases: purchasesWithScores.length,
       average_score: avgScore,
-      rating: getRating(avgScore),
-      best_purchase: best.product_name,
-      worst_purchase: worst.product_name,
+      rating: avgScore != null ? getRating(avgScore) : 'No scored items',
+      best_purchase: best?.product_name || null,
+      worst_purchase: worst?.product_name || null,
       total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
       avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
       total_co2_kg: totalCO2 ? Math.round(totalCO2 * 100) / 100 : null,
@@ -2011,6 +2016,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
         // Sustainability scoring
         sustainability_score: evaluation.score,
         sustainability_rating: evaluation.rating,
+        isNonFood: evaluation.isNonFood || false,
         has_enriched_data: evaluation.hasEnrichedData || false,
         enriched_factors: evaluation.enriched || []
       }
@@ -2244,15 +2250,7 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     // Calculate sustainability scores using enriched data from products table
     const purchasesWithScores = purchases.map(p => {
       const product = productsMap.get(p.product_id)
-      const enrichedData = product ? {
-        is_vegan: product.is_vegan,
-        is_vegetarian: product.is_vegetarian,
-        is_organic: product.is_organic,
-        is_fairtrade: product.is_fairtrade,
-        nutri_score: product.nutri_score,
-        origin_country: product.origin_country,
-        origin_by_month: product.origin_by_month
-      } : null
+      const enrichedData = product ? getEnrichedData(product) : null
       const evaluation = evaluateProduct(p.product_name, enrichedData)
       const weight = getProductWeight(product?.unit_size, evaluation.co2Category)
       return {
@@ -2268,8 +2266,10 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       }
     })
     
-    const totalScore = purchasesWithScores.reduce((sum, p) => sum + (p.sustainability_score || 0), 0)
-    const avgScore = totalScore / purchasesWithScores.length
+    // Only include scored food items in score averages (exclude non-food & unmatched)
+    const scoredItems = purchasesWithScores.filter(p => p.sustainability_score != null)
+    const totalScore = scoredItems.reduce((sum, p) => sum + p.sustainability_score, 0)
+    const avgScore = scoredItems.length > 0 ? totalScore / scoredItems.length : null
     
     // Calculate WEIGHT-WEIGHTED average CO2/kg (only for food items with matched CO2 data)
     // Formula: sum(co2PerKg_i * weight_i) / sum(weight_i)
@@ -2285,10 +2285,13 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       totalCO2 = sumWeightedCO2 / 1000  // total kg CO2 for all items
     }
     
-    const best = purchasesWithScores.reduce((max, p) => 
-      ((p.sustainability_score || 0) > (max.sustainability_score || 0) ? p : max), purchasesWithScores[0])
-    const worst = purchasesWithScores.reduce((min, p) => 
-      ((p.sustainability_score || 0) < (min.sustainability_score || 0) ? p : min), purchasesWithScores[0])
+    // Best/worst only from scored food items
+    const best = scoredItems.length > 0
+      ? scoredItems.reduce((max, p) => (p.sustainability_score > max.sustainability_score ? p : max), scoredItems[0])
+      : purchasesWithScores[0]
+    const worst = scoredItems.length > 0
+      ? scoredItems.reduce((min, p) => (p.sustainability_score < min.sustainability_score ? p : min), scoredItems[0])
+      : purchasesWithScores[0]
     
     // Compare user's avg CO2/kg against NL dietary baseline
     const baselineComparison = avgCO2PerKg ? compareToBaseline(avgCO2PerKg, 'netherlands') : null
@@ -2297,9 +2300,9 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     res.json({
       total_purchases: purchasesWithScores.length,
       average_score: avgScore,
-      rating: getRating(avgScore),
-      best_purchase: best.product_name,
-      worst_purchase: worst.product_name,
+      rating: avgScore != null ? getRating(avgScore) : 'No scored items',
+      best_purchase: best?.product_name || null,
+      worst_purchase: worst?.product_name || null,
       total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
       avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
       total_co2_kg: totalCO2 ? Math.round(totalCO2 * 100) / 100 : null,
@@ -2554,6 +2557,175 @@ app.get('/api/products/search', async (req, res) => {
     res.json(withScores)
   } catch (err) {
     res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// ============================================================================
+// BULK DATA FIX ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/products/fix-vegan-labels
+ * 
+ * Bulk fix false vegan labels: clear is_vegan for products whose ingredients
+ * contain known non-vegan items (eggs, milk, cheese, meat, fish, etc.)
+ * Also resets is_vegetarian for products with meat/fish ingredients.
+ */
+app.post('/api/products/fix-vegan-labels', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' })
+    }
+    
+    // Fetch all products that are marked as vegan or vegetarian AND have ingredients
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id, name, is_vegan, is_vegetarian, ingredients')
+      .or('is_vegan.eq.true,is_vegetarian.eq.true')
+      .not('ingredients', 'is', null)
+    
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+    
+    if (!products || products.length === 0) {
+      return res.json({ message: 'No products to fix', fixed_vegan: 0, fixed_vegetarian: 0 })
+    }
+    
+    // Non-vegan ingredient keywords (Dutch + English)
+    const nonVeganKeywords = [
+      'melk', 'milk', 'room', 'cream', 'boter', 'butter', 'kaas', 'cheese',
+      'wei', 'whey', 'lactose', 'caseïne', 'caseine', 'yoghurt', 'kwark',
+      'ei', 'eieren', 'egg', 'eggs', 'eigeel', 'eiwit',
+      'scharrelei', 'uitloopei', 'vrije-uitloopei',
+      'honing', 'honey', 'gelatine', 'gelatin',
+      'ansjovis', 'anchov', 'schaaldier', 'garnaal', 'garnalen',
+      'kip', 'chicken', 'rund', 'beef', 'varken', 'pork',
+      'vis', 'fish', 'zalm', 'salmon', 'tonijn', 'tuna',
+      'geitenkaas', 'geitenmelk', 'schapenmelk', 'schapenkaas',
+      'ricotta', 'mozzarella', 'parmezaan', 'parmesan', 'mascarpone',
+      'crème fraîche', 'creme fraiche', 'slagroom', 'karnemelk',
+      'magere melk', 'volle melk', 'halfvolle melk',
+      'MELKEIWIT', 'WEIPOEDER', 'MELKPOEDER',
+      'kipfilet', 'rundvlees', 'varkensvlees', 'spek', 'bacon',
+      'ham', 'salami', 'worst',
+    ]
+    
+    // Non-vegetarian keywords (meat/fish only) 
+    const nonVegetarianKeywords = [
+      'kip', 'chicken', 'kipfilet', 'kippenfilet',
+      'rund', 'rundvlees', 'beef', 'biefstuk',
+      'varken', 'varkensvlees', 'pork', 'spek', 'bacon',
+      'ham', 'salami', 'worst', 'rookworst', 'gehakt',
+      'vis', 'fish', 'zalm', 'salmon', 'tonijn', 'tuna', 'kabeljauw',
+      'garnaal', 'garnalen', 'shrimp', 'schaaldier',
+      'ansjovis', 'anchov', 'haring', 'makreel',
+      'gelatine', 'gelatin',
+      'lam', 'lamsvlees', 'lamb',
+    ]
+    
+    let fixedVegan = 0
+    let fixedVegetarian = 0
+    const fixedProducts = []
+    
+    for (const product of products) {
+      const ingredientsLower = product.ingredients.toLowerCase()
+      const updateData = {}
+      
+      // Check vegan
+      if (product.is_vegan === true) {
+        const hasNonVegan = nonVeganKeywords.some(kw => {
+          // For short keywords (≤3 chars), require word boundaries
+          if (kw.length <= 3) {
+            return new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ingredientsLower)
+          }
+          return ingredientsLower.includes(kw.toLowerCase())
+        })
+        if (hasNonVegan) {
+          updateData.is_vegan = null
+          fixedVegan++
+        }
+      }
+      
+      // Check vegetarian
+      if (product.is_vegetarian === true) {
+        const hasNonVegetarian = nonVegetarianKeywords.some(kw => {
+          if (kw.length <= 3) {
+            return new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(ingredientsLower)
+          }
+          return ingredientsLower.includes(kw.toLowerCase())
+        })
+        if (hasNonVegetarian) {
+          updateData.is_vegetarian = null
+          fixedVegetarian++
+        }
+      }
+      
+      if (Object.keys(updateData).length > 0) {
+        await supabase
+          .from('products')
+          .update(updateData)
+          .eq('id', product.id)
+        
+        fixedProducts.push({
+          id: product.id,
+          name: product.name,
+          cleared: Object.keys(updateData)
+        })
+      }
+    }
+    
+    console.log(`[Bulk Fix] Fixed ${fixedVegan} false vegan labels, ${fixedVegetarian} false vegetarian labels`)
+    
+    res.json({
+      message: `Fixed ${fixedVegan} vegan and ${fixedVegetarian} vegetarian false labels`,
+      fixed_vegan: fixedVegan,
+      fixed_vegetarian: fixedVegetarian,
+      total_checked: products.length,
+      fixed_products: fixedProducts
+    })
+  } catch (err) {
+    console.error('[Bulk Fix] Error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * POST /api/products/mark-non-food
+ * 
+ * Bulk mark non-food products so they're excluded from CO2 scoring.
+ * Sets details_scrape_status = 'non_food' for products matching NON_FOOD_KEYWORDS.
+ */
+app.post('/api/products/mark-non-food', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' })
+    }
+    
+    // Fetch all products
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id, name')
+    
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+    
+    let marked = 0
+    for (const product of (products || [])) {
+      if (isNonFood(product.name)) {
+        marked++
+      }
+    }
+    
+    res.json({
+      message: `Found ${marked} non-food products out of ${(products || []).length} total`,
+      non_food_count: marked,
+      total_products: (products || []).length
+    })
+  } catch (err) {
+    console.error('[Mark Non-Food] Error:', err)
+    res.status(500).json({ error: err.message })
   }
 })
 
@@ -3057,7 +3229,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       }
     } else {
       improvements.push({
-        reason: '❓ CO₂ category unknown - using default score',
+        reason: evaluation.isNonFood ? '🚫 Dit is geen voedingsmiddel' : '❓ CO₂ categorie onbekend',
         positive: false
       })
     }
@@ -3087,7 +3259,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
     
     // Find better alternatives from catalog
     let alternatives = []
-    if (supabase && evaluation.score < 9) {
+    if (supabase && evaluation.score != null && evaluation.score < 9) {
       // Get products with better scores from the same general category
       let query = supabase
         .from('products')
@@ -3115,7 +3287,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
               is_organic: c.is_organic
             }
           })
-          .filter(c => c.score > evaluation.score)
+          .filter(c => c.score != null && c.score > evaluation.score)
           .sort((a, b) => b.score - a.score)
           .slice(0, 5)
         
@@ -3134,6 +3306,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
       hasEnrichedData: evaluation.hasEnrichedData,
+      isNonFood: evaluation.isNonFood || false,
       // CO2 data
       co2PerKg: evaluation.co2PerKg,
       co2Category: evaluation.co2Category,

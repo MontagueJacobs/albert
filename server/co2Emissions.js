@@ -640,13 +640,28 @@ const NON_FOOD_KEYWORDS = [
   'huishoudfolie', 'waxinelicht', 'dreft', 'persil', 'robijn',
   'swiffer', 'bleekmiddel', 'bleekwater', 'dikbleek', 'ontkalker', 'wc-blok', 'vaatdoek',
   'spons', 'handschoen', 'prullenbak', 'stofzuig',
-  // Health
+  'wasdoek', 'waslijn', 'wasknijper', 'schuurspons', 'poetsdoek', 'strijkwater',
+  'geurverspreider', 'geurstokjes', 'luchtverfrisser', 'geurkaars',
+  'vuilniszakken', 'pedaalemmerzak', 'kattenbak', 'kattenbakvulling',
+  // Health & personal care
   'vitamine', 'paracetamol', 'ibuprofen', 'pleister', 'hoestdrank',
   'keelpastille', 'neusspray', 'davitamon', 'magnesium', 'ijzertablet',
-  'zonnebrand', 'bodylotion', 'gezichtscreme',
-  // Pet food
+  'zonnebrand', 'bodylotion', 'gezichtscreme', 'gezichtscr',
+  'tablet 200mg', 'tablet 400mg', 'tablet 500mg', 'capsule',
+  'oogdruppel', 'oordruppel', 'wondverband', 'verband',
+  'dagcreme', 'nachtcreme', 'haargel', 'haarspray', 'haarlak',
+  'scheerschuim', 'aftershave', 'parfum', 'eau de toilette',
+  'tampons', 'inlegkruisjes', 'washandjes', 'wattenstaafjes', 'wattenschijfjes',
+  'douchecrème', 'badschuim', 'handcreme', 'lipbalsem',
+  'haarkleuring', 'nagellak', 'make-up', 'mascara', 'foundation',
+  // Pet food & care
   'hondenvoer', 'hondenbrok', 'hondenstick', 'kattenvoer', 'kattenbrok',
-  'kattensnack', 'whiskas', 'pedigree', 'vogelvoer', 'dierenvoer'
+  'kattensnack', 'whiskas', 'pedigree', 'vogelvoer', 'dierenvoer',
+  // Baby non-food
+  'luiers', 'babydoekjes', 'billendoekjes',
+  // Kitchen/household items
+  'vershoudfolie', 'diepvrieszak', 'cadeaupapier', 'kaars', 'aansteker',
+  'paperclip', 'elastiek', 'plakband', 'tape'
 ]
 
 /**

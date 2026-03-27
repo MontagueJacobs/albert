@@ -81,6 +81,7 @@ function PurchaseList({ syncVersion }) {
   }
 
   const getScoreClass = (score) => {
+    if (score == null) return 'score-na'
     if (score >= 7) return 'score-high'
     if (score >= 4) return 'score-medium'
     return 'score-low'
