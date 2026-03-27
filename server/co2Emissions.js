@@ -824,7 +824,8 @@ function parseIngredients(ingredientText) {
   // "Allergie-informatie Bevat:...", "Kan bevatten:...", "Waarvan toegevoegde..."
   text = text
     .replace(/\s*allergie-informatie\b.*/si, '')
-    .replace(/\s*(Kan bevatten|Bevat|Allergenen|Voedingswaarde)\s*[:].*/si, '')
+    .replace(/\s*(Kan bevatten|Bevat|Allergenen)\s*[:].*/si, '')
+    .replace(/\s*voedingswaarde\b.*/si, '')
     .replace(/\s*\.?\s*waarvan toegevoegde\b.*/si, '')
     .trim()
   
@@ -948,12 +949,16 @@ function parseIngredients(ingredientText) {
  * Estimate weight proportions for ingredients based on EU labeling rules.
  * EU law: ingredients are listed in descending order by weight.
  * If specific percentages are given, use those. Otherwise estimate using 
- * a decreasing geometric series (each ingredient is ~60-70% of the previous).
+ * a decreasing geometric series, constrained by:
+ *   1. Ordering: undeclared ingredients after a declared % must be ≤ that %
+ *   2. Each subsequent undeclared ingredient ≤ previous undeclared ingredient
+ *   3. Nutritional hints: oil ≤ fat content, salt ≤ declared salt
  * 
  * @param {Array} ingredients - Parsed ingredients from parseIngredients()
+ * @param {Object} nutritionHints - Optional {fatPct, saltPct} from label
  * @returns {Array<{name: string, category: string|null, co2PerKg: number|null, weightFraction: number}>}
  */
-function estimateIngredientWeights(ingredients) {
+function estimateIngredientWeights(ingredients, nutritionHints = null) {
   if (!ingredients || ingredients.length === 0) return []
   
   const n = ingredients.length
@@ -971,9 +976,45 @@ function estimateIngredientWeights(ingredients) {
     }
   })
   
+  // Second pass: determine the ceiling for each position.
+  // EU law: ingredients are in descending weight order.
+  // If ingredient i has a declared percentage P, all ingredients at position > i must be ≤ P.
+  // If ingredient i has no declared percentage, it must be ≤ previous ingredient's weight.
+  let ceiling = 100 // Maximum possible weight for current position
+  const ceilings = []
+  for (let i = 0; i < enriched.length; i++) {
+    if (enriched[i].percentage != null) {
+      ceiling = enriched[i].percentage
+    }
+    ceilings.push(ceiling)
+  }
+  
+  // Apply nutritional caps to specific ingredient types
+  // Oil/fat ingredients can't exceed the total fat content
+  // Salt can't exceed the declared salt content
+  const OIL_CATEGORIES = new Set(['olive_oil', 'rapeseed_oil', 'sunflower_oil', 'soybean_oil', 'palm_oil'])
+  const OIL_KEYWORDS = ['olie', 'oil', 'vet', 'fat', 'boter', 'butter']
+  const SALT_KEYWORDS = ['zout', 'salt', 'zeezout', 'joodzout']
+  
+  if (nutritionHints) {
+    for (let i = 0; i < enriched.length; i++) {
+      const lower = enriched[i].name.toLowerCase()
+      // Cap oil/fat ingredients at the total fat percentage
+      if (nutritionHints.fatPct != null) {
+        if (OIL_CATEGORIES.has(enriched[i].category) || OIL_KEYWORDS.some(k => lower.includes(k))) {
+          ceilings[i] = Math.min(ceilings[i], nutritionHints.fatPct)
+        }
+      }
+      // Cap salt at declared salt percentage
+      if (nutritionHints.saltPct != null) {
+        if (SALT_KEYWORDS.some(k => lower.includes(k))) {
+          ceilings[i] = Math.min(ceilings[i], nutritionHints.saltPct)
+        }
+      }
+    }
+  }
+  
   // Calculate weight fractions
-  // Strategy: use declared percentages where available, 
-  // then distribute remaining weight proportionally by position
   let totalDeclared = 0
   for (const ing of enriched) {
     if (ing.percentage != null) {
@@ -981,38 +1022,96 @@ function estimateIngredientWeights(ingredients) {
     }
   }
   
-  // Use a geometric decay for undeclared ingredients (ratio ~0.65)
-  // First ingredient gets the most weight, each subsequent gets less
-  const DECAY = 0.65
-  const undeclaredIngredients = enriched.filter(ing => ing.percentage == null)
   const remainingWeight = Math.max(0, 100 - totalDeclared)
   
-  // Calculate geometric weights for undeclared ingredients
-  let geometricTotal = 0
-  const geometricWeights = []
-  for (let i = 0; i < undeclaredIngredients.length; i++) {
-    const w = Math.pow(DECAY, i)
-    geometricWeights.push(w)
-    geometricTotal += w
+  // Assign undeclared ingredients using geometric decay, but capped by ceilings
+  // First, compute raw geometric weights for undeclared ingredients
+  const DECAY = 0.65
+  const undeclaredIndices = []
+  for (let i = 0; i < enriched.length; i++) {
+    if (enriched[i].percentage == null) {
+      undeclaredIndices.push(i)
+    }
   }
   
-  // Assign weight fractions
-  let undeclaredIdx = 0
-  return enriched.map(ing => {
-    let weightFraction
-    if (ing.percentage != null) {
-      weightFraction = ing.percentage / 100
-    } else {
-      weightFraction = geometricTotal > 0 
-        ? (geometricWeights[undeclaredIdx] / geometricTotal) * (remainingWeight / 100)
-        : 0
-      undeclaredIdx++
+  // Assign raw geometric weights, then cap and redistribute
+  const rawWeights = new Array(n).fill(0)
+  
+  // Initial geometric assignment for undeclared ingredients
+  let geoWeights = []
+  for (let j = 0; j < undeclaredIndices.length; j++) {
+    geoWeights.push(Math.pow(DECAY, j))
+  }
+  const geoTotal = geoWeights.reduce((s, w) => s + w, 0)
+  
+  // Scale to fit remaining weight, then apply ceilings
+  for (let j = 0; j < undeclaredIndices.length; j++) {
+    const idx = undeclaredIndices[j]
+    let weight = geoTotal > 0 ? (geoWeights[j] / geoTotal) * remainingWeight : 0
+    // Apply ceiling constraint
+    weight = Math.min(weight, ceilings[idx])
+    rawWeights[idx] = weight
+  }
+  
+  // Set declared ingredients
+  for (let i = 0; i < enriched.length; i++) {
+    if (enriched[i].percentage != null) {
+      rawWeights[i] = enriched[i].percentage
     }
-    return {
-      ...ing,
-      weightFraction
+  }
+  
+  // Enforce descending order: each undeclared ingredient ≤ previous ingredient
+  for (let i = 1; i < n; i++) {
+    if (enriched[i].percentage == null && rawWeights[i] > rawWeights[i - 1]) {
+      rawWeights[i] = rawWeights[i - 1]
     }
-  })
+  }
+  
+  // Normalize to sum to ≤ 100%
+  const totalRaw = rawWeights.reduce((s, w) => s + w, 0)
+  
+  return enriched.map((ing, i) => ({
+    ...ing,
+    weightFraction: totalRaw > 0 ? rawWeights[i] / totalRaw : 0
+  }))
+}
+
+/**
+ * Extract fat and salt percentages from the nutritional info section of scraped text.
+ * These values (per 100g/100ml) serve as hard caps for ingredient weight estimation.
+ * 
+ * @param {string} text - Raw scraped text that may contain "Voedingswaarde" section
+ * @returns {Object|null} - { fatPct, saltPct } or null if not found
+ */
+function extractNutritionHints(text) {
+  if (!text) return null
+  
+  // Find the "Voedingswaarde" section
+  const voedingMatch = text.match(/voedingswaarde/i)
+  if (!voedingMatch) return null
+  
+  // Extract from the voedingswaarde section onwards
+  const section = text.slice(voedingMatch.index)
+  
+  let fatPct = null
+  let saltPct = null
+  
+  // Match "Vet X,X g" or "Vet X.X g" or "Fat X.X g" — per 100g values
+  const fatMatch = section.match(/\bvet\b\s*(\d+[.,]?\d*)\s*g/i)
+    || section.match(/\bfat\b\s*(\d+[.,]?\d*)\s*g/i)
+  if (fatMatch) {
+    fatPct = parseFloat(fatMatch[1].replace(',', '.'))
+  }
+  
+  // Match "Zout X,XX g" or "Salt X.XX g"
+  const saltMatch = section.match(/\bzout\b\s*(\d+[.,]?\d*)\s*g/i)
+    || section.match(/\bsalt\b\s*(\d+[.,]?\d*)\s*g/i)
+  if (saltMatch) {
+    saltPct = parseFloat(saltMatch[1].replace(',', '.'))
+  }
+  
+  if (fatPct == null && saltPct == null) return null
+  return { fatPct, saltPct }
 }
 
 /**
@@ -1024,6 +1123,9 @@ function estimateIngredientWeights(ingredients) {
  * @returns {Object} - { co2PerKg, category, matched, method: 'ingredients', ingredients: [...] }
  */
 function getCO2FromIngredients(ingredientText, maxIngredients = 10) {
+  // Extract nutritional hints BEFORE parsing strips the voedingswaarde section
+  const nutritionHints = extractNutritionHints(ingredientText)
+  
   const parsed = parseIngredients(ingredientText)
   if (parsed.length === 0) {
     return { co2PerKg: null, category: null, matched: false, method: 'ingredients' }
@@ -1031,7 +1133,7 @@ function getCO2FromIngredients(ingredientText, maxIngredients = 10) {
   
   // Only use top N ingredients (most important by weight)
   const topIngredients = parsed.slice(0, maxIngredients)
-  const weighted = estimateIngredientWeights(topIngredients)
+  const weighted = estimateIngredientWeights(topIngredients, nutritionHints)
   
   // Calculate weighted average CO2
   let totalCO2 = 0
@@ -1092,6 +1194,17 @@ function getCO2FromIngredients(ingredientText, maxIngredients = 10) {
  * @param {string|null} ingredientText - Optional ingredient list text
  * @returns {Object} - { co2PerKg, category, matched, method }
  */
+// Categories where the product name should take precedence over ingredients.
+// For these, the processing/production (fermentation, aging, roasting, etc.)
+// is a major CO2 contributor that raw ingredients don't capture.
+// e.g. "rode druif" → berries (1.53) but wine from those grapes → wine (1.79)
+const NAME_OVERRIDE_CATEGORIES = new Set([
+  'wine', 'beer', 'spirits',       // Fermentation, distillation, glass bottles
+  'coffee', 'tea',                  // Roasting, drying, long-distance transport
+  'dark_chocolate',                 // Cacao processing, fermentation
+  'cheese',                         // Aging, high milk-to-cheese ratio
+])
+
 function getCO2Emissions(productName, ingredientText = null) {
   // First: exclude non-food items by name
   if (isNonFood(productName)) {
@@ -1104,7 +1217,20 @@ function getCO2Emissions(productName, ingredientText = null) {
     }
   }
   
-  // Try ingredient-based scoring first (most accurate)
+  // Check if the product name matches a processed category where
+  // the name-based CO2 is more accurate than ingredient analysis
+  const nameCategory = getCO2Category(productName)
+  if (nameCategory && NAME_OVERRIDE_CATEGORIES.has(nameCategory) && CO2_EMISSIONS_DATA[nameCategory]) {
+    return {
+      co2PerKg: CO2_EMISSIONS_DATA[nameCategory],
+      category: nameCategory,
+      matched: true,
+      isNonFood: false,
+      method: 'name'
+    }
+  }
+  
+  // Try ingredient-based scoring (most accurate for composite products)
   if (ingredientText && typeof ingredientText === 'string' && ingredientText.length > 5) {
     const ingredientResult = getCO2FromIngredients(ingredientText)
     if (ingredientResult.matched) {
@@ -1361,6 +1487,8 @@ export {
   getCO2Emissions,
   getCO2FromIngredients,
   parseIngredients,
+  estimateIngredientWeights,
+  extractNutritionHints,
   co2ToScore,
   getCO2Rating,
   getCategoryLabel,

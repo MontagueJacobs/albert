@@ -188,8 +188,186 @@ const styles = {
   }
 }
 
+// Dutch → English ingredient translations
+const INGREDIENT_TRANSLATIONS = {
+  // Dairy
+  'melk': 'milk', 'volle melk': 'whole milk', 'magere melk': 'skim milk',
+  'halfvolle melk': 'semi-skimmed milk', 'room': 'cream', 'slagroom': 'whipping cream',
+  'boter': 'butter', 'karnemelk': 'buttermilk', 'yoghurt': 'yoghurt',
+  'kwark': 'quark', 'kaas': 'cheese', 'mozzarella': 'mozzarella',
+  'parmezaan': 'parmesan', 'cheddar': 'cheddar', 'gouda': 'gouda',
+  'wei': 'whey', 'weipoeder': 'whey powder', 'melkpoeder': 'milk powder',
+  'melkeiwit': 'milk protein', 'melkvet': 'milk fat', 'melkzuur': 'lactic acid',
+  'stremsel': 'rennet', 'melkzuurbacteriën': 'lactic acid bacteria',
+  // Eggs
+  'ei': 'egg', 'eieren': 'eggs', 'eigeel': 'egg yolk', 'eiwit': 'egg white',
+  'eipoeder': 'egg powder',
+  // Meats
+  'kip': 'chicken', 'kipfilet': 'chicken fillet', 'kippenvlees': 'chicken meat',
+  'varkensvlees': 'pork', 'rundvlees': 'beef', 'gehakt': 'ground meat',
+  'spek': 'bacon', 'ham': 'ham', 'worst': 'sausage',
+  // Fish
+  'vis': 'fish', 'zalm': 'salmon', 'tonijn': 'tuna', 'garnalen': 'shrimp',
+  'kabeljauw': 'cod', 'haring': 'herring', 'makreel': 'mackerel',
+  // Grains & flour
+  'tarwebloem': 'wheat flour', 'tarwemeel': 'wheat flour', 'tarwe': 'wheat',
+  'bloem': 'flour', 'meel': 'flour', 'rogge': 'rye', 'spelt': 'spelt',
+  'rijst': 'rice', 'haver': 'oats', 'havermout': 'oatmeal', 'gerst': 'barley',
+  'mais': 'corn', 'maïs': 'corn', 'griesmeel': 'semolina',
+  'durumtarwe': 'durum wheat', 'durumtarwegriesmeel': 'durum wheat semolina',
+  'tarwezetmeel': 'wheat starch', 'zetmeel': 'starch',
+  'aardappelzetmeel': 'potato starch', 'maïszetmeel': 'corn starch',
+  'rijstebloem': 'rice flour', 'gluten': 'gluten', 'gist': 'yeast',
+  'bakpoeder': 'baking powder', 'gelatine': 'gelatin',
+  // Oils & fats
+  'zonnebloemolie': 'sunflower oil', 'olijfolie': 'olive oil',
+  'palmolie': 'palm oil', 'palmvet': 'palm fat', 'kokosolie': 'coconut oil',
+  'kokosvet': 'coconut fat', 'raapzaadolie': 'rapeseed oil',
+  'koolzaadolie': 'rapeseed oil', 'sojaolie': 'soybean oil',
+  'plantaardig vet': 'vegetable fat', 'plantaardige olie': 'vegetable oil',
+  // Vegetables
+  'tomaat': 'tomato', 'tomaten': 'tomatoes', 'tomatenpuree': 'tomato paste',
+  'ui': 'onion', 'uien': 'onions', 'knoflook': 'garlic', 'prei': 'leek',
+  'wortel': 'carrot', 'wortelen': 'carrots', 'paprika': 'bell pepper',
+  'pompoen': 'pumpkin', 'courgette': 'zucchini', 'komkommer': 'cucumber',
+  'sla': 'lettuce', 'spinazie': 'spinach', 'broccoli': 'broccoli',
+  'bloemkool': 'cauliflower', 'champignon': 'mushroom', 'champignons': 'mushrooms',
+  'aardappel': 'potato', 'aardappelen': 'potatoes', 'aardappeleiwit': 'potato protein',
+  'selderij': 'celery', 'bleekselderij': 'celery', 'peterselie': 'parsley',
+  'basilicum': 'basil', 'oregano': 'oregano', 'tijm': 'thyme',
+  'rozemarijn': 'rosemary', 'dille': 'dill', 'bieslook': 'chives',
+  'erwten': 'peas', 'bonen': 'beans', 'sperziebonen': 'green beans',
+  // Fruits
+  'appel': 'apple', 'appels': 'apples', 'peer': 'pear', 'peren': 'pears',
+  'banaan': 'banana', 'bananen': 'bananas', 'sinaasappel': 'orange',
+  'citroen': 'lemon', 'limoen': 'lime', 'druif': 'grape', 'druiven': 'grapes',
+  'rode druif': 'red grape', 'aardbei': 'strawberry', 'aardbeien': 'strawberries',
+  'framboos': 'raspberry', 'frambozen': 'raspberries',
+  'bosbes': 'blueberry', 'bosbessen': 'blueberries', 'blauwe bes': 'blueberry',
+  'kers': 'cherry', 'kersen': 'cherries', 'mango': 'mango',
+  'ananas': 'pineapple', 'kokos': 'coconut', 'rozijn': 'raisin', 'rozijnen': 'raisins',
+  // Nuts & seeds
+  'pinda': 'peanut', "pinda's": 'peanuts', 'amandel': 'almond', 'amandelen': 'almonds',
+  'hazelnoot': 'hazelnut', 'hazelnoten': 'hazelnuts', 'walnoot': 'walnut',
+  'walnoten': 'walnuts', 'cashew': 'cashew', 'pistache': 'pistachio',
+  'noten': 'nuts', 'sesam': 'sesame', 'sesamzaad': 'sesame seed',
+  'zonnebloempitten': 'sunflower seeds', 'lijnzaad': 'flaxseed',
+  // Legumes
+  'kikkererwten': 'chickpeas', 'linzen': 'lentils', 'soja': 'soy',
+  'sojabonen': 'soybeans', 'tofu': 'tofu',
+  // Sugar & sweeteners
+  'suiker': 'sugar', 'kristalsuiker': 'granulated sugar',
+  'rietsuiker': 'cane sugar', 'poedersuiker': 'powdered sugar',
+  'honing': 'honey', 'stroop': 'syrup', 'glucose': 'glucose',
+  'fructose': 'fructose', 'maltodextrine': 'maltodextrin',
+  'gerookte maltodextrine': 'smoked maltodextrin',
+  // Common ingredients
+  'water': 'water', 'zout': 'salt', 'zeezout': 'sea salt', 'gerookt zout': 'smoked salt',
+  'peper': 'pepper', 'azijn': 'vinegar', 'mosterd': 'mustard',
+  'specerijen': 'spices', 'kruiden': 'herbs', 'aroma': 'flavoring',
+  "aroma's": 'flavorings', 'gistextract': 'yeast extract',
+  'bouillon': 'broth', 'tomatensaus': 'tomato sauce', 'sojasaus': 'soy sauce',
+  'worcestershiresaus': 'worcestershire sauce',
+  // Chocolate & cocoa
+  'chocolade': 'chocolate', 'cacao': 'cocoa', 'cacaoboter': 'cocoa butter',
+  'cacaopoeder': 'cocoa powder', 'cacaomassa': 'cocoa mass',
+  // Beverages
+  'koffie': 'coffee', 'koffiebonen': 'coffee beans', 'thee': 'tea',
+  'wijn': 'wine', 'bier': 'beer',
+  // Additives
+  'citroenzuur': 'citric acid', 'ascorbinezuur': 'ascorbic acid',
+  'kaliumchloride': 'potassium chloride', 'melasse': 'molasses',
+  'gemodificeerd aardappelzetmeel': 'modified potato starch',
+  'tomatenpoeder': 'tomato powder', 'panko': 'panko', 'paneermeel': 'breadcrumbs',
+  'laurierblad': 'bay leaf',
+}
+
+// Dutch → English category label translations
+const CATEGORY_LABEL_TRANSLATIONS = {
+  'Rundvlees (vleesrund)': 'Beef (herd)',
+  'Rundvlees (zuivelrund)': 'Beef (dairy)',
+  'Lamsvlees': 'Lamb',
+  'Varkensvlees': 'Pork',
+  'Gevogelte': 'Poultry',
+  'Garnalen': 'Shrimp',
+  'Vis': 'Fish',
+  'Kaas': 'Cheese',
+  'Zuivelproducten': 'Dairy',
+  'Eieren': 'Eggs',
+  'Palmolie': 'Palm Oil',
+  'Sojaolie': 'Soybean Oil',
+  'Olijfolie': 'Olive Oil',
+  'Raapzaadolie': 'Rapeseed Oil',
+  'Zonnebloemolie': 'Sunflower Oil',
+  'Rijst': 'Rice',
+  'Tarwe & Rogge': 'Wheat & Rye',
+  'Gerst': 'Barley',
+  'Maïs': 'Corn',
+  'Haver': 'Oats',
+  "Pinda's": 'Peanuts',
+  'Peulvruchten': 'Legumes',
+  'Erwten': 'Peas',
+  'Noten': 'Nuts',
+  'Tofu & Plantaardig': 'Tofu & Plant-based',
+  'Bessen & Druiven': 'Berries & Grapes',
+  'Citrusfruit': 'Citrus Fruit',
+  'Bananen': 'Bananas',
+  'Appels & Peren': 'Apples & Pears',
+  'Overig Fruit': 'Other Fruit',
+  'Tomaten': 'Tomatoes',
+  'Koolsoorten': 'Brassicas',
+  'Uien & Prei': 'Onions & Leeks',
+  'Aardappelen': 'Potatoes',
+  'Wortelgroenten': 'Root Vegetables',
+  'Overige Groenten': 'Other Vegetables',
+  'Rietsuiker': 'Cane Sugar',
+  'Bietsuiker': 'Beet Sugar',
+  'Koffie': 'Coffee',
+  'Chocolade': 'Chocolate',
+  'Wijn': 'Wine',
+  'Plantaardige Melk': 'Plant-based Milk',
+  'Cassave': 'Cassava',
+  'Bier': 'Beer',
+  'Sterke Drank': 'Spirits',
+  'Thee': 'Tea',
+  'Frisdranken': 'Soft Drinks',
+  'Sauzen & Kruiden': 'Sauces & Condiments',
+  'Kant-en-klaar': 'Ready Meals',
+  'Soep': 'Soup',
+  'Snoep & Drop': 'Candy & Sweets',
+  'IJs': 'Ice Cream',
+  'Gebak & Koek': 'Baked Goods',
+  'Desserts': 'Desserts',
+  'Broodbeleg': 'Spreads',
+  'Babyvoeding': 'Baby Food',
+  'Snacks': 'Snacks',
+  'Geen Voedingsmiddel': 'Non-food Item',
+}
+
+function translateIngredient(name, lang) {
+  if (!name || lang === 'nl') return name
+  const lower = name.toLowerCase()
+  // Try exact match first
+  if (INGREDIENT_TRANSLATIONS[lower]) return INGREDIENT_TRANSLATIONS[lower]
+  // Try matching the longest known substring
+  let bestMatch = null
+  let bestLen = 0
+  for (const [nl, en] of Object.entries(INGREDIENT_TRANSLATIONS)) {
+    if (lower.includes(nl) && nl.length > bestLen) {
+      bestMatch = en
+      bestLen = nl.length
+    }
+  }
+  return bestMatch || name
+}
+
+function translateCategory(label, lang) {
+  if (!label || lang === 'nl') return label
+  return CATEGORY_LABEL_TRANSLATIONS[label] || label
+}
+
 function ProductDetailModal({ purchase, onClose }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const authFetch = useAuthenticatedFetch()
   const [details, setDetails] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -401,7 +579,11 @@ function ProductDetailModal({ purchase, onClose }) {
                   color: 'var(--text-muted)',
                   marginTop: '0.25rem'
                 }}>
-                  {details.isNonFood ? 'Geen voedingsmiddel' : details.score != null ? 'CO₂ Score' : 'Geen CO₂ data'}
+                  {details.isNonFood
+                    ? (lang === 'en' ? 'Non-food item' : 'Geen voedingsmiddel')
+                    : details.score != null
+                      ? 'CO₂ Score'
+                      : (lang === 'en' ? 'No CO₂ data' : 'Geen CO₂ data')}
                 </span>
                 {/* CO2 Details */}
                 {details.co2Matched && details.co2PerKg !== null && (
@@ -413,7 +595,7 @@ function ProductDetailModal({ purchase, onClose }) {
                     fontSize: '0.85rem',
                     color: 'var(--text)'
                   }}>
-                    <div style={{ fontWeight: '500' }}>{details.co2CategoryLabel || details.co2Category}</div>
+                    <div style={{ fontWeight: '500' }}>{translateCategory(details.co2CategoryLabel || details.co2Category, lang)}</div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                       {details.co2PerKg.toFixed(1)} kg CO₂ per kg
                     </div>
@@ -424,7 +606,7 @@ function ProductDetailModal({ purchase, onClose }) {
               {/* Top Ingredient CO2 Contributors */}
               {details.ingredientBreakdown && details.ingredientBreakdown.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
-                  <div style={styles.sectionTitle}>Top CO₂ Ingredients</div>
+                  <div style={styles.sectionTitle}>{lang === 'en' ? 'Top CO₂ Ingredients' : 'Top CO₂ Ingrediënten'}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {[...details.ingredientBreakdown]
                       .sort((a, b) => (b.co2PerKg * b.weightFraction) - (a.co2PerKg * a.weightFraction))
@@ -456,7 +638,7 @@ function ProductDetailModal({ purchase, onClose }) {
                             <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
                                 <span style={{ fontWeight: '600', fontSize: '0.85rem', textTransform: 'capitalize' }}>
-                                  {ing.name}
+                                  {translateIngredient(ing.name, lang)}
                                 </span>
                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
                                   ~{Math.round(ing.weightFraction * 100)}%
@@ -486,7 +668,7 @@ function ProductDetailModal({ purchase, onClose }) {
             {details.alternatives && details.alternatives.length > 0 && (
               <div style={styles.section}>
                 <div style={styles.sectionTitle}>
-                  Better Alternatives ({details.alternatives.length})
+                  {lang === 'en' ? 'Better Alternatives' : 'Betere Alternatieven'} ({details.alternatives.length})
                 </div>
                 
                 {details.alternatives.map((alt, i) => (
@@ -560,7 +742,7 @@ function ProductDetailModal({ purchase, onClose }) {
               <div style={styles.section}>
                 <div style={styles.sectionTitle}>
                   <MapPin size={14} style={{ marginRight: '0.5rem' }} />
-                  Origin Calendar
+                  {lang === 'en' ? 'Origin Calendar' : 'Herkomstkalender'}
                 </div>
                 <div style={{ 
                   display: 'grid', 
@@ -613,7 +795,7 @@ function ProductDetailModal({ purchase, onClose }) {
                   color: 'var(--text-muted)',
                   fontStyle: 'italic'
                 }}>
-                  Origin may vary due to seasonal availability
+                  {lang === 'en' ? 'Origin may vary due to seasonal availability' : 'Herkomst kan variëren door seizoensbeschikbaarheid'}
                 </div>
               </div>
             )}
@@ -628,7 +810,7 @@ function ProductDetailModal({ purchase, onClose }) {
                   className="btn btn-primary"
                   style={{ width: '100%', justifyContent: 'center' }}
                 >
-                  View on Albert Heijn <ExternalLink size={16} />
+                  {lang === 'en' ? 'View on Albert Heijn' : 'Bekijk op Albert Heijn'} <ExternalLink size={16} />
                 </a>
               </div>
             )}
