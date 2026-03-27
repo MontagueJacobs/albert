@@ -413,26 +413,50 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Fruits
   'berries_grapes': [
-    'aardbei', 'strawberry', 'framboos', 'raspberry', 'bosbes', 'blueberry',
-    'braam', 'blackberry', 'druif', 'grape', 'bes', 'berry',
-    'rozijn', 'raisin', 'krent'
+    'aardbei', 'aardbeien', 'strawberry',
+    'framboos', 'frambozen', 'raspberry',
+    'bosbes', 'bosbessen', 'blueberry',
+    'braam', 'bramen', 'braambessen', 'blackberry',
+    'druif', 'druiven', 'grape', 'pitloze druiven',
+    'bes', 'bessen', 'berry',
+    'rozijn', 'raisin', 'krent', 'krenten',
+    'rode bessen', 'zwarte bessen', 'kruisbessen'
   ],
   'citrus_fruit': [
-    'sinaasappel', 'orange', 'citroen', 'lemon', 'limoen', 'lime',
-    'grapefruit', 'mandarijn', 'tangerine', 'clementine', 'pompelmoes'
+    'sinaasappel', 'sinaasappelen', 'sinaasappels',
+    'handsinaasappel', 'handsinaasappelen', 'bloedsinaasappel',
+    'orange', 'citroen', 'citroenen', 'lemon', 'limoen', 'lime',
+    'grapefruit', 'mandarijn', 'mandarijnen', 'tangerine',
+    'clementine', 'clementines', 'pompelmoes'
   ],
-  'bananas': ['banaan', 'bananen', 'banana', 'plantain'],
-  'apples': ['appel', 'apple', 'peer', 'pear'],
+  'bananas': ['banaan', 'bananen', 'banana', 'plantain', 'bakbanaan', 'bakbananen'],
+  'apples': [
+    'appel', 'appels', 'appelen', 'apple',
+    'peer', 'peren', 'pear',
+    'jonagold', 'elstar', 'braeburn', 'fuji', 'gala',
+    'golden delicious', 'granny smith', 'goudrenet', 'goudrenetten',
+    'conference', 'stoofpeer', 'stoofperen'
+  ],
   'other_fruit': [
     'mango', 'ananas', 'pineapple', 'meloen', 'melon', 'watermeloen',
-    'kiwi', 'papaya', 'passievrucht', 'passion fruit', 'lychee',
-    'granaatappel', 'pomegranate', 'vijg', 'fig', 'dadel', 'date',
-    'pruim', 'plum', 'kers', 'cherry', 'abrikoos', 'apricot',
-    'perzik', 'peach', 'nectarine', 'kokos', 'coconut'
+    'kiwi', 'papaya', 'passievrucht', 'passion fruit', 'lychee', 'lychees',
+    'granaatappel', 'pomegranate', 'vijg', 'vijgen', 'fig', 'dadel', 'dadels', 'date',
+    'pruim', 'pruimen', 'plum', 'kers', 'kersen', 'cherry',
+    'abrikoos', 'abrikozen', 'apricot',
+    'perzik', 'perziken', 'peach', 'nectarine', 'nectarines',
+    'kokos', 'coconut',
+    'kaki', 'sharon', 'sharonfruit', 'rabarber',
+    'guave', 'physalis', 'pitahaya', 'drakenvrucht'
   ],
   
   // Vegetables
-  'tomatoes': ['tomaat', 'tomato', 'tomatenpuree', 'passata'],
+  'tomatoes': [
+    'tomaat', 'tomaten', 'tomato', 'tomatenpuree', 'passata',
+    'trostomaat', 'trostomaten', 'cherrytomaat', 'cherrytomaten',
+    'cocktailtomaat', 'cocktailtomaatjes', 'tomaatje', 'tomaatjes',
+    'kerstomaat', 'kerstomaten', 'vleestomaat', 'vleestomaten',
+    'san marzano', 'pomodori'
+  ],
   'brassicas': [
     'broccoli', 'bloemkool', 'cauliflower', 'kool', 'cabbage',
     'spruitjes', 'brussels sprouts', 'boerenkool', 'kale',
@@ -440,15 +464,18 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   ],
   'onions_leeks': [
     'ui', 'onion', 'prei', 'leek', 'sjalot', 'shallot',
-    'knoflook', 'garlic', 'bieslook', 'chive', 'lente-ui', 'spring onion'
+    'knoflook', 'garlic', 'bieslook', 'chive', 'lente-ui', 'spring onion',
+    'bosui', 'bosuitjes'
   ],
   'potatoes': [
     'aardappel', 'potato', 'friet', 'fries', 'patat',
-    'puree', 'mash', 'chips', 'aardappelpuree', 'rösti'
+    'puree', 'mash', 'chips', 'aardappelpuree', 'rösti',
+    'zoete aardappel'
   ],
   'root_vegetables': [
     'wortel', 'carrot', 'pastinaak', 'parsnip', 'knolselderij',
-    'celeriac', 'biet', 'beet', 'radijs', 'radish', 'raap', 'turnip'
+    'celeriac', 'biet', 'beet', 'radijs', 'radish', 'raap', 'turnip',
+    'gember', 'gemberwortel', 'ginger'
   ],
   'other_vegetables': [
     'sla', 'lettuce', 'salade', 'salad', 'komkommer', 'cucumber',
@@ -456,7 +483,15 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'pompoen', 'pumpkin', 'asperge', 'asparagus', 'champignon', 'mushroom',
     'venkel', 'fennel', 'artisjok', 'artichoke', 'avocado',
     'maïskolf', 'groente', 'vegetable', 'groentemix',
-    'selderij', 'bleekselderij'
+    'selderij', 'bleekselderij',
+    // Leafy greens & salad vegetables
+    'rucola', 'veldsla', 'witlof', 'ijsbergsla',
+    // Compound produce names (to beat false-positive processed food matches)
+    'snackkomkommer', 'snackgroente', 'snoepgroente', 'snackpaprika',
+    'roerbakgroente', 'wokgroente',
+    // Other vegetables & produce
+    'romanesco', 'bataat', 'peper', 'jalapeño', 'pepertje',
+    'peterselie', 'dille', 'kervel'
   ],
   
   // Sugar
@@ -497,7 +532,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'maaltijd', 'magnetron', 'pizza', 'nasi', 'bami',
     'noodles', 'ramen', 'dim sum', 'loempia', 'spring roll',
     'bapao', 'tosti', 'wereldgerecht', 'stamppot',
-    'ovenschotel', 'wokgroente', 'roerbak',
+    'ovenschotel', 'roerbakschotel', 'wokschotel',
     'maaltijdsalade', 'bentobox'
   ],
   'soup': [
@@ -587,7 +622,7 @@ const NON_FOOD_KEYWORDS = [
   'tandpasta', 'tandenborstel', 'mondwater', 'scheermesje', 'maandverband',
   'luier', 'batterij', 'vuilniszak', 'aluminiumfolie', 'bakpapier',
   'huishoudfolie', 'waxinelicht', 'dreft', 'persil', 'robijn',
-  'swiffer', 'bleek', 'ontkalker', 'wc-blok', 'vaatdoek',
+  'swiffer', 'bleekmiddel', 'bleekwater', 'dikbleek', 'ontkalker', 'wc-blok', 'vaatdoek',
   'spons', 'handschoen', 'prullenbak', 'stofzuig',
   // Health
   'vitamine', 'paracetamol', 'ibuprofen', 'pleister', 'hoestdrank',
@@ -683,8 +718,12 @@ function getCO2Category(productName) {
       const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i')
       if (regex.test(lower)) {
         const priority = getCategoryPriority(category)
-        // Prefer higher priority categories, then longer keyword matches
-        if (priority > bestPriority || (priority === bestPriority && keyword.length > bestMatchLength)) {
+        // A much longer keyword match (>2x) is likely more specific and should win
+        // even against higher-priority categories (e.g. 'ijsbergsla' > 'ijs')
+        const newIsMuchLonger = keyword.length > bestMatchLength * 2
+        const currentIsMuchLonger = bestMatch && bestMatchLength > keyword.length * 2
+        if (newIsMuchLonger ||
+            (!currentIsMuchLonger && (priority > bestPriority || (priority === bestPriority && keyword.length > bestMatchLength)))) {
           bestMatch = category
           bestMatchLength = keyword.length
           bestPriority = priority
