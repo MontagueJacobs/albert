@@ -810,16 +810,22 @@ function getCO2Category(productName) {
 function parseIngredients(ingredientText) {
   if (!ingredientText || typeof ingredientText !== 'string') return []
   
-  // Remove leading label like "Ingrediënten: " or "Ingredients: "
-  let text = ingredientText
-    .replace(/^ingredi[ëe]nten\s*[:;]/i, '')
-    .replace(/^ingredients\s*[:;]/i, '')
+  // Collapse newlines to spaces first (scraped text often has line breaks)
+  let text = ingredientText.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
+  
+  // Remove all occurrences of "Ingrediënten" / "Ingredients" headers/labels
+  // (scraped text often has "Ingrediënten  Ingrediënten: ...")
+  text = text
+    .replace(/ingredi[ëe]nten\s*[:;]?\s*/gi, '')
+    .replace(/ingredients\s*[:;]?\s*/gi, '')
     .trim()
   
-  // Remove trailing allergen/nutritional notes 
-  // (often starts with "Kan bevatten:", "Bevat:", "Allergenen:")
+  // Remove trailing allergen/nutritional notes
+  // "Allergie-informatie Bevat:...", "Kan bevatten:...", "Waarvan toegevoegde..."
   text = text
-    .replace(/\s*(Kan bevatten|Bevat|Allergenen|Allergie-info|Voedingswaarde)\s*[:].*/si, '')
+    .replace(/\s*allergie-informatie\b.*/si, '')
+    .replace(/\s*(Kan bevatten|Bevat|Allergenen|Voedingswaarde)\s*[:].*/si, '')
+    .replace(/\s*\.?\s*waarvan toegevoegde\b.*/si, '')
     .trim()
   
   // Remove trailing period
