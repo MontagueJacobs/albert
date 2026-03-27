@@ -3017,15 +3017,16 @@ app.post('/api/products/enrich-batch', async (req, res) => {
             await supabase
               .from('products')
               .update({
-                is_vegan: details.is_vegan,
-                is_vegetarian: details.is_vegetarian,
-                is_organic: details.is_organic,
-                nutri_score: details.nutri_score,
-                origin_country: details.origin_country,
-                brand: details.brand,
-                unit_size: details.unit_size,
+                is_vegan: details.is_vegan ?? null,
+                is_vegetarian: details.is_vegetarian ?? null,
+                is_organic: details.is_organic ?? null,
+                is_fairtrade: details.is_fairtrade ?? null,
+                nutri_score: details.nutri_score ?? null,
+                origin_country: details.origin_country ?? null,
+                brand: details.brand ?? null,
+                unit_size: details.unit_size ?? null,
                 allergens: details.allergens || [],
-                ingredients: details.ingredients,
+                ingredients: details.ingredients ?? null,
                 details_scraped_at: new Date().toISOString(),
                 details_scrape_status: 'success',
                 updated_at: new Date().toISOString()

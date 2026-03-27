@@ -196,7 +196,9 @@ class BatchOriginScraper:
             return False
             
         try:
-            # Build update payload - only include non-None values
+            # Build update payload - only include non-None values for optional fields
+            # ALWAYS include is_vegan/is_vegetarian/is_organic/is_fairtrade so that
+            # previously incorrect values (e.g. false vegan=true) get overwritten with None
             update_payload = {}
             
             if origin_data.get('origin_country'):
@@ -204,18 +206,13 @@ class BatchOriginScraper:
                 
             if origin_data.get('origin_by_month'):
                 update_payload['origin_by_month'] = origin_data['origin_by_month']
-                
-            if origin_data.get('is_fairtrade') is not None:
-                update_payload['is_fairtrade'] = origin_data['is_fairtrade']
-                
-            if origin_data.get('is_organic') is not None:
-                update_payload['is_organic'] = origin_data['is_organic']
-                
-            if origin_data.get('is_vegan') is not None:
-                update_payload['is_vegan'] = origin_data['is_vegan']
-                
-            if origin_data.get('is_vegetarian') is not None:
-                update_payload['is_vegetarian'] = origin_data['is_vegetarian']
+            
+            # Always write boolean flags - None means "not detected" and should
+            # overwrite any stale true/false from previous (buggy) scrapes
+            update_payload['is_fairtrade'] = origin_data.get('is_fairtrade')
+            update_payload['is_organic'] = origin_data.get('is_organic')
+            update_payload['is_vegan'] = origin_data.get('is_vegan')
+            update_payload['is_vegetarian'] = origin_data.get('is_vegetarian')
                 
             if origin_data.get('nutri_score'):
                 update_payload['nutri_score'] = origin_data['nutri_score']

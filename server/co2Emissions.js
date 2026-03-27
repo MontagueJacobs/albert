@@ -1021,16 +1021,18 @@ function getCO2FromIngredients(ingredientText, maxIngredients = 10) {
   let totalCO2 = 0
   let totalWeight = 0
   let dominantCategory = null
-  let dominantWeight = 0
+  let dominantCO2Contribution = 0
   
   for (const ing of weighted) {
     if (ing.co2PerKg != null && ing.weightFraction > 0) {
-      totalCO2 += ing.co2PerKg * ing.weightFraction
+      const co2Contribution = ing.co2PerKg * ing.weightFraction
+      totalCO2 += co2Contribution
       totalWeight += ing.weightFraction
       
-      // Track the category with highest weight contribution
-      if (ing.weightFraction > dominantWeight) {
-        dominantWeight = ing.weightFraction
+      // Track the category with highest CO2 contribution (not just weight)
+      // This ensures the label matches the actual CO2 driver
+      if (co2Contribution > dominantCO2Contribution) {
+        dominantCO2Contribution = co2Contribution
         dominantCategory = ing.category
       }
     }
