@@ -368,11 +368,16 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'yoghurt', 'yogurt', 'kwark', 'vla', 'custard',
     'karnemelk', 'buttermilk', 'creme fraiche', 'zure room',
     'boter', 'butter', 'margarine', 'roomboter',
-    'zuivel', 'drinkyoghurt', 'optimel', 'chocomel'
+    'zuivel', 'drinkyoghurt', 'optimel', 'chocomel',
+    'wei', 'whey', 'weipoeder', 'lactose', 'caseïne', 'caseine',
+    'room', 'magere melk', 'volle melk', 'halfvolle melk'
   ],
   'eggs': [
     'ei', 'eieren', 'eggs', 'omelet', 'roerei', 'gebakken ei',
-    'hardgekookt', 'zachtgekookt'
+    'hardgekookt', 'zachtgekookt',
+    'vrije-uitloopei', 'vrije-uitloopeieren', 'uitloopei', 'uitloopeieren',
+    'scharrelei', 'scharreleieren', 'biologisch ei',
+    'eigeel', 'eiwit', 'eipoeder', 'ei-ingrediënt'
   ],
   
   // Oils
@@ -390,7 +395,10 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'pasta', 'spaghetti', 'macaroni', 'penne', 'fusilli', 'tagliatelle',
     'lasagne', 'ravioli', 'gnocchi', 'couscous', 'tortelloni', 'tortellini',
     'meel', 'flour', 'tarwebloem', 'zelfrijzend bakmeel',
-    'crackers', 'beschuit'
+    'crackers', 'beschuit',
+    'tarwe', 'wheat', 'rogge', 'rye', 'bloem',
+    'durumtarwe', 'durumtarwegriesmeel', 'griesmeel', 'semolina',
+    'spelt', 'tarwemeel', 'tarwezetmeel', 'gluten'
   ],
   'barley': ['gerst', 'barley', 'gort'],
   'maize': ['mais', 'corn', 'polenta', 'tortilla chips', 'nachos'],
@@ -470,7 +478,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'spinazie', 'spinach', 'andijvie', 'paksoi', 'chinese kool'
   ],
   'onions_leeks': [
-    'ui', 'onion', 'prei', 'leek', 'sjalot', 'shallot',
+    'ui', 'uien', 'onion', 'prei', 'leek', 'sjalot', 'shallot',
     'knoflook', 'garlic', 'bieslook', 'chive', 'lente-ui', 'spring onion',
     'bosui', 'bosuitjes'
   ],
@@ -674,8 +682,8 @@ const FALLBACK_CATEGORIES = [
   { keywords: ['noten', 'noot', 'nut'], category: 'nuts' },
   // Snack fallback
   { keywords: ['snack', 'tussendoor', 'borrel'], category: 'snacks' },
-  // Sugar/sweet fallback
-  { keywords: ['zoet', 'sweet', 'suiker', 'sugar', 'snoep', 'candy'], category: 'beet_sugar' },
+  // Sugar/sweet fallback (not 'zoet' - too many false positives like 'zoete appeltjes')
+  { keywords: ['sweet', 'suiker', 'sugar', 'snoep', 'candy'], category: 'beet_sugar' },
 ]
 
 // Category priority - higher priority wins when keywords from multiple categories match
@@ -723,7 +731,12 @@ function getCO2Category(productName) {
   for (const [category, keywords] of Object.entries(PRODUCT_CATEGORY_KEYWORDS)) {
     for (const keyword of keywords) {
       // Match whole words or word boundaries
-      const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i')
+      // For very short keywords (≤3 chars), require word boundary on BOTH sides
+      // to prevent false positives like 'ui' matching inside 'uitloopei'
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = keyword.length <= 3
+        ? new RegExp(`\\b${escaped}\\b`, 'i')
+        : new RegExp(`\\b${escaped}`, 'i')
       if (regex.test(lower)) {
         const priority = getCategoryPriority(category)
         // A much longer keyword match (>2x) is likely more specific and should win
