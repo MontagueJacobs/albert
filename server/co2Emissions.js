@@ -1052,8 +1052,11 @@ function getCO2FromIngredients(ingredientText, maxIngredients = 10) {
     return { co2PerKg: null, category: null, matched: false, method: 'ingredients' }
   }
   
-  // Weighted average (normalize by matched weight, not total)
-  const avgCO2 = totalCO2 / totalWeight
+  // Sum of contributions = total CO2 per kg of product
+  // We use totalCO2 directly (not divided by totalWeight) because unmatched
+  // ingredients (water, salt, additives, vitamins) have near-zero CO2.
+  // This makes the number intuitive: the individual contributions add up to the total.
+  const avgCO2 = totalCO2
   
   return {
     co2PerKg: Math.round(avgCO2 * 100) / 100,
