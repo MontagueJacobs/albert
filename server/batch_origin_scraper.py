@@ -233,6 +233,12 @@ class BatchOriginScraper:
             if origin_data.get('ingredients'):
                 update_payload['ingredients'] = origin_data['ingredients']
             
+            if origin_data.get('nutrition_text'):
+                update_payload['nutrition_text'] = origin_data['nutrition_text']
+            
+            if origin_data.get('nutrition_json'):
+                update_payload['nutrition_json'] = origin_data['nutrition_json']
+            
             # Allergens is a list - store as JSON array
             if origin_data.get('allergens'):
                 update_payload['allergens'] = origin_data['allergens']

@@ -1004,9 +1004,64 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
   // Apply nutritional caps to specific ingredient types
   // Oil/fat ingredients can't exceed the total fat content
   // Salt can't exceed the declared salt content
+  // Protein sources can't exceed protein content (with conversion factor)
+  // Sugar ingredients can't exceed sugar content
+  // Grain/starch can't exceed total carbs
   const OIL_CATEGORIES = new Set(['olive_oil', 'rapeseed_oil', 'sunflower_oil', 'soybean_oil', 'palm_oil'])
-  const OIL_KEYWORDS = ['olie', 'oil', 'boter', 'butter', 'margarine']
+  const OIL_KEYWORDS = ['olie', 'oil', 'boter', 'butter', 'margarine', 'room', 'cream', 'slagroom', 'crème']
   const SALT_KEYWORDS = ['zout', 'salt', 'zeezout', 'joodzout', 'natriumchloride']
+  
+  // Protein-rich ingredients: meat (~20-25% protein), dairy (~3-25%), legumes (~8-25%), eggs (~13%)
+  // We use a conversion: if label says X g protein, max meat weight ≈ X/0.20 = 5*X
+  // But simpler: protein-rich ingredients can't contribute more protein than the label shows
+  const PROTEIN_CATEGORIES = new Set([
+    'beef', 'lamb', 'pork', 'poultry', 'fish', 'shrimp', 'cheese', 'eggs',
+    'tofu', 'nuts', 'groundnuts', 'soymilk'
+  ])
+  const PROTEIN_KEYWORDS = [
+    'vlees', 'meat', 'kip', 'chicken', 'rund', 'beef', 'varken', 'pork',
+    'vis', 'fish', 'zalm', 'salmon', 'tonijn', 'tuna', 'garnaal', 'shrimp',
+    'ei', 'egg', 'eieren', 'kaas', 'cheese', 'kwark', 'yoghurt',
+    'tofu', 'tempeh', 'soja', 'soy', 'linzen', 'lentils', 'kikkererwt', 'chickpea',
+    'bonen', 'beans', 'noten', 'nuts', 'amandel', 'almond', 'cashew',
+    'pinda', 'peanut', 'walnoot', 'walnut', 'erwt', 'pea',
+    'melk', 'milk', 'wei', 'whey', 'caseïne', 'casein'
+  ]
+  // Typical protein content by ingredient type (g protein per 100g ingredient)
+  const PROTEIN_DENSITY = {
+    // Meats: ~20% protein
+    beef: 0.20, lamb: 0.20, pork: 0.20, poultry: 0.22, fish: 0.20, shrimp: 0.20,
+    // Dairy: varies a lot
+    cheese: 0.25, eggs: 0.13, milk: 0.03,
+    // Plant protein
+    tofu: 0.12, nuts: 0.20, groundnuts: 0.25, soymilk: 0.03,
+  }
+  
+  // Sugar ingredients: sugar, siroop, honing, glucose, fructose, etc.
+  const SUGAR_KEYWORDS = [
+    'suiker', 'sugar', 'siroop', 'syrup', 'stroop', 'honing', 'honey',
+    'glucose', 'fructose', 'dextrose', 'maltose', 'lactose', 'saccharose',
+    'agave', 'maltodextrine', 'isoglucose'
+  ]
+  const SUGAR_CATEGORIES = new Set(['cane_sugar', 'beet_sugar'])
+  
+  // Starch/grain/flour ingredients  
+  const CARB_KEYWORDS = [
+    'meel', 'flour', 'bloem', 'tarwe', 'wheat', 'rijst', 'rice',
+    'mais', 'corn', 'maize', 'haver', 'oat', 'gerst', 'barley',
+    'rogge', 'rye', 'griesmeel', 'semolina', 'aardappel', 'potato',
+    'zetmeel', 'starch', 'pasta', 'couscous', 'bulgur', 'quinoa',
+    'boekweit', 'buckwheat', 'spelt'
+  ]
+  const CARB_CATEGORIES = new Set([
+    'wheat', 'rice', 'maize', 'oatmeal', 'potatoes', 'cassava', 'bread'
+  ])
+  
+  // Fiber-rich ingredients
+  const FIBER_KEYWORDS = [
+    'vezels', 'fiber', 'zemelen', 'bran', 'psyllium', 'inuline', 'inulin',
+    'cellulose', 'pectine', 'pectin'
+  ]
   
   // Trace ingredients: always present in tiny amounts (< 2%), regardless of product
   // These get a hard ceiling even without nutritional data
@@ -1039,17 +1094,58 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
   
   if (nutritionHints) {
     for (let i = 0; i < enriched.length; i++) {
+      if (enriched[i].percentage != null) continue // Skip declared percentages
       const lower = enriched[i].name.toLowerCase()
-      // Cap oil/fat ingredients at the total fat percentage
+      const cat = enriched[i].category
+      
+      // ---- FAT cap: oil/fat ingredients can't exceed total fat ----
       if (nutritionHints.fatPct != null) {
-        if (OIL_CATEGORIES.has(enriched[i].category) || OIL_KEYWORDS.some(k => lower.includes(k))) {
+        if (OIL_CATEGORIES.has(cat) || OIL_KEYWORDS.some(k => lower.includes(k))) {
           ceilings[i] = Math.min(ceilings[i], nutritionHints.fatPct)
         }
       }
-      // Cap salt at declared salt percentage (tighter than default)
+      
+      // ---- SALT cap: salt ingredients can't exceed declared salt ----
       if (nutritionHints.saltPct != null) {
         if (SALT_KEYWORDS.some(k => lower.includes(k))) {
           ceilings[i] = Math.min(ceilings[i], nutritionHints.saltPct)
+        }
+      }
+      
+      // ---- PROTEIN cap: protein-rich ingredients capped by protein content ----
+      // If label says Xg protein, a meat ingredient (20% protein) can be at most X/0.20 = 5X% 
+      if (nutritionHints.proteinPct != null) {
+        const isProteinSource = PROTEIN_CATEGORIES.has(cat) || PROTEIN_KEYWORDS.some(k => lower.includes(k))
+        if (isProteinSource) {
+          // Determine this ingredient's typical protein density
+          const density = (cat && PROTEIN_DENSITY[cat]) || 0.18 // Default ~18% protein
+          // Max weight = label_protein / density (protein from this ingredient can't exceed total)
+          const maxWeight = nutritionHints.proteinPct / density
+          ceilings[i] = Math.min(ceilings[i], maxWeight)
+        }
+      }
+      
+      // ---- SUGAR cap: sugar ingredients can't exceed declared sugars ----
+      if (nutritionHints.sugarsPct != null) {
+        if (SUGAR_CATEGORIES.has(cat) || SUGAR_KEYWORDS.some(k => lower.includes(k))) {
+          // Pure sugar ingredients are ~100% sugar, so max weight ≈ label sugars value
+          ceilings[i] = Math.min(ceilings[i], nutritionHints.sugarsPct * 1.1) // Small margin for impure
+        }
+      }
+      
+      // ---- CARBS cap: grain/starch ingredients capped by total carbs ----
+      // Grains are roughly 70-80% carbs by weight, so max weight = carbs / 0.70
+      if (nutritionHints.carbsPct != null) {
+        if (CARB_CATEGORIES.has(cat) || CARB_KEYWORDS.some(k => lower.includes(k))) {
+          const maxWeight = nutritionHints.carbsPct / 0.65 // Generous: ~65% carbs in flour
+          ceilings[i] = Math.min(ceilings[i], maxWeight)
+        }
+      }
+      
+      // ---- FIBER cap: fiber ingredients capped by declared fiber ----
+      if (nutritionHints.fiberPct != null) {
+        if (FIBER_KEYWORDS.some(k => lower.includes(k))) {
+          ceilings[i] = Math.min(ceilings[i], nutritionHints.fiberPct * 1.5) // Fiber sources vary 30-90%
         }
       }
     }
@@ -1149,13 +1245,37 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
 }
 
 /**
- * Extract fat and salt percentages from the nutritional info section of scraped text.
- * These values (per 100g/100ml) serve as hard caps for ingredient weight estimation.
+ * Extract nutritional values from raw text OR return structured nutrition JSON.
+ * Values per 100g/100ml = direct weight percentages.
+ * Used to constrain ingredient weight estimates:
+ *   fat     → caps oil/butter/margarine ingredients
+ *   protein → caps meat/dairy/legume ingredients
+ *   carbs   → caps grain/flour/starch/sugar ingredients
+ *   sugars  → caps sugar ingredient specifically
+ *   fiber   → caps legume/whole grain ingredients
+ *   salt    → caps salt ingredient
+ *   saturated_fat → helps distinguish palm oil/butter from sunflower oil
  * 
  * @param {string} text - Raw scraped text that may contain "Voedingswaarde" section
- * @returns {Object|null} - { fatPct, saltPct } or null if not found
+ * @param {Object|null} nutritionJson - Pre-parsed structured nutrition from DB
+ * @returns {Object|null} - { fatPct, saltPct, proteinPct, carbsPct, sugarsPct, fiberPct, saturatedFatPct, energyKcal }
  */
-function extractNutritionHints(text) {
+function extractNutritionHints(text, nutritionJson = null) {
+  // If we have pre-parsed structured JSON from the scraper, use it directly
+  if (nutritionJson && typeof nutritionJson === 'object') {
+    const hints = {}
+    let found = false
+    if (nutritionJson.fat != null) { hints.fatPct = nutritionJson.fat; found = true }
+    if (nutritionJson.salt != null) { hints.saltPct = nutritionJson.salt; found = true }
+    if (nutritionJson.protein != null) { hints.proteinPct = nutritionJson.protein; found = true }
+    if (nutritionJson.carbs != null) { hints.carbsPct = nutritionJson.carbs; found = true }
+    if (nutritionJson.sugars != null) { hints.sugarsPct = nutritionJson.sugars; found = true }
+    if (nutritionJson.fiber != null) { hints.fiberPct = nutritionJson.fiber; found = true }
+    if (nutritionJson.saturated_fat != null) { hints.saturatedFatPct = nutritionJson.saturated_fat; found = true }
+    if (nutritionJson.energy_kcal != null) { hints.energyKcal = nutritionJson.energy_kcal; found = true }
+    return found ? hints : null
+  }
+
   if (!text) return null
   
   // Find the "Voedingswaarde" / "Nutritional" / "Nutrition" section
@@ -1165,25 +1285,57 @@ function extractNutritionHints(text) {
   // Extract from the voedingswaarde section onwards
   const section = text.slice(voedingMatch.index)
   
-  let fatPct = null
-  let saltPct = null
+  const hints = {}
+  let found = false
   
-  // Match "Vet X,X g" or "Vet X.X g" or "Fat X.X g" — per 100g values
-  const fatMatch = section.match(/\bvet\b\s*(\d+[.,]?\d*)\s*g/i)
-    || section.match(/\bfat\b\s*(\d+[.,]?\d*)\s*g/i)
-  if (fatMatch) {
-    fatPct = parseFloat(fatMatch[1].replace(',', '.'))
+  // Helper: try to match a nutrient value in grams
+  function matchGrams(patterns) {
+    for (const p of patterns) {
+      const m = section.match(p)
+      if (m) return parseFloat(m[1].replace(',', '.'))
+    }
+    return null
   }
   
-  // Match "Zout X,XX g" or "Salt X.XX g"
-  const saltMatch = section.match(/\bzout\b\s*(\d+[.,]?\d*)\s*g/i)
-    || section.match(/\bsalt\b\s*(\d+[.,]?\d*)\s*g/i)
-  if (saltMatch) {
-    saltPct = parseFloat(saltMatch[1].replace(',', '.'))
-  }
+  // Fat (total)
+  const fat = matchGrams([/\bvetten?\b\s*(\d+[.,]?\d*)\s*g/i, /\bfat\b\s*(\d+[.,]?\d*)\s*g/i])
+  if (fat != null) { hints.fatPct = fat; found = true }
   
-  if (fatPct == null && saltPct == null) return null
-  return { fatPct, saltPct }
+  // Saturated fat
+  const satFat = matchGrams([
+    /waarvan\s+verzadigd(?:e?\s+vetzuren?)?\s*(\d+[.,]?\d*)\s*g/i,
+    /(?:of\s+which\s+)?saturates?\s*(\d+[.,]?\d*)\s*g/i
+  ])
+  if (satFat != null) { hints.saturatedFatPct = satFat; found = true }
+  
+  // Carbohydrates
+  const carbs = matchGrams([/\bkoolhydraten\b\s*(\d+[.,]?\d*)\s*g/i, /\bcarbohydrate\b\s*(\d+[.,]?\d*)\s*g/i])
+  if (carbs != null) { hints.carbsPct = carbs; found = true }
+  
+  // Sugars
+  const sugars = matchGrams([
+    /waarvan\s+suikers?\s*(\d+[.,]?\d*)\s*g/i,
+    /(?:of\s+which\s+)?sugars?\s*(\d+[.,]?\d*)\s*g/i
+  ])
+  if (sugars != null) { hints.sugarsPct = sugars; found = true }
+  
+  // Fiber
+  const fiber = matchGrams([/\bvezels?\b\s*(\d+[.,]?\d*)\s*g/i, /\bfib(?:re|er)\b\s*(\d+[.,]?\d*)\s*g/i])
+  if (fiber != null) { hints.fiberPct = fiber; found = true }
+  
+  // Protein
+  const protein = matchGrams([/\beiwitten?\b\s*(\d+[.,]?\d*)\s*g/i, /\bprotein\b\s*(\d+[.,]?\d*)\s*g/i])
+  if (protein != null) { hints.proteinPct = protein; found = true }
+  
+  // Salt
+  const salt = matchGrams([/\bzout\b\s*(\d+[.,]?\d*)\s*g/i, /\bsalt\b\s*(\d+[.,]?\d*)\s*g/i])
+  if (salt != null) { hints.saltPct = salt; found = true }
+  
+  // Energy
+  const energyMatch = section.match(/(\d+[.,]?\d*)\s*kcal/i)
+  if (energyMatch) { hints.energyKcal = parseFloat(energyMatch[1].replace(',', '.')); found = true }
+  
+  return found ? hints : null
 }
 
 /**
@@ -1194,10 +1346,11 @@ function extractNutritionHints(text) {
  * @param {number} maxIngredients - Max ingredients to consider (default 10)
  * @returns {Object} - { co2PerKg, category, matched, method: 'ingredients', ingredients: [...] }
  */
-function getCO2FromIngredients(ingredientText, nutritionText = null, maxIngredients = 10) {
-  // Extract nutritional hints from dedicated nutrition text field, OR from
-  // the ingredient text itself (some scraped text includes voedingswaarde)
-  const nutritionHints = extractNutritionHints(nutritionText) || extractNutritionHints(ingredientText)
+function getCO2FromIngredients(ingredientText, nutritionText = null, nutritionJson = null, maxIngredients = 10) {
+  // Get nutritional hints: prefer structured JSON, then dedicated nutrition text, then ingredient text
+  const nutritionHints = extractNutritionHints(null, nutritionJson) 
+    || extractNutritionHints(nutritionText) 
+    || extractNutritionHints(ingredientText)
   
   const parsed = parseIngredients(ingredientText)
   if (parsed.length === 0) {
@@ -1278,7 +1431,7 @@ const NAME_OVERRIDE_CATEGORIES = new Set([
   'cheese',                         // Aging, high milk-to-cheese ratio
 ])
 
-function getCO2Emissions(productName, ingredientText = null, nutritionText = null) {
+function getCO2Emissions(productName, ingredientText = null, nutritionText = null, nutritionJson = null) {
   // First: exclude non-food items by name
   if (isNonFood(productName)) {
     return {
@@ -1305,7 +1458,7 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
   
   // Try ingredient-based scoring (most accurate for composite products)
   if (ingredientText && typeof ingredientText === 'string' && ingredientText.length > 5) {
-    const ingredientResult = getCO2FromIngredients(ingredientText, nutritionText)
+    const ingredientResult = getCO2FromIngredients(ingredientText, nutritionText, nutritionJson)
     if (ingredientResult.matched) {
       return {
         ...ingredientResult,

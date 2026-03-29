@@ -153,6 +153,75 @@ class AHProductDetailScraper:
         if self._playwright:
             await self._playwright.stop()
             
+    def _parse_nutrition_values(self, text: str) -> Optional[Dict[str, float]]:
+        """
+        Parse structured nutrition values from voedingswaarden text.
+        AH nutrition tables show values per 100g/100ml, so the gram values
+        directly translate to percentages of the product's composition.
+        
+        Returns dict with keys: energy_kcal, fat, saturated_fat, carbs, sugars, fiber, protein, salt
+        All values in grams per 100g (= percentage), except energy in kcal.
+        """
+        if not text:
+            return None
+        
+        values = {}
+        
+        # Each pattern: (output_key, regex_patterns)
+        # We try Dutch names first, then English
+        nutrition_fields = [
+            ('energy_kcal', [
+                r'(?:energie|energy)\s*[\d,.]+\s*kJ\s*/\s*(\d+[.,]?\d*)\s*kcal',
+                r'(\d+[.,]?\d*)\s*kcal',
+            ]),
+            ('fat', [
+                r'\bvetten?\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bfat\b\s*(\d+[.,]?\d*)\s*g',
+                r'\btotal\s+fat\b\s*(\d+[.,]?\d*)\s*g',
+            ]),
+            ('saturated_fat', [
+                r'waarvan\s+verzadigd(?:e?\s+vetzuren?)?\s*(\d+[.,]?\d*)\s*g',
+                r'(?:of\s+which\s+)?saturates?\s*(\d+[.,]?\d*)\s*g',
+            ]),
+            ('carbs', [
+                r'\bkoolhydraten\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bcarbohydrate\b\s*(\d+[.,]?\d*)\s*g',
+            ]),
+            ('sugars', [
+                r'waarvan\s+suikers?\s*(\d+[.,]?\d*)\s*g',
+                r'(?:of\s+which\s+)?sugars?\s*(\d+[.,]?\d*)\s*g',
+            ]),
+            ('fiber', [
+                r'\bvezels?\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bfib(?:re|er)\b\s*(\d+[.,]?\d*)\s*g',
+            ]),
+            ('protein', [
+                r'\beiwitten?\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bprotein\b\s*(\d+[.,]?\d*)\s*g',
+            ]),
+            ('salt', [
+                r'\bzout\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bsalt\b\s*(\d+[.,]?\d*)\s*g',
+            ]),
+        ]
+        
+        for key, patterns in nutrition_fields:
+            for pattern in patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    try:
+                        val = float(match.group(1).replace(',', '.'))
+                        values[key] = val
+                    except ValueError:
+                        pass
+                    break
+        
+        if not values:
+            return None
+        
+        print(f"[DEBUG] Parsed nutrition values: {values}", flush=True)
+        return values
+    
     async def scrape_product(self, url: str) -> Dict[str, Any]:
         """
         Scrape detailed information from a single product page.
@@ -180,6 +249,7 @@ class AHProductDetailScraper:
             'allergens': [],
             'ingredients': None,
             'nutrition_text': None,
+            'nutrition_json': None,  # Structured: {energy_kcal, fat, saturated_fat, carbs, sugars, fiber, protein, salt}
             'error': None,
             'scraped_at': datetime.now().isoformat()
         }
@@ -814,20 +884,48 @@ class AHProductDetailScraper:
             
             # ================================================================
             # Extract Voedingswaarde (Nutritional info) for CO2 weight estimation
-            # We need fat and salt values to cap ingredient weight estimates.
+            # We scrape both raw text AND structured values (fat, protein, carbs, etc.)
+            # to cross-reference ingredients with nutrition labels.
             # ================================================================
             try:
-                # Try to find a voedingswaarde/nutrition section by selector
-                nutrition_elem = await self.page.query_selector(
-                    '[class*="nutrition"], [class*="voedingswaarde"], '
-                    '[itemprop="nutrition"], [data-testhook*="nutrition"]'
-                )
-                if nutrition_elem:
-                    result['nutrition_text'] = (await nutrition_elem.inner_text()).strip()[:1000]
-            except:
-                pass
+                # Strategy 1: Expand the Voedingswaarden accordion (same pattern as Kenmerken/Herkomst)
+                nutrition_text = await self.page.evaluate('''() => {
+                    const summaries = Array.from(document.querySelectorAll('summary'));
+                    for (const s of summaries) {
+                        const txt = s.textContent || s.innerText || '';
+                        if (txt.includes('Voedingswaarden') || txt.includes('Nutritional')) {
+                            const details = s.closest('details');
+                            if (details) {
+                                details.open = true;
+                                return details.innerText;
+                            }
+                        }
+                    }
+                    return null;
+                }''')
+                
+                if nutrition_text and len(nutrition_text.strip()) > 20:
+                    result['nutrition_text'] = nutrition_text.strip()[:2000]
+                    print(f"[DEBUG] Voedingswaarden from accordion: {nutrition_text[:150]}...", flush=True)
+            except Exception as e:
+                print(f"[WARN] Voedingswaarden accordion failed: {e}", flush=True)
             
-            # Fallback: extract from page content using regex
+            # Strategy 2: CSS selectors fallback
+            if not result.get('nutrition_text'):
+                try:
+                    nutrition_elem = await self.page.query_selector(
+                        '[class*="nutrition"], [class*="voedingswaarde"], '
+                        '[itemprop="nutrition"], [data-testhook*="nutrition"]'
+                    )
+                    if nutrition_elem:
+                        nt = (await nutrition_elem.inner_text()).strip()
+                        if len(nt) > 20:
+                            result['nutrition_text'] = nt[:2000]
+                            print(f"[DEBUG] Voedingswaarden from CSS selector: {nt[:150]}...", flush=True)
+                except:
+                    pass
+            
+            # Strategy 3: Regex fallback from raw HTML content
             if not result.get('nutrition_text'):
                 nutrition_patterns = [
                     r'voedingswaarde\s*(?:per\s+\d+\s*(?:g|ml))?\s*(.+?)(?=ingredi[ëe]nten|allergi|bewaar|bereid|$)',
@@ -840,8 +938,12 @@ class AHProductDetailScraper:
                         nutrition_raw = re.sub(r'<[^>]+>', ' ', nutrition_raw)
                         nutrition_raw = re.sub(r'\s+', ' ', nutrition_raw).strip()
                         if len(nutrition_raw) > 20:
-                            result['nutrition_text'] = nutrition_raw[:1000]
+                            result['nutrition_text'] = nutrition_raw[:2000]
                         break
+            
+            # Parse structured nutrition values from the text
+            if result.get('nutrition_text'):
+                result['nutrition_json'] = self._parse_nutrition_values(result['nutrition_text'])
             
             # ================================================================
             # Extract Price (only if not already extracted from JSON-LD Strategy 1)
