@@ -1313,6 +1313,7 @@ function getEnrichedData(product) {
     allergens: product.allergens,
     ingredients: product.ingredients,
     nutrition_text: product.nutrition_text,
+    image_url: product.image_url,
     details_scraped_at: product.details_scraped_at
   }
 }
@@ -3677,6 +3678,7 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
     const fromPurchases = await Promise.all(shuffledPurchases.map(async (p) => {
       // Get enriched data from products table
       let enrichedData = null
+      let productImage = null
       if (p.product_id) {
         const { data: product } = await supabase
           .from('products')
@@ -3685,13 +3687,14 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
           .single()
         if (product) {
           enrichedData = getEnrichedData(product)
+          productImage = product.image_url
         }
       }
       const evaluation = evaluateProduct(p.product_name, enrichedData)
       return {
         id: p.product_id,
         name: p.product_name,
-        image_url: enrichedData?.image_url || null,
+        image_url: enrichedData?.image_url || productImage || null,
         source: 'purchased',
         actual_score: evaluation.score,
         co2PerKg: evaluation.co2PerKg,
