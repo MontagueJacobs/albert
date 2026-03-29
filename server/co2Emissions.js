@@ -1307,12 +1307,17 @@ function extractNutritionHints(text, nutritionJson = null) {
 
   if (!text) return null
   
-  // Find the "Voedingswaarde" / "Nutritional" / "Nutrition" section
+  // Find the "Voedingswaarde" / "Nutritional" / "Nutrition" section.
+  // If no header found, check if the text itself looks like nutrition data
+  // (e.g. nutrition_text from the DB often starts with "Energie ...kcal")
+  let section = text
   const voedingMatch = text.match(/voedingswaarde|nutrition/i)
-  if (!voedingMatch) return null
-  
-  // Extract from the voedingswaarde section onwards
-  const section = text.slice(voedingMatch.index)
+  if (voedingMatch) {
+    section = text.slice(voedingMatch.index)
+  } else if (!/\b(?:kcal|kJ|vet|fat|eiwit|protein|koolhydra|carbohydrate)\b/i.test(text)) {
+    // Text doesn't look like nutrition data at all
+    return null
+  }
   
   const hints = {}
   let found = false
@@ -1326,8 +1331,8 @@ function extractNutritionHints(text, nutritionJson = null) {
     return null
   }
   
-  // Fat (total)
-  const fat = matchGrams([/\bvetten?\b\s*(\d+[.,]?\d*)\s*g/i, /\bfat\b\s*(\d+[.,]?\d*)\s*g/i])
+  // Fat (total) — \bvet(?:ten?)?\b matches 'Vet', 'Vette', 'Vetten'
+  const fat = matchGrams([/\bvet(?:ten?)?\b\s*(\d+[.,]?\d*)\s*g/i, /\bfat\b\s*(\d+[.,]?\d*)\s*g/i])
   if (fat != null) { hints.fatPct = fat; found = true }
   
   // Saturated fat
@@ -1348,8 +1353,8 @@ function extractNutritionHints(text, nutritionJson = null) {
   ])
   if (sugars != null) { hints.sugarsPct = sugars; found = true }
   
-  // Fiber
-  const fiber = matchGrams([/\bvezels?\b\s*(\d+[.,]?\d*)\s*g/i, /\bfib(?:re|er)\b\s*(\d+[.,]?\d*)\s*g/i])
+  // Fiber — (?:voedings)?vezels? matches both 'Vezel(s)' and 'Voedingsvezel'
+  const fiber = matchGrams([/(?:voedings)?vezels?\b\s*(\d+[.,]?\d*)\s*g/i, /\bfib(?:re|er)\b\s*(\d+[.,]?\d*)\s*g/i])
   if (fiber != null) { hints.fiberPct = fiber; found = true }
   
   // Protein
@@ -1381,10 +1386,19 @@ function extractNutritionHints(text, nutritionJson = null) {
  * @returns {Object} - { co2PerKg, category, matched, method: 'ingredients', ingredients: [...] }
  */
 function getCO2FromIngredients(ingredientText, nutritionText = null, nutritionJson = null, maxIngredients = 10) {
-  // Get nutritional hints: prefer structured JSON, then dedicated nutrition text, then ingredient text
-  const nutritionHints = extractNutritionHints(null, nutritionJson) 
-    || extractNutritionHints(nutritionText) 
-    || extractNutritionHints(ingredientText)
+  // Get nutritional hints: prefer structured JSON, supplement with text parsing
+  // JSON may be incomplete (e.g. missing fat/fiber due to scraper regex bugs),
+  // so we merge: JSON fields take priority, text fills in gaps.
+  let nutritionHints = null
+  const jsonHints = extractNutritionHints(null, nutritionJson)
+  const textHints = extractNutritionHints(nutritionText) || extractNutritionHints(ingredientText)
+  
+  if (jsonHints && textHints) {
+    // Merge: JSON wins where present, text fills gaps
+    nutritionHints = { ...textHints, ...jsonHints }
+  } else {
+    nutritionHints = jsonHints || textHints
+  }
   
   const parsed = parseIngredients(ingredientText)
   if (parsed.length === 0) {

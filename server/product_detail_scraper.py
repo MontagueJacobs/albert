@@ -180,7 +180,7 @@ class AHProductDetailScraper:
                 r'(\d+[.,]?\d*)\s*kcal',
             ]),
             ('fat', [
-                r'\bvetten?\b\s+(\d+[.,]?\d*)\s*g',
+                r'\bvet(?:ten?)?\b\s+(\d+[.,]?\d*)\s*g',
                 r'\bfat\b\s+(\d+[.,]?\d*)\s*g',
                 r'\btotal\s+fat\b\s+(\d+[.,]?\d*)\s*g',
             ]),
@@ -197,7 +197,7 @@ class AHProductDetailScraper:
                 r'(?:of\s+which\s+)?sugars?\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('fiber', [
-                r'\bvezels?\b\s+(\d+[.,]?\d*)\s*g',
+                r'(?:voedings)?vezels?\b\s+(\d+[.,]?\d*)\s*g',
                 r'\bfib(?:re|er)\b\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('protein', [
