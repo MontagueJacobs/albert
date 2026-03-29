@@ -641,12 +641,12 @@ function ProductDetailModal({ purchase, onClose }) {
                                   {translateIngredient(ing.name, lang)}
                                 </span>
                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
-                                  ~{Math.round(ing.weightFraction * 100)}%
+                                  {(ing.weightFraction * 100).toFixed(2)}%
                                 </span>
                               </div>
                               <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
                                 <div style={{ fontWeight: '600' }}>
-                                  {contribution.toFixed(1)} kg CO₂
+                                  {contribution.toFixed(2)} kg CO₂
                                 </div>
                                 <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
                                   {ing.co2PerKg.toFixed(1)} /kg
