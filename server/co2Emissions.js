@@ -9,6 +9,8 @@
  * processing, transport, retail, packaging, and losses.
  */
 
+import { getIngredientProfile, getOilSaturatedFraction, getProteinDensity } from './usda_ingredient_profiles.js'
+
 /**
  * EU & Netherlands Dietary Baseline
  * 
@@ -525,7 +527,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'carménère', 'carmenere', 'rioja', 'bordeaux', 'burgundy',
     'chablis', 'chianti', 'barolo', 'sangiovese', 'zinfandel'
   ],
-  'beer': ['bier', 'pils', 'radler', 'witbier', 'ipa', 'weizen', 'heineken', 'amstel', 'grolsch', 'hertog jan', 'palm', 'jupiler', 'duvel'],
+  'beer': ['bier', 'pils', 'radler', 'witbier', 'ipa', 'weizen', 'heineken', 'amstel', 'grolsch', 'hertog jan', 'palm bier', 'palm speciale', 'jupiler', 'duvel'],
   'spirits': ['jenever', 'vodka', 'rum', 'whisky', 'whiskey', 'gin', 'likeur', 'baileys', 'tequila', 'cognac', 'glühwein', 'advocaat'],
   'tea': ['thee', 'tea', 'rooibos', 'kamille', 'munt thee', 'groene thee', 'earl grey'],
   'soft_drinks': [
@@ -766,8 +768,8 @@ function getCO2Category(productName) {
         const priority = getCategoryPriority(category)
         // A much longer keyword match (>2x) is likely more specific and should win
         // even against higher-priority categories (e.g. 'ijsbergsla' > 'ijs')
-        const newIsMuchLonger = keyword.length > bestMatchLength * 2
-        const currentIsMuchLonger = bestMatch && bestMatchLength > keyword.length * 2
+        const newIsMuchLonger = keyword.length >= bestMatchLength * 2
+        const currentIsMuchLonger = bestMatch && bestMatchLength >= keyword.length * 2
         if (newIsMuchLonger ||
             (!currentIsMuchLonger && (priority > bestPriority || (priority === bestPriority && keyword.length > bestMatchLength)))) {
           bestMatch = category
@@ -1028,13 +1030,12 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
     'melk', 'milk', 'wei', 'whey', 'caseïne', 'casein'
   ]
   // Typical protein content by ingredient type (g protein per 100g ingredient)
-  const PROTEIN_DENSITY = {
-    // Meats: ~20% protein
-    beef: 0.20, lamb: 0.20, pork: 0.20, poultry: 0.22, fish: 0.20, shrimp: 0.20,
-    // Dairy: varies a lot
+  // Now sourced from USDA FoodData Central via usda_ingredient_profiles.js
+  // Fallback values only used when USDA profile not found
+  const PROTEIN_DENSITY_FALLBACK = {
+    beef: 0.17, lamb: 0.20, pork: 0.21, poultry: 0.22, fish: 0.20, shrimp: 0.20,
     cheese: 0.25, eggs: 0.13, milk: 0.03,
-    // Plant protein
-    tofu: 0.12, nuts: 0.20, groundnuts: 0.25, soymilk: 0.03,
+    tofu: 0.16, nuts: 0.20, groundnuts: 0.26, soymilk: 0.03,
   }
   
   // Sugar ingredients: sugar, siroop, honing, glucose, fructose, etc.
@@ -1099,9 +1100,31 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
       const cat = enriched[i].category
       
       // ---- FAT cap: oil/fat ingredients can't exceed total fat ----
+      // Enhanced: uses USDA FoodData Central profiles for accurate saturated fat fractions.
+      // E.g., rapeseed oil is 6.6% saturated → 0.2g sat fat means ~3.0g oil.
       if (nutritionHints.fatPct != null) {
-        if (OIL_CATEGORIES.has(cat) || OIL_KEYWORDS.some(k => lower.includes(k))) {
-          ceilings[i] = Math.min(ceilings[i], nutritionHints.fatPct)
+        const isOil = OIL_CATEGORIES.has(cat) || OIL_KEYWORDS.some(k => lower.includes(k))
+        if (isOil) {
+          let oilCap = nutritionHints.fatPct // Default: cap at total fat
+          
+          // If we know the saturated fat, calculate more precise oil content
+          if (nutritionHints.saturatedFatPct != null && nutritionHints.saturatedFatPct > 0) {
+            // Look up saturated fat fraction from USDA profiles
+            const satFraction = getOilSaturatedFraction(lower, cat)
+            
+            if (satFraction && satFraction > 0) {
+              // Estimated oil weight = saturated_fat_in_product / saturated_fraction_of_oil
+              // But we can't assume ALL saturated fat comes from this one ingredient,
+              // so we use it as a tighter upper bound alongside total fat.
+              const estOilFromSat = nutritionHints.saturatedFatPct / satFraction
+              // Also check via total fat (oil is ~100% fat)
+              const estOilFromTotal = nutritionHints.fatPct
+              // Use the tighter of the two estimates
+              oilCap = Math.min(estOilFromSat, estOilFromTotal)
+            }
+          }
+          
+          ceilings[i] = Math.min(ceilings[i], oilCap)
         }
       }
       
@@ -1113,12 +1136,13 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
       }
       
       // ---- PROTEIN cap: protein-rich ingredients capped by protein content ----
-      // If label says Xg protein, a meat ingredient (20% protein) can be at most X/0.20 = 5X% 
+      // Uses USDA profiles for accurate protein density per ingredient.
       if (nutritionHints.proteinPct != null) {
         const isProteinSource = PROTEIN_CATEGORIES.has(cat) || PROTEIN_KEYWORDS.some(k => lower.includes(k))
         if (isProteinSource) {
-          // Determine this ingredient's typical protein density
-          const density = (cat && PROTEIN_DENSITY[cat]) || 0.18 // Default ~18% protein
+          // Look up protein density from USDA profiles first, then fallback
+          const usdaDensity = getProteinDensity(lower, cat)
+          const density = usdaDensity || (cat && PROTEIN_DENSITY_FALLBACK[cat]) || 0.18
           // Max weight = label_protein / density (protein from this ingredient can't exceed total)
           const maxWeight = nutritionHints.proteinPct / density
           ceilings[i] = Math.min(ceilings[i], maxWeight)
@@ -1128,16 +1152,20 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
       // ---- SUGAR cap: sugar ingredients can't exceed declared sugars ----
       if (nutritionHints.sugarsPct != null) {
         if (SUGAR_CATEGORIES.has(cat) || SUGAR_KEYWORDS.some(k => lower.includes(k))) {
-          // Pure sugar ingredients are ~100% sugar, so max weight ≈ label sugars value
-          ceilings[i] = Math.min(ceilings[i], nutritionHints.sugarsPct * 1.1) // Small margin for impure
+          // Use USDA profile for actual sugar density, or default ~100%
+          const profile = getIngredientProfile(lower, cat)
+          const sugarDensity = (profile && profile.sugars > 0) ? profile.sugars / 100 : 0.95
+          ceilings[i] = Math.min(ceilings[i], nutritionHints.sugarsPct / sugarDensity)
         }
       }
       
       // ---- CARBS cap: grain/starch ingredients capped by total carbs ----
-      // Grains are roughly 70-80% carbs by weight, so max weight = carbs / 0.70
       if (nutritionHints.carbsPct != null) {
         if (CARB_CATEGORIES.has(cat) || CARB_KEYWORDS.some(k => lower.includes(k))) {
-          const maxWeight = nutritionHints.carbsPct / 0.65 // Generous: ~65% carbs in flour
+          // Use USDA profile for actual carb density, or default ~70%
+          const profile = getIngredientProfile(lower, cat)
+          const carbDensity = (profile && profile.carbs > 0) ? profile.carbs / 100 : 0.65
+          const maxWeight = nutritionHints.carbsPct / carbDensity
           ceilings[i] = Math.min(ceilings[i], maxWeight)
         }
       }
@@ -1272,6 +1300,7 @@ function extractNutritionHints(text, nutritionJson = null) {
     if (nutritionJson.sugars != null) { hints.sugarsPct = nutritionJson.sugars; found = true }
     if (nutritionJson.fiber != null) { hints.fiberPct = nutritionJson.fiber; found = true }
     if (nutritionJson.saturated_fat != null) { hints.saturatedFatPct = nutritionJson.saturated_fat; found = true }
+    if (nutritionJson.unsaturated_fat != null) { hints.unsaturatedFatPct = nutritionJson.unsaturated_fat; found = true }
     if (nutritionJson.energy_kcal != null) { hints.energyKcal = nutritionJson.energy_kcal; found = true }
     return found ? hints : null
   }
@@ -1334,6 +1363,11 @@ function extractNutritionHints(text, nutritionJson = null) {
   // Energy
   const energyMatch = section.match(/(\d+[.,]?\d*)\s*kcal/i)
   if (energyMatch) { hints.energyKcal = parseFloat(energyMatch[1].replace(',', '.')); found = true }
+  
+  // Derive unsaturated fat from total fat - saturated fat (when parsed from text)
+  if (hints.fatPct != null && hints.saturatedFatPct != null) {
+    hints.unsaturatedFatPct = Math.round((hints.fatPct - hints.saturatedFatPct) * 100) / 100
+  }
   
   return found ? hints : null
 }

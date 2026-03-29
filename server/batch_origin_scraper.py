@@ -92,7 +92,7 @@ class BatchOriginScraper:
             .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
             .not_.is_('url', 'null') \
             .is_('origin_country', 'null') \
-            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') 
+            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') \
             .limit(limit) \
             .execute()
             
@@ -145,7 +145,7 @@ class BatchOriginScraper:
                 .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
                 .in_('url', chunk_urls) \
                 .is_('origin_country', 'null') \
-                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') 
+                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') \
                 .execute()
             
             if result.data:

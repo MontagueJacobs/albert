@@ -224,6 +224,10 @@ class AHProductDetailScraper:
         if not values:
             return None
         
+        # Derive unsaturated fat = total fat - saturated fat
+        if 'fat' in values and 'saturated_fat' in values:
+            values['unsaturated_fat'] = round(values['fat'] - values['saturated_fat'], 2)
+        
         print(f"[DEBUG] Parsed nutrition values: {values}", flush=True)
         return values
     
