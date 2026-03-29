@@ -159,6 +159,9 @@ class AHProductDetailScraper:
         AH nutrition tables show values per 100g/100ml, so the gram values
         directly translate to percentages of the product's composition.
         
+        Handles both inline format ("Vetten 3,2 g") and line-separated table
+        format ("Vetten\n3,2 g") from the pdp-nutricional-info table.
+        
         Returns dict with keys: energy_kcal, fat, saturated_fat, carbs, sugars, fiber, protein, salt
         All values in grams per 100g (= percentage), except energy in kcal.
         """
@@ -167,41 +170,43 @@ class AHProductDetailScraper:
         
         values = {}
         
+        # \s+ covers both space and newline between label and value (table row extraction)
         # Each pattern: (output_key, regex_patterns)
         # We try Dutch names first, then English
         nutrition_fields = [
             ('energy_kcal', [
-                r'(?:energie|energy)\s*[\d,.]+\s*kJ\s*/\s*(\d+[.,]?\d*)\s*kcal',
+                r'(?:energie|energy)\s+[\d,.]+\s*kJ\s*/\s*(\d+[.,]?\d*)\s*kcal',
+                r'(?:energie|energy)\s+(\d+[.,]?\d*)\s*kcal',
                 r'(\d+[.,]?\d*)\s*kcal',
             ]),
             ('fat', [
-                r'\bvetten?\b\s*(\d+[.,]?\d*)\s*g',
-                r'\bfat\b\s*(\d+[.,]?\d*)\s*g',
-                r'\btotal\s+fat\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bvetten?\b\s+(\d+[.,]?\d*)\s*g',
+                r'\bfat\b\s+(\d+[.,]?\d*)\s*g',
+                r'\btotal\s+fat\b\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('saturated_fat', [
-                r'waarvan\s+verzadigd(?:e?\s+vetzuren?)?\s*(\d+[.,]?\d*)\s*g',
-                r'(?:of\s+which\s+)?saturates?\s*(\d+[.,]?\d*)\s*g',
+                r'waarvan\s+verzadigd(?:e?\s*(?:vetzuren?)?)?\s+(\d+[.,]?\d*)\s*g',
+                r'(?:of\s+which\s+)?saturates?\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('carbs', [
-                r'\bkoolhydraten\b\s*(\d+[.,]?\d*)\s*g',
-                r'\bcarbohydrate\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bkoolhydraten\b\s+(\d+[.,]?\d*)\s*g',
+                r'\bcarbohydrate\b\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('sugars', [
-                r'waarvan\s+suikers?\s*(\d+[.,]?\d*)\s*g',
-                r'(?:of\s+which\s+)?sugars?\s*(\d+[.,]?\d*)\s*g',
+                r'waarvan\s+suikers?\s+(\d+[.,]?\d*)\s*g',
+                r'(?:of\s+which\s+)?sugars?\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('fiber', [
-                r'\bvezels?\b\s*(\d+[.,]?\d*)\s*g',
-                r'\bfib(?:re|er)\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bvezels?\b\s+(\d+[.,]?\d*)\s*g',
+                r'\bfib(?:re|er)\b\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('protein', [
-                r'\beiwitten?\b\s*(\d+[.,]?\d*)\s*g',
-                r'\bprotein\b\s*(\d+[.,]?\d*)\s*g',
+                r'\beiwitten?\b\s+(\d+[.,]?\d*)\s*g',
+                r'\bprotein\b\s+(\d+[.,]?\d*)\s*g',
             ]),
             ('salt', [
-                r'\bzout\b\s*(\d+[.,]?\d*)\s*g',
-                r'\bsalt\b\s*(\d+[.,]?\d*)\s*g',
+                r'\bzout\b\s+(\d+[.,]?\d*)\s*g',
+                r'\bsalt\b\s+(\d+[.,]?\d*)\s*g',
             ]),
         ]
         
@@ -887,28 +892,68 @@ class AHProductDetailScraper:
             # We scrape both raw text AND structured values (fat, protein, carbs, etc.)
             # to cross-reference ingredients with nutrition labels.
             # ================================================================
+            
+            # Strategy 0 (BEST): Use AH's data-testid="pdp-nutricional-info" container
+            # This contains the table with all voedingswaarden per 100g/100ml
             try:
-                # Strategy 1: Expand the Voedingswaarden accordion (same pattern as Kenmerken/Herkomst)
                 nutrition_text = await self.page.evaluate('''() => {
-                    const summaries = Array.from(document.querySelectorAll('summary'));
-                    for (const s of summaries) {
-                        const txt = s.textContent || s.innerText || '';
-                        if (txt.includes('Voedingswaarden') || txt.includes('Nutritional')) {
-                            const details = s.closest('details');
-                            if (details) {
-                                details.open = true;
-                                return details.innerText;
+                    // Primary: the dedicated nutrition info container
+                    const nutri = document.querySelector('[data-testid="pdp-nutricional-info"]');
+                    if (nutri) {
+                        // Try to get the table body specifically for clean data
+                        const tbody = nutri.querySelector('[class*="table_body"]');
+                        if (tbody) {
+                            // Extract each row as "label value" pairs
+                            const rows = tbody.querySelectorAll('tr');
+                            if (rows.length > 0) {
+                                const lines = [];
+                                rows.forEach(row => {
+                                    const cells = row.querySelectorAll('td, th');
+                                    const parts = [];
+                                    cells.forEach(cell => {
+                                        const t = (cell.innerText || cell.textContent || '').trim();
+                                        if (t) parts.push(t);
+                                    });
+                                    if (parts.length > 0) lines.push(parts.join(' '));
+                                });
+                                if (lines.length > 0) return lines.join('\\n');
                             }
                         }
+                        // Fallback: just get all text from the container
+                        return nutri.innerText;
                     }
                     return null;
                 }''')
                 
                 if nutrition_text and len(nutrition_text.strip()) > 20:
                     result['nutrition_text'] = nutrition_text.strip()[:2000]
-                    print(f"[DEBUG] Voedingswaarden from accordion: {nutrition_text[:150]}...", flush=True)
+                    print(f"[DEBUG] Voedingswaarden from data-testid: {nutrition_text[:200]}...", flush=True)
             except Exception as e:
-                print(f"[WARN] Voedingswaarden accordion failed: {e}", flush=True)
+                print(f"[WARN] Voedingswaarden data-testid extraction failed: {e}", flush=True)
+            
+            # Strategy 1: Expand the Voedingswaarden accordion (fallback for different page layouts)
+            if not result.get('nutrition_text'):
+                try:
+                    nutrition_text = await self.page.evaluate('''() => {
+                        const summaries = Array.from(document.querySelectorAll('summary'));
+                        for (const s of summaries) {
+                            const txt = s.textContent || s.innerText || '';
+                            if (txt.includes('Voedingswaarden') || txt.includes('Nutritional')) {
+                                const details = s.closest('details');
+                                if (details) {
+                                    details.open = true;
+                                    return details.innerText;
+                                }
+                            }
+                        }
+                        return null;
+                    }''')
+                    
+                    if nutrition_text and len(nutrition_text.strip()) > 20:
+                        result['nutrition_text'] = nutrition_text.strip()[:2000]
+                        print(f"[DEBUG] Voedingswaarden from accordion: {nutrition_text[:150]}...", flush=True)
+                except Exception as e:
+                    print(f"[WARN] Voedingswaarden accordion failed: {e}", flush=True)
             
             # Strategy 2: CSS selectors fallback
             if not result.get('nutrition_text'):

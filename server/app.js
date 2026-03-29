@@ -2753,7 +2753,7 @@ app.get('/api/products/pending-enrichment', async (req, res) => {
       .from('products')
       .select('id, name, url, details_scrape_status, details_scraped_at')
       .not('url', 'is', null)
-      .or('details_scrape_status.eq.pending,details_scraped_at.is.null')
+      .or('details_scrape_status.eq.pending,details_scrape_status.eq.incomplete,details_scraped_at.is.null')
       .order('seen_count', { ascending: false })
       .limit(limit)
     
@@ -2899,6 +2899,13 @@ app.post('/api/products/:productId/enrich', async (req, res) => {
       if (code === 0 && resultData?.success && resultData.results?.[0]) {
         const details = resultData.results[0]
         
+        // Determine scrape completeness: mark as 'incomplete' if key fields are missing
+        const hasKeyFields = details.price != null && details.image_url && details.ingredients
+        const scrapeStatus = hasKeyFields ? 'success' : 'incomplete'
+        if (!hasKeyFields) {
+          console.log(`[Enrich] Incomplete scrape for ${productId}: price=${details.price != null}, image=${!!details.image_url}, ingredients=${!!details.ingredients}`)
+        }
+        
         // Update product in database
         const { error: updateError } = await supabase
           .from('products')
@@ -2915,7 +2922,7 @@ app.post('/api/products/:productId/enrich', async (req, res) => {
             nutrition_text: details.nutrition_text ?? null,
             nutrition_json: details.nutrition_json ?? null,
             details_scraped_at: new Date().toISOString(),
-            details_scrape_status: 'success',
+            details_scrape_status: scrapeStatus,
             updated_at: new Date().toISOString()
           })
           .eq('id', productId)
@@ -2964,7 +2971,7 @@ app.post('/api/products/enrich-batch', async (req, res) => {
       .from('products')
       .select('id, name, url')
       .not('url', 'is', null)
-      .or('details_scrape_status.eq.pending,details_scraped_at.is.null')
+      .or('details_scrape_status.eq.pending,details_scrape_status.eq.incomplete,details_scraped_at.is.null')
       .order('seen_count', { ascending: false })
       .limit(limit)
     
@@ -3022,6 +3029,11 @@ app.post('/api/products/enrich-batch', async (req, res) => {
           
           if (result?.success && result.results?.[0]) {
             const details = result.results[0]
+            
+            // Mark as 'incomplete' if key fields are missing so it gets re-scraped
+            const hasKeyFields = details.price != null && details.image_url && details.ingredients
+            const scrapeStatus = hasKeyFields ? 'success' : 'incomplete'
+            
             await supabase
               .from('products')
               .update({
@@ -3038,14 +3050,15 @@ app.post('/api/products/enrich-batch', async (req, res) => {
                 nutrition_text: details.nutrition_text ?? null,
                 nutrition_json: details.nutrition_json ?? null,
                 details_scraped_at: new Date().toISOString(),
-                details_scrape_status: 'success',
+                details_scrape_status: scrapeStatus,
                 updated_at: new Date().toISOString()
               })
               .eq('id', product.id)
             
+            const statusIcon = hasKeyFields ? '✅' : '⚠️'
             productEnrichState.logs.push({
               timestamp: new Date().toISOString(),
-              message: `✅ ${product.name}: vegan=${details.is_vegan}, organic=${details.is_organic}, nutri=${details.nutri_score}`
+              message: `${statusIcon} ${product.name}: vegan=${details.is_vegan}, organic=${details.is_organic}, nutri=${details.nutri_score}${!hasKeyFields ? ' [INCOMPLETE - missing: ' + [!details.price && 'price', !details.image_url && 'image', !details.ingredients && 'ingredients'].filter(Boolean).join(', ') + ']' : ''}`
             })
           } else {
             await supabase
@@ -4371,9 +4384,8 @@ async function checkForUnenrichedProducts() {
       const result = await supabase
         .from('products')
         .select('id')
-        .is('details_scraped_at', null)
-        .is('details_scrape_status', null)
         .not('url', 'is', null)  // Only products with URLs can be enriched
+        .or('details_scrape_status.is.null,details_scrape_status.eq.incomplete')
         .order('created_at', { ascending: false })
         .limit(autoEnrichConfig.batchSize)
       
@@ -4482,8 +4494,11 @@ async function processEnrichmentQueue() {
             nutrition_text: result.data.nutrition_text ?? null,
             nutrition_json: result.data.nutrition_json ?? null,
             details_scraped_at: new Date().toISOString(),
-            details_scrape_status: 'success'
           }
+          
+          // Mark as 'incomplete' if key fields are missing so it gets re-scraped
+          const hasKeyFields = result.data.price != null && result.data.image_url && result.data.ingredients
+          updateData.details_scrape_status = hasKeyFields ? 'success' : 'incomplete'
           
           await supabase
             .from('products')
@@ -4491,7 +4506,7 @@ async function processEnrichmentQueue() {
             .eq('id', productId)
           
           autoEnrichQueue.stats.totalProcessed++
-          console.log(`[Auto-Enrich] Successfully enriched: ${product.name}`)
+          console.log(`[Auto-Enrich] ${hasKeyFields ? 'Successfully' : 'Partially'} enriched: ${product.name}${!hasKeyFields ? ' [incomplete]' : ''}`)
         } else {
           // Mark as failed
           await supabase

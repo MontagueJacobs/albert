@@ -92,7 +92,7 @@ class BatchOriginScraper:
             .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
             .not_.is_('url', 'null') \
             .is_('origin_country', 'null') \
-            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending') \
+            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') 
             .limit(limit) \
             .execute()
             
@@ -145,7 +145,7 @@ class BatchOriginScraper:
                 .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
                 .in_('url', chunk_urls) \
                 .is_('origin_country', 'null') \
-                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending') \
+                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') 
                 .execute()
             
             if result.data:
@@ -248,9 +248,10 @@ class BatchOriginScraper:
                 print(f"  [SKIP] No data extracted for product {product_id}", flush=True)
                 return False
                 
-            # Only mark as success if we have actual data
+            # Only mark as success if we have key fields, otherwise 'incomplete' for re-scraping
             update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
-            update_payload['details_scrape_status'] = 'success'
+            has_key_fields = bool(origin_data.get('price')) and bool(origin_data.get('image_url')) and bool(origin_data.get('ingredients'))
+            update_payload['details_scrape_status'] = 'success' if has_key_fields else 'incomplete'
                 
             # Update the product
             result = self.supabase.table('products') \
