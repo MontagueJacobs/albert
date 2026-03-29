@@ -1666,8 +1666,8 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
     let productsMap = new Map()
     if (productIds.length > 0) {
       const { data: products } = await supabase
-        .from('products'), nutrition_json
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, nutri_score, unit_size, ingredients, nutrition_text')
+        .from('products')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, nutri_score, unit_size, ingredients, nutrition_text, nutrition_json')
         .in('id', productIds)
       if (products) {
         productsMap = new Map(products.map(p => [p.id, p]))
@@ -2242,8 +2242,8 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     let productsMap = new Map()
     if (productIds.length > 0) {
       const { data: products, error: prodError } = await supabase
-        .from('products'), nutrition_json
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, price, unit_size, ingredients, nutrition_text')
+        .from('products')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, price, unit_size, ingredients, nutrition_text, nutrition_json')
         .in('id', productIds)
       
       if (prodError) {
@@ -2382,8 +2382,8 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
     
     if (enrichedColumnsAvailable) {
       const { data, error: productsError } = await supabase
-        .from('products'), nutrition_json
-        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text')
+        .from('products')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text, nutrition_json')
         .order('seen_count', { ascending: false })
         .limit(200)
       
@@ -2471,8 +2471,8 @@ app.get('/api/products/popular', async (req, res) => {
     // Try with enriched fields if we believe they're available
     if (enrichedColumnsAvailable) {
       const result = await supabase
-        .from('products'), nutrition_json
-        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, details_scraped_at, ingredients, nutrition_text')
+        .from('products')
+        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, details_scraped_at, ingredients, nutrition_text, nutrition_json')
         .order('seen_count', { ascending: false })
         .limit(limit)
       
@@ -2528,8 +2528,8 @@ app.get('/api/products/search', async (req, res) => {
     // Try with enriched fields if available
     if (enrichedColumnsAvailable) {
       const result = await supabase
-        .from('products'), nutrition_json
-        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text')
+        .from('products')
+        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text, nutrition_json')
         .ilike('normalized_name', `%${query.toLowerCase()}%`)
         .limit(50)
       
@@ -3273,8 +3273,8 @@ app.get('/api/product/:productId/details', async (req, res) => {
     if (supabase && evaluation.score != null && evaluation.score < 9) {
       // Get products with better scores from the same general category
       let query = supabase
-        .from('products'), nutrition_json
-        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, ingredients, nutrition_text')
+        .from('products')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, ingredients, nutrition_text, nutrition_json')
         .neq('id', productId)
         .order('seen_count', { ascending: false })
         .limit(100)
@@ -3642,8 +3642,8 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
     // Get products from products table that user hasn't purchased
     // Build query - only add exclusion filter if there are purchased IDs
     let productsQuery = supabase
-      .from('products'), nutrition_json
-      .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, ingredients, nutrition_text')
+      .from('products')
+      .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, ingredients, nutrition_text, nutrition_json')
     
     // Only exclude purchased IDs if there are any
     const purchasedIdArray = [...purchasedIds].filter(id => id)
@@ -3685,8 +3685,8 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
       let productImage = null
       if (p.product_id) {
         const { data: product } = await supabase
-          .from('products'), nutrition_json
-          .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url, ingredients, nutrition_text')
+          .from('products')
+          .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url, ingredients, nutrition_text, nutrition_json')
           .eq('id', p.product_id)
           .single()
         if (product) {
