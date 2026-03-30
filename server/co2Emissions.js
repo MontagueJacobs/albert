@@ -549,7 +549,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'ketjap', 'worcestershire', 'bearnaise', 'tartaar saus',
     'azijn', 'balsamico', 'kruiden', 'specerijen',
     'kaneel', 'nootmuskaat', 'komijn', 'kerrie', 'paprikapoeder',
-    'oregano', 'basilicum', 'tijm', 'rozemarijn', 'zout'
+    'oregano', 'basilicum', 'tijm', 'rozemarijn', 'zout', 'zeezout', 'joodzout'
   ],
   
   // Ready meals & Soups
@@ -1203,6 +1203,67 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
   
   const remainingWeight = Math.max(0, 100 - totalDeclared)
   
+  // ── NUTRITION-BASED FLOORS ──
+  // When an ingredient is the sole/dominant source of a macro nutrient, its
+  // weight can be inferred directly from the nutrition label.  We compute
+  // "floors" (minimum weights) that the geometric allocation must respect.
+  // Example: if there's 29 g fat and the only oil is kokosolie (100% fat),
+  //          then kokosolie must be at least 29%.
+  //
+  // Only applied for unambiguous nutrient→ingredient mappings:
+  //   - FAT → oil/fat ingredients (oils are ~100% fat, very reliable)
+  //   - SALT → salt ingredients (salt ≈ 100% salt, very reliable)
+  // Protein/carb floors are NOT applied because ingredient names like
+  // "aardappeleiwit" (potato protein isolate, ~75% protein) can match
+  // wrong USDA profiles like raw potato (2% protein), causing wild errors.
+  const floors = new Array(n).fill(0)
+  
+  if (nutritionHints) {
+    const oilIndices = []
+    const saltIndices = []
+    
+    for (let i = 0; i < enriched.length; i++) {
+      if (enriched[i].percentage != null) continue
+      const lower = enriched[i].name.toLowerCase()
+      const cat = enriched[i].category
+      
+      if (OIL_CATEGORIES.has(cat) || OIL_KEYWORDS.some(k => lower.includes(k)))
+        oilIndices.push(i)
+      if (SALT_KEYWORDS.some(k => lower.includes(k)))
+        saltIndices.push(i)
+    }
+    
+    // FAT floor: if there's exactly one undeclared oil and we know total fat,
+    // that oil must weigh ≥ (remaining_fat) / (fat_per_100g_of_oil / 100).
+    // Subtract fat contributed by ingredients with declared percentages.
+    if (oilIndices.length === 1 && nutritionHints.fatPct != null && nutritionHints.fatPct > 0) {
+      const idx = oilIndices[0]
+      const lower = enriched[idx].name.toLowerCase()
+      const cat = enriched[idx].category
+      const profile = getIngredientProfile(lower, cat)
+      const fatDensity = profile ? profile.fat / 100 : 1.0 // oils are ~100% fat
+      if (fatDensity > 0) {
+        // Subtract fat from ingredients with known percentages
+        let fatFromDeclared = 0
+        for (const ing of enriched) {
+          if (ing.percentage != null) {
+            const ingProfile = getIngredientProfile(ing.name, ing.category)
+            if (ingProfile) fatFromDeclared += ing.percentage * (ingProfile.fat / 100)
+          }
+        }
+        const remainingFat = Math.max(0, nutritionHints.fatPct - fatFromDeclared)
+        const minOil = remainingFat / fatDensity
+        floors[idx] = Math.max(floors[idx], Math.min(minOil, ceilings[idx]))
+      }
+    }
+    
+    // SALT floor: if there's exactly one salt source
+    if (saltIndices.length === 1 && nutritionHints.saltPct != null && nutritionHints.saltPct > 0) {
+      const idx = saltIndices[0]
+      floors[idx] = Math.max(floors[idx], Math.min(nutritionHints.saltPct, ceilings[idx]))
+    }
+  }
+  
   // Assign undeclared ingredients using iterative geometric decay with capping.
   // When a cap reduces an ingredient's share, the excess flows back to uncapped
   // ingredients (especially the first/largest ones like water).
@@ -1223,12 +1284,23 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
     }
   }
   
-  // Iterative allocation: distribute remaining weight using geometric decay,
-  // cap at ceilings, redistribute excess. Converges in a few iterations.
+  // Pre-allocate floors: fix ingredients at their floor value and remove from budget
   const allocated = new Array(undeclaredIndices.length).fill(0)
-  const fixed = new Array(undeclaredIndices.length).fill(false) // true if hit cap
+  const fixed = new Array(undeclaredIndices.length).fill(false)
   let budget = remainingWeight
   
+  for (let j = 0; j < undeclaredIndices.length; j++) {
+    const idx = undeclaredIndices[j]
+    if (floors[idx] > 0) {
+      allocated[j] = floors[idx]
+      fixed[j] = true
+      budget -= floors[idx]
+    }
+  }
+  budget = Math.max(0, budget)
+  
+  // Iterative allocation: distribute remaining budget using geometric decay,
+  // cap at ceilings, redistribute excess. Converges in a few iterations.
   for (let iter = 0; iter < 10 && budget > 0.01; iter++) {
     // Compute geometric weights for unfixed ingredients
     const unfixedJs = []
