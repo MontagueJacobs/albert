@@ -1961,7 +1961,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     if (productIds.length > 0 && enrichedColumnsAvailable) {
       const { data: products, error: enrichError } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, ingredients, nutrition_text, nutrition_json')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
         .in('id', productIds)
       
       if (enrichError?.message?.includes('does not exist')) {
