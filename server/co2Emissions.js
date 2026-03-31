@@ -1,8 +1,9 @@
 /**
  * CO2 Emissions Data for Food Products
  * 
- * Data source: Our World in Data - Environmental Impacts of Food
- * https://ourworldindata.org/grapher/food-emissions-supply-chain
+ * Multi-source emission model:
+ *   Primary: Agribalyse v3.2 (ADEME, French LCA) + OWID (Poore & Nemecek 2018, global)
+ *   Validation: OWID range used to flag outliers
  * 
  * Values are in kg CO2 equivalent per kg of food product
  * These include all supply chain emissions: land use, farming, animal feed,
@@ -10,6 +11,7 @@
  */
 
 import { getIngredientProfile, getOilSaturatedFraction, getProteinDensity } from './usda_ingredient_profiles.js'
+import { AGRIBALYSE_EMISSIONS } from './agribalyse_emissions.js'
 
 /**
  * EU & Netherlands Dietary Baseline
@@ -223,87 +225,223 @@ function getProductWeight(unitSize, co2Category) {
   return { weightGrams: 400, source: 'generic_default' }
 }
 
-// CO2 emissions data (kg CO2 eq per kg of food)
-// Sourced from Our World in Data 2018 global averages
-const CO2_EMISSIONS_DATA = {
-  // Meat products (highest emissions)
-  'beef_herd': 99.48,        // Beef from beef herd
-  'beef_dairy': 33.30,       // Beef from dairy herd
-  'lamb_mutton': 39.72,      // Lamb & Mutton
-  'pig_meat': 12.31,         // Pork
-  'poultry_meat': 9.87,      // Chicken, turkey
-  
-  // Seafood
-  'shrimps_farmed': 26.87,   // Farmed shrimp
-  'fish_farmed': 13.63,      // Farmed fish
-  
-  // Dairy & Eggs
-  'cheese': 23.88,           // All cheese types
-  'milk': 3.15,              // Milk
-  'eggs': 4.67,              // Eggs
-  
-  // Oils
-  'palm_oil': 7.32,
-  'soybean_oil': 6.32,
-  'olive_oil': 5.42,
-  'rapeseed_oil': 3.77,
-  'sunflower_oil': 3.60,
-  
-  // Grains & Cereals
-  'rice': 4.45,
-  'wheat_rye': 1.57,
-  'barley': 1.18,
-  'maize': 1.70,
-  'oatmeal': 2.48,
-  
-  // Legumes & Nuts
-  'groundnuts': 3.23,        // Peanuts
-  'other_pulses': 1.79,      // Beans, lentils
-  'peas': 0.98,
-  'nuts': 0.43,
-  'tofu': 3.16,
-  
-  // Fruits
-  'berries_grapes': 1.53,
-  'citrus_fruit': 0.39,
-  'bananas': 0.86,
-  'apples': 0.43,
+// ── OWID Emission Factors ──
+// Source: Poore & Nemecek (2018) via Our World in Data — global averages
+// Includes all supply chain stages + land use change
+const OWID_EMISSIONS = {
+  'beef_herd': 99.48, 'beef_dairy': 33.30, 'lamb_mutton': 39.72,
+  'pig_meat': 12.31, 'poultry_meat': 9.87,
+  'shrimps_farmed': 26.87, 'fish_farmed': 13.63,
+  'cheese': 23.88, 'milk': 3.15, 'eggs': 4.67,
+  'palm_oil': 7.32, 'soybean_oil': 6.32, 'olive_oil': 5.42,
+  'rapeseed_oil': 3.77, 'sunflower_oil': 3.60,
+  'rice': 4.45, 'wheat_rye': 1.57, 'barley': 1.18, 'maize': 1.70, 'oatmeal': 2.48,
+  'groundnuts': 3.23, 'other_pulses': 1.79, 'peas': 0.98, 'nuts': 0.43, 'tofu': 3.16,
+  'berries_grapes': 1.53, 'citrus_fruit': 0.39, 'bananas': 0.86, 'apples': 0.43,
   'other_fruit': 1.05,
+  'tomatoes': 2.09, 'brassicas': 0.51, 'onions_leeks': 0.50, 'potatoes': 0.46,
+  'root_vegetables': 0.43, 'other_vegetables': 0.53, 'cassava': 1.32,
+  'cane_sugar': 3.20, 'beet_sugar': 1.81,
+  'coffee': 28.53, 'dark_chocolate': 46.65, 'wine': 1.79, 'beer': 1.20,
+  'spirits': 2.50, 'tea': 1.00, 'soft_drinks': 0.80, 'soy_milk': 0.98,
+  'sauces_condiments': 2.00, 'ready_meals': 4.50, 'soup': 2.00,
+  'candy_sweets': 1.80, 'ice_cream': 3.50, 'baked_goods': 1.80,
+  'spreads': 2.50, 'desserts': 3.00, 'baby_food': 3.00, 'snacks': 2.50,
+}
+
+// ── Multi-Source Emission Model ──
+// Combines Agribalyse (primary LCA) + OWID (primary global) with OWID as validation.
+// Structure per category:
+//   primary: [{name, value}]  — LCA data sources used for the estimate
+//   validation: {name, min, max} — independent range for cross-checking
+//
+// The 'mean' is the simple average of primary sources.
+// OWID is used BOTH as a primary source AND for validation range.
+// Agribalyse provides a tighter European-specific estimate.
+
+/**
+ * @typedef {Object} EmissionSource
+ * @property {"Agribalyse"|"OWID"} name
+ * @property {number} value - kgCO2e per kg
+ */
+
+/**
+ * @typedef {Object} ValidationSource
+ * @property {"OWID"} name
+ * @property {number} min
+ * @property {number} max
+ */
+
+/**
+ * @typedef {Object} IngredientEmission
+ * @property {EmissionSource[]} primary
+ * @property {ValidationSource} [validation]
+ */
+
+/**
+ * Compute the mean of primary emission sources.
+ * @param {EmissionSource[]} sources
+ * @returns {number}
+ */
+function computePrimaryMean(sources) {
+  if (!sources || sources.length === 0) return 0
+  return sources.reduce((sum, s) => sum + s.value, 0) / sources.length
+}
+
+/**
+ * Compute the min/max range across primary sources.
+ * @param {EmissionSource[]} sources
+ * @returns {{ min: number, max: number }}
+ */
+function computePrimaryRange(sources) {
+  if (!sources || sources.length === 0) return { min: 0, max: 0 }
+  const values = sources.map(s => s.value)
+  return { min: Math.min(...values), max: Math.max(...values) }
+}
+
+/**
+ * Validate a mean estimate against an independent OWID range.
+ * @param {number} mean
+ * @param {ValidationSource} [validation]
+ * @returns {{ valid: boolean, deviation: number }}
+ */
+function validateAgainstOWID(mean, validation) {
+  if (!validation) return { valid: true, deviation: 0 }
+  const withinRange = mean >= validation.min && mean <= validation.max
+  return {
+    valid: withinRange,
+    deviation: mean < validation.min
+      ? validation.min - mean
+      : mean > validation.max
+        ? mean - validation.max
+        : 0
+  }
+}
+
+/**
+ * @typedef {Object} IngredientResult
+ * @property {number} mean
+ * @property {number} min
+ * @property {number} max
+ * @property {boolean} valid
+ * @property {number} deviation
+ * @property {EmissionSource[]} sources
+ */
+
+/**
+ * Compute the emission result for a single ingredient category.
+ * @param {IngredientEmission} ingredient
+ * @returns {IngredientResult}
+ */
+function computeIngredient(ingredient) {
+  const mean = computePrimaryMean(ingredient.primary)
+  const { min, max } = computePrimaryRange(ingredient.primary)
+  const validation = validateAgainstOWID(mean, ingredient.validation)
+  return {
+    mean,
+    min,
+    max,
+    valid: validation.valid,
+    deviation: validation.deviation,
+    sources: ingredient.primary
+  }
+}
+
+/**
+ * Compute a product-level footprint from weighted ingredient portions.
+ * @param {Array<{ingredient: IngredientEmission, fraction: number}>} portions
+ * @returns {{ mean: number, min: number, max: number, valid: boolean }}
+ */
+function computeProduct(portions) {
+  let mean = 0, min = 0, max = 0, valid = true
+  for (const item of portions) {
+    const result = computeIngredient(item.ingredient)
+    mean += result.mean * item.fraction
+    min  += result.min  * item.fraction
+    max  += result.max  * item.fraction
+    if (!result.valid) valid = false
+  }
+  return { mean, min, max, valid }
+}
+
+// Build MULTI_SOURCE_EMISSIONS: one entry per category with Agribalyse + OWID
+const MULTI_SOURCE_EMISSIONS = {}
+
+// Get all category keys from both sources
+const allCategories = new Set([
+  ...Object.keys(OWID_EMISSIONS),
+  ...Object.keys(AGRIBALYSE_EMISSIONS)
+])
+
+for (const cat of allCategories) {
+  const agri = AGRIBALYSE_EMISSIONS[cat]
+  const owid = OWID_EMISSIONS[cat]
   
-  // Vegetables
-  'tomatoes': 2.09,          // Greenhouse tomatoes have higher emissions
-  'brassicas': 0.51,         // Broccoli, cabbage, cauliflower
-  'onions_leeks': 0.50,
-  'potatoes': 0.46,
-  'root_vegetables': 0.43,   // Carrots, parsnips, etc.
-  'other_vegetables': 0.53,
-  'cassava': 1.32,
+  // Primary: Agribalyse is the LCA source. OWID is validation-only unless
+  // it's the only data we have for a category (e.g. beef_herd).
+  const primary = []
+  if (agri) {
+    primary.push({ name: 'Agribalyse', value: agri.mean })
+  } else if (owid != null) {
+    // No Agribalyse data — fall back to OWID as primary
+    primary.push({ name: 'OWID', value: owid })
+  }
   
-  // Sugars
-  'cane_sugar': 3.20,
-  'beet_sugar': 1.81,
+  // Validation: use OWID value as a single-point range (±50% to account for
+  // methodological differences between global averages and European LCA)
+  let validation = undefined
+  if (owid != null) {
+    validation = {
+      name: 'OWID',
+      min: owid * 0.5,
+      max: owid * 1.5
+    }
+  }
   
-  // Beverages & Other
-  'coffee': 28.53,
-  'dark_chocolate': 46.65,
-  'wine': 1.79,
-  'beer': 1.20,
-  'spirits': 2.50,
-  'tea': 1.00,
-  'soft_drinks': 0.80,
-  'soy_milk': 0.98,
+  // Also incorporate Agribalyse min/max into the range if available
+  let rangeMin, rangeMax
+  if (agri && owid != null) {
+    rangeMin = Math.min(agri.min, owid)
+    rangeMax = Math.max(agri.max, owid)
+  } else if (agri) {
+    rangeMin = agri.min
+    rangeMax = agri.max
+  } else {
+    rangeMin = owid
+    rangeMax = owid
+  }
   
-  // Processed / Mixed categories (estimated averages)
-  'sauces_condiments': 2.00,
-  'ready_meals': 4.50,        // Weighted average of mixed ingredients
-  'soup': 2.00,
-  'candy_sweets': 1.80,       // Sugar-based
-  'ice_cream': 3.50,          // Dairy-based
-  'baked_goods': 1.80,        // Flour + sugar based
-  'spreads': 2.50,            // Varies widely
-  'desserts': 3.00,           // Dairy-based
-  'baby_food': 3.00,          // Dairy-based average
-  'snacks': 2.50              // Mixed snack average
+  MULTI_SOURCE_EMISSIONS[cat] = {
+    primary,
+    validation,
+    rangeMin,
+    rangeMax,
+    n: agri ? agri.n : 0
+  }
+}
+
+/**
+ * Get multi-source emission data for a category.
+ * Returns { mean, min, max, valid, deviation, sources } or null.
+ * @param {string} category
+ * @returns {IngredientResult | null}
+ */
+function getEmission(category) {
+  const entry = MULTI_SOURCE_EMISSIONS[category]
+  if (!entry) return null
+  return {
+    ...computeIngredient(entry),
+    rangeMin: entry.rangeMin,
+    rangeMax: entry.rangeMax
+  }
+}
+
+// CO2_EMISSIONS_DATA: backward-compatible single-value lookup.
+// Uses the multi-source mean (average of Agribalyse + OWID where both exist).
+const CO2_EMISSIONS_DATA = {}
+for (const cat of allCategories) {
+  const entry = MULTI_SOURCE_EMISSIONS[cat]
+  CO2_EMISSIONS_DATA[cat] = computePrimaryMean(entry.primary)
 }
 
 // Dutch to English category keyword mappings
@@ -977,16 +1115,18 @@ function estimateIngredientWeights(ingredients, nutritionHints = null) {
   
   const n = ingredients.length
   
-  // First pass: collect known percentages and match CO2 categories
+  // First pass: collect known percentages, match CO2 categories, and get multi-source data
   const enriched = ingredients.map(ing => {
     const category = getCO2Category(ing.name)
     const co2PerKg = (category && category !== '__non_food__' && CO2_EMISSIONS_DATA[category]) 
       ? CO2_EMISSIONS_DATA[category] 
       : null
+    const emission = (category && category !== '__non_food__') ? getEmission(category) : null
     return {
       ...ing,
       category,
-      co2PerKg
+      co2PerKg,
+      emission  // { mean, min, max, rangeMin, rangeMax, valid, deviation, sources }
     }
   })
   
@@ -1481,9 +1621,12 @@ function getCO2FromIngredients(ingredientText, nutritionText = null, nutritionJs
   const topIngredients = parsed.slice(0, maxIngredients)
   const weighted = estimateIngredientWeights(topIngredients, nutritionHints)
   
-  // Calculate weighted average CO2
+  // Calculate weighted average CO2 with multi-source uncertainty
   let totalCO2 = 0
+  let totalCO2Min = 0
+  let totalCO2Max = 0
   let totalWeight = 0
+  let allValid = true
   let dominantCategory = null
   let dominantCO2Contribution = 0
   
@@ -1493,8 +1636,17 @@ function getCO2FromIngredients(ingredientText, nutritionText = null, nutritionJs
       totalCO2 += co2Contribution
       totalWeight += ing.weightFraction
       
+      // Accumulate uncertainty range from multi-source data
+      if (ing.emission) {
+        totalCO2Min += ing.emission.rangeMin * ing.weightFraction
+        totalCO2Max += ing.emission.rangeMax * ing.weightFraction
+        if (!ing.emission.valid) allValid = false
+      } else {
+        totalCO2Min += co2Contribution
+        totalCO2Max += co2Contribution
+      }
+      
       // Track the category with highest CO2 contribution (not just weight)
-      // This ensures the label matches the actual CO2 driver
       if (co2Contribution > dominantCO2Contribution) {
         dominantCO2Contribution = co2Contribution
         dominantCategory = ing.category
@@ -1509,12 +1661,14 @@ function getCO2FromIngredients(ingredientText, nutritionText = null, nutritionJs
   // Sum of contributions = total CO2 per kg of product
   // We use totalCO2 directly (not divided by totalWeight) because unmatched
   // ingredients (water, salt, additives, vitamins) have near-zero CO2.
-  // This makes the number intuitive: the individual contributions add up to the total.
   const avgCO2 = totalCO2
   
   return {
     co2PerKg: Math.round(avgCO2 * 100) / 100,
-    category: dominantCategory, // Report the dominant ingredient's category
+    co2Min: Math.round(totalCO2Min * 100) / 100,
+    co2Max: Math.round(totalCO2Max * 100) / 100,
+    co2Valid: allValid,
+    category: dominantCategory,
     matched: true,
     method: 'ingredients',
     ingredientBreakdown: weighted
@@ -1523,7 +1677,10 @@ function getCO2FromIngredients(ingredientText, nutritionText = null, nutritionJs
         name: i.name,
         category: i.category,
         co2PerKg: i.co2PerKg,
-        weightFraction: Math.round(i.weightFraction * 1000) / 1000
+        weightFraction: Math.round(i.weightFraction * 1000) / 1000,
+        sources: i.emission ? i.emission.sources : null,
+        co2Min: i.emission ? i.emission.rangeMin : i.co2PerKg,
+        co2Max: i.emission ? i.emission.rangeMax : i.co2PerKg
       })),
     matchedIngredients: weighted.filter(i => i.co2PerKg != null).length,
     totalIngredients: weighted.length
@@ -1567,8 +1724,12 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
   // the name-based CO2 is more accurate than ingredient analysis
   const nameCategory = getCO2Category(productName)
   if (nameCategory && NAME_OVERRIDE_CATEGORIES.has(nameCategory) && CO2_EMISSIONS_DATA[nameCategory]) {
+    const nameEmission = getEmission(nameCategory)
     return {
       co2PerKg: CO2_EMISSIONS_DATA[nameCategory],
+      co2Min: nameEmission ? nameEmission.rangeMin : CO2_EMISSIONS_DATA[nameCategory],
+      co2Max: nameEmission ? nameEmission.rangeMax : CO2_EMISSIONS_DATA[nameCategory],
+      co2Valid: nameEmission ? nameEmission.valid : true,
       category: nameCategory,
       matched: true,
       isNonFood: false,
@@ -1593,6 +1754,9 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
   if (!category || !CO2_EMISSIONS_DATA[category]) {
     return {
       co2PerKg: null,
+      co2Min: null,
+      co2Max: null,
+      co2Valid: null,
       category: null,
       matched: false,
       isNonFood: false,
@@ -1600,8 +1764,12 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
     }
   }
   
+  const fallbackEmission = getEmission(category)
   return {
     co2PerKg: CO2_EMISSIONS_DATA[category],
+    co2Min: fallbackEmission ? fallbackEmission.rangeMin : CO2_EMISSIONS_DATA[category],
+    co2Max: fallbackEmission ? fallbackEmission.rangeMax : CO2_EMISSIONS_DATA[category],
+    co2Valid: fallbackEmission ? fallbackEmission.valid : true,
     category,
     matched: true,
     isNonFood: false,

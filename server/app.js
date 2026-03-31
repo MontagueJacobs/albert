@@ -1267,6 +1267,9 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     ratingColor: co2Rating.color,
     // CO2 specific fields
     co2PerKg: co2Data.co2PerKg,
+    co2Min: co2Data.co2Min || null,
+    co2Max: co2Data.co2Max || null,
+    co2Valid: co2Data.co2Valid != null ? co2Data.co2Valid : null,
     co2Category: co2Data.category,
     co2CategoryLabel: getCategoryLabel(co2Data.category),
     co2Matched: co2Data.matched,
