@@ -493,6 +493,16 @@ function ProductDetailModal({ purchase, onClose }) {
                   {purchase.brand}
                 </span>
               )}
+
+              {(purchase.unit_size || (details && details.unitSize)) && (
+                <span style={{ 
+                  ...styles.badge, 
+                  background: 'var(--bg-hover)', 
+                  color: 'var(--text-muted)' 
+                }}>
+                  {purchase.unit_size || details.unitSize}
+                </span>
+              )}
               
               {purchase.is_organic && (
                 <span style={{ 
@@ -598,23 +608,21 @@ function ProductDetailModal({ purchase, onClose }) {
                     <div style={{ fontWeight: '500' }}>{translateCategory(details.co2CategoryLabel || details.co2Category, lang)}</div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                       {details.co2PerKg.toFixed(1)} kg CO₂ per kg
+                      {details.co2Min != null && details.co2Max != null && details.co2Min !== details.co2Max && (
+                        <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                          {' '}({details.co2Min.toFixed(1)} – {details.co2Max.toFixed(1)})
+                        </span>
+                      )}
                     </div>
-                    {details.co2Min != null && details.co2Max != null && details.co2Min !== details.co2Max && (
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '2px' }}>
-                        {lang === 'en' ? 'Range' : 'Bereik'}: {details.co2Min.toFixed(1)} – {details.co2Max.toFixed(1)} kg CO₂/kg
-                      </div>
-                    )}
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '0.35rem',
-                      fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '3px'
+                      fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px'
                     }}>
                       <span style={{
                         display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%',
                         background: details.co2Valid === false ? '#f97316' : '#22c55e'
                       }} />
-                      {details.co2Valid === false
-                        ? (lang === 'en' ? 'Outside OWID validation range' : 'Buiten OWID validatiebereik')
-                        : (lang === 'en' ? 'Validated (Agribalyse + OWID)' : 'Gevalideerd (Agribalyse + OWID)')}
+                      {lang === 'en' ? 'Source: Agribalyse v3.1' : 'Bron: Agribalyse v3.1'}
                     </div>
                   </div>
                 )}
@@ -665,12 +673,11 @@ function ProductDetailModal({ purchase, onClose }) {
                                 <div style={{ fontWeight: '600' }}>
                                   {contribution.toFixed(2)} kg CO₂
                                 </div>
-                                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                                  {ing.co2PerKg.toFixed(1)} /kg
-                                  {ing.co2Min != null && ing.co2Max != null && ing.co2Min !== ing.co2Max && (
-                                    <span> ({ing.co2Min.toFixed(1)}–{ing.co2Max.toFixed(1)})</span>
-                                  )}
-                                </div>
+                                {ing.co2Min != null && ing.co2Max != null && ing.co2Min !== ing.co2Max && (
+                                  <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+                                    {(ing.co2Min * ing.weightFraction).toFixed(2)} – {(ing.co2Max * ing.weightFraction).toFixed(2)}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>

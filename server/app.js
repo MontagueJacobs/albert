@@ -2022,6 +2022,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
         brand: enriched?.brand ?? null,
         image_url: enriched?.image_url ?? null,
         product_url: enriched?.url ?? null,
+        unit_size: enriched?.unit_size ?? null,
         // Sustainability scoring
         sustainability_score: evaluation.score,
         sustainability_rating: evaluation.rating,
@@ -2153,7 +2154,7 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
     if (productIds.length > 0) {
       const { data: products } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, ingredients, nutrition_text, nutrition_json')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
         .in('id', productIds)
       
       if (products) {
@@ -2188,6 +2189,7 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
         brand: enriched.brand ?? null,
         image_url: enriched.image_url ?? null,
         product_url: enriched.url ?? null,
+        unit_size: enriched.unit_size ?? null,
         sustainability_score: evaluation.score,
         rating: evaluation.rating,
         name: purchase.product_name
@@ -3340,7 +3342,8 @@ app.get('/api/product/:productId/details', async (req, res) => {
       co2CategoryLabel: evaluation.co2CategoryLabel,
       co2Matched: evaluation.co2Matched,
       co2Method: evaluation.co2Method,
-      ingredientBreakdown: evaluation.ingredientBreakdown || null
+      ingredientBreakdown: evaluation.ingredientBreakdown || null,
+      unitSize: product?.unit_size || null
     })
   } catch (err) {
     console.error('[product/details] Error:', err)
