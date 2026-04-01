@@ -3338,12 +3338,23 @@ app.get('/api/product/:productId/details', async (req, res) => {
       isNonFood: evaluation.isNonFood || false,
       // CO2 data
       co2PerKg: evaluation.co2PerKg,
+      co2Min: evaluation.co2Min || null,
+      co2Max: evaluation.co2Max || null,
+      co2Valid: evaluation.co2Valid != null ? evaluation.co2Valid : null,
       co2Category: evaluation.co2Category,
       co2CategoryLabel: evaluation.co2CategoryLabel,
       co2Matched: evaluation.co2Matched,
       co2Method: evaluation.co2Method,
       ingredientBreakdown: evaluation.ingredientBreakdown || null,
-      unitSize: product?.unit_size || null
+      unitSize: product?.unit_size || null,
+      weightGrams: (() => {
+        const w = getProductWeight(product?.unit_size, evaluation.co2Category)
+        return w.weightGrams
+      })(),
+      weightSource: (() => {
+        const w = getProductWeight(product?.unit_size, evaluation.co2Category)
+        return w.source
+      })()
     })
   } catch (err) {
     console.error('[product/details] Error:', err)

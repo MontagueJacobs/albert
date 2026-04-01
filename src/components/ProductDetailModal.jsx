@@ -494,15 +494,21 @@ function ProductDetailModal({ purchase, onClose }) {
                 </span>
               )}
 
-              {(purchase.unit_size || (details && details.unitSize)) && (
-                <span style={{ 
-                  ...styles.badge, 
-                  background: 'var(--bg-hover)', 
-                  color: 'var(--text-muted)' 
-                }}>
-                  {purchase.unit_size || details.unitSize}
-                </span>
-              )}
+              {(() => {
+                const size = purchase.unit_size || (details && details.unitSize)
+                if (size) return (
+                  <span style={{ ...styles.badge, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                    {size}
+                  </span>
+                )
+                // Show estimated weight from server when no unit_size is stored
+                if (details && details.weightGrams && details.weightSource !== 'generic_default') return (
+                  <span style={{ ...styles.badge, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                    ~{details.weightGrams >= 1000 ? `${(details.weightGrams / 1000).toFixed(1)} kg` : `${details.weightGrams} g`}
+                  </span>
+                )
+                return null
+              })()}
               
               {purchase.is_organic && (
                 <span style={{ 
@@ -606,7 +612,20 @@ function ProductDetailModal({ purchase, onClose }) {
                     color: 'var(--text)'
                   }}>
                     <div style={{ fontWeight: '500' }}>{translateCategory(details.co2CategoryLabel || details.co2Category, lang)}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    {/* Total CO₂ for this product (primary display) */}
+                    {details.weightGrams && (
+                      <div style={{ fontWeight: '600', fontSize: '0.95rem', marginTop: '2px' }}>
+                        {(details.co2PerKg * details.weightGrams / 1000).toFixed(2)} kg CO₂
+                        <span style={{ fontWeight: '400', fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+                          {lang === 'en' ? 'for this product' : 'voor dit product'}
+                          {details.weightSource === 'category_default' || details.weightSource === 'generic_default'
+                            ? ` (${lang === 'en' ? 'est.' : 'gesch.'} ${details.weightGrams}g)`
+                            : ` (${details.weightGrams}g)`}
+                        </span>
+                      </div>
+                    )}
+                    {/* Per-kg rate as secondary info */}
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
                       {details.co2PerKg.toFixed(1)} kg CO₂ per kg
                       {details.co2Min != null && details.co2Max != null && details.co2Min !== details.co2Max && (
                         <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>
