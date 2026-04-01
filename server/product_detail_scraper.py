@@ -813,6 +813,17 @@ class AHProductDetailScraper:
                                 result['unit_size'] = match.group(1).strip()
                                 print(f"[DEBUG] Extracted unit_size from weight section (fallback): {result['unit_size']}", flush=True)
                                 break
+                    
+                    # If unit_size is "stuks", look for Portiegrootte as the real weight
+                    # AH format: "1 Stuks\nPortiegrootte:\n    250 gram"
+                    if result['unit_size'] and re.match(r'^\d+\s*stuks?$', result['unit_size'], re.IGNORECASE):
+                        portie_match = re.search(
+                            r'portiegrootte[:\s]*(\d+(?:[,.]\d+)?\s*(?:gram|kilogram|liter|milliliter|centiliter|deciliter|kg|ml|cl|dl|g|l))',
+                            weight_text, re.IGNORECASE
+                        )
+                        if portie_match:
+                            result['unit_size'] = portie_match.group(1).strip()
+                            print(f"[DEBUG] Replaced stuks with portiegrootte: {result['unit_size']}", flush=True)
             except Exception as e:
                 print(f"[WARN] Weight section extraction failed: {e}", flush=True)
             
