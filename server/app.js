@@ -187,7 +187,7 @@ app.use(cors())
 app.use(bodyParser.json({ limit: '2mb' }))
 
 // ============================================================================
-// HEALTH CHECK ENDPOINT (for Railway/deployment monitoring)
+// HEALTH CHECK ENDPOINT (for deployment monitoring)
 // ============================================================================
 app.get('/api/health', (req, res) => {
   res.json({ 
