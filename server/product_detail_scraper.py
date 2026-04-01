@@ -785,8 +785,9 @@ class AHProductDetailScraper:
             # Extract Unit Size
             # ================================================================
             unit_patterns = [
-                r'(\d+(?:[,.]\d+)?\s*(?:g|kg|ml|l|cl|stuks?|st))\b',
-                r'inhoud[:\s]*(\d+(?:[,.]\d+)?\s*(?:g|kg|ml|l|cl))',
+                r'(\d+\s*[xX×]\s*\d+(?:[,.]\d+)?\s*(?:gram|kilogram|liter|milliliter|centiliter|deciliter|stuks?|st|kg|ml|cl|dl|g|l))\b',
+                r'(\d+(?:[,.]\d+)?\s*(?:gram|kilogram|liter|milliliter|centiliter|deciliter|stuks?|st|kg|ml|cl|dl|g|l))\b',
+                r'inhoud[:\s]*(\d+(?:[,.]\d+)?\s*(?:gram|kilogram|liter|milliliter|centiliter|deciliter|kg|ml|cl|dl|g|l))',
             ]
             
             try:
@@ -798,7 +799,7 @@ class AHProductDetailScraper:
                     print(f"[DEBUG] Found weight section: {weight_text[:100]}", flush=True)
                     # Look for explicit netto inhoud / net weight patterns
                     netto_match = re.search(
-                        r'(?:netto\s*inhoud|inhoud|volume|gewicht)[:\s]*(\d+(?:[,.]\d+)?\s*(?:g|kg|ml|l|cl|dl))',
+                        r'(?:netto\s*inhoud|inhoud|volume|gewicht)[:\s]*(\d+(?:[,.]\d+)?\s*(?:gram|kilogram|liter|milliliter|centiliter|deciliter|kg|ml|cl|dl|g|l))',
                         weight_text, re.IGNORECASE
                     )
                     if netto_match:

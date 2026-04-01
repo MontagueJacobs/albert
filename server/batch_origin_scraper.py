@@ -86,13 +86,14 @@ class BatchOriginScraper:
         if not self.supabase:
             return []
             
-        # Query products missing origin data, excluding already failed ones
+        # Query products missing origin data OR unit_size, excluding permanently failed ones
         # The table uses 'url' column, not 'product_url'
         result = self.supabase.table('products') \
-            .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
+            .select('id, name, url, origin_country, origin_by_month, unit_size, details_scrape_status') \
             .not_.is_('url', 'null') \
-            .is_('origin_country', 'null') \
-            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') \
+            .or_('origin_country.is.null,unit_size.is.null') \
+            .neq('details_scrape_status', 'not_found') \
+            .neq('details_scrape_status', 'failed') \
             .limit(limit) \
             .execute()
             
@@ -134,7 +135,7 @@ class BatchOriginScraper:
         # Debug: show sample
         print(f"[DEBUG] Sample URLs: {product_urls[:3]}", flush=True)
         
-        # Query products table by URL - find those missing origin data
+        # Query products table by URL - find those missing origin OR unit_size data
         all_products = []
         chunk_size = 20  # Smaller chunks for URL queries
         
@@ -142,10 +143,11 @@ class BatchOriginScraper:
             chunk_urls = product_urls[i:i + chunk_size]
             
             result = self.supabase.table('products') \
-                .select('id, name, url, origin_country, origin_by_month, details_scrape_status') \
+                .select('id, name, url, origin_country, origin_by_month, unit_size, details_scrape_status') \
                 .in_('url', chunk_urls) \
-                .is_('origin_country', 'null') \
-                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.eq.incomplete') \
+                .or_('origin_country.is.null,unit_size.is.null') \
+                .neq('details_scrape_status', 'not_found') \
+                .neq('details_scrape_status', 'failed') \
                 .execute()
             
             if result.data:

@@ -93,8 +93,20 @@ function parseWeightGrams(unitSize) {
   
   const s = unitSize.trim().toLowerCase().replace(',', '.')
   
-  // Match number + unit patterns
-  const match = s.match(/(\d+(?:\.\d+)?)\s*(kg|g|l|ml|cl|dl|stuks?|st)\b/)
+  // Handle multi-pack format: "6 x 330 ml" → multiply count × volume
+  const multiMatch = s.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(kilogram|gram|liter|milliliter|centiliter|deciliter|kg|g|l|ml|cl|dl)\b/)
+  if (multiMatch) {
+    const count = parseInt(multiMatch[1])
+    const value = parseFloat(multiMatch[2])
+    const unit = multiMatch[3]
+    if (!isNaN(count) && !isNaN(value) && count > 0 && value > 0) {
+      const perUnit = unitToGrams(value, unit)
+      return perUnit !== null ? count * perUnit : null
+    }
+  }
+  
+  // Match number + unit patterns (supports both abbreviated and full Dutch/English words)
+  const match = s.match(/(\d+(?:\.\d+)?)\s*(kilogram|gram|liter|milliliter|centiliter|deciliter|stuks?|st|kg|g|l|ml|cl|dl)\b/)
   if (!match) return null
   
   const value = parseFloat(match[1])
@@ -102,13 +114,23 @@ function parseWeightGrams(unitSize) {
   
   if (isNaN(value) || value <= 0) return null
   
+  return unitToGrams(value, unit)
+}
+
+function unitToGrams(value, unit) {
   switch (unit) {
-    case 'kg': return value * 1000
-    case 'g': return value
-    case 'l': return value * 1000    // ~1g/ml for most food liquids
-    case 'dl': return value * 100
-    case 'cl': return value * 10
-    case 'ml': return value
+    case 'kg':
+    case 'kilogram': return value * 1000
+    case 'g':
+    case 'gram': return value
+    case 'l':
+    case 'liter': return value * 1000    // ~1g/ml for most food liquids
+    case 'dl':
+    case 'deciliter': return value * 100
+    case 'cl':
+    case 'centiliter': return value * 10
+    case 'ml':
+    case 'milliliter': return value
     case 'stuk':
     case 'stuks':
     case 'st':
