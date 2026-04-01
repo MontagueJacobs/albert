@@ -815,15 +815,44 @@ class AHProductDetailScraper:
                                 break
                     
                     # If unit_size is "stuks", look for Portiegrootte as the real weight
-                    # AH format: "1 Stuks\nPortiegrootte:\n    250 gram"
+                    # The portiegrootte is often in a sibling element (description-list), not in the weight-contents element
+                    # So we check: 1) the broader weight section, 2) the description-list, 3) the weight_text itself
                     if result['unit_size'] and re.match(r'^\d+\s*stuks?$', result['unit_size'], re.IGNORECASE):
+                        # Get text from broader section and description list
+                        broader_text = weight_text
+                        try:
+                            broad_elem = await self.page.query_selector('[data-testid="pdp-content-and-weight"]')
+                            if broad_elem:
+                                broader_text = await broad_elem.inner_text()
+                                print(f"[DEBUG] Broader weight section: {broader_text[:150]}", flush=True)
+                        except:
+                            pass
+                        # Also try the description list specifically
+                        try:
+                            desc_elem = await self.page.query_selector('[data-testid="pdp-content-and-weight-description-list"]')
+                            if desc_elem:
+                                desc_text = await desc_elem.inner_text()
+                                broader_text = broader_text + "\n" + desc_text
+                                print(f"[DEBUG] Description list: {desc_text[:150]}", flush=True)
+                        except:
+                            pass
+                        
                         portie_match = re.search(
-                            r'portiegrootte[:\s]*(\d+(?:[,.]\d+)?\s*(?:gram|kilogram|liter|milliliter|centiliter|deciliter|kg|ml|cl|dl|g|l))',
-                            weight_text, re.IGNORECASE
+                            r'portiegrootte[:\s]*(\d+(?:[,.]\d+)?)\s*(gram|kilogram|liter|milliliter|centiliter|deciliter|kg|ml|cl|dl|g|l)',
+                            broader_text, re.IGNORECASE
                         )
                         if portie_match:
-                            result['unit_size'] = portie_match.group(1).strip()
-                            print(f"[DEBUG] Replaced stuks with portiegrootte: {result['unit_size']}", flush=True)
+                            portie_val = float(portie_match.group(1).replace(',', '.'))
+                            portie_unit = portie_match.group(2)
+                            # Check for "Aantal porties" to compute total weight
+                            aantal_match = re.search(r'aantal\s*porties[:\s]*(\d+)', broader_text, re.IGNORECASE)
+                            if aantal_match:
+                                total_val = portie_val * int(aantal_match.group(1))
+                                result['unit_size'] = f"{int(total_val)} {portie_unit}"
+                                print(f"[DEBUG] Computed weight from portie × aantal: {portie_val} × {aantal_match.group(1)} = {result['unit_size']}", flush=True)
+                            else:
+                                result['unit_size'] = f"{portie_match.group(1)} {portie_unit}"
+                                print(f"[DEBUG] Replaced stuks with portiegrootte: {result['unit_size']}", flush=True)
             except Exception as e:
                 print(f"[WARN] Weight section extraction failed: {e}", flush=True)
             

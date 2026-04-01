@@ -88,12 +88,13 @@ class BatchOriginScraper:
             
         # Query products missing origin data OR unit_size, excluding permanently failed ones
         # The table uses 'url' column, not 'product_url'
+        # Note: SQL NULL comparisons require special handling — neq/not-in exclude NULLs
+        # We use or_() to include status=null along with non-excluded statuses
         result = self.supabase.table('products') \
             .select('id, name, url, origin_country, origin_by_month, unit_size, details_scrape_status') \
             .not_.is_('url', 'null') \
             .or_('origin_country.is.null,unit_size.is.null') \
-            .neq('details_scrape_status', 'not_found') \
-            .neq('details_scrape_status', 'failed') \
+            .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
             .limit(limit) \
             .execute()
             
@@ -146,8 +147,7 @@ class BatchOriginScraper:
                 .select('id, name, url, origin_country, origin_by_month, unit_size, details_scrape_status') \
                 .in_('url', chunk_urls) \
                 .or_('origin_country.is.null,unit_size.is.null') \
-                .neq('details_scrape_status', 'not_found') \
-                .neq('details_scrape_status', 'failed') \
+                .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
                 .execute()
             
             if result.data:
@@ -253,7 +253,7 @@ class BatchOriginScraper:
             # Only mark as success if we have key fields, otherwise 'incomplete' for re-scraping
             update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
             has_key_fields = bool(origin_data.get('price')) and bool(origin_data.get('image_url')) and bool(origin_data.get('ingredients'))
-            update_payload['details_scrape_status'] = 'success' if has_key_fields else 'incomplete'
+            update_payload['details_scrape_status'] = 'success' if has_key_fields else 'pending'
                 
             # Update the product
             result = self.supabase.table('products') \

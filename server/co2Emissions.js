@@ -224,18 +224,80 @@ const CATEGORY_DEFAULT_WEIGHTS = {
 }
 
 /**
+ * Typical weights (grams) for items sold "per stuk" that lack a declared weight.
+ * Keyed by lowercase keyword found in the product name.
+ * Sources: average Dutch supermarket weights.
+ */
+const PER_STUK_WEIGHTS = {
+  // Vegetables
+  'komkommer': 400,
+  'cucumber': 400,
+  'courgette': 300,
+  'zucchini': 300,
+  'paprika': 180,
+  'aubergine': 350,
+  'broccoli': 500,
+  'bloemkool': 1000,
+  'andijvie': 500,
+  'sla': 300,
+  'ijsbergsla': 500,
+  'prei': 200,
+  'selderij': 500,
+  'venkel': 350,
+  'kool': 1000,
+  'pompoen': 1500,
+  'mais': 250,        // corn cob
+  'avocado': 200,
+  'rode uien': 500,   // net bag
+  'uien': 1000,       // net bag
+  // Fruit
+  'elstar': 200,
+  'jonagold': 200,
+  'granny smith': 200,
+  'appel': 200,
+  'peer': 200,
+  'conference': 200,
+  'mango': 350,
+  'ananas': 1200,
+  'meloen': 1500,
+  'watermeloen': 5000,
+  'kokosnoot': 400,
+  'granaatappel': 350,
+  'sinaasappel': 200,
+  'citroen': 100,
+  'limoen': 60,
+  'banaan': 120,
+  'kiwi': 80,
+  'perzik': 150,
+  'nectarine': 150,
+  'pruim': 70,
+}
+
+/**
  * Get the weight in grams for a product, using:
  * 1. Parsed unit_size from product data (most accurate)
- * 2. Category default weight (fallback for loose produce etc.)
+ * 2. Name-based lookup for "per stuk" items (komkommer, appel, etc.)
+ * 3. Category default weight (fallback for loose produce etc.)
  * @param {string|null} unitSize - unit_size string from DB, e.g. "500 g"
  * @param {string|null} co2Category - matched CO2 category key
+ * @param {string|null} productName - product name for per-stuk lookup
  * @returns {{ weightGrams: number|null, source: string }}
  */
-function getProductWeight(unitSize, co2Category) {
+function getProductWeight(unitSize, co2Category, productName = null) {
   // Try parsing the unit_size first
   const parsed = parseWeightGrams(unitSize)
   if (parsed !== null) {
     return { weightGrams: parsed, source: 'unit_size' }
+  }
+  
+  // For "per stuk" items, try name-based weight lookup
+  if (productName) {
+    const lower = productName.toLowerCase()
+    for (const [keyword, weight] of Object.entries(PER_STUK_WEIGHTS)) {
+      if (lower.includes(keyword)) {
+        return { weightGrams: weight, source: 'per_stuk_estimate' }
+      }
+    }
   }
   
   // Fall back to category default

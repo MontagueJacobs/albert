@@ -618,7 +618,7 @@ function ProductDetailModal({ purchase, onClose }) {
                         {(details.co2PerKg * details.weightGrams / 1000).toFixed(2)} kg CO₂
                         <span style={{ fontWeight: '400', fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
                           {lang === 'en' ? 'for this product' : 'voor dit product'}
-                          {details.weightSource === 'category_default' || details.weightSource === 'generic_default'
+                          {details.weightSource === 'category_default' || details.weightSource === 'generic_default' || details.weightSource === 'per_stuk_estimate'
                             ? ` (${lang === 'en' ? 'est.' : 'gesch.'} ${details.weightGrams}g)`
                             : ` (${details.weightGrams}g)`}
                         </span>

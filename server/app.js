@@ -33,6 +33,18 @@ import {
   getProductWeight
 } from './co2Emissions.js'
 
+import {
+  getGenericQuiz1Items,
+  getGenericQuiz3Items,
+  calculateRankingScore,
+  assignABVariant,
+  getProductCO2,
+  SELF_PERCEPTION_QUESTIONS,
+  REFLECTION_QUESTIONS,
+  EXPERIMENT_STEPS,
+  getNextStep
+} from './co2Experiment.js'
+
 // Ensure .env is loaded from the webapp root regardless of cwd
 dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env') })
 
@@ -1682,7 +1694,7 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
       const product = productsMap.get(p.product_id)
       const enrichedData = product ? getEnrichedData(product) : null
       const evaluation = evaluateProduct(p.product_name, enrichedData)
-      const weight = getProductWeight(product?.unit_size, evaluation.co2Category)
+      const weight = getProductWeight(product?.unit_size, evaluation.co2Category, p.product_name)
       return {
         ...p,
         sustainability_score: evaluation.score,
@@ -2263,7 +2275,7 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       const product = productsMap.get(p.product_id)
       const enrichedData = product ? getEnrichedData(product) : null
       const evaluation = evaluateProduct(p.product_name, enrichedData)
-      const weight = getProductWeight(product?.unit_size, evaluation.co2Category)
+      const weight = getProductWeight(product?.unit_size, evaluation.co2Category, p.product_name)
       return {
         ...p,
         // Use purchase price, fall back to product price if null
@@ -3347,13 +3359,9 @@ app.get('/api/product/:productId/details', async (req, res) => {
       co2Method: evaluation.co2Method,
       ingredientBreakdown: evaluation.ingredientBreakdown || null,
       unitSize: product?.unit_size || null,
-      weightGrams: (() => {
-        const w = getProductWeight(product?.unit_size, evaluation.co2Category)
-        return w.weightGrams
-      })(),
-      weightSource: (() => {
-        const w = getProductWeight(product?.unit_size, evaluation.co2Category)
-        return w.source
+      ...(() => {
+        const w = getProductWeight(product?.unit_size, evaluation.co2Category, product?.name || productName)
+        return { weightGrams: w.weightGrams, weightSource: w.source }
       })()
     })
   } catch (err) {
@@ -3803,6 +3811,424 @@ app.post('/api/origin-scraper/trigger', (req, res) => {
   
   triggerBackgroundOriginScraper()
   res.json({ ok: true, message: 'Origin scraper triggered' })
+})
+
+// ===========================================================================
+// EXPERIMENT API ENDPOINTS
+// Multi-step CO2 awareness experiment with A/B testing
+// ===========================================================================
+
+// Start or resume an experiment session
+app.post('/api/experiment/start', async (req, res) => {
+  try {
+    const { bonus_card } = req.body
+    if (!bonus_card) {
+      return res.status(400).json({ error: 'bonus_card is required' })
+    }
+
+    // Check for existing active (non-complete) session
+    const { data: existing } = await supabase
+      .from('experiment_sessions')
+      .select('*')
+      .eq('bonus_card', bonus_card)
+      .neq('current_step', 'complete')
+      .order('started_at', { ascending: false })
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      // Resume existing session
+      return res.json({ session: existing[0], resumed: true })
+    }
+
+    // Create new session with A/B assignment
+    const ab_variant = assignABVariant(bonus_card)
+    
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .insert({
+        bonus_card,
+        ab_variant,
+        current_step: 'intro',
+        consent_given: false
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[experiment/start] Error:', error)
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data, resumed: false })
+  } catch (e) {
+    console.error('[experiment/start] Exception:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Get experiment session status
+app.get('/api/experiment/:bonusCard/session', async (req, res) => {
+  try {
+    const { bonusCard } = req.params
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .select('*')
+      .eq('bonus_card', bonusCard)
+      .order('started_at', { ascending: false })
+      .limit(1)
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    if (!data || data.length === 0) {
+      return res.json({ session: null })
+    }
+
+    res.json({ session: data[0] })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Update consent and advance to quiz1
+app.post('/api/experiment/:sessionId/consent', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { consent_given } = req.body
+
+    if (!consent_given) {
+      return res.status(400).json({ error: 'Consent must be given to proceed' })
+    }
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        consent_given: true, 
+        current_step: 'quiz1',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Get quiz items for a specific quiz (1-4)
+app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) => {
+  try {
+    const { sessionId, quizNumber } = req.params
+    const quizNum = parseInt(quizNumber)
+    
+    if (![1, 2, 3, 4].includes(quizNum)) {
+      return res.status(400).json({ error: 'Quiz number must be 1, 2, 3, or 4' })
+    }
+
+    // Get session to check state and used items
+    const { data: session, error: sessionError } = await supabase
+      .from('experiment_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
+
+    if (sessionError || !session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    // Check if quiz already has items assigned
+    const quizDataKey = `quiz${quizNum}_data`
+    if (session[quizDataKey] && session[quizDataKey].items) {
+      // Return existing items (for page refresh / resume)
+      return res.json({ items: session[quizDataKey].items })
+    }
+
+    // Collect already-used item IDs to prevent overlap
+    const usedIds = new Set()
+    for (const qn of [1, 2, 3, 4]) {
+      const ids = session[`quiz${qn}_item_ids`]
+      if (ids) ids.forEach(id => usedIds.add(id))
+    }
+
+    let items = []
+
+    if (quizNum === 1) {
+      // Generic pool A
+      items = getGenericQuiz1Items()
+    } else if (quizNum === 3) {
+      // Generic pool B
+      items = getGenericQuiz3Items()
+    } else if (quizNum === 2 || quizNum === 4) {
+      // Personal products from user's purchases
+      const { data: userPurchases } = await supabase
+        .from('user_purchases')
+        .select('product_id, product_name')
+        .eq('bonus_card_number', session.bonus_card)
+
+      const foodPurchases = (userPurchases || []).filter(p => {
+        const nameLower = (p.product_name || '').toLowerCase()
+        return !isNonFood(nameLower)
+      })
+
+      // Deduplicate by product_id, exclude already-used
+      const uniqueProducts = []
+      const seenIds = new Set()
+      for (const p of foodPurchases) {
+        const pid = p.product_id || p.product_name
+        if (!seenIds.has(pid) && !usedIds.has(pid) && !usedIds.has(p.product_name)) {
+          seenIds.add(pid)
+          uniqueProducts.push(p)
+        }
+      }
+
+      // Enrich with CO2 data
+      const enriched = await Promise.all(uniqueProducts.map(async (p) => {
+        let enrichedData = null
+        let productImage = null
+        if (p.product_id) {
+          const { data: product } = await supabase
+            .from('products')
+            .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url, ingredients, nutrition_text, nutrition_json')
+            .eq('id', p.product_id)
+            .single()
+          if (product) {
+            enrichedData = getEnrichedData(product)
+            productImage = product.image_url
+          }
+        }
+        const evaluation = evaluateProduct(p.product_name, enrichedData)
+        return {
+          id: p.product_id || p.product_name,
+          name: p.product_name,
+          image_url: productImage,
+          image_emoji: null,
+          source: 'purchased',
+          co2PerKg: evaluation.co2PerKg,
+          co2Category: evaluation.co2Category,
+          co2Matched: evaluation.co2PerKg != null
+        }
+      }))
+
+      // Filter valid CO2 data, shuffle, take up to 10
+      items = enriched
+        .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 10)
+    }
+
+    // Filter out any used IDs (safety)
+    items = items.filter(item => !usedIds.has(item.id))
+
+    if (items.length < 4) {
+      return res.status(400).json({ 
+        error: 'not_enough_products',
+        message: `Not enough products available for quiz ${quizNum}. Need at least 4.`,
+        available: items.length
+      })
+    }
+
+    // Store item IDs in session to prevent reuse
+    const itemIds = items.map(i => i.id)
+    const { error: updateError } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        [`quiz${quizNum}_item_ids`]: itemIds,
+        [`quiz${quizNum}_data`]: { items },
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+
+    if (updateError) {
+      console.error(`[experiment/quiz${quizNum}/items] Update error:`, updateError)
+    }
+
+    res.json({ items })
+  } catch (e) {
+    console.error(`[experiment/quiz/items] Exception:`, e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Submit quiz ranking results
+app.post('/api/experiment/:sessionId/quiz/:quizNumber/submit', async (req, res) => {
+  try {
+    const { sessionId, quizNumber } = req.params
+    const { user_ranking } = req.body  // Array of item objects in user's order
+    const quizNum = parseInt(quizNumber)
+
+    if (![1, 2, 3, 4].includes(quizNum)) {
+      return res.status(400).json({ error: 'Quiz number must be 1, 2, 3, or 4' })
+    }
+
+    if (!user_ranking || !Array.isArray(user_ranking) || user_ranking.length === 0) {
+      return res.status(400).json({ error: 'user_ranking array is required' })
+    }
+
+    // Get session to retrieve original items
+    const { data: session } = await supabase
+      .from('experiment_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    const quizDataKey = `quiz${quizNum}_data`
+    const originalItems = session[quizDataKey]?.items || user_ranking
+
+    // Calculate score
+    const scoreResult = calculateRankingScore(user_ranking, originalItems)
+    
+    // Determine next step
+    const stepMap = { 1: 'quiz1', 2: 'quiz2', 3: 'quiz3', 4: 'quiz4' }
+    const currentStep = stepMap[quizNum]
+    const nextStep = getNextStep(currentStep)
+
+    // Update session
+    const updateData = {
+      [quizDataKey]: {
+        items: originalItems,
+        user_ranking: user_ranking.map((item, i) => ({ rank: i + 1, id: item.id, name: item.name })),
+        score: scoreResult.score,
+        maxScore: scoreResult.maxScore,
+        totalDistance: scoreResult.totalDistance,
+        details: scoreResult.details,
+        correctOrder: scoreResult.correctOrder
+      },
+      current_step: nextStep,
+      updated_at: new Date().toISOString()
+    }
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update(updateData)
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ 
+      session: data,
+      score: scoreResult.score,
+      maxScore: scoreResult.maxScore,
+      details: scoreResult.details,
+      correctOrder: scoreResult.correctOrder,
+      nextStep
+    })
+  } catch (e) {
+    console.error('[experiment/quiz/submit] Exception:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Submit self-perception responses
+app.post('/api/experiment/:sessionId/self-perception', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { responses } = req.body
+
+    if (!responses || typeof responses !== 'object') {
+      return res.status(400).json({ error: 'responses object is required' })
+    }
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        self_perception: responses,
+        current_step: 'intervention',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Advance past intervention step
+app.post('/api/experiment/:sessionId/intervention-complete', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        current_step: 'quiz3',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Submit reflection responses and complete experiment
+app.post('/api/experiment/:sessionId/reflection', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { responses } = req.body
+
+    if (!responses || typeof responses !== 'object') {
+      return res.status(400).json({ error: 'responses object is required' })
+    }
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        reflection: responses,
+        current_step: 'complete',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data, completed: true })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Get experiment config (questions, etc.) for frontend
+app.get('/api/experiment/config', (req, res) => {
+  res.json({
+    selfPerceptionQuestions: SELF_PERCEPTION_QUESTIONS,
+    reflectionQuestions: REFLECTION_QUESTIONS,
+    steps: EXPERIMENT_STEPS
+  })
 })
 
 // Debug endpoint to test inserting into user_purchases
