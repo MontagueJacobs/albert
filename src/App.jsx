@@ -57,12 +57,13 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
     setLang(nextLang)
   }, [lang, setLang])
 
-  const ThemeToggle = () => (
-    <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === 'xp' ? 'Switch to dark theme' : 'Switch to XP theme'}>
-      {theme === 'xp' ? '🌙' : '🪟'}
-      <span>{theme === 'xp' ? 'Dark' : 'XP'}</span>
-    </button>
-  )
+  // ThemeToggle kept for future use — currently XP is the only active theme
+  // const ThemeToggle = () => (
+  //   <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === 'xp' ? 'Switch to dark theme' : 'Switch to XP theme'}>
+  //     {theme === 'xp' ? '🌙' : '🪟'}
+  //     <span>{theme === 'xp' ? 'Dark' : 'XP'}</span>
+  //   </button>
+  // )
 
   const ABToggle = () => (
     <button
@@ -105,7 +106,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </div>
           <div className="header-actions">
             <ABToggle />
-            <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -132,7 +132,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </div>
           <div className="header-actions">
             <ABToggle />
-            <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -172,7 +171,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           
           <div className="header-actions">
             <ABToggle />
-            <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -261,7 +259,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         
         <div className="header-actions">
           <ABToggle />
-          <ThemeToggle />
           <button className="lang-btn" onClick={handleToggleLanguage}>
             {lang === 'nl' ? 'EN' : 'NL'}
           </button>

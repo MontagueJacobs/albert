@@ -12,9 +12,9 @@
     }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: #f3f4f6;
+      font-family: 'Trebuchet MS', 'Tahoma', 'Segoe UI', sans-serif;
+      background: #D8D4BF;
+      color: #1a1a0e;
       min-height: 100vh;
       padding: 40px 20px;
     }
@@ -30,18 +30,21 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      color: #0060CC;
     }
     
     .subtitle {
-      color: #9ca3af;
+      color: #55523e;
       margin-bottom: 32px;
     }
     
     .card {
-      background: #334155;
-      border-radius: 16px;
+      background: #F5F0E0;
+      border-radius: 12px;
       padding: 24px;
       margin-bottom: 24px;
+      border: 1px solid #C4BFA8;
+      box-shadow: 0 1px 3px rgba(40,35,10,.22);
     }
     
     .card h2 {
@@ -50,10 +53,8 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      color: #0060CC;
     }
-    
-    .card.ah h2 { color: #22c55e; }
-    .card.jumbo h2 { color: #fbbf24; }
     
     .store-grid {
       display: grid;
@@ -69,45 +70,46 @@
     }
     
     .store-card {
-      background: #1e293b;
-      border-radius: 12px;
+      background: #EEEAD8;
+      border-radius: 10px;
       padding: 20px;
       text-align: center;
-      border: 2px solid transparent;
+      border: 2px solid #C4BFA8;
       transition: border-color 0.2s;
     }
     
-    .store-card.ah { border-color: rgba(34, 197, 94, 0.3); }
-    .store-card.jumbo { border-color: rgba(251, 191, 36, 0.3); }
+    .store-card.ah { border-color: #3C9A3C; }
+    .store-card.jumbo { border-color: #d4a017; }
     
     .store-card h3 {
       font-size: 1.1rem;
       margin-bottom: 12px;
     }
     
-    .store-card.ah h3 { color: #22c55e; }
-    .store-card.jumbo h3 { color: #fbbf24; }
+    .store-card.ah h3 { color: #2D7B2D; }
+    .store-card.jumbo h3 { color: #b8860b; }
     
     .bookmarklet {
       display: inline-block;
       padding: 14px 28px;
       color: white;
       text-decoration: none;
-      border-radius: 10px;
+      border-radius: 8px;
       font-weight: 600;
       font-size: 1rem;
       cursor: grab;
       transition: transform 0.2s, box-shadow 0.2s;
       margin: 8px 0;
+      border: 1px solid rgba(0,0,0,0.15);
     }
     
     .bookmarklet.ah {
-      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      background: linear-gradient(180deg, #4CB84C 0%, #3C9A3C 100%);
     }
     
     .bookmarklet.jumbo {
-      background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
-      color: #1e293b;
+      background: linear-gradient(180deg, #e6b422 0%, #d4a017 100%);
+      color: #1a1a0e;
     }
     
     .bookmarklet:hover {
@@ -115,11 +117,11 @@
     }
     
     .bookmarklet.ah:hover {
-      box-shadow: 0 8px 25px rgba(34, 197, 94, 0.35);
+      box-shadow: 0 4px 12px rgba(60, 154, 60, 0.35);
     }
     
     .bookmarklet.jumbo:hover {
-      box-shadow: 0 8px 25px rgba(251, 191, 36, 0.35);
+      box-shadow: 0 4px 12px rgba(212, 160, 23, 0.35);
     }
     
     .bookmarklet:active {
@@ -130,18 +132,19 @@
       display: block;
       margin-top: 12px;
       font-size: 0.85rem;
-      color: #9ca3af;
+      color: #55523e;
     }
     
     .store-link a {
-      color: inherit;
+      color: #0060CC;
       text-decoration: underline;
     }
     
     .instructions {
-      background: #1e293b;
-      border-radius: 12px;
+      background: #EEEAD8;
+      border-radius: 10px;
       padding: 20px;
+      border: 1px solid #C4BFA8;
     }
     
     .step {
@@ -157,7 +160,7 @@
     .step-number {
       width: 28px;
       height: 28px;
-      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+      background: linear-gradient(180deg, #3399FF 0%, #0080FF 100%);
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -165,6 +168,7 @@
       font-weight: bold;
       font-size: 0.85rem;
       flex-shrink: 0;
+      color: white;
     }
     
     .step-content {
@@ -172,39 +176,42 @@
     }
     
     .step-content p {
-      color: #d1d5db;
+      color: #33311e;
       line-height: 1.6;
     }
     
     .drag-hint {
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.3);
+      background: rgba(212, 160, 23, 0.12);
+      border: 1px solid rgba(212, 160, 23, 0.4);
       border-radius: 8px;
       padding: 12px;
       margin-top: 16px;
       font-size: 0.9rem;
-      color: #fcd34d;
+      color: #8B6914;
     }
     
     kbd {
-      background: #475569;
+      background: #C4BFA8;
       padding: 2px 6px;
       border-radius: 4px;
       font-family: monospace;
       font-size: 0.85em;
+      border: 1px solid #9E9A86;
     }
     
     .back-link {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      color: #9ca3af;
+      color: #0060CC;
       text-decoration: none;
       margin-top: 24px;
+      font-weight: 500;
     }
     
     .back-link:hover {
-      color: #f3f4f6;
+      color: #0080FF;
+      text-decoration: underline;
     }
   </style>
 </head>
