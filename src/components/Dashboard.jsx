@@ -58,7 +58,7 @@ const styles = {
     height: '60px',
     borderRadius: '8px',
     objectFit: 'cover',
-    background: '#374151'
+    background: 'var(--bg-hover, #374151)'
   },
   purchaseDetails: {
     flex: 1,
@@ -412,7 +412,7 @@ function Dashboard({ syncVersion }) {
                   <span>{t('baseline_you')}</span>
                   <span>{insights.baseline_comparison.userAvgCO2PerKg?.toFixed(2)} kg CO₂/kg</span>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                <div style={{ background: 'var(--progress-track, rgba(255,255,255,0.1))', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
                   <div style={{
                     width: `${Math.min(100, (insights.baseline_comparison.userAvgCO2PerKg / Math.max(insights.baseline_comparison.baseline, insights.baseline_comparison.userAvgCO2PerKg)) * 100)}%`,
                     height: '100%',
@@ -427,7 +427,7 @@ function Dashboard({ syncVersion }) {
                   <span>{t('baseline_avg_nl')}</span>
                   <span>{insights.baseline_comparison.baseline?.toFixed(2)} kg CO₂/kg</span>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                <div style={{ background: 'var(--progress-track, rgba(255,255,255,0.1))', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
                   <div style={{
                     width: `${Math.min(100, (insights.baseline_comparison.baseline / Math.max(insights.baseline_comparison.baseline, insights.baseline_comparison.userAvgCO2PerKg)) * 100)}%`,
                     height: '100%',
@@ -448,7 +448,7 @@ function Dashboard({ syncVersion }) {
             <div style={{ 
               marginTop: '1rem', 
               paddingTop: '0.75rem', 
-              borderTop: '1px solid rgba(255,255,255,0.1)',
+              borderTop: '1px solid var(--divider, rgba(255,255,255,0.1))',
               display: 'flex',
               justifyContent: 'space-between',
               fontSize: '0.85rem',

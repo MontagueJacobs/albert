@@ -5,17 +5,17 @@
 
 /* ---------- XP colour tokens ---------- */
 [data-theme="xp"] {
-  /* Core Luna palette */
+  /* Core Luna palette — warm / parchment tint */
   --xp-blue:         #0054E3;
   --xp-blue-dark:    #003C9E;
   --xp-blue-light:   #3169C6;
   --xp-blue-lighter: #4A7FD7;
   --xp-green:        #3C9A3C;
   --xp-green-dark:   #2D7B2D;
-  --xp-silver:       #ECE9D8;
-  --xp-silver-dark:  #D6D2C2;
-  --xp-silver-darker:#ACA899;
-  --xp-white:        #FFFFFF;
+  --xp-silver:       #D8D4BF;
+  --xp-silver-dark:  #C4BFA8;
+  --xp-silver-darker:#9E9A86;
+  --xp-white:        #F5F0E0;
   --xp-title-start:  #0054E3;
   --xp-title-end:    #4A7FD7;
   --xp-start-green:  #3C9A3C;
@@ -27,13 +27,18 @@
   --accent:         var(--xp-blue-light);
   --bg:             var(--xp-silver);
   --bg-card:        var(--xp-white);
+  --bg-secondary:   var(--xp-silver);
   --bg-hover:       var(--xp-silver-dark);
-  --text:           #000000;
-  --text-muted:     #444444;
-  --white:          #FFFFFF;
+  --text:           #1a1a0e;
+  --text-muted:     #55523e;
+  --white:          #F5F0E0;
   --border:         var(--xp-silver-darker);
-  --shadow:         0 1px 3px rgba(0,0,0,.18);
-  --shadow-lg:      0 4px 12px rgba(0,0,0,.22);
+  --shadow:         0 1px 3px rgba(40,35,10,.22);
+  --shadow-lg:      0 4px 12px rgba(40,35,10,.28);
+
+  /* Progress bars & dividers */
+  --progress-track: rgba(0, 0, 0, 0.12);
+  --divider:        rgba(0, 0, 0, 0.1);
 
   /* XP font stack */
   font-family: Tahoma, Verdana, 'Segoe UI', sans-serif;
@@ -54,15 +59,15 @@
   border-left: 1px solid var(--xp-silver-darker);
 }
 [data-theme="xp"] ::-webkit-scrollbar-thumb {
-  background: linear-gradient(to right, #FAFAFA, #D6D2C2);
-  border: 1px solid #999;
+  background: linear-gradient(to right, #EDE8D4, #C4BFA8);
+  border: 1px solid #8E8A76;
   border-radius: 0;
 }
 [data-theme="xp"] ::-webkit-scrollbar-button {
   display: block;
   height: 17px;
   background: var(--xp-silver-dark);
-  border: 1px outset #FFF;
+  border: 1px outset #DDD8C4;
 }
 
 /* ============ APP HEADER → XP Title-bar gradient ============ */
@@ -96,24 +101,24 @@
 /* Language & auth buttons on header */
 [data-theme="xp"] .lang-btn,
 [data-theme="xp"] .auth-btn {
-  background: linear-gradient(180deg, #FAFAFA 0%, #D6D2C2 100%);
-  color: #000;
-  border: 1px solid #999;
+  background: linear-gradient(180deg, #EDE8D4 0%, #C4BFA8 100%);
+  color: #1a1a0e;
+  border: 1px solid #8E8A76;
   border-radius: 3px;
-  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15);
+  box-shadow: inset 0 1px 0 #F5F0E0, 0 1px 2px rgba(40,35,10,.18);
   text-shadow: none;
   font-weight: 600;
 }
 
 [data-theme="xp"] .lang-btn:hover,
 [data-theme="xp"] .auth-btn:hover {
-  background: linear-gradient(180deg, #FFF 0%, #E5E1D2 100%);
+  background: linear-gradient(180deg, #F5F0E0 0%, #D0CBB4 100%);
 }
 
 [data-theme="xp"] .lang-btn:active,
 [data-theme="xp"] .auth-btn:active {
-  background: linear-gradient(180deg, #D6D2C2 0%, #FAFAFA 100%);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,.25);
+  background: linear-gradient(180deg, #C4BFA8 0%, #EDE8D4 100%);
+  box-shadow: inset 0 1px 3px rgba(40,35,10,.3);
 }
 
 /* ============ SLIDE MENU → XP Explorer side-panel ============ */
@@ -125,7 +130,7 @@
 
 [data-theme="xp"] .menu-item {
   border-radius: 3px;
-  color: #000;
+  color: #1a1a0e;
   font-size: 0.9rem;
 }
 
@@ -145,7 +150,7 @@
 }
 
 [data-theme="xp"] .menu-arrow {
-  color: #666;
+  color: #7a7660;
 }
 
 /* ============ HERO ============ */
@@ -159,7 +164,7 @@
 }
 
 [data-theme="xp"] .hero-subtitle {
-  color: #333;
+  color: #3a3826;
 }
 
 [data-theme="xp"] .hero-icon-circle {
@@ -170,8 +175,8 @@
 /* ============ BUTTONS → XP beveled style ============ */
 [data-theme="xp"] .btn {
   border-radius: 3px;
-  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15);
-  border: 1px solid #999;
+  box-shadow: inset 0 1px 0 #EDE8D4, 0 1px 2px rgba(40,35,10,.18);
+  border: 1px solid #8E8A76;
   font-weight: 600;
   transition: all 0.1s;
 }
@@ -186,7 +191,7 @@
 [data-theme="xp"] .btn-primary:hover {
   background: linear-gradient(180deg, #6CCB6C 0%, #4AAD4A 50%, var(--xp-green) 100%);
   transform: none;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 1px 2px rgba(0,0,0,.15);
+  box-shadow: inset 0 1px 0 rgba(245,240,224,.5), 0 1px 2px rgba(40,35,10,.18);
 }
 
 [data-theme="xp"] .btn-primary:active {
@@ -195,25 +200,25 @@
 }
 
 [data-theme="xp"] .btn-outline {
-  background: linear-gradient(180deg, #FAFAFA 0%, #E5E1D2 100%);
-  color: #000;
-  border: 1px solid #999;
+  background: linear-gradient(180deg, #EDE8D4 0%, #D0CBB4 100%);
+  color: #1a1a0e;
+  border: 1px solid #8E8A76;
 }
 
 [data-theme="xp"] .btn-outline:hover {
-  background: linear-gradient(180deg, #FFF 0%, #EDE9D8 100%);
-  color: #000;
+  background: linear-gradient(180deg, #F5F0E0 0%, #D8D4BF 100%);
+  color: #1a1a0e;
   border-color: var(--xp-blue);
 }
 
 [data-theme="xp"] .btn-secondary {
-  background: linear-gradient(180deg, #FAFAFA 0%, #D6D2C2 100%);
-  color: #000;
-  border: 1px solid #999;
+  background: linear-gradient(180deg, #EDE8D4 0%, #C4BFA8 100%);
+  color: #1a1a0e;
+  border: 1px solid #8E8A76;
 }
 
 [data-theme="xp"] .btn-secondary:hover {
-  background: linear-gradient(180deg, #FFF 0%, #E5E1D2 100%);
+  background: linear-gradient(180deg, #F5F0E0 0%, #D0CBB4 100%);
 }
 
 /* ============ FEATURE CARDS → XP Task-pane style ============ */
@@ -240,7 +245,7 @@
 }
 
 [data-theme="xp"] .feature-desc {
-  color: #333;
+  color: #3a3826;
 }
 
 [data-theme="xp"] .feature-link {
@@ -297,11 +302,11 @@
 [data-theme="xp"] input[type="number"],
 [data-theme="xp"] select,
 [data-theme="xp"] textarea {
-  background: #fff;
-  color: #000;
+  background: #FAF6E8;
+  color: #1a1a0e;
   border: 2px solid var(--xp-silver-darker);
   border-radius: 2px;
-  box-shadow: inset 1px 1px 2px rgba(0,0,0,.15);
+  box-shadow: inset 1px 1px 2px rgba(40,35,10,.15);
   font-family: Tahoma, Verdana, sans-serif;
 }
 
@@ -317,11 +322,11 @@
 
 [data-theme="xp"] input::placeholder,
 [data-theme="xp"] textarea::placeholder {
-  color: #999;
+  color: #9E9A86;
 }
 
 [data-theme="xp"] .form-group label {
-  color: #000;
+  color: #1a1a0e;
   font-weight: 600;
 }
 
@@ -342,12 +347,12 @@
 }
 
 [data-theme="xp"] .purchase-item .product-name {
-  color: #000;
+  color: #1a1a0e;
   font-weight: 700;
 }
 
 [data-theme="xp"] .purchase-item .details {
-  color: #444;
+  color: #55523e;
 }
 
 /* ============ BADGES ============ */
@@ -359,10 +364,9 @@
 
 /* ============ SUGGESTIONS → XP info panel ============ */
 [data-theme="xp"] .suggestions {
-  background: #FFF8DC;
-  border-left: 4px solid #f0c040;
-  border: 1px solid #E0D8B0;
-  border-left: 4px solid #f0c040;
+  background: #F0E8C8;
+  border: 1px solid #D0C8A0;
+  border-left: 4px solid #D4A820;
   border-radius: 2px;
 }
 
@@ -376,19 +380,19 @@
 }
 
 [data-theme="xp"] .tab {
-  background: linear-gradient(180deg, #FAFAFA 0%, var(--xp-silver) 100%);
+  background: linear-gradient(180deg, #EDE8D4 0%, var(--xp-silver) 100%);
   border: 1px solid var(--xp-silver-darker);
   border-bottom: none;
   border-radius: 4px 4px 0 0;
   margin-bottom: -2px;
-  color: #000;
+  color: #1a1a0e;
   font-weight: 600;
 }
 
 [data-theme="xp"] .tab.active {
   background: var(--xp-white);
   border-color: var(--xp-silver-darker);
-  border-bottom: 2px solid #fff;
+  border-bottom: 2px solid var(--xp-white);
   color: var(--xp-blue);
 }
 
@@ -413,27 +417,27 @@
 }
 
 [data-theme="xp"] .header p {
-  color: #444;
+  color: #55523e;
 }
 
 /* ============ USER-EMAIL (header pill) ============ */
 [data-theme="xp"] .user-email-display {
-  background: linear-gradient(180deg, #FAFAFA 0%, #E5E1D2 100%);
-  border: 1px solid #999;
+  background: linear-gradient(180deg, #EDE8D4 0%, #D0CBB4 100%);
+  border: 1px solid #8E8A76;
   border-radius: 3px;
 }
 
 [data-theme="xp"] .user-email {
-  color: #333;
+  color: #3a3826;
 }
 
 [data-theme="xp"] .logout-btn {
-  color: #666;
+  color: #55523e;
 }
 
 [data-theme="xp"] .logout-btn:hover {
-  background: #D6D2C2;
-  color: #000;
+  background: #C4BFA8;
+  color: #1a1a0e;
 }
 
 /* ============ SKELETON LOADING ============ */
@@ -458,7 +462,7 @@
 
 /* ============ EMPTY STATE ============ */
 [data-theme="xp"] .empty-state {
-  color: #666;
+  color: #7a7660;
 }
 
 /* ============ MENU BACKDROP ============ */
@@ -488,26 +492,26 @@
 }
 
 [data-theme="xp"] .theme-toggle-btn {
-  background: linear-gradient(180deg, #FAFAFA 0%, #D6D2C2 100%);
-  color: #000;
-  border: 1px solid #999;
+  background: linear-gradient(180deg, #EDE8D4 0%, #C4BFA8 100%);
+  color: #1a1a0e;
+  border: 1px solid #8E8A76;
   border-radius: 3px;
-  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15);
+  box-shadow: inset 0 1px 0 #F5F0E0, 0 1px 2px rgba(40,35,10,.18);
 }
 
 [data-theme="xp"] .theme-toggle-btn:hover {
-  background: linear-gradient(180deg, #FFF 0%, #E5E1D2 100%);
+  background: linear-gradient(180deg, #F5F0E0 0%, #D0CBB4 100%);
 }
 
 /* ============ XP-specific overrides for component inline styles ============ */
 
-/* Experiment / quiz components often use inline backgrounds — 
-   add light-friendly overrides for common patterns */
+/* Dashboard cards use inline background with dark fallbacks.
+   CSS attribute selectors catch the computed style strings. */
 [data-theme="xp"] [style*="background: #1e293b"],
 [data-theme="xp"] [style*="background:#1e293b"],
 [data-theme="xp"] [style*="background: rgb(30, 41, 59)"] {
   background: var(--xp-white) !important;
-  color: #000 !important;
+  color: #1a1a0e !important;
   border: 1px solid var(--xp-silver-darker) !important;
 }
 
@@ -515,19 +519,32 @@
 [data-theme="xp"] [style*="background:#0f172a"],
 [data-theme="xp"] [style*="background: rgb(15, 23, 42)"] {
   background: var(--xp-silver) !important;
-  color: #000 !important;
+  color: #1a1a0e !important;
+}
+
+/* Dark gray image placeholder in purchase items */
+[data-theme="xp"] [style*="background: #374151"],
+[data-theme="xp"] [style*="background:#374151"],
+[data-theme="xp"] [style*="background: rgb(55, 65, 81)"] {
+  background: var(--xp-silver-dark) !important;
+}
+
+/* Gray icons (cart placeholder, etc.) */
+[data-theme="xp"] [style*="color: #6b7280"],
+[data-theme="xp"] [style*="color:#6b7280"] {
+  color: #7a7660 !important;
 }
 
 [data-theme="xp"] [style*="color: #f3f4f6"],
 [data-theme="xp"] [style*="color:#f3f4f6"],
 [data-theme="xp"] [style*="color: rgb(243, 244, 246)"] {
-  color: #000 !important;
+  color: #1a1a0e !important;
 }
 
 [data-theme="xp"] [style*="color: #9ca3af"],
 [data-theme="xp"] [style*="color:#9ca3af"],
 [data-theme="xp"] [style*="color: rgb(156, 163, 175)"] {
-  color: #444 !important;
+  color: #55523e !important;
 }
 
 /* Fix gradient text that becomes invisible on light background */
