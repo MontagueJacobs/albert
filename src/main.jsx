@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 // Use a clean App implementation while the original file is corrupted
 import App from './App'
 import './index.css'
+import './xp-theme.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

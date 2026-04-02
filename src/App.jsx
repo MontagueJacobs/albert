@@ -46,7 +46,7 @@ const features = [
   }
 ]
 
-function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion, questionnaireType }) {
+function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion, questionnaireType, theme, toggleTheme }) {
   const { t, lang, setLang } = useI18n()
   const isNl = lang === 'nl'
   const { bonusCardNumber, isAuthenticated: isBonusAuth, login: bonusLogin, logout: bonusLogout } = useBonusCard()
@@ -56,6 +56,13 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
     const nextLang = lang === 'nl' ? 'en' : 'nl'
     setLang(nextLang)
   }, [lang, setLang])
+
+  const ThemeToggle = () => (
+    <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === 'xp' ? 'Switch to dark theme' : 'Switch to XP theme'}>
+      {theme === 'xp' ? '🌙' : '🪟'}
+      <span>{theme === 'xp' ? 'Dark' : 'XP'}</span>
+    </button>
+  )
 
   const navigateTo = (tab) => {
     setActiveTab(tab)
@@ -85,6 +92,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <span className="logo-text">Sustainable Shop</span>
           </div>
           <div className="header-actions">
+            <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -110,6 +118,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <span className="logo-text">Sustainable Shop</span>
           </div>
           <div className="header-actions">
+            <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -148,6 +157,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </div>
           
           <div className="header-actions">
+            <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -235,6 +245,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </button>
         
         <div className="header-actions">
+          <ThemeToggle />
           <button className="lang-btn" onClick={handleToggleLanguage}>
             {lang === 'nl' ? 'EN' : 'NL'}
           </button>
@@ -320,6 +331,25 @@ function App() {
   const [lang, setLang] = useState(() => getSavedLang())
   const [syncVersion, setSyncVersion] = useState(0)
 
+  // Theme state — persisted in localStorage
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('app-theme') || 'dark'
+  })
+
+  // Apply data-theme attribute to <html>
+  useEffect(() => {
+    if (theme === 'xp') {
+      document.documentElement.setAttribute('data-theme', 'xp')
+    } else {
+      document.documentElement.removeAttribute('data-theme')
+    }
+    localStorage.setItem('app-theme', theme)
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'xp' ? 'dark' : 'xp')
+  }, [])
+
   // Sync activeTab with URL hash
   useEffect(() => {
     // Update hash when tab changes
@@ -385,6 +415,8 @@ function App() {
               setActiveTab={setActiveTab}
               syncVersion={syncVersion}
               questionnaireType={questionnaireType}
+              theme={theme}
+              toggleTheme={toggleTheme}
             />
           </I18nProvider>
         </BonusCardProvider>

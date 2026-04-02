@@ -1,0 +1,544 @@
+/* ============================================================
+   WINDOWS XP "LUNA" THEME
+   Toggled via [data-theme="xp"] on <html>
+   ============================================================ */
+
+/* ---------- XP colour tokens ---------- */
+[data-theme="xp"] {
+  /* Core Luna palette */
+  --xp-blue:         #0054E3;
+  --xp-blue-dark:    #003C9E;
+  --xp-blue-light:   #3169C6;
+  --xp-blue-lighter: #4A7FD7;
+  --xp-green:        #3C9A3C;
+  --xp-green-dark:   #2D7B2D;
+  --xp-silver:       #ECE9D8;
+  --xp-silver-dark:  #D6D2C2;
+  --xp-silver-darker:#ACA899;
+  --xp-white:        #FFFFFF;
+  --xp-title-start:  #0054E3;
+  --xp-title-end:    #4A7FD7;
+  --xp-start-green:  #3C9A3C;
+
+  /* Override the app-wide tokens */
+  --primary:        var(--xp-green);
+  --primary-dark:   var(--xp-green-dark);
+  --secondary:      var(--xp-blue);
+  --accent:         var(--xp-blue-light);
+  --bg:             var(--xp-silver);
+  --bg-card:        var(--xp-white);
+  --bg-hover:       var(--xp-silver-dark);
+  --text:           #000000;
+  --text-muted:     #444444;
+  --white:          #FFFFFF;
+  --border:         var(--xp-silver-darker);
+  --shadow:         0 1px 3px rgba(0,0,0,.18);
+  --shadow-lg:      0 4px 12px rgba(0,0,0,.22);
+
+  /* XP font stack */
+  font-family: Tahoma, Verdana, 'Segoe UI', sans-serif;
+
+  color-scheme: light;
+}
+
+/* ---------- global resets for light text ---------- */
+[data-theme="xp"] body {
+  background: var(--xp-silver);
+  color: #000;
+}
+
+/* ============ SCROLLBARS (XP classic 3-D) ============ */
+[data-theme="xp"] ::-webkit-scrollbar { width: 17px; }
+[data-theme="xp"] ::-webkit-scrollbar-track {
+  background: var(--xp-silver);
+  border-left: 1px solid var(--xp-silver-darker);
+}
+[data-theme="xp"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(to right, #FAFAFA, #D6D2C2);
+  border: 1px solid #999;
+  border-radius: 0;
+}
+[data-theme="xp"] ::-webkit-scrollbar-button {
+  display: block;
+  height: 17px;
+  background: var(--xp-silver-dark);
+  border: 1px outset #FFF;
+}
+
+/* ============ APP HEADER → XP Title-bar gradient ============ */
+[data-theme="xp"] .app-header {
+  background: linear-gradient(180deg, var(--xp-title-end) 0%, var(--xp-title-start) 45%, var(--xp-blue-dark) 100%);
+  border-bottom: 2px solid #002D80;
+  border-radius: 8px 8px 0 0;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+
+[data-theme="xp"] .logo-text {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 1px 1px 2px rgba(0,0,0,.45);
+}
+
+[data-theme="xp"] .logo-icon {
+  color: #fff;
+  filter: drop-shadow(1px 1px 1px rgba(0,0,0,.3));
+}
+
+[data-theme="xp"] .menu-toggle {
+  color: #fff;
+}
+
+[data-theme="xp"] .menu-toggle:hover {
+  background: rgba(255,255,255,.2);
+}
+
+/* Language & auth buttons on header */
+[data-theme="xp"] .lang-btn,
+[data-theme="xp"] .auth-btn {
+  background: linear-gradient(180deg, #FAFAFA 0%, #D6D2C2 100%);
+  color: #000;
+  border: 1px solid #999;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15);
+  text-shadow: none;
+  font-weight: 600;
+}
+
+[data-theme="xp"] .lang-btn:hover,
+[data-theme="xp"] .auth-btn:hover {
+  background: linear-gradient(180deg, #FFF 0%, #E5E1D2 100%);
+}
+
+[data-theme="xp"] .lang-btn:active,
+[data-theme="xp"] .auth-btn:active {
+  background: linear-gradient(180deg, #D6D2C2 0%, #FAFAFA 100%);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.25);
+}
+
+/* ============ SLIDE MENU → XP Explorer side-panel ============ */
+[data-theme="xp"] .slide-menu {
+  background: var(--xp-white);
+  border-right: 2px solid var(--xp-silver-darker);
+  box-shadow: 3px 0 8px rgba(0,0,0,.15);
+}
+
+[data-theme="xp"] .menu-item {
+  border-radius: 3px;
+  color: #000;
+  font-size: 0.9rem;
+}
+
+[data-theme="xp"] .menu-item:hover {
+  background: #316AC5;
+  color: #fff;
+}
+
+[data-theme="xp"] .menu-item:hover .menu-arrow,
+[data-theme="xp"] .menu-item:hover .menu-label {
+  color: #fff;
+}
+
+[data-theme="xp"] .menu-item.active {
+  background: #316AC5;
+  color: #fff;
+}
+
+[data-theme="xp"] .menu-arrow {
+  color: #666;
+}
+
+/* ============ HERO ============ */
+[data-theme="xp"] .hero-title {
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  background-clip: unset;
+  color: var(--xp-blue);
+  font-weight: 700;
+}
+
+[data-theme="xp"] .hero-subtitle {
+  color: #333;
+}
+
+[data-theme="xp"] .hero-icon-circle {
+  background: linear-gradient(135deg, var(--xp-blue-light) 0%, var(--xp-green) 100%);
+  box-shadow: 2px 2px 6px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+/* ============ BUTTONS → XP beveled style ============ */
+[data-theme="xp"] .btn {
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15);
+  border: 1px solid #999;
+  font-weight: 600;
+  transition: all 0.1s;
+}
+
+[data-theme="xp"] .btn-primary {
+  background: linear-gradient(180deg, #5AB45A 0%, var(--xp-green) 50%, var(--xp-green-dark) 100%);
+  color: #fff;
+  border-color: #2D7B2D;
+  text-shadow: 0 1px 1px rgba(0,0,0,.25);
+}
+
+[data-theme="xp"] .btn-primary:hover {
+  background: linear-gradient(180deg, #6CCB6C 0%, #4AAD4A 50%, var(--xp-green) 100%);
+  transform: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 1px 2px rgba(0,0,0,.15);
+}
+
+[data-theme="xp"] .btn-primary:active {
+  background: linear-gradient(180deg, var(--xp-green-dark) 0%, var(--xp-green) 100%);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.3);
+}
+
+[data-theme="xp"] .btn-outline {
+  background: linear-gradient(180deg, #FAFAFA 0%, #E5E1D2 100%);
+  color: #000;
+  border: 1px solid #999;
+}
+
+[data-theme="xp"] .btn-outline:hover {
+  background: linear-gradient(180deg, #FFF 0%, #EDE9D8 100%);
+  color: #000;
+  border-color: var(--xp-blue);
+}
+
+[data-theme="xp"] .btn-secondary {
+  background: linear-gradient(180deg, #FAFAFA 0%, #D6D2C2 100%);
+  color: #000;
+  border: 1px solid #999;
+}
+
+[data-theme="xp"] .btn-secondary:hover {
+  background: linear-gradient(180deg, #FFF 0%, #E5E1D2 100%);
+}
+
+/* ============ FEATURE CARDS → XP Task-pane style ============ */
+[data-theme="xp"] .feature-card {
+  background: var(--xp-white);
+  border: 1px solid var(--xp-silver-darker);
+  border-radius: 4px;
+  box-shadow: 1px 1px 3px rgba(0,0,0,.12);
+}
+
+[data-theme="xp"] .feature-card::before {
+  border-radius: 0;
+}
+
+[data-theme="xp"] .feature-card:hover {
+  transform: none;
+  box-shadow: 2px 2px 6px rgba(0,0,0,.2);
+  border-color: var(--xp-blue);
+}
+
+[data-theme="xp"] .feature-title {
+  color: var(--xp-blue);
+  font-weight: 700;
+}
+
+[data-theme="xp"] .feature-desc {
+  color: #333;
+}
+
+[data-theme="xp"] .feature-link {
+  color: var(--xp-blue);
+}
+
+[data-theme="xp"] .feature-link:hover {
+  text-decoration: underline;
+}
+
+/* ============ SECTION TITLES ============ */
+[data-theme="xp"] .section-title {
+  color: var(--xp-blue);
+  font-weight: 700;
+}
+
+/* ============ CONTENT CARD → XP window body ============ */
+[data-theme="xp"] .content-card {
+  background: var(--xp-white);
+  border: 2px solid var(--xp-silver-darker);
+  border-radius: 0 0 4px 4px;
+  box-shadow: 1px 1px 4px rgba(0,0,0,.15);
+  /* Add a little blue bar at top to mimic window */
+  border-top: 3px solid var(--xp-blue);
+}
+
+/* ============ BREADCRUMB → XP address-bar ============ */
+[data-theme="xp"] .breadcrumb {
+  background: var(--xp-white);
+  border: 1px solid var(--xp-silver-darker);
+  border-radius: 2px;
+  padding: 0.375rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+}
+
+[data-theme="xp"] .breadcrumb button {
+  color: var(--xp-blue);
+  font-weight: 600;
+}
+
+[data-theme="xp"] .breadcrumb button:hover {
+  color: var(--xp-blue-dark);
+}
+
+/* ============ FORMS → XP classic inputs ============ */
+[data-theme="xp"] .form-group input,
+[data-theme="xp"] .form-group select,
+[data-theme="xp"] .form-group textarea,
+[data-theme="xp"] input[type="text"],
+[data-theme="xp"] input[type="email"],
+[data-theme="xp"] input[type="password"],
+[data-theme="xp"] input[type="search"],
+[data-theme="xp"] input[type="number"],
+[data-theme="xp"] select,
+[data-theme="xp"] textarea {
+  background: #fff;
+  color: #000;
+  border: 2px solid var(--xp-silver-darker);
+  border-radius: 2px;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,.15);
+  font-family: Tahoma, Verdana, sans-serif;
+}
+
+[data-theme="xp"] .form-group input:focus,
+[data-theme="xp"] .form-group select:focus,
+[data-theme="xp"] .form-group textarea:focus,
+[data-theme="xp"] input:focus,
+[data-theme="xp"] select:focus,
+[data-theme="xp"] textarea:focus {
+  border-color: var(--xp-blue);
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,.1), 0 0 0 1px var(--xp-blue);
+}
+
+[data-theme="xp"] input::placeholder,
+[data-theme="xp"] textarea::placeholder {
+  color: #999;
+}
+
+[data-theme="xp"] .form-group label {
+  color: #000;
+  font-weight: 600;
+}
+
+/* ============ STATS CARDS → XP grouped panels ============ */
+[data-theme="xp"] .stat-card {
+  background: linear-gradient(180deg, var(--xp-blue-lighter) 0%, var(--xp-blue) 45%, var(--xp-blue-dark) 100%);
+  border-radius: 4px;
+  box-shadow: 1px 1px 3px rgba(0,0,0,.2);
+  border: 1px solid var(--xp-blue-dark);
+}
+
+/* ============ PURCHASE LIST ============ */
+[data-theme="xp"] .purchase-item {
+  background: var(--xp-white);
+  border: 1px solid var(--xp-silver-darker);
+  border-radius: 2px;
+  box-shadow: 1px 1px 2px rgba(0,0,0,.08);
+}
+
+[data-theme="xp"] .purchase-item .product-name {
+  color: #000;
+  font-weight: 700;
+}
+
+[data-theme="xp"] .purchase-item .details {
+  color: #444;
+}
+
+/* ============ BADGES ============ */
+[data-theme="xp"] .score-badge {
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,.15);
+  font-weight: 700;
+}
+
+/* ============ SUGGESTIONS → XP info panel ============ */
+[data-theme="xp"] .suggestions {
+  background: #FFF8DC;
+  border-left: 4px solid #f0c040;
+  border: 1px solid #E0D8B0;
+  border-left: 4px solid #f0c040;
+  border-radius: 2px;
+}
+
+[data-theme="xp"] .suggestions h4 {
+  color: var(--xp-blue);
+}
+
+/* ============ TABS (legacy) → XP property sheet tabs ============ */
+[data-theme="xp"] .tabs {
+  border-bottom: 2px solid var(--xp-silver-darker);
+}
+
+[data-theme="xp"] .tab {
+  background: linear-gradient(180deg, #FAFAFA 0%, var(--xp-silver) 100%);
+  border: 1px solid var(--xp-silver-darker);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  margin-bottom: -2px;
+  color: #000;
+  font-weight: 600;
+}
+
+[data-theme="xp"] .tab.active {
+  background: var(--xp-white);
+  border-color: var(--xp-silver-darker);
+  border-bottom: 2px solid #fff;
+  color: var(--xp-blue);
+}
+
+[data-theme="xp"] .tab:hover {
+  color: var(--xp-blue);
+}
+
+/* ============ CONTAINER (legacy) ============ */
+[data-theme="xp"] .container {
+  background: var(--xp-white);
+  border: 2px solid var(--xp-silver-darker);
+  border-radius: 4px;
+  box-shadow: 1px 1px 4px rgba(0,0,0,.15);
+}
+
+[data-theme="xp"] .header h1 {
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  background-clip: unset;
+  color: var(--xp-blue);
+}
+
+[data-theme="xp"] .header p {
+  color: #444;
+}
+
+/* ============ USER-EMAIL (header pill) ============ */
+[data-theme="xp"] .user-email-display {
+  background: linear-gradient(180deg, #FAFAFA 0%, #E5E1D2 100%);
+  border: 1px solid #999;
+  border-radius: 3px;
+}
+
+[data-theme="xp"] .user-email {
+  color: #333;
+}
+
+[data-theme="xp"] .logout-btn {
+  color: #666;
+}
+
+[data-theme="xp"] .logout-btn:hover {
+  background: #D6D2C2;
+  color: #000;
+}
+
+/* ============ SKELETON LOADING ============ */
+[data-theme="xp"] .skeleton-card {
+  background: var(--xp-silver-dark);
+  border: 1px solid var(--xp-silver-darker);
+  border-radius: 2px;
+}
+
+/* ============ SUGGESTION CARDS ============ */
+[data-theme="xp"] .suggestion-card {
+  background: var(--xp-white);
+  border: 1px solid var(--xp-silver-darker);
+  border-radius: 4px;
+}
+
+[data-theme="xp"] .suggestion-card:hover {
+  box-shadow: 2px 2px 6px rgba(0,0,0,.18);
+  transform: none;
+  border-color: var(--xp-blue);
+}
+
+/* ============ EMPTY STATE ============ */
+[data-theme="xp"] .empty-state {
+  color: #666;
+}
+
+/* ============ MENU BACKDROP ============ */
+[data-theme="xp"] .menu-backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ============ XP THEME TOGGLE BUTTON ============ */
+.theme-toggle-btn {
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.theme-toggle-btn:hover {
+  background: var(--border);
+}
+
+[data-theme="xp"] .theme-toggle-btn {
+  background: linear-gradient(180deg, #FAFAFA 0%, #D6D2C2 100%);
+  color: #000;
+  border: 1px solid #999;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15);
+}
+
+[data-theme="xp"] .theme-toggle-btn:hover {
+  background: linear-gradient(180deg, #FFF 0%, #E5E1D2 100%);
+}
+
+/* ============ XP-specific overrides for component inline styles ============ */
+
+/* Experiment / quiz components often use inline backgrounds — 
+   add light-friendly overrides for common patterns */
+[data-theme="xp"] [style*="background: #1e293b"],
+[data-theme="xp"] [style*="background:#1e293b"],
+[data-theme="xp"] [style*="background: rgb(30, 41, 59)"] {
+  background: var(--xp-white) !important;
+  color: #000 !important;
+  border: 1px solid var(--xp-silver-darker) !important;
+}
+
+[data-theme="xp"] [style*="background: #0f172a"],
+[data-theme="xp"] [style*="background:#0f172a"],
+[data-theme="xp"] [style*="background: rgb(15, 23, 42)"] {
+  background: var(--xp-silver) !important;
+  color: #000 !important;
+}
+
+[data-theme="xp"] [style*="color: #f3f4f6"],
+[data-theme="xp"] [style*="color:#f3f4f6"],
+[data-theme="xp"] [style*="color: rgb(243, 244, 246)"] {
+  color: #000 !important;
+}
+
+[data-theme="xp"] [style*="color: #9ca3af"],
+[data-theme="xp"] [style*="color:#9ca3af"],
+[data-theme="xp"] [style*="color: rgb(156, 163, 175)"] {
+  color: #444 !important;
+}
+
+/* Fix gradient text that becomes invisible on light background */
+[data-theme="xp"] [style*="-webkit-text-fill-color: transparent"] {
+  -webkit-text-fill-color: var(--xp-blue) !important;
+  background: none !important;
+}
+
+/* ============ RESPONSIVE – keep XP feel on mobile ============ */
+@media (max-width: 768px) {
+  [data-theme="xp"] .app-header {
+    border-radius: 0;
+  }
+}
