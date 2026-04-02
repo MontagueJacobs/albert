@@ -269,38 +269,6 @@ export default function BonusCardLanding({ onBonusCardSubmit, onAutoLogin, onSta
         </div>
       )}
       
-      {/* Features preview */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>
-          {lang === 'nl' ? 'Wat je kunt zien' : 'What you\'ll see'}
-        </h2>
-        <div style={styles.featureGrid}>
-          <div style={styles.featureItem}>
-            <TrendingUp size={20} style={styles.featureIcon} />
-            <span style={styles.featureText}>
-              {lang === 'nl' ? 'Duurzaamheidsscore' : 'Sustainability score'}
-            </span>
-          </div>
-          <div style={styles.featureItem}>
-            <Leaf size={20} style={styles.featureIcon} />
-            <span style={styles.featureText}>
-              {lang === 'nl' ? 'Herkomst producten' : 'Product origins'}
-            </span>
-          </div>
-          <div style={styles.featureItem}>
-            <Calendar size={20} style={styles.featureIcon} />
-            <span style={styles.featureText}>
-              {lang === 'nl' ? 'Maandoverzichten' : 'Monthly insights'}
-            </span>
-          </div>
-          <div style={styles.featureItem}>
-            <ShoppingBag size={20} style={styles.featureIcon} />
-            <span style={styles.featureText}>
-              {lang === 'nl' ? 'Aankoopgeschiedenis' : 'Purchase history'}
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
