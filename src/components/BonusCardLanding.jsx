@@ -60,6 +60,10 @@ const styles = {
     background: 'var(--primary, #22c55e)',
     color: 'white',
   },
+  secondaryButton: {
+    background: 'var(--bg-hover, #334155)',
+    color: 'var(--text-muted, #9ca3af)',
+  },
   message: {
     padding: '1rem',
     borderRadius: '12px',
@@ -127,7 +131,7 @@ const styles = {
   },
 }
 
-export default function BonusCardLanding({ onBonusCardSubmit, onStartScrape }) {
+export default function BonusCardLanding({ onBonusCardSubmit, onAutoLogin, onStartScrape }) {
   const { t, lang } = useI18n()
   const [userInfo, setUserInfo] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -142,9 +146,9 @@ export default function BonusCardLanding({ onBonusCardSubmit, onStartScrape }) {
           if (response.ok) {
             const data = await response.json()
             setUserInfo(data)
-            // Notify parent
-            if (onBonusCardSubmit) {
-              onBonusCardSubmit(savedCard, data)
+            // Silently log in without navigating away from home
+            if (onAutoLogin) {
+              onAutoLogin(savedCard, data)
             }
           }
         } catch (err) {
@@ -195,6 +199,13 @@ export default function BonusCardLanding({ onBonusCardSubmit, onStartScrape }) {
           </div>
           <button 
             style={{...styles.button, ...styles.primaryButton}}
+            onClick={() => { if (onBonusCardSubmit) onBonusCardSubmit(localStorage.getItem('ah_bonus_card'), userInfo) }}
+          >
+            <TrendingUp size={20} />
+            {lang === 'nl' ? 'Naar mijn dashboard' : 'Go to my dashboard'}
+          </button>
+          <button 
+            style={{...styles.button, ...styles.secondaryButton, marginTop: '0.5rem'}}
             onClick={handleStartScrape}
           >
             <RefreshCw size={20} />

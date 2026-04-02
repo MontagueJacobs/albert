@@ -188,6 +188,9 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             bonusLogin(cardNumber, userInfo)
             navigateTo('dashboard')
           }}
+          onAutoLogin={(cardNumber, userInfo) => {
+            bonusLogin(cardNumber, userInfo)
+          }}
           onStartScrape={() => window.location.href = '/bookmarklet.html'}
         />
 
