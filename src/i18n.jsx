@@ -2,8 +2,8 @@ import { createContext, useContext, useMemo } from 'react'
 
 const TRANSLATIONS = {
   nl: {
-    app_title: 'Duurzaam Boodschappen',
-    app_subtitle: 'Track je Albert Heijn boodschappen en verbeter je duurzaamheid',
+    app_title: 'Broodschappen (Un)wrapped',
+    app_subtitle: 'Ontdek de CO₂-impact van je Albert Heijn boodschappen',
     toggle_language: 'Schakel naar Engels',
     toggle_language_aria: 'Schakel de interface naar Engels',
     // Navigation
@@ -263,8 +263,8 @@ const TRANSLATIONS = {
       seafood: 'Vis & zeevruchten'
     },
     // Landing page translations
-    landing_title: 'Duurzaam Boodschappen',
-    landing_subtitle: 'Ontdek de duurzaamheid van je Albert Heijn aankopen',
+    landing_title: 'Broodschappen (Un)wrapped',
+    landing_subtitle: 'Ontdek de CO₂-impact van je Albert Heijn aankopen',
     landing_feature_history: 'Bekijk je aankoopgeschiedenis',
     landing_feature_scores: 'Krijg duurzaamheidsscores',
     landing_already_connected: 'Al eerder gekoppeld?',
@@ -303,8 +303,8 @@ const TRANSLATIONS = {
     modal_no_link: 'Geen productlink beschikbaar'
   },
   en: {
-    app_title: 'Sustainable Shopping',
-    app_subtitle: 'Track your Albert Heijn purchases and improve your sustainability',
+    app_title: 'Broodschappen (Un)wrapped',
+    app_subtitle: 'Discover the CO₂ impact of your Albert Heijn groceries',
     toggle_language: 'Switch to Dutch',
     toggle_language_aria: 'Switch the interface to Dutch',
     // Navigation
@@ -564,8 +564,8 @@ const TRANSLATIONS = {
       seafood: 'Seafood'
     },
     // Landing page translations
-    landing_title: 'Sustainable Shopping',
-    landing_subtitle: 'Discover the sustainability of your Albert Heijn purchases',
+    landing_title: 'Broodschappen (Un)wrapped',
+    landing_subtitle: 'Discover the CO₂ impact of your Albert Heijn purchases',
     landing_feature_history: 'View your purchase history',
     landing_feature_scores: 'Get sustainability scores',
     landing_already_connected: 'Already connected?',

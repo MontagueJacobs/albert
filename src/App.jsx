@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Leaf, TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle, FlaskConical } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle, FlaskConical } from 'lucide-react'
 import Dashboard from './components/Dashboard'
 import PurchaseList from './components/PurchaseList'
 import HowItWorks from './components/HowItWorks'
@@ -101,8 +101,8 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
       <div className="app-wrapper">
         <header className="app-header">
           <div className="header-logo">
-            <Leaf size={28} className="logo-icon" />
-            <span className="logo-text">Sustainable Shop</span>
+            <img src="/radboud-logo.svg" alt="Radboud" className="radboud-logo" />
+            <span className="logo-text">Broodschappen (Un)wrapped</span>
           </div>
           <div className="header-actions">
             <ABToggle />
@@ -127,8 +127,8 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
       <div className="app-wrapper">
         <header className="app-header">
           <div className="header-logo">
-            <Leaf size={28} className="logo-icon" />
-            <span className="logo-text">Sustainable Shop</span>
+            <img src="/radboud-logo.svg" alt="Radboud" className="radboud-logo" />
+            <span className="logo-text">Broodschappen (Un)wrapped</span>
           </div>
           <div className="header-actions">
             <ABToggle />
@@ -165,8 +165,8 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </button>
           
           <div className="header-logo">
-            <Leaf size={28} className="logo-icon" />
-            <span className="logo-text">Sustainable Shop</span>
+            <img src="/radboud-logo.svg" alt="Radboud" className="radboud-logo" />
+            <span className="logo-text">Broodschappen (Un)wrapped</span>
           </div>
           
           <div className="header-actions">
@@ -253,8 +253,8 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </button>
         
         <button className="header-logo" onClick={() => setActiveTab('home')}>
-          <Leaf size={28} className="logo-icon" />
-          <span className="logo-text">Sustainable Shop</span>
+          <img src="/radboud-logo.svg" alt="Radboud" className="radboud-logo" />
+          <span className="logo-text">Broodschappen (Un)wrapped</span>
         </button>
         
         <div className="header-actions">

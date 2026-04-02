@@ -59,9 +59,9 @@ export default function AHLanding() {
           <div style={styles.logoContainer}>
             <Leaf size={32} style={{ color: '#00ADE6' }} />
           </div>
-          <h1 style={styles.title}>{t('landing_title') || 'Sustainable Shop'}</h1>
+          <h1 style={styles.title}>{t('landing_title') || 'Broodschappen (Un)wrapped'}</h1>
           <p style={styles.subtitle}>
-            {t('landing_subtitle') || 'Track your sustainable shopping'}
+            {t('landing_subtitle') || 'Discover the CO₂ impact of your groceries'}
           </p>
         </div>
 
