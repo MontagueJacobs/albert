@@ -49,7 +49,7 @@ const features = [
 function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion, questionnaireType, theme, toggleTheme }) {
   const { t, lang, setLang } = useI18n()
   const isNl = lang === 'nl'
-  const { bonusCardNumber, isAuthenticated: isBonusAuth, login: bonusLogin, logout: bonusLogout } = useBonusCard()
+  const { bonusCardNumber, isAuthenticated: isBonusAuth, login: bonusLogin, logout: bonusLogout, websiteVariant, setVariantOverride } = useBonusCard()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleToggleLanguage = useCallback(() => {
@@ -61,6 +61,18 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
     <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === 'xp' ? 'Switch to dark theme' : 'Switch to XP theme'}>
       {theme === 'xp' ? '🌙' : '🪟'}
       <span>{theme === 'xp' ? 'Dark' : 'XP'}</span>
+    </button>
+  )
+
+  const ABToggle = () => (
+    <button
+      className="theme-toggle-btn"
+      onClick={() => setVariantOverride(websiteVariant === 'A' ? 'B' : 'A')}
+      title={`Currently variant ${websiteVariant || '?'} — click to switch`}
+      style={{ minWidth: 'auto' }}
+    >
+      <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{websiteVariant === 'B' ? 'B' : 'A'}</span>
+      <span>A/B</span>
     </button>
   )
 
@@ -92,6 +104,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <span className="logo-text">Sustainable Shop</span>
           </div>
           <div className="header-actions">
+            <ABToggle />
             <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
@@ -118,6 +131,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <span className="logo-text">Sustainable Shop</span>
           </div>
           <div className="header-actions">
+            <ABToggle />
             <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
@@ -157,6 +171,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </div>
           
           <div className="header-actions">
+            <ABToggle />
             <ThemeToggle />
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
@@ -245,6 +260,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </button>
         
         <div className="header-actions">
+          <ABToggle />
           <ThemeToggle />
           <button className="lang-btn" onClick={handleToggleLanguage}>
             {lang === 'nl' ? 'EN' : 'NL'}

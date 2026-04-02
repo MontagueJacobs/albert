@@ -55,6 +55,18 @@ export function BonusCardProvider({ children }) {
   })
   const [userInfo, setUserInfo] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [variantOverride, setVariantOverrideState] = useState(() => {
+    try { return localStorage.getItem('ab_variant_override') } catch (e) {}
+    return null
+  })
+
+  const setVariantOverride = useCallback((v) => {
+    setVariantOverrideState(v)
+    try {
+      if (v) localStorage.setItem('ab_variant_override', v)
+      else localStorage.removeItem('ab_variant_override')
+    } catch (e) {}
+  }, [])
   
   // Clean URL and fetch user info on mount
   useEffect(() => {
@@ -158,7 +170,8 @@ export function BonusCardProvider({ children }) {
       userInfo,
       loading,
       isAuthenticated: !!bonusCardNumber,
-      websiteVariant: userInfo?.website_variant || null,
+      websiteVariant: variantOverride || userInfo?.website_variant || null,
+      setVariantOverride,
       login,
       logout,
       refresh,
