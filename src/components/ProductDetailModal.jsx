@@ -706,8 +706,6 @@ function ProductDetailModal({ purchase, onClose }) {
                 </div>
               )}
 
-              )
-
             </div>
 
             {/* Better Alternatives */}
