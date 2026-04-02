@@ -101,7 +101,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
       <div className="app-wrapper">
         <header className="app-header">
           <div className="header-logo">
-            <img src="/radboud-logo.svg" alt="Radboud" className="radboud-logo" />
+            <img src="/radboud-logo.png" alt="Radboud" className="radboud-logo" />
             <span className="logo-text">Broodschappen (Un)wrapped</span>
           </div>
           <div className="header-actions">
