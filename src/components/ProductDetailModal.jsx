@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { X, Leaf, Apple, MapPin, ArrowRight, ExternalLink, Loader2, TrendingUp, TrendingDown, Minus, ShoppingCart } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useAuthenticatedFetch } from '../lib/authContext'
+import { useBonusCard } from '../lib/bonusCardContext'
+import { variantScoreColor, variantScoreBgSubtle, variantScoreLabel } from '../lib/scoreUtils.js'
 
 const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -369,33 +371,14 @@ function translateCategory(label, lang) {
 function ProductDetailModal({ purchase, onClose }) {
   const { t, lang } = useI18n()
   const authFetch = useAuthenticatedFetch()
+  const { websiteVariant } = useBonusCard()
   const [details, setDetails] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const getScoreColor = (score) => {
-    if (score == null) return '#6b7280'
-    if (score >= 7) return '#22c55e'
-    if (score >= 5) return '#eab308'
-    return '#ef4444'
-  }
-
-  const getScoreBg = (score) => {
-    if (score == null) return 'rgba(107, 114, 128, 0.1)'
-    if (score >= 7) return 'rgba(34, 197, 94, 0.15)'
-    if (score >= 5) return 'rgba(234, 179, 8, 0.15)'
-    return 'rgba(239, 68, 68, 0.15)'
-  }
-
-  const getScoreLabel = (score) => {
-    if (score == null) return 'N/A'
-    // CO2-based scoring labels
-    if (score >= 9) return 'Very Low CO₂'
-    if (score >= 7) return 'Low CO₂'
-    if (score >= 5) return 'Moderate CO₂'
-    if (score >= 3) return 'High CO₂'
-    return 'Very High CO₂'
-  }
+  const getScoreColor = (score) => variantScoreColor(websiteVariant, score)
+  const getScoreBg = (score) => variantScoreBgSubtle(websiteVariant, score)
+  const getScoreLabel = (score) => variantScoreLabel(websiteVariant, score)
 
   useEffect(() => {
     async function fetchDetails() {

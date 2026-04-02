@@ -158,6 +158,7 @@ export function BonusCardProvider({ children }) {
       userInfo,
       loading,
       isAuthenticated: !!bonusCardNumber,
+      websiteVariant: userInfo?.website_variant || null,
       login,
       logout,
       refresh,

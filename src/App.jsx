@@ -333,7 +333,7 @@ function App() {
 
   // Theme state — persisted in localStorage
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('app-theme') || 'dark'
+    return localStorage.getItem('app-theme') || 'xp'
   })
 
   // Apply data-theme attribute to <html>

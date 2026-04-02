@@ -2078,6 +2078,19 @@ app.get('/api/bonus/:cardNumber/user', async (req, res) => {
       .single()
     
     if (user) {
+      // Assign website_variant if not yet set
+      if (!user.website_variant) {
+        const variant = Math.random() < 0.5 ? 'A' : 'B'
+        const { data: updated } = await supabase
+          .from('ah_bonus_users')
+          .update({ website_variant: variant })
+          .eq('bonus_card_number', cardNumber)
+          .select()
+          .single()
+        if (updated) return res.json(updated)
+        // Fallback: return with variant attached
+        return res.json({ ...user, website_variant: variant })
+      }
       return res.json(user)
     }
     
@@ -2090,11 +2103,13 @@ app.get('/api/bonus/:cardNumber/user', async (req, res) => {
       .limit(1)
     
     if (!purchaseError && purchases !== null) {
-      // User has purchases but no ah_bonus_users record - create one
+      // User has purchases but no ah_bonus_users record - create one with variant
+      const variant = Math.random() < 0.5 ? 'A' : 'B'
       const { data: newUser, error: createError } = await supabase
         .from('ah_bonus_users')
         .upsert({
           bonus_card_number: cardNumber,
+          website_variant: variant,
           created_at: new Date().toISOString()
         }, { onConflict: 'bonus_card_number' })
         .select()
@@ -2107,6 +2122,7 @@ app.get('/api/bonus/:cardNumber/user', async (req, res) => {
       // Return synthetic user if creation failed
       return res.json({
         bonus_card_number: cardNumber,
+        website_variant: variant,
         created_at: new Date().toISOString(),
         _synthetic: true
       })
@@ -4446,13 +4462,26 @@ app.post('/api/ingest/scrape', async (req, res) => {
       // 2. If bonus card provided, ensure user record exists in ah_bonus_users
       if (bonusCard) {
         try {
+          // Check if user already exists (to preserve their variant)
+          const { data: existingUser } = await supabase
+            .from('ah_bonus_users')
+            .select('website_variant')
+            .eq('bonus_card_number', bonusCard)
+            .single()
+
+          const upsertData = {
+            bonus_card_number: bonusCard,
+            last_scrape_at: new Date().toISOString(),
+            scrape_count: 1
+          }
+          // Only assign variant for new users
+          if (!existingUser || !existingUser.website_variant) {
+            upsertData.website_variant = Math.random() < 0.5 ? 'A' : 'B'
+          }
+
           const { error: userError } = await supabase
             .from('ah_bonus_users')
-            .upsert({
-              bonus_card_number: bonusCard,
-              last_scrape_at: new Date().toISOString(),
-              scrape_count: 1  // Will be incremented on conflict
-            }, {
+            .upsert(upsertData, {
               onConflict: 'bonus_card_number',
               ignoreDuplicates: false
             })

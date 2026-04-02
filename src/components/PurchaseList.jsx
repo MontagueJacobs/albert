@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { ShoppingBag, LogIn, Loader2 } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useAHUser, useAHFetch } from '../lib/ahUserContext'
+import { useBonusCard } from '../lib/bonusCardContext'
+import { variantScoreClass } from '../lib/scoreUtils.js'
 import ScoreBreakdownModal from './ScoreBreakdownModal'
 
 function PurchaseList({ syncVersion }) {
   const { t, lang } = useI18n()
   const { ahEmail } = useAHUser()
   const ahFetch = useAHFetch()
+  const { websiteVariant } = useBonusCard()
   
   const [purchases, setPurchases] = useState([])
   const [loading, setLoading] = useState(true)
@@ -80,12 +83,7 @@ function PurchaseList({ syncVersion }) {
     )
   }
 
-  const getScoreClass = (score) => {
-    if (score == null) return 'score-na'
-    if (score >= 7) return 'score-high'
-    if (score >= 4) return 'score-medium'
-    return 'score-low'
-  }
+  const getScoreClass = (score) => variantScoreClass(websiteVariant, score)
 
   const formatDate = (dateString) => {
     if (!dateString) return ''

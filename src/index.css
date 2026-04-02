@@ -612,6 +612,11 @@ code {
   opacity: 0.7;
 }
 
+.score-neutral {
+  background: #6b7280;
+  color: white;
+}
+
 /* ============ SUGGESTIONS ============ */
 .suggestions {
   background: var(--bg-hover);

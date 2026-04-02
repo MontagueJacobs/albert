@@ -5,6 +5,7 @@ import { useI18n } from '../i18n.jsx'
 import { useAuth, useAuthenticatedFetch } from '../lib/authContext'
 import { useAHUser } from '../lib/ahUserContext.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
+import { variantScoreColor, variantScoreBg } from '../lib/scoreUtils.js'
 
 // Dark mode styles
 const styles = {
@@ -103,7 +104,7 @@ function Dashboard({ syncVersion }) {
   const { t } = useI18n()
   const { user, isAuthenticated } = useAuth()
   const { sessionId, loading: sessionLoading } = useAHUser()
-  const { bonusCardNumber, isAuthenticated: isBonusAuth, userInfo: bonusUserInfo, loading: bonusLoading } = useBonusCard()
+  const { bonusCardNumber, isAuthenticated: isBonusAuth, userInfo: bonusUserInfo, loading: bonusLoading, websiteVariant } = useBonusCard()
   const authFetch = useAuthenticatedFetch()
   
   // User is "connected" if they have JWT auth OR bonus card
@@ -535,6 +536,7 @@ function Dashboard({ syncVersion }) {
                     key={purchase.id} 
                     purchase={purchase} 
                     onClick={() => setSelectedPurchase(purchase)}
+                    variant={websiteVariant}
                   />
                 ))}
                 
@@ -634,20 +636,9 @@ function Dashboard({ syncVersion }) {
 }
 
 // Helper component for individual purchase items
-function PurchaseItem({ purchase, onClick }) {
-  const getScoreColor = (score) => {
-    if (score == null) return '#6b7280'
-    if (score >= 7) return '#22c55e'
-    if (score >= 5) return '#eab308'
-    return '#ef4444'
-  }
-
-  const getScoreBg = (score) => {
-    if (score == null) return 'rgba(107, 114, 128, 0.1)'
-    if (score >= 7) return 'rgba(34, 197, 94, 0.2)'
-    if (score >= 5) return 'rgba(234, 179, 8, 0.2)'
-    return 'rgba(239, 68, 68, 0.2)'
-  }
+function PurchaseItem({ purchase, onClick, variant }) {
+  const getScoreColor = (score) => variantScoreColor(variant, score)
+  const getScoreBg = (score) => variantScoreBg(variant, score)
 
   const getNutriScoreColor = (grade) => {
     const colors = {
