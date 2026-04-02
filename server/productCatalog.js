@@ -698,7 +698,9 @@ export const PRODUCT_CATALOG = [
 export function normalizeProductName(value = '') {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9äöüßàáâãåæçèéêëìíîïñòóôõöøùúûüýÿ\s]/g, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')  // Strip diacritics (é→e, è→e, etc.)
+    .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }

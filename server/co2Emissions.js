@@ -531,16 +531,16 @@ for (const cat of allCategories) {
 // Dutch to English category keyword mappings
 // Maps Dutch product keywords to CO2 categories
 const PRODUCT_CATEGORY_KEYWORDS = {
-  // Beef products
+  // Beef products — supermarket beef (including gehakt) comes from beef cattle
   'beef_herd': [
     'biefstuk', 'ribeye', 'entrecote', 'ossenhaas', 'bavette',
     'tournedos', 't-bone', 'tenderloin', 'rosbief', 'sukade',
-    'rundertartaar', 'runderfilet', 'rund', 'beef', 'angus'
-  ],
-  'beef_dairy': [
-    // Processed beef products often from dairy cattle
+    'rundertartaar', 'runderfilet', 'rund', 'beef', 'angus',
     'gehakt', 'hamburger', 'balkenbrij', 'rundvlees', 'stoofvlees',
     'draadjesvlees'
+  ],
+  'beef_dairy': [
+    // Reserved for products explicitly from dairy cattle (currently none identified)
   ],
   
   // Lamb

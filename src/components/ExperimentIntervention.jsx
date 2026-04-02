@@ -3,94 +3,95 @@ import { ChevronRight, ChevronDown, ChevronUp, Lightbulb, BarChart3, Leaf, Flame
 import { useI18n } from '../i18n.jsx'
 import QuizResultsReview from './QuizResultsReview.jsx'
 
-// CO2 data for the learning page - common food categories with CO2/kg values
+// CO2 data for the learning page - values from Our World in Data (Poore & Nemecek 2018)
+// Must match the OWID_EMISSIONS values used by the quiz scoring engine (server/co2Emissions.js)
 const CO2_CATEGORIES = [
   { 
-    name: 'Beef / Rood vlees', nameNl: 'Rundvlees', 
-    co2: 27, emoji: '🥩', color: '#ef4444',
-    tip: 'Beef has the highest CO₂ footprint of all common foods.',
-    tipNl: 'Rundvlees heeft de hoogste CO₂-voetafdruk van alle gangbare voedingsmiddelen.'
+    name: 'Dark Chocolate', nameNl: 'Pure Chocolade', 
+    co2: 46.65, emoji: '🍫', color: '#ef4444',
+    tip: 'Cocoa farming drives deforestation, making chocolate one of the highest-emission foods.',
+    tipNl: 'Cacaoteelt veroorzaakt ontbossing, waardoor chocolade een van de hoogste uitstoot heeft.'
   },
   { 
     name: 'Lamb', nameNl: 'Lamsvlees', 
-    co2: 24, emoji: '🍖', color: '#ef4444',
-    tip: 'Lamb produces similar emissions to beef due to methane from digestion.',
-    tipNl: 'Lamsvlees produceert vergelijkbare uitstoot als rundvlees door methaan uit de spijsvertering.'
+    co2: 39.72, emoji: '🍖', color: '#ef4444',
+    tip: 'Lamb produces very high emissions due to methane from digestion and low feed efficiency.',
+    tipNl: 'Lamsvlees produceert zeer hoge uitstoot door methaan uit de spijsvertering en lage voederefficiëntie.'
+  },
+  { 
+    name: 'Beef', nameNl: 'Rundvlees', 
+    co2: 99.48, emoji: '🥩', color: '#ef4444',
+    tip: 'Beef has by far the highest CO₂ footprint due to methane, land use, and low feed efficiency.',
+    tipNl: 'Rundvlees heeft veruit de hoogste CO₂-voetafdruk door methaan, landgebruik en lage voederefficiëntie.'
   },
   { 
     name: 'Cheese', nameNl: 'Kaas', 
-    co2: 13.5, emoji: '🧀', color: '#f97316',
+    co2: 23.88, emoji: '🧀', color: '#f97316',
     tip: 'It takes ~10 liters of milk to make 1 kg of cheese, concentrating the emissions.',
     tipNl: 'Er is ~10 liter melk nodig om 1 kg kaas te maken, wat de uitstoot concentreert.'
   },
   { 
-    name: 'Chocolate', nameNl: 'Chocolade', 
-    co2: 11.5, emoji: '🍫', color: '#f97316',
-    tip: 'Cocoa farming drives deforestation, increasing its carbon footprint.',
-    tipNl: 'Cacaoteelt veroorzaakt ontbossing, wat de CO₂-voetafdruk verhoogt.'
-  },
-  { 
     name: 'Pork', nameNl: 'Varkensvlees', 
-    co2: 7.6, emoji: '🥓', color: '#eab308',
-    tip: 'Pork has a much lower footprint than beef, about 3-4x less.',
-    tipNl: 'Varkensvlees heeft een veel lagere voetafdruk dan rundvlees, ongeveer 3-4x minder.'
+    co2: 12.31, emoji: '🥓', color: '#eab308',
+    tip: 'Pork has a much lower footprint than beef, about 3x less.',
+    tipNl: 'Varkensvlees heeft een veel lagere voetafdruk dan rundvlees, ongeveer 3x minder.'
   },
   { 
     name: 'Chicken', nameNl: 'Kip', 
-    co2: 6.9, emoji: '🍗', color: '#eab308',
+    co2: 9.87, emoji: '🍗', color: '#eab308',
     tip: 'Chicken is one of the lowest-emission meats available.',
     tipNl: 'Kip is een van de vleessoorten met de laagste uitstoot.'
   },
   { 
     name: 'Eggs', nameNl: 'Eieren', 
-    co2: 4.7, emoji: '🥚', color: '#eab308',
+    co2: 4.67, emoji: '🥚', color: '#eab308',
     tip: 'Eggs are an efficient protein source with moderate emissions.',
     tipNl: 'Eieren zijn een efficiënte eiwitbron met gematigde uitstoot.'
   },
   { 
     name: 'Rice', nameNl: 'Rijst', 
-    co2: 4.0, emoji: '🍚', color: '#84cc16',
+    co2: 4.45, emoji: '🍚', color: '#84cc16',
     tip: 'Flooded rice paddies produce methane, making rice higher than other grains.',
     tipNl: 'Ondergelopen rijstvelden produceren methaan, waardoor rijst hoger scoort dan andere granen.'
   },
   { 
     name: 'Milk', nameNl: 'Melk', 
-    co2: 3.2, emoji: '🥛', color: '#84cc16',
+    co2: 3.15, emoji: '🥛', color: '#84cc16',
     tip: 'Plant-based milk alternatives typically have 2-3x lower emissions.',
     tipNl: 'Plantaardige melkalternatieven hebben doorgaans 2-3x lagere uitstoot.'
   },
   { 
-    name: 'Bread', nameNl: 'Brood', 
-    co2: 1.4, emoji: '🍞', color: '#22c55e',
+    name: 'Bread / Wheat', nameNl: 'Brood / Tarwe', 
+    co2: 1.57, emoji: '🍞', color: '#22c55e',
     tip: 'Bread is one of the most climate-friendly staple foods.',
     tipNl: 'Brood is een van de meest klimaatvriendelijke basisvoedingsmiddelen.'
   },
   { 
-    name: 'Potatoes', nameNl: 'Aardappelen', 
-    co2: 0.5, emoji: '🥔', color: '#22c55e',
-    tip: 'Root vegetables like potatoes have very low emissions.',
-    tipNl: 'Wortelgroenten zoals aardappelen hebben een zeer lage uitstoot.'
-  },
-  { 
     name: 'Lentils', nameNl: 'Linzen', 
-    co2: 0.9, emoji: '🫘', color: '#22c55e',
+    co2: 1.79, emoji: '🫘', color: '#22c55e',
     tip: 'Legumes fix nitrogen naturally, needing less fertilizer.',
     tipNl: 'Peulvruchten binden stikstof van nature, waardoor minder kunstmest nodig is.'
+  },
+  { 
+    name: 'Potatoes', nameNl: 'Aardappelen', 
+    co2: 0.46, emoji: '🥔', color: '#22c55e',
+    tip: 'Root vegetables like potatoes have very low emissions.',
+    tipNl: 'Wortelgroenten zoals aardappelen hebben een zeer lage uitstoot.'
   }
 ]
 
 const KEY_INSIGHTS = {
   en: [
-    'Red meat (beef, lamb) has 10-50x the CO₂ footprint of plant-based foods',
-    'Cheese is surprisingly high because it concentrates milk emissions',
-    'Switching one beef meal per week to chicken saves ~20 kg CO₂/year',
+    'Beef (99.5 kg), dark chocolate (46.7 kg) and lamb (39.7 kg) top the emissions chart',
+    'Cheese (23.9 kg) is surprisingly high because it concentrates milk emissions',
+    'Switching one beef meal per week to chicken saves ~24 kg CO₂/year',
     'Local vs. imported matters less than what you eat — transport is usually <10% of food\'s footprint',
     'Plant proteins (lentils, beans, tofu) have the lowest emissions per gram of protein'
   ],
   nl: [
-    'Rood vlees (rund, lam) heeft 10-50x de CO₂-voetafdruk van plantaardige voeding',
-    'Kaas is verrassend hoog omdat het de melkuitstoot concentreert',
-    'Eén rundvleesmaaltijd per week vervangen door kip bespaart ~20 kg CO₂/jaar',
+    'Rundvlees (99,5 kg), pure chocolade (46,7 kg) en lam (39,7 kg) staan bovenaan de uitstootlijst',
+    'Kaas (23,9 kg) is verrassend hoog omdat het de melkuitstoot concentreert',
+    'Eén rundvleesmaaltijd per week vervangen door kip bespaart ~24 kg CO₂/jaar',
     'Lokaal vs. geïmporteerd maakt minder uit dan wát je eet — transport is meestal <10% van de voetafdruk',
     'Plantaardige eiwitten (linzen, bonen, tofu) hebben de laagste uitstoot per gram eiwit'
   ]
