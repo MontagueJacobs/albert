@@ -6,18 +6,18 @@
 /* ---------- XP colour tokens ---------- */
 [data-theme="xp"] {
   /* Core Luna palette — warm / parchment tint */
-  --xp-blue:         #0054E3;
-  --xp-blue-dark:    #003C9E;
-  --xp-blue-light:   #3169C6;
-  --xp-blue-lighter: #4A7FD7;
+  --xp-blue:         #0080FF;
+  --xp-blue-dark:    #0060CC;
+  --xp-blue-light:   #3399FF;
+  --xp-blue-lighter: #66B2FF;
   --xp-green:        #3C9A3C;
   --xp-green-dark:   #2D7B2D;
   --xp-silver:       #D8D4BF;
   --xp-silver-dark:  #C4BFA8;
   --xp-silver-darker:#9E9A86;
   --xp-white:        #F5F0E0;
-  --xp-title-start:  #0054E3;
-  --xp-title-end:    #4A7FD7;
+  --xp-title-start:  #0080FF;
+  --xp-title-end:    #66B2FF;
   --xp-start-green:  #3C9A3C;
 
   /* Override the app-wide tokens */
