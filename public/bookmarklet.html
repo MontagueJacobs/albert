@@ -213,21 +213,39 @@
       color: #0080FF;
       text-decoration: underline;
     }
+
+    .lang-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 6px 14px;
+      border: 1px solid #C4BFA8;
+      border-radius: 6px;
+      background: #F5F0E0;
+      color: #0060CC;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .lang-toggle:hover {
+      background: #EEEAD8;
+    }
   </style>
 </head>
 <body>
+  <button class="lang-toggle" id="lang-btn" onclick="toggleLang()">EN</button>
   <div class="container">
-    <h1>� Broodschappen (Un)wrapped</h1>
-    <p class="subtitle">Importeer je supermarkt aankopen met één klik</p>
+    <h1>🌾 Broodschappen (Un)wrapped</h1>
+    <p class="subtitle" data-nl="Importeer je supermarkt aankopen met één klik" data-en="Import your supermarket purchases with one click">Importeer je supermarkt aankopen met één klik</p>
     
     <div class="card">
-      <h2>📚 Stap 1: Sleep een bookmarklet naar je bladwijzerbalk</h2>
+      <h2 data-nl="📚 Stap 1: Sleep een bookmarklet naar je bladwijzerbalk" data-en="📚 Step 1: Drag a bookmarklet to your bookmarks bar">📚 Stap 1: Sleep een bookmarklet naar je bladwijzerbalk</h2>
       
       <div class="store-grid">
         <div class="store-card ah">
           <h3>🛒 Albert Heijn</h3>
           <a class="bookmarklet ah" id="ah-bookmarklet" href="#">🌱 AH → Duurzaam</a>
-          <div class="store-link">
+          <div class="store-link" data-nl='Gebruik op <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank">ah.nl/eerder-gekocht</a>' data-en='Use on <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank">ah.nl/eerder-gekocht</a>'>
             Gebruik op <a href="https://www.ah.nl/producten/eerder-gekocht" target="_blank">ah.nl/eerder-gekocht</a>
           </div>
         </div>
@@ -235,48 +253,66 @@
         <div class="store-card jumbo">
           <h3>🍊 Jumbo</h3>
           <a class="bookmarklet jumbo" id="jumbo-bookmarklet" href="#">🍊 Jumbo → Duurzaam</a>
-          <div class="store-link">
+          <div class="store-link" data-nl='Gebruik op <a href="https://www.jumbo.com/bestellingen" target="_blank">jumbo.com/bestellingen</a>' data-en='Use on <a href="https://www.jumbo.com/bestellingen" target="_blank">jumbo.com/bestellingen</a>'>
             Gebruik op <a href="https://www.jumbo.com/bestellingen" target="_blank">jumbo.com/bestellingen</a>
           </div>
         </div>
       </div>
       
-      <div class="drag-hint">
+      <div class="drag-hint" data-nl="<strong>💡 Tip:</strong> Geen bladwijzerbalk? Druk <kbd>Ctrl+Shift+B</kbd> (Windows) of <kbd>⌘+Shift+B</kbd> (Mac)" data-en="<strong>💡 Tip:</strong> No bookmarks bar? Press <kbd>Ctrl+Shift+B</kbd> (Windows) or <kbd>⌘+Shift+B</kbd> (Mac)">
         <strong>💡 Tip:</strong> Geen bladwijzerbalk? Druk <kbd>Ctrl+Shift+B</kbd> (Windows) of <kbd>⌘+Shift+B</kbd> (Mac)
       </div>
     </div>
     
     <div class="card">
-      <h2>🚀 Stap 2: Gebruik de bookmarklet</h2>
+      <h2 data-nl="🚀 Stap 2: Gebruik de bookmarklet" data-en="🚀 Step 2: Use the bookmarklet">🚀 Stap 2: Gebruik de bookmarklet</h2>
       
       <div class="instructions">
         <div class="step">
           <div class="step-number">1</div>
           <div class="step-content">
-            <p>Ga naar de website van je supermarkt en <strong>log in</strong></p>
+            <p data-nl="Ga naar de website van je supermarkt en <strong>log in</strong>" data-en="Go to your supermarket's website and <strong>log in</strong>">Ga naar de website van je supermarkt en <strong>log in</strong></p>
           </div>
         </div>
         
         <div class="step">
           <div class="step-number">2</div>
           <div class="step-content">
-            <p>Ga naar je <strong>bestelgeschiedenis</strong> of <strong>eerder gekocht</strong> pagina</p>
+            <p data-nl="Ga naar je <strong>bestelgeschiedenis</strong> of <strong>eerder gekocht</strong> pagina" data-en="Go to your <strong>order history</strong> or <strong>previously bought</strong> page">Ga naar je <strong>bestelgeschiedenis</strong> of <strong>eerder gekocht</strong> pagina</p>
           </div>
         </div>
         
         <div class="step">
           <div class="step-number">3</div>
           <div class="step-content">
-            <p>Klik op de bookmarklet in je bladwijzerbalk - <strong>klaar!</strong></p>
+            <p data-nl="Klik op de bookmarklet in je bladwijzerbalk - <strong>klaar!</strong>" data-en="Click the bookmarklet in your bookmarks bar - <strong>done!</strong>">Klik op de bookmarklet in je bladwijzerbalk - <strong>klaar!</strong></p>
           </div>
         </div>
       </div>
     </div>
     
-    <a href="/" class="back-link">← Terug naar Dashboard</a>
+    <a href="/" class="back-link" data-nl="← Terug naar Dashboard" data-en="← Back to Dashboard">← Terug naar Dashboard</a>
   </div>
   
   <script>
+    let currentLang = localStorage.getItem('bookmarklet_lang') || 'nl';
+    
+    function applyLang(lang) {
+      currentLang = lang;
+      localStorage.setItem('bookmarklet_lang', lang);
+      document.getElementById('lang-btn').textContent = lang === 'nl' ? 'EN' : 'NL';
+      document.querySelectorAll('[data-' + lang + ']').forEach(el => {
+        el.innerHTML = el.getAttribute('data-' + lang);
+      });
+    }
+    
+    function toggleLang() {
+      applyLang(currentLang === 'nl' ? 'en' : 'nl');
+    }
+    
+    // Apply saved language on load
+    applyLang(currentLang);
+
     const API_BASE = window.location.origin.includes('localhost') 
       ? 'http://localhost:3001' 
       : window.location.origin;
