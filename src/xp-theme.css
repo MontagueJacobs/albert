@@ -332,7 +332,7 @@
 
 /* ============ STATS CARDS → XP grouped panels ============ */
 [data-theme="xp"] .stat-card {
-  background: linear-gradient(180deg, var(--xp-blue-lighter) 0%, var(--xp-blue) 45%, var(--xp-blue-dark) 100%);
+  background: var(--xp-blue);
   border-radius: 4px;
   box-shadow: 1px 1px 3px rgba(0,0,0,.2);
   border: 1px solid var(--xp-blue-dark);
