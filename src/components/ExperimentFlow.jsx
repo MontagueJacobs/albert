@@ -6,6 +6,7 @@ import ExperimentRanking from './ExperimentRanking.jsx'
 import ExperimentLikert from './ExperimentLikert.jsx'
 import ExperimentIntervention from './ExperimentIntervention.jsx'
 import ExperimentReflection from './ExperimentReflection.jsx'
+import QuizResultsReview from './QuizResultsReview.jsx'
 
 const STEP_LABELS = {
   intro: { en: 'Introduction', nl: 'Introductie' },
@@ -544,6 +545,27 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                 return isNl ? `📊 Je score veranderde met ${diff} punten.` : `📊 Your score changed by ${diff} points.`
               })()}
             </p>
+          )}
+
+          {/* Detailed quiz 3 & 4 results */}
+          {(session.quiz3_data || session.quiz4_data) && (
+            <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #9ca3af)', marginBottom: '1rem', lineHeight: '1.5' }}>
+                {isNl
+                  ? 'Bekijk hieronder hoe je het deed op de laatste twee quizzen:'
+                  : 'See below how you did on the last two quizzes:'}
+              </p>
+              <QuizResultsReview
+                quizData={session.quiz3_data}
+                quizLabel={isNl ? 'Quiz 3 – Nieuwe Producten' : 'Quiz 3 – New Products'}
+                defaultOpen={true}
+              />
+              <QuizResultsReview
+                quizData={session.quiz4_data}
+                quizLabel={isNl ? 'Quiz 4 – Jouw Aankopen' : 'Quiz 4 – Your Purchases'}
+                defaultOpen={false}
+              />
+            </div>
           )}
 
           <button style={styles.doneBtn} onClick={onComplete || onBack}>

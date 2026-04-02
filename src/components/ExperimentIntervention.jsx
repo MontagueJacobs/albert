@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronRight, ChevronDown, ChevronUp, Lightbulb, BarChart3, Leaf, Flame } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
+import QuizResultsReview from './QuizResultsReview.jsx'
 
 // CO2 data for the learning page - common food categories with CO2/kg values
 const CO2_CATEGORIES = [
@@ -315,27 +316,29 @@ export default function ExperimentIntervention({ session, onComplete }) {
         </p>
       </div>
 
-      {/* Quiz score summary */}
-      {(q1Score != null || q2Score != null) && (
-        <div style={styles.quizSummary}>
-          <div style={styles.summaryTitle}>
-            {isNl ? '📊 Jouw quiz resultaten tot nu toe' : '📊 Your quiz results so far'}
+      {/* Detailed quiz results shown above via QuizResultsReview */}
+
+      {/* Detailed quiz 1 & 2 results */}
+      {(session?.quiz1_data || session?.quiz2_data) && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text, #f3f4f6)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            📋 {isNl ? 'Jouw quiz resultaten' : 'Your quiz results'}
           </div>
-          <div style={styles.summaryText}>
-            {q1Score != null && (
-              <span>Quiz 1 (algemeen): <strong>{q1Score}/100</strong></span>
-            )}
-            {q1Score != null && q2Score != null && <span> • </span>}
-            {q2Score != null && (
-              <span>Quiz 2 (persoonlijk): <strong>{q2Score}/100</strong></span>
-            )}
-            <br />
-            <span style={{ fontSize: '0.8rem' }}>
-              {isNl 
-                ? 'Bekijk hieronder de werkelijke CO₂-waarden en probeer je score te verbeteren!'
-                : 'View the actual CO₂ values below and try to improve your score!'}
-            </span>
-          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #9ca3af)', marginBottom: '1rem', lineHeight: '1.5' }}>
+            {isNl
+              ? 'Bekijk hoe je het deed. Groene items had je goed, gele waren er net naast, en rode waren verder weg van de juiste positie.'
+              : 'See how you did. Green items were correct, yellow were close, and red were further from the correct position.'}
+          </p>
+          <QuizResultsReview
+            quizData={session.quiz1_data}
+            quizLabel={isNl ? 'Quiz 1 – Algemene Producten' : 'Quiz 1 – General Products'}
+            defaultOpen={true}
+          />
+          <QuizResultsReview
+            quizData={session.quiz2_data}
+            quizLabel={isNl ? 'Quiz 2 – Jouw Aankopen' : 'Quiz 2 – Your Purchases'}
+            defaultOpen={false}
+          />
         </div>
       )}
 

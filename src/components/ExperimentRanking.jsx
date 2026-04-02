@@ -290,12 +290,11 @@ export default function ExperimentRanking({
       })
       setSubmitted(true)
 
-      // If not showing results inline, advance after brief delay
+      // Advance immediately without showing results
+      // Results are shown later: in the intervention step (quiz 1&2)
+      // or in the complete screen (quiz 3&4)
       if (!showResults) {
-        // Show score briefly, then advance
-        setTimeout(() => {
-          onComplete(data.session, data)
-        }, 2500)
+        onComplete(data.session, data)
       }
     } catch (e) {
       setError(e.message)
@@ -330,8 +329,8 @@ export default function ExperimentRanking({
     )
   }
 
-  // Build display items (with result data if submitted)
-  const displayItems = submitted && scoreResult 
+  // Build display items — never show result coloring inline (results shown later)
+  const displayItems = (submitted && scoreResult && showResults)
     ? items.map((item, idx) => {
         const detail = scoreResult.details?.find(d => d.id === item.id)
         return { ...item, ...detail, userRank: idx + 1 }
@@ -356,8 +355,8 @@ export default function ExperimentRanking({
         </div>
       )}
 
-      {/* Score card (shown after submit) */}
-      {submitted && scoreResult && (
+      {/* Score card (only shown if showResults=true, i.e. not during experiment flow) */}
+      {submitted && scoreResult && showResults && (
         <div style={styles.scoreCard}>
           <div style={styles.scoreTitle}>
             {isNl ? 'Jouw Score' : 'Your Score'}
@@ -366,11 +365,6 @@ export default function ExperimentRanking({
             <span style={styles.scoreNum}>{scoreResult.score}</span>
             <span style={styles.scoreSub}> / {scoreResult.maxScore}</span>
           </div>
-          {!showResults && (
-            <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              {isNl ? 'Even geduld, we gaan door...' : 'Please wait, continuing...'}
-            </div>
-          )}
         </div>
       )}
 
@@ -378,7 +372,7 @@ export default function ExperimentRanking({
       <div style={styles.productList}>
         {displayItems.map((item, index) => {
           let cardStyle = { ...styles.productCard }
-          if (submitted && scoreResult) {
+          if (submitted && scoreResult && showResults) {
             if (item.distance === 0) {
               cardStyle = { ...cardStyle, ...styles.resultCorrect }
             } else if (item.distance === 1) {
@@ -392,7 +386,7 @@ export default function ExperimentRanking({
             <div key={item.id} style={cardStyle}>
               <div style={{
                 ...styles.rankNumber,
-                background: submitted && item.distance === 0 ? '#22c55e' : 'var(--accent-bg, #374151)'
+                background: (submitted && showResults && item.distance === 0) ? '#22c55e' : 'var(--accent-bg, #374151)'
               }}>
                 {index + 1}
               </div>
@@ -438,7 +432,7 @@ export default function ExperimentRanking({
                 </div>
               )}
 
-              {submitted && scoreResult && (
+              {submitted && scoreResult && showResults && (
                 <div style={styles.resultInfo}>
                   {item.distance === 0 ? (
                     <span style={{ color: '#22c55e' }}>✓ {isNl ? 'Correct' : 'Correct'}</span>
