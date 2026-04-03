@@ -54,7 +54,7 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 2rem;
+  padding: 0.5rem 2rem;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -94,14 +94,8 @@ code {
 }
 
 .radboud-logo {
-  height: 150px;
+  height: 60px;
   width: auto;
-}
-
-.logo-text {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text);
 }
 
 .header-actions {
@@ -695,10 +689,6 @@ code {
 @media (max-width: 768px) {
   .app-header {
     padding: 1rem;
-  }
-
-  .header-logo .logo-text {
-    display: none;
   }
 
   .auth-btn {

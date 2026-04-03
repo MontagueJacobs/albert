@@ -101,8 +101,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
       <div className="app-wrapper">
         <header className="app-header">
           <div className="header-logo">
-            <img src="/radboud-logo.png" alt="Radboud" className="radboud-logo" />
-            <span className="logo-text">Broodschappen (Un)wrapped</span>
+            <img src="/radboud-logo.png" alt="Radboud Universiteit" className="radboud-logo" />
           </div>
           <div className="header-actions">
             <ABToggle />
@@ -127,8 +126,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
       <div className="app-wrapper">
         <header className="app-header">
           <div className="header-logo">
-            <img src="/radboud-logo.png" alt="Radboud" className="radboud-logo" />
-            <span className="logo-text">Broodschappen (Un)wrapped</span>
+            <img src="/radboud-logo.png" alt="Radboud Universiteit" className="radboud-logo" />
           </div>
           <div className="header-actions">
             <ABToggle />
@@ -165,8 +163,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </button>
           
           <div className="header-logo">
-            <img src="/radboud-logo.png" alt="Radboud" className="radboud-logo" />
-            <span className="logo-text">Broodschappen (Un)wrapped</span>
+            <img src="/radboud-logo.png" alt="Radboud Universiteit" className="radboud-logo" />
           </div>
           
           <div className="header-actions">
@@ -253,8 +250,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </button>
         
         <button className="header-logo" onClick={() => setActiveTab('home')}>
-          <img src="/radboud-logo.png" alt="Radboud" className="radboud-logo" />
-          <span className="logo-text">Broodschappen (Un)wrapped</span>
+          <img src="/radboud-logo.png" alt="Radboud Universiteit" className="radboud-logo" />
         </button>
         
         <div className="header-actions">

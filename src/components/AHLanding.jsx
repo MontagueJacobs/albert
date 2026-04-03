@@ -56,10 +56,7 @@ export default function AHLanding() {
       <div style={styles.card}>
         {/* Header */}
         <div style={styles.header}>
-          <div style={styles.logoContainer}>
-            <Leaf size={32} style={{ color: '#00ADE6' }} />
-          </div>
-          <h1 style={styles.title}>{t('landing_title') || 'Broodschappen (Un)wrapped'}</h1>
+          <img src="/radboud-logo.png" alt="Radboud Universiteit" style={{ height: '180px', width: 'auto', marginBottom: '1rem' }} />
           <p style={styles.subtitle}>
             {t('landing_subtitle') || 'Discover the CO₂ impact of your groceries'}
           </p>

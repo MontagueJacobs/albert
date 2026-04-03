@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo } from 'react'
 
 const TRANSLATIONS = {
   nl: {
-    app_title: 'Broodschappen (Un)wrapped',
+    app_title: 'Radboud Universiteit',
     app_subtitle: 'Ontdek de CO₂-impact van je Albert Heijn boodschappen',
     toggle_language: 'Schakel naar Engels',
     toggle_language_aria: 'Schakel de interface naar Engels',
@@ -263,7 +263,7 @@ const TRANSLATIONS = {
       seafood: 'Vis & zeevruchten'
     },
     // Landing page translations
-    landing_title: 'Broodschappen (Un)wrapped',
+    landing_title: 'Radboud Universiteit',
     landing_subtitle: 'Ontdek de CO₂-impact van je Albert Heijn aankopen',
     landing_feature_history: 'Bekijk je aankoopgeschiedenis',
     landing_feature_scores: 'Krijg duurzaamheidsscores',
@@ -303,7 +303,7 @@ const TRANSLATIONS = {
     modal_no_link: 'Geen productlink beschikbaar'
   },
   en: {
-    app_title: 'Broodschappen (Un)wrapped',
+    app_title: 'Radboud Universiteit',
     app_subtitle: 'Discover the CO₂ impact of your Albert Heijn groceries',
     toggle_language: 'Switch to Dutch',
     toggle_language_aria: 'Switch the interface to Dutch',
@@ -564,7 +564,7 @@ const TRANSLATIONS = {
       seafood: 'Seafood'
     },
     // Landing page translations
-    landing_title: 'Broodschappen (Un)wrapped',
+    landing_title: 'Radboud Universiteit',
     landing_subtitle: 'Discover the CO₂ impact of your Albert Heijn purchases',
     landing_feature_history: 'View your purchase history',
     landing_feature_scores: 'Get sustainability scores',
