@@ -119,64 +119,131 @@
       seen.add(href);
 
       const url = new URL(href, location.origin).toString();
-      
-      // Get product name - prefer specific title element, avoid aria-label (too verbose)
+
+      // Get container (article > data-testid > class-based > parent fallback)
+      const card = a.closest('article') || 
+                   a.closest('[data-testid="product-card"]') ||
+                   a.closest('[data-testhook="product-card"]') || 
+                   a.closest('[class*="product"]') ||
+                   a.parentElement?.parentElement;
+
+      // ---- PRODUCT NAME ----
+      // AH now uses data-testid (was data-testhook)
       let name = '';
-      const titleEl = a.querySelector('[data-testhook="product-title"]') ||
+      const titleEl = card?.querySelector('[data-testid="product-title-line-clamp"]') ||
+                      card?.querySelector('[data-testid="product-title"]') ||
+                      a.querySelector('[data-testid="product-title-line-clamp"]') ||
+                      a.querySelector('[data-testid="product-title"]') ||
+                      a.querySelector('[data-testhook="product-title"]') ||
                       a.querySelector('span[class*="title"]') ||
-                      a.closest('article')?.querySelector('h2, h3, [class*="title"]');
+                      card?.querySelector('h2, h3, [class*="title"]');
       if (titleEl) {
         name = titleEl.textContent?.trim() || '';
       }
       
-      // If no title found, extract clean name from URL slug
+      // If no title found, try the link's own title attribute (e.g. "Bekijk AH Courgette")
+      if (!name) {
+        const linkTitle = a.getAttribute('title') || card?.querySelector('a[title]')?.getAttribute('title') || '';
+        if (linkTitle) {
+          name = linkTitle.replace(/^Bekijk\s+/i, '').trim();
+        }
+      }
+      
+      // Last resort: extract clean name from URL slug
       if (!name) {
         const slugMatch = href.match(/\/producten\/product\/[^/]+\/([^/?#]+)/);
         if (slugMatch && slugMatch[1]) {
           name = slugMatch[1].replace(/-/g, ' ');
-          // Capitalize first letter of each word
           name = name.replace(/\b[a-z]/g, c => c.toUpperCase());
         }
       }
       
       // Clean up name - remove common noise patterns
       name = name.replace(/\s+/g, ' ').trim();
-      // Remove everything after common separators (Nutri-Score, price info, etc.)
       name = name.split(/,\s*(?:Nutri-Score|per stuk|per kg|€|\d+\s*voor|vandaag|morgen)/i)[0].trim();
 
-      // Get container
-      const card = a.closest('article') || 
-                   a.closest('[data-testhook="product-card"]') || 
-                   a.closest('[class*="product"]') ||
-                   a.parentElement?.parentElement;
-
-      // Get price
+      // ---- PRICE ----
+      // AH now splits prices into separate elements (integer, dot, fractional)
+      // Best source: aria-label on sr-only span inside [data-testid="price-amount"]
+      // For discount items there are two price-amount elements: "was" (old) and "highlight" (current)
       let price = null;
-      const priceEl = card?.querySelector('[data-testhook="product-price"]') ||
-                      card?.querySelector('[class*="price"]');
-      if (priceEl) {
-        const raw = priceEl.textContent?.replace(',', '.').match(/(\d+\.?\d*)/);
-        if (raw) price = parseFloat(raw[1]);
+      if (card) {
+        const priceAmounts = card.querySelectorAll('[data-testid="price-amount"]');
+        if (priceAmounts.length > 0) {
+          // Prefer the current/highlight price (last one, or the non-"was" one)
+          let targetPriceEl = priceAmounts[priceAmounts.length - 1]; // default: last
+          for (const pa of priceAmounts) {
+            const cls = pa.className || '';
+            // Skip "was" (old/strikethrough) price, prefer "highlight" (current) price
+            if (cls.includes('highlight') && !cls.includes('was')) {
+              targetPriceEl = pa;
+              break;
+            }
+          }
+          
+          // Method A: Extract from aria-label on sr-only child (most reliable)
+          // e.g. aria-label="Prijs: €0.65" or aria-label="Prijs: €2.30"
+          const srOnly = targetPriceEl.querySelector('.sr-only[aria-label], [aria-label*="Prijs"]');
+          if (srOnly) {
+            const label = srOnly.getAttribute('aria-label') || '';
+            const m = label.replace(',', '.').match(/€\s*(\d+\.?\d*)/);
+            if (m) price = parseFloat(m[1]);
+          }
+          
+          // Method B: Concatenate integer + fractional text from child spans
+          if (price === null) {
+            const intEl = targetPriceEl.querySelector('[class*="integer"]');
+            const fracEl = targetPriceEl.querySelector('[class*="fractional"]');
+            if (intEl && fracEl) {
+              const intPart = intEl.textContent?.trim() || '0';
+              const fracPart = fracEl.textContent?.trim() || '00';
+              price = parseFloat(`${intPart}.${fracPart}`);
+            }
+          }
+          
+          // Method C: Fall back to full textContent of the price element
+          if (price === null) {
+            const raw = targetPriceEl.textContent?.replace(',', '.').match(/(\d+\.?\d*)/);
+            if (raw) price = parseFloat(raw[1]);
+          }
+        }
+        
+        // Legacy fallback: old data-testhook or class-based selector
+        if (price === null) {
+          const legacyPriceEl = card.querySelector('[data-testhook="product-price"]') ||
+                                card.querySelector('[class*="price-amount"]') ||
+                                card.querySelector('[class*="price_amount"]');
+          if (legacyPriceEl) {
+            const raw = legacyPriceEl.textContent?.replace(',', '.').match(/(\d+\.?\d*)/);
+            if (raw) price = parseFloat(raw[1]);
+          }
+        }
       }
 
-      // Get image - try multiple selectors
+      // ---- IMAGE ----
       let image = '';
       const imgEl = card?.querySelector('img[src*="static.ah.nl"]') || 
                     card?.querySelector('img[src*="ah.nl"]') ||
                     a.querySelector('img') ||
                     card?.querySelector('img');
       if (imgEl) {
-        // Get highest quality image URL
         image = imgEl.src || imgEl.dataset?.src || '';
-        // Ensure full URL
         if (image && !image.startsWith('http')) {
           image = new URL(image, location.origin).toString();
         }
       }
 
-      // Get product ID
+      // ---- PRODUCT ID ----
       const idMatch = href.match(/wi(\d+)/);
       const productId = idMatch ? idMatch[1] : null;
+      
+      // ---- UNIT SIZE ----
+      let unit_size = '';
+      const unitEl = card?.querySelector('[data-testid="product-unit-size"]') ||
+                     card?.querySelector('[class*="unitSize"]');
+      if (unitEl) {
+        unit_size = unitEl.textContent?.trim() || '';
+      }
 
       if (name && name.length > 1) {
         items.push({ 
@@ -185,6 +252,7 @@
           price, 
           image_url: image, 
           ah_id: productId,
+          unit_size: unit_size || undefined,
           source: 'bookmarklet' 
         });
       }
