@@ -12,6 +12,11 @@ DROP INDEX IF EXISTS idx_user_purchases_user_id;
 -- 3. Drop RLS policies that reference user_id
 DROP POLICY IF EXISTS "Users can view own purchases" ON user_purchases;
 DROP POLICY IF EXISTS "Users can insert own purchases" ON user_purchases;
+DROP POLICY IF EXISTS "Users can delete own purchases" ON user_purchases;
+DROP POLICY IF EXISTS "Users can update own purchases" ON user_purchases;
+
+-- 3b. Drop the view that depends on user_id (must happen before column drop)
+DROP VIEW IF EXISTS public.user_purchase_summary;
 
 -- 4. Drop the user_id column itself
 ALTER TABLE user_purchases DROP COLUMN IF EXISTS user_id;
@@ -44,7 +49,6 @@ GRANT SELECT, INSERT, UPDATE ON user_purchases TO service_role;
 GRANT SELECT, INSERT ON user_purchases TO authenticated;
 GRANT SELECT, INSERT ON user_purchases TO anon;
 
--- 7. Also drop the user_purchase_summary view (it referenced user_id)
-DROP VIEW IF EXISTS public.user_purchase_summary;
+-- 7. user_purchase_summary view already dropped above (step 3b)
 
 COMMENT ON TABLE user_purchases IS 'User purchase history — identified by bonus_card_number only (user_id removed)';
