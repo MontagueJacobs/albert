@@ -86,17 +86,29 @@ class BatchOriginScraper:
         if not self.supabase:
             return []
             
-        # Query products missing origin data OR unit_size, excluding permanently failed ones
-        # The table uses 'url' column, not 'product_url'
-        # Note: SQL NULL comparisons require special handling — neq/not-in exclude NULLs
-        # We use or_() to include status=null along with non-excluded statuses
+        # Query products missing key data (origin, unit_size, OR price),
+        # excluding permanently failed ones and recently-scraped pending items
         result = self.supabase.table('products') \
-            .select('id, name, url, origin_country, origin_by_month, unit_size, details_scrape_status') \
+            .select('id, name, url, origin_country, origin_by_month, unit_size, price, details_scrape_status, details_scraped_at') \
             .not_.is_('url', 'null') \
-            .or_('origin_country.is.null,unit_size.is.null') \
-            .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
+            .or_('origin_country.is.null,unit_size.is.null,price.is.null') \
+            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.not.in.(not_found,failed,success)') \
             .limit(limit) \
             .execute()
+        
+        # Filter out items scraped in the last hour to avoid re-scrape loops
+        products = []
+        now = datetime.now()
+        for p in (result.data or []):
+            scraped_at = p.get('details_scraped_at')
+            if scraped_at and p.get('details_scrape_status') == 'pending':
+                try:
+                    sa = datetime.fromisoformat(scraped_at.replace('Z', '+00:00')).replace(tzinfo=None)
+                    if (now - sa).total_seconds() < 3600:
+                        continue  # Skip recently scraped pending items
+                except (ValueError, TypeError):
+                    pass
+            products.append(p)
             
         products = result.data if result.data else []
         self.stats['total_candidates'] = len(products)
@@ -144,18 +156,32 @@ class BatchOriginScraper:
             chunk_urls = product_urls[i:i + chunk_size]
             
             result = self.supabase.table('products') \
-                .select('id, name, url, origin_country, origin_by_month, unit_size, details_scrape_status') \
+                .select('id, name, url, origin_country, origin_by_month, unit_size, price, details_scrape_status, details_scraped_at') \
                 .in_('url', chunk_urls) \
-                .or_('origin_country.is.null,unit_size.is.null') \
-                .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
+                .or_('origin_country.is.null,unit_size.is.null,price.is.null') \
+                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.not.in.(not_found,failed,success)') \
                 .execute()
             
             if result.data:
                 all_products.extend(result.data)
                 print(f"[DEBUG] Found {len(result.data)} products in chunk {i//chunk_size + 1}", flush=True)
         
+        # Filter out items scraped in the last hour to avoid re-scrape loops
+        now = datetime.now()
+        filtered = []
+        for p in all_products:
+            scraped_at = p.get('details_scraped_at')
+            if scraped_at and p.get('details_scrape_status') == 'pending':
+                try:
+                    sa = datetime.fromisoformat(scraped_at.replace('Z', '+00:00')).replace(tzinfo=None)
+                    if (now - sa).total_seconds() < 3600:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+            filtered.append(p)
+        
         # Limit results
-        products = all_products[:limit]
+        products = filtered[:limit]
         self.stats['total_candidates'] = len(products)
         
         print(f"[INFO] Found {len(products)} user purchase products needing origin data", flush=True)
@@ -250,9 +276,14 @@ class BatchOriginScraper:
                 print(f"  [SKIP] No data extracted for product {product_id}", flush=True)
                 return False
                 
-            # Only mark as success if we have key fields, otherwise 'incomplete' for re-scraping
+            # Mark as success if we extracted anything useful.
+            # Previously this used 'pending' for incomplete scrapes, causing
+            # infinite re-scrape loops since pending items were never excluded.
             update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
             has_key_fields = bool(origin_data.get('price')) and bool(origin_data.get('image_url')) and bool(origin_data.get('ingredients'))
+            # Use 'success' for complete scrapes, 'pending' for incomplete ones.
+            # Pending items with a recent scraped_at are skipped in the query filter
+            # to prevent same-session re-scraping, but will be retried in future runs.
             update_payload['details_scrape_status'] = 'success' if has_key_fields else 'pending'
                 
             # Update the product
