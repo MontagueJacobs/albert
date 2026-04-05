@@ -209,69 +209,7 @@ app.get('/api/health', (req, res) => {
   })
 })
 
-// ============================================================================
-// AH USER CHECK ENDPOINT (Email-based user lookup)
-// Note: user_ah_credentials table removed - email-based auth disabled
-// Users should use bonus card identification instead
-// ============================================================================
-app.get('/api/ah-user/check', async (req, res) => {
-  try {
-    const email = req.query.email
-    
-    if (!email) {
-      return res.status(400).json({ error: 'missing_email', message: 'Email parameter is required' })
-    }
-    
-    if (!supabase) {
-      return res.status(500).json({ error: 'db_not_configured', message: 'Database not configured' })
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    // Check users table only (user_ah_credentials removed)
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('email', normalizedEmail)
-      .single()
-    
-    if (userData) {
-      // Get purchase count
-      const { count } = await supabase
-        .from('user_purchases')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userData.id)
-      
-      return res.json({
-        exists: true,
-        email: userData.email,
-        lastSync: null,
-        syncStatus: 'not_connected',
-        purchaseCount: count || 0
-      })
-    }
-    
-    // User not found - recommend bonus card login
-    return res.json({ 
-      exists: false, 
-      message: 'Use the bookmarklet to sync your AH purchases with your bonus card.' 
-    })
-  } catch (err) {
-    console.error('Error checking AH user:', err)
-    res.status(500).json({ error: 'check_failed', message: err.message })
-  }
-})
-
-// ============================================================================
-// AH USER REGISTER ENDPOINT (Deprecated - use bonus card instead)
-// ============================================================================
-app.post('/api/ah-user/register', async (req, res) => {
-  // Email-based registration disabled - recommend bonus card
-  res.json({ 
-    success: false, 
-    message: 'Email-based registration is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
-  })
-})
+// AH user check/register removed — users table dropped, bonus card is the only auth method
 
 // ============================================================================
 // PASSWORD-BASED AUTHENTICATION ENDPOINTS (Deprecated)
@@ -335,135 +273,39 @@ async function getUserFromRequest(req) {
   }
 }
 
-// Get user ID from session (deprecated - user_ah_credentials table removed)
-// Now we rely on bonus card identification via URL params and /api/bonus/:cardNumber/* endpoints
-async function getUserIdFromSession(req) {
-  // First check for JWT auth
-  const jwtUser = await getUserFromRequest(req)
-  if (jwtUser) {
-    return jwtUser.id
-  }
-  
-  // Session-based auth via user_ah_credentials is no longer available
-  // Users should use bonus card identification instead
-  return null
+// Get bonus card from request (query param or body)
+function getBonusCard(req) {
+  return req.body?.bonus_card?.toString().trim() ||
+         req.query?.card?.toString().trim() ||
+         req.user?.bonusCard ||
+         null
 }
 
-// Get ALL user IDs and bonus card associated with this request
-// Returns { userIds: string[], bonusCardNumber: string|null }
-// This helps find purchases that were stored by user_id OR bonus_card_number
-async function getAllUserIds(req) {
-  const userIds = []
-  let bonusCardNumber = null
-  
-  // Get JWT user ID
-  const jwtUser = await getUserFromRequest(req)
-  if (jwtUser) {
-    userIds.push(jwtUser.id)
+// requireAuth now just delegates to requireAHEmail (bonus card is the only auth)
+const requireAuth = (req, res, next) => requireAHEmail(req, res, next)
+
+/**
+ * Middleware: authenticate via bonus card (query/body) or JWT fallback.
+ * Sets req.user = { id, bonusCard } or returns 401.
+ */
+function requireAHEmail(req, res, next) {
+  // Primary: bonus card from query or body
+  const bonusCard = req.query?.card?.toString().trim() || req.body?.bonus_card?.toString().trim() || null
+  if (bonusCard) {
+    req.user = { id: bonusCard, bonusCard }
+    return next()
   }
   
-  // Check for bonus card in request body or query
-  // (Session-based user_ah_credentials lookup removed)
-  bonusCardNumber = req.body?.bonus_card?.toString().trim() || 
-                    req.query?.card?.toString().trim() || 
-                    null
-  
-  return { userIds, bonusCardNumber }
-}
-
-// Middleware to require authentication (supports both JWT and session-based auth)
-function requireAuth(req, res, next) {
+  // Fallback: JWT auth
   getUserFromRequest(req).then(user => {
-    if (user) {
-      req.user = user
-      return next()
+    if (!user) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Please provide your bonus card number or log in' })
     }
-    
-    // Fallback: check for session-based auth
-    return getUserIdFromSession(req).then(sessionUserId => {
-      if (!sessionUserId) {
-        return res.status(401).json({ error: 'unauthorized', message: 'Please log in to access this resource' })
-      }
-      // Create a pseudo-user object for session-based users
-      req.user = { id: sessionUserId, session_based: true }
-      next()
-    })
+    req.user = user
+    next()
   }).catch(err => {
     res.status(500).json({ error: 'auth_error', message: err.message })
   })
-}
-
-// ============================================================================
-// EMAIL-BASED USER IDENTIFICATION (Simple auth for thesis participants)
-// Users are identified by their AH email address - no password/login needed
-// ============================================================================
-
-/**
- * Look up a user by their email address.
- * With user_ah_credentials removed, only checks users table.
- * Returns the user_id if found, null otherwise.
- */
-async function getUserIdByAHEmail(ahEmail) {
-  if (!supabase || !ahEmail) return null
-  
-  const normalizedEmail = ahEmail.toLowerCase().trim()
-  
-  try {
-    // Check users table (main account email)
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('email', normalizedEmail)
-      .single()
-    
-    if (!userError && userData) {
-      console.log(`[Auth] Found user ${userData.id} via users table for ${normalizedEmail}`)
-      return userData.id
-    }
-    
-    console.log(`[Auth] No user found for email: ${normalizedEmail}`)
-    return null
-  } catch (err) {
-    console.error('Error looking up user by AH email:', err.message)
-    return null
-  }
-}
-
-/**
- * Middleware for email-based authentication.
- * Checks X-AH-Email header and looks up the corresponding user_id.
- * Falls back to JWT auth if no email header is present.
- */
-function requireAHEmail(req, res, next) {
-  const ahEmail = req.headers['x-ah-email']
-  
-  if (ahEmail) {
-    // Email-based auth
-    getUserIdByAHEmail(ahEmail).then(userId => {
-      if (!userId) {
-        return res.status(401).json({ 
-          error: 'user_not_found', 
-          message: 'No account found for this email. Please connect your Albert Heijn account first.' 
-        })
-      }
-      // Create a minimal user object with the user_id
-      req.user = { id: userId, email: ahEmail }
-      next()
-    }).catch(err => {
-      res.status(500).json({ error: 'auth_error', message: err.message })
-    })
-  } else {
-    // Fall back to JWT auth for backwards compatibility
-    getUserFromRequest(req).then(user => {
-      if (!user) {
-        return res.status(401).json({ error: 'unauthorized', message: 'Please provide your AH email or log in' })
-      }
-      req.user = user
-      next()
-    }).catch(err => {
-      res.status(500).json({ error: 'auth_error', message: err.message })
-    })
-  }
 }
 
 // ============================================================================
@@ -1482,62 +1324,10 @@ function minutes(ms) {
   return Math.round(ms / 60000)
 }
 
-// ============================================================================
-// USER API ROUTES
-// ============================================================================
+// User profile, credentials, and link-bonus-card routes removed — users table dropped
+// Bonus card is the sole identification method (stored client-side, passed per request)
 
-// Get current user profile
-app.get('/api/user/profile', requireAuth, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', req.user.id)
-      .single()
-    
-    if (error) throw error
-    res.json(data)
-  } catch (err) {
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
-})
-
-// Update user profile
-app.patch('/api/user/profile', requireAuth, async (req, res) => {
-  try {
-    const { display_name } = req.body
-    const { data, error } = await supabase
-      .from('users')
-      .update({ display_name })
-      .eq('id', req.user.id)
-      .select()
-      .single()
-    
-    if (error) throw error
-    res.json(data)
-  } catch (err) {
-    res.status(500).json({ error: 'update_failed', message: err.message })
-  }
-})
-
-// Get user's AH credentials status (deprecated - table removed)
-app.get('/api/user/ah-credentials', requireAuth, async (req, res) => {
-  res.json({ configured: false, message: 'AH credentials storage removed. Use bonus card instead.' })
-})
-
-// Save user's AH credentials (deprecated - table removed)
-app.post('/api/user/ah-credentials', requireAuth, async (req, res) => {
-  res.status(501).json({ error: 'not_supported', message: 'AH credentials storage removed. Use the bookmarklet with your bonus card.' })
-})
-
-// Save user's AH email and password for scraping (deprecated - table removed)
-app.post('/api/user/ah-credentials/password', requireAuth, async (req, res) => {
-  res.status(501).json({ error: 'not_supported', message: 'AH credentials storage removed. Use the bookmarklet with your bonus card.' })
-})
-
-// Link bonus card number (deprecated - user_ah_credentials table removed)
-// Bonus card is now only stored in localStorage on frontend
-// and passed via URL params or request body
+// Legacy stub: /api/user/link-bonus-card
 app.post('/api/user/link-bonus-card', async (req, res) => {
   const { bonusCardNumber } = req.body
   if (!bonusCardNumber) {
@@ -1551,13 +1341,15 @@ app.post('/api/user/link-bonus-card', async (req, res) => {
 // Get user's purchase history
 app.get('/api/user/purchases', requireAHEmail, async (req, res) => {
   try {
+    const bonusCard = getBonusCard(req)
+    if (!bonusCard) return res.status(400).json({ error: 'no_bonus_card' })
     const limit = Math.min(parseInt(req.query.limit) || 100, 500)
     const offset = parseInt(req.query.offset) || 0
     
     const { data, error, count } = await supabase
       .from('user_purchases')
       .select('*', { count: 'exact' })
-      .eq('user_id', req.user.id)
+      .eq('bonus_card_number', bonusCard)
       .order('scraped_at', { ascending: false })
       .range(offset, offset + limit - 1)
     
@@ -1571,14 +1363,21 @@ app.get('/api/user/purchases', requireAHEmail, async (req, res) => {
 // Get user's purchase summary/stats
 app.get('/api/user/purchases/summary', requireAHEmail, async (req, res) => {
   try {
+    const bonusCard = getBonusCard(req)
+    if (!bonusCard) return res.status(400).json({ error: 'no_bonus_card' })
+    // Query directly instead of using the view (which still references user_id)
     const { data, error } = await supabase
-      .from('user_purchase_summary')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .single()
+      .from('user_purchases')
+      .select('product_id, quantity, price')
+      .eq('bonus_card_number', bonusCard)
     
-    if (error && error.code !== 'PGRST116') throw error
-    res.json(data || { total_purchases: 0, unique_products: 0, total_spent: 0 })
+    if (error) throw error
+    const purchases = data || []
+    res.json({
+      total_purchases: purchases.length,
+      unique_products: new Set(purchases.map(p => p.product_id)).size,
+      total_spent: purchases.reduce((sum, p) => sum + (p.price || 0), 0)
+    })
   } catch (err) {
     res.status(500).json({ error: 'fetch_failed', message: err.message })
   }
@@ -1587,11 +1386,13 @@ app.get('/api/user/purchases/summary', requireAHEmail, async (req, res) => {
 // Delete a specific purchase
 app.delete('/api/user/purchases/:id', requireAuth, async (req, res) => {
   try {
+    const bonusCard = getBonusCard(req)
+    if (!bonusCard) return res.status(400).json({ error: 'no_bonus_card' })
     const { error } = await supabase
       .from('user_purchases')
       .delete()
       .eq('id', req.params.id)
-      .eq('user_id', req.user.id)
+      .eq('bonus_card_number', bonusCard)
     
     if (error) throw error
     res.json({ success: true })
@@ -1603,6 +1404,8 @@ app.delete('/api/user/purchases/:id', requireAuth, async (req, res) => {
 // Add a manual purchase for authenticated user
 app.post('/api/user/purchases', requireAuth, async (req, res) => {
   try {
+    const bonusCard = getBonusCard(req)
+    if (!bonusCard) return res.status(400).json({ error: 'no_bonus_card' })
     const { product, quantity, price } = req.body
     
     if (!product || typeof product !== 'string' || product.trim().length === 0) {
@@ -1612,7 +1415,7 @@ app.post('/api/user/purchases', requireAuth, async (req, res) => {
     const evaluation = evaluateProduct(product)
     
     const purchase = {
-      user_id: req.user.id,
+      bonus_card_number: bonusCard,
       product_name: product.trim(),
       quantity: parseInt(quantity) || 1,
       price: parseFloat(price) || 0,
@@ -1645,28 +1448,14 @@ app.post('/api/user/purchases', requireAuth, async (req, res) => {
 // Get user's purchase insights/dashboard data
 app.get('/api/user/insights', requireAHEmail, async (req, res) => {
   try {
-    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
-    const { userIds, bonusCardNumber } = await getAllUserIds(req)
-    console.log('[Insights] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
+    const bonusCard = getBonusCard(req)
+    if (!bonusCard) return res.json({ message: 'No purchases yet!' })
+    console.log('[Insights] Fetching for bonus card:', '****' + bonusCard.slice(-4))
     
-    if (userIds.length === 0 && !bonusCardNumber) {
-      return res.json({ message: 'No purchases yet!' })
-    }
-    
-    // Build query to fetch by user_id OR bonus_card_number
-    // Join with products table to get enriched data for scoring
     let query = supabase
       .from('user_purchases')
       .select('product_id, product_name, quantity, price')
-    
-    if (userIds.length > 0 && bonusCardNumber) {
-      // Query by both user_id and bonus_card_number using OR
-      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
-    } else if (userIds.length > 0) {
-      query = query.in('user_id', userIds)
-    } else if (bonusCardNumber) {
-      query = query.eq('bonus_card_number', bonusCardNumber)
-    }
+      .eq('bonus_card_number', bonusCard)
     
     const { data: purchases, error } = await query
     
@@ -1755,192 +1544,28 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
   }
 })
 
-// Get user's purchase rank history - shows how products moved in purchase order over time
-app.get('/api/user/purchases/rank-history', requireAHEmail, async (req, res) => {
-  try {
-    const productId = req.query.product_id
-    const limit = Math.min(parseInt(req.query.limit) || 100, 500)
-    
-    let query = supabase
-      .from('purchase_rank_history')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .order('scraped_at', { ascending: false })
-      .limit(limit)
-    
-    // If specific product requested, filter to that product
-    if (productId) {
-      query = query.eq('product_id', productId)
-    }
-    
-    const { data, error } = await query
-    
-    if (error) throw error
-    res.json({ rank_history: data })
-  } catch (err) {
-    console.error('Error fetching rank history:', err)
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
-})
-
-// Get purchase rank changes - shows products that moved in rank between scrapes
-app.get('/api/user/purchases/rank-changes', requireAHEmail, async (req, res) => {
-  try {
-    // Get the two most recent scrapes for this user
-    const { data: scrapes, error: scrapeError } = await supabase
-      .from('purchase_rank_history')
-      .select('scraped_at')
-      .eq('user_id', req.user.id)
-      .order('scraped_at', { ascending: false })
-      .limit(2)
-    
-    if (scrapeError) throw scrapeError
-    
-    if (!scrapes || scrapes.length < 2) {
-      return res.json({ 
-        message: 'Need at least 2 scrapes to show rank changes',
-        rank_changes: [],
-        current_scrape: scrapes?.[0]?.scraped_at || null,
-        previous_scrape: null
-      })
-    }
-    
-    const [currentScrape, previousScrape] = scrapes
-    
-    // Get current ranks
-    const { data: currentRanks, error: currentError } = await supabase
-      .from('purchase_rank_history')
-      .select('product_id, product_name, purchase_rank')
-      .eq('user_id', req.user.id)
-      .eq('scraped_at', currentScrape.scraped_at)
-    
-    if (currentError) throw currentError
-    
-    // Get previous ranks
-    const { data: previousRanks, error: previousError } = await supabase
-      .from('purchase_rank_history')
-      .select('product_id, purchase_rank')
-      .eq('user_id', req.user.id)
-      .eq('scraped_at', previousScrape.scraped_at)
-    
-    if (previousError) throw previousError
-    
-    // Build map of previous ranks
-    const prevRankMap = new Map(previousRanks.map(r => [r.product_id, r.purchase_rank]))
-    
-    // Calculate rank changes
-    const rankChanges = currentRanks.map(curr => {
-      const prevRank = prevRankMap.get(curr.product_id)
-      const change = prevRank ? prevRank - curr.purchase_rank : null  // Positive = moved up (more recent purchase)
-      return {
-        product_id: curr.product_id,
-        product_name: curr.product_name,
-        current_rank: curr.purchase_rank,
-        previous_rank: prevRank || null,
-        rank_change: change,
-        is_new: prevRank === undefined  // Product wasn't in previous scrape
-      }
-    })
-    
-    // Sort by rank change (biggest movers first)
-    rankChanges.sort((a, b) => {
-      // New products first
-      if (a.is_new && !b.is_new) return -1
-      if (!a.is_new && b.is_new) return 1
-      // Then by rank change (positive = moved up)
-      return (b.rank_change || 0) - (a.rank_change || 0)
-    })
-    
-    res.json({
-      current_scrape: currentScrape.scraped_at,
-      previous_scrape: previousScrape.scraped_at,
-      rank_changes: rankChanges,
-      new_purchases: rankChanges.filter(r => r.is_new).length,
-      moved_up: rankChanges.filter(r => r.rank_change && r.rank_change > 0).length
-    })
-  } catch (err) {
-    console.error('Error fetching rank changes:', err)
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
-})
-
-// Get latest purchase ranks (most recent scrape)
-app.get('/api/user/purchases/latest-ranks', requireAHEmail, async (req, res) => {
-  try {
-    // Get the most recent scrape timestamp
-    const { data: latestScrape } = await supabase
-      .from('purchase_rank_history')
-      .select('scraped_at')
-      .eq('user_id', req.user.id)
-      .order('scraped_at', { ascending: false })
-      .limit(1)
-      .single()
-    
-    if (!latestScrape) {
-      return res.json({ 
-        message: 'No rank history available',
-        ranks: [],
-        scraped_at: null
-      })
-    }
-    
-    // Get all ranks from that scrape
-    const { data: ranks, error } = await supabase
-      .from('purchase_rank_history')
-      .select('product_id, product_name, purchase_rank')
-      .eq('user_id', req.user.id)
-      .eq('scraped_at', latestScrape.scraped_at)
-      .order('purchase_rank', { ascending: true })
-    
-    if (error) throw error
-    
-    res.json({
-      scraped_at: latestScrape.scraped_at,
-      ranks: ranks,
-      total_products: ranks.length
-    })
-  } catch (err) {
-    console.error('Error fetching latest ranks:', err)
-    res.status(500).json({ error: 'fetch_failed', message: err.message })
-  }
-})
+// Rank history routes removed — purchase_rank_history table used user_id (JWT auth)
+// which is no longer used. These routes had no frontend consumers.
 
 // Get user's full purchase history with enriched product data
 app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
   try {
+    const bonusCard = getBonusCard(req)
     const page = parseInt(req.query.page) || 1
     const limit = Math.min(parseInt(req.query.limit) || 50, 100)
     const offset = (page - 1) * limit
-    const sortBy = req.query.sortBy || 'scraped_at'  // Use scraped_at as default
+    const sortBy = req.query.sortBy || 'scraped_at'
     const sortOrder = req.query.sortOrder === 'asc' ? true : false
     
-    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
-    const { userIds, bonusCardNumber } = await getAllUserIds(req)
-    console.log('[History] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
-    
-    if (userIds.length === 0 && !bonusCardNumber) {
-      return res.json({ 
-        purchases: [], 
-        total: 0,
-        page,
-        limit,
-        totalPages: 0
-      })
+    if (!bonusCard) {
+      return res.json({ purchases: [], total: 0, page, limit, totalPages: 0 })
     }
+    console.log('[History] Fetching for bonus card:', '****' + bonusCard.slice(-4))
     
-    // Build query to fetch by user_id OR bonus_card_number
     let query = supabase
       .from('user_purchases')
       .select('*', { count: 'exact' })
-    
-    if (userIds.length > 0 && bonusCardNumber) {
-      // Query by both user_id and bonus_card_number using OR
-      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
-    } else if (userIds.length > 0) {
-      query = query.in('user_id', userIds)
-    } else if (bonusCardNumber) {
-      query = query.eq('bonus_card_number', bonusCardNumber)
-    }
+      .eq('bonus_card_number', bonusCard)
     
     const { data: purchases, error, count } = await query
       .order(sortBy, { ascending: sortOrder })
@@ -1951,7 +1576,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
       throw error
     }
     
-    console.log(`[History] Fetched ${purchases?.length || 0} purchases for user IDs ${userIds.join(', ')}`)
+    console.log(`[History] Fetched ${purchases?.length || 0} purchases for bonus card`)
     
     if (!purchases || purchases.length === 0) {
       return res.json({ 
@@ -2358,11 +1983,10 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
 // Get personalized suggestions based on user's purchase history
 app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
   try {
-    // Get all user IDs (JWT + session-based) and bonus card to merge purchases
-    const { userIds, bonusCardNumber } = await getAllUserIds(req)
-    console.log('[Suggestions] Fetching for user IDs:', userIds, 'bonus card:', bonusCardNumber ? '****' + bonusCardNumber.slice(-4) : 'none')
+    const bonusCard = getBonusCard(req)
+    console.log('[Suggestions] Fetching for bonus card:', bonusCard ? '****' + bonusCard.slice(-4) : 'none')
     
-    if (userIds.length === 0 && !bonusCardNumber) {
+    if (!bonusCard) {
       return res.json({
         profile: {
           total_products: 0,
@@ -2375,18 +1999,10 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
       })
     }
     
-    // Build query to fetch by user_id OR bonus_card_number
     let query = supabase
       .from('user_purchases')
       .select('product_name, quantity, price')
-    
-    if (userIds.length > 0 && bonusCardNumber) {
-      query = query.or(`user_id.in.(${userIds.join(',')}),bonus_card_number.eq.${bonusCardNumber}`)
-    } else if (userIds.length > 0) {
-      query = query.in('user_id', userIds)
-    } else if (bonusCardNumber) {
-      query = query.eq('bonus_card_number', bonusCardNumber)
-    }
+      .eq('bonus_card_number', bonusCard)
     
     const { data: purchases, error: purchasesError } = await query
     
@@ -4306,22 +3922,12 @@ app.get('/api/catalog/meta', async (req, res) => {
 
 // Ingest scraped items from the user's browser (extension/bookmarklet)
 // Products go to shared 'products' table (unified catalog)
-// Purchases are recorded per-user in user_purchases table (by user_id or bonus_card)
+// Purchases are recorded per-user in user_purchases table (by bonus_card)
 app.post('/api/ingest/scrape', async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : []
     if (!items.length) return res.status(400).json({ error: 'no_items' })
 
-    // Get authenticated user OR bonus card (optional - if neither, just store products)
-    // Check both JWT auth AND session-based auth
-    let user = await getUserFromRequest(req)
-    let userId = user?.id || null
-    
-    // If no JWT user, try session-based auth
-    if (!userId) {
-      userId = await getUserIdFromSession(req)
-    }
-    
     const bonusCard = req.body?.bonus_card?.toString().trim() || null
     const sessionId = req.headers['x-session-id']
     const requestStore = req.body?.store?.toString().trim() || 'ah'  // 'ah' or 'jumbo'
@@ -4334,7 +3940,6 @@ app.post('/api/ingest/scrape', async (req, res) => {
     
     console.log(`[Ingest] ===== NEW REQUEST =====`)
     console.log(`[Ingest] Items: ${items.length}, Store: ${requestStore}`)
-    console.log(`[Ingest] User ID: ${userId ? userId : 'none'}`)
     console.log(`[Ingest] Bonus Card: ${cardDisplay}`)
     console.log(`[Ingest] Session ID: ${sessionId ? sessionId.slice(0, 8) + '...' : 'none'}`)
     console.log(`[Ingest] Source IP: ${req.ip || req.connection?.remoteAddress || 'unknown'}`)
@@ -4498,41 +4103,46 @@ app.post('/api/ingest/scrape', async (req, res) => {
         }
       }
 
-      // 3. If user is authenticated OR bonus card provided, record purchases
-      if (userId || bonusCard) {
+      // 3. If bonus card provided, record purchases
+      if (bonusCard) {
         const now = new Date().toISOString()
         const purchaseRecords = cleaned.map(p => ({
-          ...(userId ? { user_id: userId } : {}),
-          ...(bonusCard ? { bonus_card_number: bonusCard } : {}),
+          bonus_card_number: bonusCard,
           product_id: p.id,
           product_name: p.name,
-          product_url: p.url,  // Include URL for scraper to use
+          product_url: p.url,
           price: p.price,
           quantity: 1,
           source: req.body?.source || 'bookmarklet',
           purchased_at: now,
-          scraped_at: now,      // Required NOT NULL column
+          scraped_at: now,
           last_seen_at: now
         }))
 
-        const cardForLog = isDev ? bonusCard : (bonusCard ? '****' + bonusCard.slice(-4) : null)
-        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for ${userId ? 'user ' + userId : 'bonus card ' + cardForLog}`)
+        const cardForLog = isDev ? bonusCard : ('****' + bonusCard.slice(-4))
+        console.log(`[Ingest] Recording ${purchaseRecords.length} purchases for bonus card ${cardForLog}`)
         if (isDev) {
           console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
         }
 
-        // Try simple INSERT first (most reliable)
-        // If duplicates exist, they'll fail with 23505 which is OK
+        // Step A: INSERT new products (duplicates will fail with 23505, that's fine)
         const { data, error: insertError } = await supabase
           .from('user_purchases')
           .insert(purchaseRecords)
           .select()
         
+        let newlyInserted = 0
         if (insertError) {
-          // Duplicate key error is OK - means products already exist
           if (insertError.code === '23505') {
-            console.log('[Ingest] Some purchases already exist (duplicate key) - that is OK')
-            purchasesRecorded = purchaseRecords.length
+            // Some or all are duplicates — try inserting one by one to get the new ones in
+            console.log('[Ingest] Batch insert hit duplicates — inserting individually...')
+            for (const record of purchaseRecords) {
+              const { error: singleErr } = await supabase
+                .from('user_purchases')
+                .insert([record])
+              if (!singleErr) newlyInserted++
+            }
+            console.log(`[Ingest] Individual insert: ${newlyInserted} new, ${purchaseRecords.length - newlyInserted} already existed`)
           } else {
             purchaseError = insertError
             console.error('[Ingest] Purchase insert FAILED:', JSON.stringify({
@@ -4543,11 +4153,41 @@ app.post('/api/ingest/scrape', async (req, res) => {
             }, null, 2))
           }
         } else {
-          purchasesRecorded = data?.length || purchaseRecords.length
-          console.log(`[Ingest] SUCCESS: Inserted ${purchasesRecorded} purchase records`)
+          newlyInserted = data?.length || purchaseRecords.length
+          console.log(`[Ingest] SUCCESS: Inserted ${newlyInserted} new purchase records`)
         }
+
+        // Step B: UPDATE last_seen_at (and price) for ALL products in this scrape
+        // This keeps track of which items are still in the user's history
+        const productIds = cleaned.map(p => p.id).filter(Boolean)
+        if (productIds.length > 0) {
+          const { error: updateError } = await supabase
+            .from('user_purchases')
+            .update({ last_seen_at: now })
+            .eq('bonus_card_number', bonusCard)
+            .in('product_id', productIds)
+
+          if (updateError) {
+            console.error('[Ingest] last_seen_at update error:', updateError.message)
+          } else {
+            console.log(`[Ingest] Updated last_seen_at for ${productIds.length} products`)
+          }
+
+          // Also update price if it changed (non-null new price)
+          for (const p of cleaned) {
+            if (p.id && p.price != null) {
+              await supabase
+                .from('user_purchases')
+                .update({ price: p.price })
+                .eq('bonus_card_number', bonusCard)
+                .eq('product_id', p.id)
+            }
+          }
+        }
+
+        purchasesRecorded = purchaseRecords.length
       } else {
-        console.log('[Ingest] No userId or bonusCard - skipping user_purchases insert')
+        console.log('[Ingest] No bonusCard - skipping user_purchases insert')
       }
     }
 
@@ -4571,7 +4211,7 @@ app.post('/api/ingest/scrape', async (req, res) => {
       purchasesRecorded,
       purchaseError: purchaseError ? { code: purchaseError.code, message: purchaseError.message, hint: purchaseError.hint } : null,
       queuedForEnrichment,
-      userId: userId ? 'authenticated' : (bonusCard ? 'bonus_card' : 'anonymous'),
+      authType: bonusCard ? 'bonus_card' : 'anonymous',
       bonusCard: bonusCard ? bonusCard.slice(-4).padStart(13, '•') : null,
       redirect_url: redirectUrl
     })
@@ -5181,8 +4821,7 @@ app.delete('/api/auto-scrape/cookies', async (req, res) => {
 const cookieCaptureState = {
   running: false,
   startedAt: null,
-  logs: [],
-  userId: null  // Store user ID to save credentials when process completes
+  logs: []
 }
 
 // Start cookie capture (manual login in browser)
@@ -5210,15 +4849,11 @@ app.post('/api/auto-scrape/capture-cookies', async (req, res) => {
     return res.status(500).json({ error: 'script_missing' })
   }
   
-  // Get user ID for tracking (no credential storage)
-  const user = await getUserFromRequest(req)
-  const userId = user?.id || null
-  
+  // Cookie capture doesn't need user tracking
   const startedAt = new Date().toISOString()
   cookieCaptureState.running = true
   cookieCaptureState.startedAt = startedAt
   cookieCaptureState.logs = []
-  cookieCaptureState.userId = userId
   
   const captureProcess = spawn(PYTHON_CMD, [
     AUTO_SCRAPE_SCRIPT,
@@ -5292,41 +4927,13 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
     return res.status(500).json({ error: 'script_missing', details: 'auto_scraper.py not found' })
   }
   
-  // Get user from auth header if provided (for recording purchases)
-  // Support both JWT auth and email-based identification
-  let userId = null
-  const ahEmailHeader = req.headers['x-ah-email']
-  
-  if (ahEmailHeader) {
-    // Email-based: look up existing user_id by AH email
-    userId = await getUserIdByAHEmail(ahEmailHeader)
-  } else {
-    // JWT-based (legacy): get user from token
-    const user = await getUserFromRequest(req)
-    userId = user?.id || null
-  }
-  
-  // For email-based users, look up or create user_id from email header
-  const { email } = req.body || {}
-  if (!userId && email && supabase) {
-    // Check if user already exists by this email
-    const existingUserId = await getUserIdByAHEmail(email)
-    if (existingUserId) {
-      userId = existingUserId
-    } else {
-      // Create new user - generate a UUID
-      userId = crypto.randomUUID()
-      appendAutoScrapeLog('info', `Created new user account for ${email}`)
-    }
-  }
-  
+  // Visual login doesn't track userId — purchases are linked via bonus card at bookmarklet ingest time
   const startedAt = new Date().toISOString()
   autoScrapeState.running = true
   autoScrapeState.startedAt = startedAt
-  autoScrapeState.lastRun = { status: 'running', startedAt, userId }
+  autoScrapeState.lastRun = { status: 'running', startedAt }
   autoScrapeState.logs = []
   autoScrapeState.progress = 'Opening browser window...'
-  autoScrapeState.currentUserId = userId
   
   appendAutoScrapeLog('info', '🖥️ Opening browser window for Albert Heijn login...')
   appendAutoScrapeLog('info', 'Please log in to your AH account in the browser window.')
@@ -5488,88 +5095,9 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
           autoScrapeState.lastRun.productsStored = cleaned.length
           console.log(`[SUCCESS] Stored ${cleaned.length} products to ${SUPABASE_PRODUCTS_TABLE}`)
           
-          // Also save to user_purchases if we have a userId
-          // Uses upsert to prevent duplicates when re-scraping
-          if (userId) {
-            appendAutoScrapeLog('info', `👤 Saving purchases for user: ${userId}`)
-            const now = new Date().toISOString()
-            const purchases = cleaned.map(p => ({
-              user_id: userId,
-              product_id: p.id,
-              product_name: p.name,
-              product_url: p.url,
-              price: p.price,
-              quantity: 1,
-              source: 'ah_visual_login',
-              purchased_at: now,  // Will be ignored on conflict (keeps original)
-              last_seen_at: now   // Always updated on re-scrape
-            }))
-            
-            console.log(`[DEBUG] Upserting ${purchases.length} purchases for user ${userId}`)
-            console.log('[DEBUG] Sample purchase:', JSON.stringify(purchases[0], null, 2))
-            
-            // Use upsert with ON CONFLICT to handle re-scrapes
-            // On conflict: update last_seen_at, keep original purchased_at
-            const { data: upsertedData, error: purchaseError } = await supabase
-              .from('user_purchases')
-              .upsert(purchases, { 
-                onConflict: 'user_id,product_id',
-                ignoreDuplicates: false  // We want to update last_seen_at
-              })
-              .select()
-            if (purchaseError) {
-              appendAutoScrapeLog('stderr', `Failed to record purchases: ${purchaseError.message}`)
-              console.error('user_purchases upsert error:', purchaseError)
-              console.error('user_purchases upsert error code:', purchaseError.code)
-              console.error('user_purchases upsert error details:', purchaseError.details)
-            } else {
-              appendAutoScrapeLog('info', `✅ Upserted ${purchases.length} purchases for user (no duplicates on re-scrape)`)
-              console.log(`[SUCCESS] Upserted ${upsertedData?.length || purchases.length} rows to user_purchases`)
-              
-              // Save purchase rank history if products have purchase_rank data
-              if (resultData.sorted_by_purchase_date) {
-                try {
-                  // Build map of product_id -> purchase_rank from original data
-                  const rankMap = new Map()
-                  resultData.products.forEach(item => {
-                    const url = (item.url || '').toString().trim()
-                    const extracted = extractProductFromUrl(url, item.name || '')
-                    if (extracted.id && item.purchase_rank) {
-                      rankMap.set(extracted.id, {
-                        rank: item.purchase_rank,
-                        name: extracted.name
-                      })
-                    }
-                  })
-                  
-                  if (rankMap.size > 0) {
-                    const rankHistory = Array.from(rankMap.entries()).map(([productId, data]) => ({
-                      user_id: userId,
-                      product_id: productId,
-                      product_name: data.name,
-                      purchase_rank: data.rank,
-                      scraped_at: now
-                    }))
-                    
-                    const { error: rankError } = await supabase
-                      .from('purchase_rank_history')
-                      .insert(rankHistory)
-                    
-                    if (rankError) {
-                      appendAutoScrapeLog('stderr', `Failed to save rank history: ${rankError.message}`)
-                    } else {
-                      appendAutoScrapeLog('info', `📊 Saved purchase rank history for ${rankHistory.length} products`)
-                    }
-                  }
-                } catch (rankErr) {
-                  appendAutoScrapeLog('stderr', `Rank history error: ${rankErr.message}`)
-                }
-              }
-            }
-          } else {
-            appendAutoScrapeLog('info', `⚠️ No user authenticated - purchases not saved to user account`)
-            console.log('[WARNING] userId is null - products scraped but not saved to user_purchases')
-          }
+          // Auto-scrape stores to product catalog only
+          // User purchases are linked via bonus card during bookmarklet ingest
+          appendAutoScrapeLog('info', `⚠️ Products stored to catalog only — use bookmarklet with bonus card to link purchases`)
         }
         }  // end if (cleaned.length > 0)
       } catch (e) {
@@ -5591,8 +5119,7 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
 
 // Scrape using saved cookies (no credentials needed)
 // Uses stealth mode: runs headless in background, signals if login needed
-// Accepts optional user_id to record purchases for a specific user
-// Also accepts optional email/password to save credentials for admin use
+// Products stored to catalog only — purchases linked via bonus card at bookmarklet ingest
 app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   if (process.env.VERCEL && !process.env.BROWSERLESS_URL) {
     return res.status(501).json({
@@ -5605,10 +5132,6 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     return res.status(409).json({ error: 'scrape_in_progress' })
   }
   
-  // Get user from session ID or JWT (for recording purchases, no credential storage)
-  const userId = await getUserIdFromSession(req) || req.body?.user_id || null
-  console.log('[DEBUG] With-cookies - userId:', userId)
-  
   // Check if cookies exist
   if (!existsSync(COOKIES_FILE)) {
     return res.status(400).json({
@@ -5620,14 +5143,11 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
   const startedAt = new Date().toISOString()
   autoScrapeState.running = true
   autoScrapeState.startedAt = startedAt
-  autoScrapeState.lastRun = { status: 'running', startedAt, userId }
+  autoScrapeState.lastRun = { status: 'running', startedAt }
   autoScrapeState.logs = []
   autoScrapeState.progress = 'Starting scraper in background...'
   
   appendAutoScrapeLog('info', 'Starting AH scraper in stealth mode (background)...')
-  if (userId) {
-    appendAutoScrapeLog('info', `Recording purchases for user: ${userId}`)
-  }
   
   // Account protection check removed - user_ah_credentials table no longer used
   const accountProtectionAlreadyDisabled = false
@@ -5645,8 +5165,8 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     scriptArgs.push('--skip-account-protection')
   }
   
-  // Store userId in state for use in the close handler
-  autoScrapeState.currentUserId = userId
+  // Auto-scrape only stores to product catalog
+  // No userId tracking needed
   
   const browserlessUrl = process.env.BROWSERLESS_URL
   if (browserlessUrl) {
@@ -5719,9 +5239,6 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
     if (resultData?.success && resultData?.products?.length > 0 && supabase) {
       appendAutoScrapeLog('info', `Ingesting ${resultData.products.length} products to database...`)
       
-      // Get userId from state
-      const userId = autoScrapeState.currentUserId
-      
       try {
         const seenIds = new Set()
         const cleaned = resultData.products.map((item) => {
@@ -5782,87 +5299,13 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
           }
         }
         
-        // 2. If user is authenticated, also record as user purchases
-        // Uses upsert to prevent duplicates on re-scrape
-        if (userId) {
-          const now = new Date().toISOString()
-          const userPurchases = cleaned.map(item => ({
-            user_id: userId,
-            product_id: item.id,
-            product_name: item.name,
-            product_url: item.url,
-            product_image_url: item.image_url,
-            price: item.price,
-            source: 'ah_auto_scrape',
-            purchased_at: now,  // Kept on conflict (original purchase date)
-            last_seen_at: now   // Always updated
-          }))
-          
-          const { error: purchaseError } = await supabase
-            .from('user_purchases')
-            .upsert(userPurchases, {
-              onConflict: 'user_id,product_id',
-              ignoreDuplicates: false
-            })
-          
-          if (purchaseError) {
-            appendAutoScrapeLog('stderr', `User purchases upsert failed: ${purchaseError.message}`)
-          } else {
-            appendAutoScrapeLog('info', `Upserted ${userPurchases.length} purchases for user (no duplicates on re-scrape).`)
-            autoScrapeState.lastRun.userPurchasesRecorded = userPurchases.length
-            
-            // Save purchase rank history if products have purchase_rank data
-            if (resultData.sorted_by_purchase_date) {
-              try {
-                const now = new Date().toISOString()
-                // Build map of product_id -> purchase_rank from original data
-                const rankMap = new Map()
-                resultData.products.forEach(item => {
-                  const url = (item.url || '').toString().trim()
-                  const extracted = extractProductFromUrl(url, item.name || '')
-                  if (extracted.id && item.purchase_rank) {
-                    rankMap.set(extracted.id, {
-                      rank: item.purchase_rank,
-                      name: extracted.name
-                    })
-                  }
-                })
-                
-                if (rankMap.size > 0) {
-                  const rankHistory = Array.from(rankMap.entries()).map(([productId, data]) => ({
-                    user_id: userId,
-                    product_id: productId,
-                    product_name: data.name,
-                    purchase_rank: data.rank,
-                    scraped_at: now
-                  }))
-                  
-                  const { error: rankError } = await supabase
-                    .from('purchase_rank_history')
-                    .insert(rankHistory)
-                  
-                  if (rankError) {
-                    appendAutoScrapeLog('stderr', `Failed to save rank history: ${rankError.message}`)
-                  } else {
-                    appendAutoScrapeLog('info', `📊 Saved purchase rank history for ${rankHistory.length} products`)
-                  }
-                }
-              } catch (rankErr) {
-                appendAutoScrapeLog('stderr', `Rank history error: ${rankErr.message}`)
-              }
-            }
-          }
-          
-          // Sync status update removed - user_ah_credentials table no longer used
-          appendAutoScrapeLog('info', '✅ Scrape completed successfully')
-        }
+        // Auto-scrape stores to product catalog only
+        // User purchases are linked via bonus card during bookmarklet ingest
+        appendAutoScrapeLog('info', '✅ Scrape completed — products stored to catalog')
       } catch (e) {
         appendAutoScrapeLog('stderr', `Ingestion error: ${e.message}`)
       }
     }
-    
-    // Clear current user ID
-    autoScrapeState.currentUserId = null
   })
   
   res.status(202).json({ status: 'started', startedAt, useCookies: true })
