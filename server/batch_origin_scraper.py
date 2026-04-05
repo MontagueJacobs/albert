@@ -86,13 +86,15 @@ class BatchOriginScraper:
         if not self.supabase:
             return []
             
-        # Query products missing key data (origin, unit_size, OR price),
-        # excluding permanently failed ones and recently-scraped pending items
+        # Query products missing key data (origin, unit_size, OR price).
+        # Only permanently exclude not_found and failed — allow re-scraping
+        # of 'success' items that still have null key fields (from older runs
+        # that marked success without checking all fields).
         result = self.supabase.table('products') \
             .select('id, name, url, origin_country, origin_by_month, unit_size, price, details_scrape_status, details_scraped_at') \
             .not_.is_('url', 'null') \
             .or_('origin_country.is.null,unit_size.is.null,price.is.null') \
-            .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.not.in.(not_found,failed,success)') \
+            .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
             .limit(limit) \
             .execute()
         
@@ -101,16 +103,15 @@ class BatchOriginScraper:
         now = datetime.now()
         for p in (result.data or []):
             scraped_at = p.get('details_scraped_at')
-            if scraped_at and p.get('details_scrape_status') == 'pending':
+            if scraped_at:
                 try:
                     sa = datetime.fromisoformat(scraped_at.replace('Z', '+00:00')).replace(tzinfo=None)
                     if (now - sa).total_seconds() < 3600:
-                        continue  # Skip recently scraped pending items
+                        continue  # Skip recently scraped items
                 except (ValueError, TypeError):
                     pass
             products.append(p)
             
-        products = result.data if result.data else []
         self.stats['total_candidates'] = len(products)
         
         print(f"[INFO] Found {len(products)} products needing origin data", flush=True)
@@ -159,7 +160,7 @@ class BatchOriginScraper:
                 .select('id, name, url, origin_country, origin_by_month, unit_size, price, details_scrape_status, details_scraped_at') \
                 .in_('url', chunk_urls) \
                 .or_('origin_country.is.null,unit_size.is.null,price.is.null') \
-                .or_('details_scrape_status.is.null,details_scrape_status.eq.pending,details_scrape_status.not.in.(not_found,failed,success)') \
+                .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
                 .execute()
             
             if result.data:
@@ -171,7 +172,7 @@ class BatchOriginScraper:
         filtered = []
         for p in all_products:
             scraped_at = p.get('details_scraped_at')
-            if scraped_at and p.get('details_scrape_status') == 'pending':
+            if scraped_at:
                 try:
                     sa = datetime.fromisoformat(scraped_at.replace('Z', '+00:00')).replace(tzinfo=None)
                     if (now - sa).total_seconds() < 3600:
