@@ -296,31 +296,81 @@ class AHProductDetailScraper:
             # STRATEGY 1: Extract from JSON-LD schema.org structured data
             # This is the most reliable source for price, image, brand
             # ================================================================
+            def _find_product_in_jsonld(obj):
+                """Recursively find a Product node in parsed JSON-LD."""
+                if isinstance(obj, list):
+                    for item in obj:
+                        found = _find_product_in_jsonld(item)
+                        if found:
+                            return found
+                elif isinstance(obj, dict):
+                    if obj.get('@type') == 'Product':
+                        return obj
+                    # Check @graph arrays
+                    if '@graph' in obj:
+                        return _find_product_in_jsonld(obj['@graph'])
+                return None
+
             try:
-                # Look for JSON-LD Product schema
-                jsonld_match = re.search(r'(\{[^}]*"@type"\s*:\s*"Product"[^}]*"offers"[^}]*\})', content, re.DOTALL)
-                if jsonld_match:
-                    jsonld_text = jsonld_match.group(1)
-                    # Unescape unicode
-                    jsonld_text = jsonld_text.replace('\\u0026', '&').replace('\\u003c', '<').replace('\\u003e', '>')
-                    
-                    # Extract price from offers (handle both quoted and unquoted values)
-                    # JSON can have: "price": 2.99 or "price": "2.99"
-                    price_match = re.search(r'"price"\s*:\s*"?([\d.]+)"?', jsonld_text)
-                    if price_match:
-                        result['price'] = float(price_match.group(1))
-                        print(f"[DEBUG] JSON-LD price: {result['price']}", flush=True)
-                    
+                # Method A: find <script type="application/ld+json"> tags in raw HTML
+                # and parse them properly with json.loads (handles nested objects)
+                jsonld_blocks = re.findall(
+                    r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+                    content, re.DOTALL | re.IGNORECASE
+                )
+                product_data = None
+                for block in jsonld_blocks:
+                    try:
+                        data = json.loads(block)
+                        product_data = _find_product_in_jsonld(data)
+                        if product_data:
+                            break
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+
+                # Method B: AH sometimes embeds JSON-LD in Next.js RSC chunks, not
+                # in <script> tags.  Fall back to a regex that handles nested braces.
+                if not product_data:
+                    # Match a Product block that may contain nested { } objects
+                    m = re.search(
+                        r'\{[^{}]*"@type"\s*:\s*"Product"[^{}]*(?:\{[^{}]*\}[^{}]*)*"offers"\s*:\s*\{[^{}]*"price"\s*:\s*"?([\d.]+)"?',
+                        content, re.DOTALL
+                    )
+                    if m:
+                        result['price'] = float(m.group(1))
+                        print(f"[DEBUG] JSON-LD inline price: {result['price']}", flush=True)
+                    # Also try with offers before brand (field order varies)
+                    if not result['price']:
+                        m2 = re.search(r'"@type"\s*:\s*"Product".*?"offers"\s*:\s*\{[^}]*"price"\s*:\s*"?([\d.]+)"?', content, re.DOTALL)
+                        if m2:
+                            result['price'] = float(m2.group(1))
+                            print(f"[DEBUG] JSON-LD greedy price: {result['price']}", flush=True)
+
+                if product_data:
+                    # Extract price from offers
+                    offers = product_data.get('offers', {})
+                    if isinstance(offers, list):
+                        offers = offers[0] if offers else {}
+                    if isinstance(offers, dict):
+                        price_val = offers.get('price')
+                        if price_val is not None:
+                            result['price'] = float(price_val)
+                            print(f"[DEBUG] JSON-LD price: {result['price']}", flush=True)
+
                     # Extract image
-                    img_match = re.search(r'"image"\s*:\s*"([^"]+static\.ah\.nl[^"]+)"', jsonld_text)
-                    if img_match:
-                        result['image_url'] = img_match.group(1).replace('\\u0026', '&')
+                    img = product_data.get('image')
+                    if isinstance(img, list):
+                        img = img[0] if img else None
+                    if isinstance(img, str) and 'ah.nl' in img:
+                        result['image_url'] = img
                         print(f"[DEBUG] JSON-LD image: found", flush=True)
-                    
+
                     # Extract brand
-                    brand_match = re.search(r'"brand"[^}]*"name"\s*:\s*"([^"]+)"', jsonld_text)
-                    if brand_match:
-                        result['brand'] = brand_match.group(1)
+                    brand = product_data.get('brand')
+                    if isinstance(brand, dict):
+                        brand = brand.get('name')
+                    if isinstance(brand, str) and brand:
+                        result['brand'] = brand
                         print(f"[DEBUG] JSON-LD brand: {result['brand']}", flush=True)
             except Exception as e:
                 print(f"[WARN] JSON-LD extraction failed: {e}", flush=True)
@@ -1040,41 +1090,73 @@ class AHProductDetailScraper:
             # ================================================================
             if not result['price']:
                 try:
-                    # Look for price elements (AH uses various price selectors)
-                    price_selectors = [
-                        '[class*="price-amount"]',
-                        '[class*="product-price"]',
-                        '[data-testhook="price-amount"]',
-                        '[itemprop="price"]',
-                        '.price',
-                    ]
-                    
-                    for selector in price_selectors:
-                        price_elem = await self.page.query_selector(selector)
-                        if price_elem:
-                            price_text = await price_elem.inner_text()
-                            # Parse price from text like "€2,99" or "2.99"
-                            price_match = re.search(r'[\d]+[.,][\d]{2}', price_text)
-                            if price_match:
-                                price_str = price_match.group().replace(',', '.')
-                                result['price'] = float(price_str)
-                                print(f"[DEBUG] DOM price from {selector}: {result['price']}", flush=True)
+                    # Method A: aria-label on price elements (most reliable on AH)
+                    # e.g. <span aria-label="Prijs: €1.89"> or <span aria-label="Oude prijs: €2.49">
+                    price_labels = await self.page.query_selector_all('[data-testid="price-amount"]')
+                    for pl in price_labels:
+                        cls = await pl.get_attribute('class') or ''
+                        # Skip "was" (old/strikethrough) prices
+                        if 'was' in cls:
+                            continue
+                        # Try aria-label on sr-only child first
+                        sr = await pl.query_selector('.sr-only[aria-label], [aria-label*="Prijs"]')
+                        if sr:
+                            label = await sr.get_attribute('aria-label') or ''
+                            m = re.search(r'€\s*(\d+[.,]\d+)', label.replace(',', '.'))
+                            if m:
+                                result['price'] = float(m.group(1))
+                                print(f"[DEBUG] DOM price from aria-label: {result['price']}", flush=True)
                                 break
-                    
-                    # Also try JSON-LD structured data for price
+                        # Fall back to integer + fractional spans
+                        int_el = await pl.query_selector('[class*="integer"]')
+                        frac_el = await pl.query_selector('[class*="fractional"]')
+                        if int_el and frac_el:
+                            int_text = (await int_el.inner_text()).strip()
+                            frac_text = (await frac_el.inner_text()).strip()
+                            if int_text and frac_text:
+                                result['price'] = float(f"{int_text}.{frac_text}")
+                                print(f"[DEBUG] DOM price from int+frac: {result['price']}", flush=True)
+                                break
+
+                    # Method B: generic CSS selectors
+                    if not result['price']:
+                        price_selectors = [
+                            '[class*="price-amount"]:not([class*="was"])',
+                            '[class*="price-amount"]',
+                            '[class*="product-price"]',
+                            '[data-testhook="price-amount"]',
+                            '[itemprop="price"]',
+                            '.price',
+                        ]
+                        for selector in price_selectors:
+                            price_elem = await self.page.query_selector(selector)
+                            if price_elem:
+                                price_text = await price_elem.inner_text()
+                                # Try comma-separated (€2,99) and dot-separated (2.99) formats
+                                price_match = re.search(r'(\d+)[.,](\d{2})', price_text)
+                                if price_match:
+                                    result['price'] = float(f"{price_match.group(1)}.{price_match.group(2)}")
+                                    print(f"[DEBUG] DOM price from {selector}: {result['price']}", flush=True)
+                                    break
+
+                    # Method C: JSON-LD <script> tags via Playwright DOM (already tried
+                    # in Strategy 1 via raw HTML, but retry via DOM in case of late render)
                     if not result['price']:
                         scripts = await self.page.query_selector_all('script[type="application/ld+json"]')
                         for script in scripts:
                             script_content = await script.inner_text()
                             try:
                                 data = json.loads(script_content)
-                                if isinstance(data, dict):
-                                    offers = data.get('offers', {})
+                                product = _find_product_in_jsonld(data)
+                                if product:
+                                    offers = product.get('offers', {})
+                                    if isinstance(offers, list):
+                                        offers = offers[0] if offers else {}
                                     if isinstance(offers, dict):
                                         price = offers.get('price')
                                         if price:
                                             result['price'] = float(price)
-                                            print(f"[DEBUG] JSON-LD parsed price: {result['price']}", flush=True)
+                                            print(f"[DEBUG] JSON-LD DOM price: {result['price']}", flush=True)
                                             break
                             except (json.JSONDecodeError, ValueError):
                                 pass
