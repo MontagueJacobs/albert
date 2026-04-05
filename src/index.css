@@ -54,10 +54,11 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 2rem;
+  padding: 0.25rem 2rem;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow);
+  overflow: visible;
 }
 
 .menu-toggle {
@@ -94,8 +95,9 @@ code {
 }
 
 .radboud-logo {
-  height: 60px;
+  height: 150px;
   width: auto;
+  margin: -2rem 0;
 }
 
 .header-actions {
@@ -177,16 +179,16 @@ code {
 /* ============ SLIDE MENU ============ */
 .slide-menu {
   position: fixed;
-  top: 65px;
+  top: 58px;
   left: 0;
   width: 320px;
-  max-height: calc(100vh - 65px);
+  max-height: calc(100vh - 58px);
   height: auto;
   background: var(--bg-card);
   border-right: 1px solid var(--border);
   transform: translateX(-100%);
   transition: transform 0.3s ease;
-  z-index: 90;
+  z-index: 101;
   overflow-y: auto;
   overflow-x: hidden;
   padding-bottom: 1rem;
@@ -199,7 +201,7 @@ code {
 
 .menu-backdrop {
   position: fixed;
-  top: 65px;
+  top: 58px;
   left: 0;
   right: 0;
   bottom: 0;
