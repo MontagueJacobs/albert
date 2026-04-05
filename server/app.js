@@ -1598,7 +1598,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     if (productIds.length > 0 && enrichedColumnsAvailable) {
       const { data: products, error: enrichError } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
+        .select('id, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
         .in('id', productIds)
       
       if (enrichError?.message?.includes('does not exist')) {
@@ -1613,11 +1613,11 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
       }
     }
     
-    // If enriched columns not available, at least get basic product info (image_url, url)
+    // If enriched columns not available, at least get basic product info (image_url, url, price)
     if (productIds.length > 0 && !hasEnrichedData) {
       const { data: products } = await supabase
         .from('products')
-        .select('id, image_url, url')
+        .select('id, price, image_url, url')
         .in('id', productIds)
       
       if (products) {
@@ -1643,7 +1643,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
         id: purchase.id,
         product_id: purchase.product_id,
         product_name: purchase.product_name,
-        price: purchase.price,
+        price: purchase.price ?? enriched?.price ?? null,
         quantity: purchase.quantity,
         source: purchase.source,
         purchased_at: purchaseDate,  // Normalize to purchased_at for frontend
@@ -1807,7 +1807,7 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
     if (productIds.length > 0) {
       const { data: products } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
+        .select('id, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
         .in('id', productIds)
       
       if (products) {
@@ -1828,7 +1828,7 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
         id: purchase.id,
         product_id: purchase.product_id,
         product_name: purchase.product_name,
-        price: purchase.price,
+        price: purchase.price ?? enriched.price ?? null,
         quantity: purchase.quantity,
         source: purchase.source,
         purchased_at: purchase.scraped_at || purchase.created_at,
