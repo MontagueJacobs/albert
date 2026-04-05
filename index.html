@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="nl" data-theme="xp">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/ah-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Radboud Universiteit</title>
+    <script>
+      // Set theme before CSS paints to prevent dark-flash (FOUC)
+      document.documentElement.setAttribute('data-theme',
+        localStorage.getItem('app-theme') || 'xp');
+    </script>
   </head>
   <body>
     <div id="root"></div>
