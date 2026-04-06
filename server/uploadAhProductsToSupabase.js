@@ -98,8 +98,7 @@ function buildPayload(records) {
       normalized_name: normalizeProductName(name),
       url,
       image_url: imageUrl,
-      source: item.source || 'cleaned_products.json',
-      tags: item.tags || null
+      source: item.source || 'cleaned_products.json'
     })
   }
 

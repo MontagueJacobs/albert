@@ -45,41 +45,6 @@ function toStringArray(value) {
   return []
 }
 
-function normalizeAdjustment(adjustment) {
-  if (Array.isArray(adjustment)) {
-    return adjustment.map(normalizeAdjustment).filter(Boolean)
-  }
-  if (!adjustment || typeof adjustment !== 'object') return null
-  const code = typeof adjustment.code === 'string' && adjustment.code.trim().length > 0
-    ? adjustment.code.trim()
-    : typeof adjustment.id === 'string'
-      ? adjustment.id.trim()
-      : null
-  const deltaValue = adjustment.delta ?? adjustment.value ?? null
-  const delta = typeof deltaValue === 'number' ? deltaValue : Number.parseFloat(deltaValue)
-  if (!code || Number.isNaN(delta)) return null
-  return { code, delta }
-}
-
-function normalizeAdjustments(value) {
-  if (!value) return []
-  if (Array.isArray(value)) {
-    return value.map(normalizeAdjustment).filter(Boolean)
-  }
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value)
-      return normalizeAdjustments(parsed)
-    } catch (err) {
-      return []
-    }
-  }
-  if (typeof value === 'object') {
-    return Object.values(value).map(normalizeAdjustment).filter(Boolean)
-  }
-  return []
-}
-
 function buildIndex(entries) {
   return entries.map((entry) => ({
     ...entry,
@@ -91,10 +56,9 @@ async function fetchSupabaseCatalog() {
   if (!supabase) return null
   
   // Fetch from unified 'products' table
-  // The schema has: id, name, alt_names, base_score, categories, adjustments, suggestions, notes
   const { data, error } = await supabase
     .from(SUPABASE_TABLE)
-    .select('id, name, alt_names, base_score, categories, adjustments, suggestions, notes')
+    .select('id, name, alt_names, base_score, categories')
     .not('base_score', 'is', null)  // Only get products with sustainability scores
     .order('id', { ascending: true })
     .limit(2000)
@@ -135,10 +99,7 @@ async function fetchSupabaseCatalog() {
           : typeof row.baseScore === 'number'
             ? row.baseScore
             : 5,
-        categories: toStringArray(row.categories),
-        adjustments: normalizeAdjustments(row.adjustments),
-        suggestions: toStringArray(row.suggestions),
-        notes: typeof row.notes === 'string' ? row.notes : null
+        categories: toStringArray(row.categories)
       }
     })
     .filter(Boolean)

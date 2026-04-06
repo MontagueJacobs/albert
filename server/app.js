@@ -5072,7 +5072,6 @@ app.post('/api/auto-scrape/visual-login', async (req, res) => {
             image_url: (item.image || '').toString().trim() || null,
             price: typeof item.price === 'number' ? item.price : null,
             source: 'ah_visual_login',
-            tags: null,
             updated_at: new Date().toISOString()
           }
         }).filter((item) => item && item.name && item.id)
@@ -5257,7 +5256,6 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
             image_url: (item.image || '').toString().trim() || null,
             price: typeof item.price === 'number' ? item.price : null,
             source: 'ah_auto_scrape',
-            tags: null,
             updated_at: new Date().toISOString()
           }
         }).filter((item) => {

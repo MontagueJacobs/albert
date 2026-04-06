@@ -42,11 +42,7 @@ async function seed() {
     normalized_name: (toTextArray(entry.names)[0] || entry.id).toLowerCase().trim(),
     base_score: entry.baseScore ?? 5,
     categories: toTextArray(entry.categories),
-    adjustments: entry.adjustments ?? [],
-    suggestions: toTextArray(entry.suggestions),
-    notes: entry.notes ?? null,
-    source: 'curated',
-    tags: toTextArray(entry.names) // Store all name variants as tags for matching
+    source: 'curated'
   }))
 
   const { error } = await supabase.from(tableName).upsert(payload, {
