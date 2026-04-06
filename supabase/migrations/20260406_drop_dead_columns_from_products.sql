@@ -4,6 +4,9 @@
 --   tags           – written by several paths but never read anywhere
 --   contributed_by – only exists in migration DDL; zero app code references
 
+-- product_popularity view depends on contributed_by but is never queried by the app
+DROP VIEW IF EXISTS public.product_popularity;
+
 ALTER TABLE products DROP COLUMN IF EXISTS adjustments;
 ALTER TABLE products DROP COLUMN IF EXISTS notes;
 ALTER TABLE products DROP COLUMN IF EXISTS tags;
