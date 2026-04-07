@@ -297,13 +297,22 @@ export default function ExperimentFlow({ onComplete, onBack }) {
   const [consentChecked, setConsentChecked] = useState(false)
   const [syncVersion, setSyncVersion] = useState(0)
 
-  // Start or resume session
-  useEffect(() => {
-    if (!bonusCardNumber) {
-      setError(isNl ? 'Geen bonuskaart gevonden' : 'No bonus card found')
-      setLoading(false)
-      return
+  // Generate or retrieve a stable anonymous ID for sessions without bonus card
+  const getAnonymousId = () => {
+    try {
+      let anonId = localStorage.getItem('experiment_anonymous_id')
+      if (!anonId) {
+        anonId = 'anon-' + crypto.randomUUID()
+        localStorage.setItem('experiment_anonymous_id', anonId)
+      }
+      return anonId
+    } catch (_) {
+      return 'anon-' + Math.random().toString(36).slice(2)
     }
+  }
+
+  // Start or resume session — works with or without bonus card
+  useEffect(() => {
     startOrResume()
   }, [bonusCardNumber])
 
@@ -311,10 +320,16 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     try {
       setLoading(true)
       setError(null)
+      const body = {}
+      if (bonusCardNumber) {
+        body.bonus_card = bonusCardNumber
+      } else {
+        body.anonymous_id = getAnonymousId()
+      }
       const res = await fetch('/api/experiment/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bonus_card: bonusCardNumber })
+        body: JSON.stringify(body)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -350,9 +365,13 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     try {
       setLoading(true)
       setSyncVersion(v => v + 1)
+      // After bookmarklet runs, bonus card may now be available in context
+      const body = {}
+      if (bonusCardNumber) body.bonus_card = bonusCardNumber
       const res = await fetch(`/api/experiment/${session.id}/scrape-complete`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)

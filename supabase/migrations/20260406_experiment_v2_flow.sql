@@ -2,6 +2,14 @@
 -- closed questionnaire → learning+dashboard → 3 post-quizzes →
 -- closed questionnaire → open questionnaire → complete
 
+-- Allow sessions to start without a bonus card (linked after scrape step)
+ALTER TABLE experiment_sessions ALTER COLUMN bonus_card DROP NOT NULL;
+
+-- Anonymous ID for sessions started before bonus card is known
+ALTER TABLE experiment_sessions ADD COLUMN IF NOT EXISTS anonymous_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_experiment_sessions_anonymous_id
+  ON experiment_sessions(anonymous_id) WHERE anonymous_id IS NOT NULL;
+
 -- Add columns for quiz 5 & 6 (AH-specific product ranking pools)
 ALTER TABLE experiment_sessions ADD COLUMN IF NOT EXISTS quiz5_data JSONB;
 ALTER TABLE experiment_sessions ADD COLUMN IF NOT EXISTS quiz6_data JSONB;

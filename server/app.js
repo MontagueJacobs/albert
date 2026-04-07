@@ -3465,36 +3465,61 @@ app.post('/api/origin-scraper/trigger', (req, res) => {
 // Start or resume an experiment session
 app.post('/api/experiment/start', async (req, res) => {
   try {
-    const { bonus_card } = req.body
-    if (!bonus_card) {
-      return res.status(400).json({ error: 'bonus_card is required' })
+    const { bonus_card, anonymous_id } = req.body
+    const identifier = bonus_card || anonymous_id
+    if (!identifier) {
+      return res.status(400).json({ error: 'bonus_card or anonymous_id is required' })
     }
 
-    // Check for existing active (non-complete) session
-    const { data: existing } = await supabase
-      .from('experiment_sessions')
-      .select('*')
-      .eq('bonus_card', bonus_card)
-      .neq('current_step', 'complete')
-      .order('started_at', { ascending: false })
-      .limit(1)
+    // Check for existing active (non-complete) session by bonus_card or anonymous_id
+    let existing = null
+    if (bonus_card) {
+      const { data } = await supabase
+        .from('experiment_sessions')
+        .select('*')
+        .eq('bonus_card', bonus_card)
+        .neq('current_step', 'complete')
+        .order('started_at', { ascending: false })
+        .limit(1)
+      if (data?.length) existing = data[0]
+    }
+    if (!existing && anonymous_id) {
+      const { data } = await supabase
+        .from('experiment_sessions')
+        .select('*')
+        .eq('anonymous_id', anonymous_id)
+        .neq('current_step', 'complete')
+        .order('started_at', { ascending: false })
+        .limit(1)
+      if (data?.length) existing = data[0]
+    }
 
-    if (existing && existing.length > 0) {
-      // Resume existing session
-      return res.json({ session: existing[0], resumed: true })
+    if (existing) {
+      // If we now have a bonus card and the session didn't, link it
+      if (bonus_card && !existing.bonus_card) {
+        await supabase
+          .from('experiment_sessions')
+          .update({ bonus_card, updated_at: new Date().toISOString() })
+          .eq('id', existing.id)
+        existing.bonus_card = bonus_card
+      }
+      return res.json({ session: existing, resumed: true })
     }
 
     // Create new session with A/B assignment
-    const ab_variant = assignABVariant(bonus_card)
+    const ab_variant = assignABVariant(bonus_card || anonymous_id)
     
+    const insertData = {
+      ab_variant,
+      current_step: 'consent',
+      consent_given: false
+    }
+    if (bonus_card) insertData.bonus_card = bonus_card
+    if (anonymous_id) insertData.anonymous_id = anonymous_id
+
     const { data, error } = await supabase
       .from('experiment_sessions')
-      .insert({
-        bonus_card,
-        ab_variant,
-        current_step: 'consent',
-        consent_given: false
-      })
+      .insert(insertData)
       .select()
       .single()
 
@@ -3571,13 +3596,20 @@ app.post('/api/experiment/:sessionId/consent', async (req, res) => {
 app.post('/api/experiment/:sessionId/scrape-complete', async (req, res) => {
   try {
     const { sessionId } = req.params
+    const { bonus_card } = req.body || {}
+
+    const updateData = { 
+      current_step: 'pre_quiz_general',
+      updated_at: new Date().toISOString()
+    }
+    // Link bonus card to session if provided and not yet set
+    if (bonus_card) {
+      updateData.bonus_card = bonus_card
+    }
 
     const { data, error } = await supabase
       .from('experiment_sessions')
-      .update({ 
-        current_step: 'pre_quiz_general',
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', sessionId)
       .select()
       .single()
