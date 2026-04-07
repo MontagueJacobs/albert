@@ -2,20 +2,23 @@
 """
 Albert Heijn Full Catalog Scraper
 
-Scrapes products from AH category pages AND their detail pages in one run.
-Handles the privacy popup automatically.
+Scrapes products from all AH category pages AND their detail pages in one run.
+Handles the cookie/privacy popup automatically.
 
 Usage:
   python full_scraper.py --test              # Test with 10 products
   python full_scraper.py --limit 100         # Scrape 100 products with details
   python full_scraper.py                     # Scrape entire catalog (thousands of products)
+  python full_scraper.py -c diepvries        # Scrape one category only
+  python full_scraper.py --force             # Re-scrape products already in DB
+  python full_scraper.py --list-categories   # Show all available categories
 
 The scraper:
-1. Opens a visible browser window
+1. Opens a visible browser window (AH blocks headless)
 2. Handles the cookie/privacy popup
-3. Scrapes product listings from category pages
+3. Scrolls through category pages until all products are loaded
 4. Visits each product page to get detailed info (origin, fairtrade, organic, etc.)
-5. Saves everything to Supabase
+5. Saves everything to Supabase (with resume support — skips already-enriched products)
 """
 
 import asyncio
@@ -24,6 +27,7 @@ import json
 import os
 import sys
 import re
+import textwrap
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Set
 
@@ -37,6 +41,13 @@ try:
     from supabase import create_client, Client
 except ImportError:
     print("ERROR: supabase-py not installed. Run: pip install supabase", file=sys.stderr)
+    sys.exit(1)
+
+# Import the comprehensive detail scraper to reuse its extraction logic
+try:
+    from product_detail_scraper import AHProductDetailScraper
+except ImportError:
+    print("ERROR: product_detail_scraper.py not found in server/ directory", file=sys.stderr)
     sys.exit(1)
 
 from dotenv import load_dotenv
@@ -88,25 +99,38 @@ MONTH_NAMES = {
     'december': 'dec', 'dec': 'dec',
 }
 
-# AH categories
+# AH categories — complete list from ah.nl/producten navigation
+# Excludes personal pages (Eerder gekocht, Ontdek nieuwe producten) and deals (AH Voordeelshop)
 AH_CATEGORIES = [
-    {'slug': 'producten/aardappel-groente-fruit', 'name': 'Groente & Fruit'},
-    {'slug': 'producten/vlees-kip-vis-vega', 'name': 'Vlees, Kip, Vis & Vega'},
-    {'slug': 'producten/kaas-vleeswaren-tapas', 'name': 'Kaas & Vleeswaren'},
-    {'slug': 'producten/zuivel-plantaardig-eieren', 'name': 'Zuivel & Eieren'},
-    {'slug': 'producten/bakkerij-banket', 'name': 'Bakkerij'},
-    {'slug': 'producten/ontbijtgranen-beleg', 'name': 'Ontbijt & Beleg'},
-    {'slug': 'producten/pasta-rijst-internationale-keuken', 'name': 'Pasta, Rijst & Wereldkeuken'},
-    {'slug': 'producten/soepen-conserven-sauzen', 'name': 'Soepen & Sauzen'},
-    {'slug': 'producten/snoep-koek-chips', 'name': 'Snoep & Koek'},
-    {'slug': 'producten/koffie-thee', 'name': 'Koffie & Thee'},
-    {'slug': 'producten/frisdrank-sappen-water', 'name': 'Dranken'},
-    {'slug': 'producten/wijn-bier-sterke-drank', 'name': 'Wijn & Bier'},
+    # --- Food ---
+    {'slug': 'producten/aardappel-groente-fruit', 'name': 'Aardappel, groente, fruit'},
+    {'slug': 'producten/maaltijden-salades', 'name': 'Maaltijden, salades'},
+    {'slug': 'producten/vlees-kip-vis-vega', 'name': 'Vlees, kip, vis, vega'},
+    {'slug': 'producten/vegetarisch-vegan', 'name': 'Vegetarisch, vegan'},
+    {'slug': 'producten/kaas-vleeswaren-tapas', 'name': 'Kaas, vleeswaren, tapas'},
+    {'slug': 'producten/zuivel-plantaardig-eieren', 'name': 'Zuivel, plantaardig, eieren'},
+    {'slug': 'producten/bakkerij-banket', 'name': 'Bakkerij, banket'},
+    {'slug': 'producten/ontbijtgranen-beleg', 'name': 'Ontbijtgranen, beleg'},
+    {'slug': 'producten/pasta-rijst-internationale-keuken', 'name': 'Pasta, rijst, internationale keuken'},
+    {'slug': 'producten/soepen-conserven-sauzen-olie', 'name': 'Soepen, conserven, sauzen, oliën'},
+    {'slug': 'producten/snoep-koek-chips', 'name': 'Snoep, koek, chips'},
+    {'slug': 'producten/borrel-chips-noten', 'name': 'Borrel, chips, noten'},
+    {'slug': 'producten/tussendoortjes-koek', 'name': 'Tussendoortjes, koek'},
+    {'slug': 'producten/koffie-thee', 'name': 'Koffie, thee'},
+    {'slug': 'producten/frisdrank-sappen-water', 'name': 'Frisdrank, sappen, water'},
+    {'slug': 'producten/wijn-bier-sterke-drank', 'name': 'Wijn, bier, sterke drank'},
     {'slug': 'producten/diepvries', 'name': 'Diepvries'},
-    {'slug': 'producten/baby-en-kind', 'name': 'Baby & Kind'},
-    {'slug': 'producten/dieren', 'name': 'Huisdieren'},
+    # --- Special diets ---
+    {'slug': 'producten/glutenvrij', 'name': 'Glutenvrij'},
+    {'slug': 'producten/gezondheid-en-sport', 'name': 'Gezondheid en sport'},
+    # --- Non-food ---
+    {'slug': 'producten/baby-en-kind', 'name': 'Baby en kind'},
+    {'slug': 'producten/dieren', 'name': 'Dieren'},
     {'slug': 'producten/drogisterij', 'name': 'Drogisterij'},
     {'slug': 'producten/huishouden', 'name': 'Huishouden'},
+    {'slug': 'producten/koken-tafelen-vrije-tijd', 'name': 'Koken, tafelen, vrije tijd'},
+    # --- Seasonal ---
+    {'slug': 'producten/pasen', 'name': 'Pasen'},
 ]
 
 
@@ -142,9 +166,11 @@ class AHFullScraper:
             'categories_scraped': 0,
             'products_found': 0,
             'details_scraped': 0,
+            'details_skipped': 0,
             'products_saved': 0,
             'errors': 0,
         }
+        self.existing_product_ids: Set[str] = set()
         
     def connect_supabase(self) -> bool:
         """Connect to Supabase."""
@@ -158,6 +184,21 @@ class AHFullScraper:
         self.supabase = create_client(url, key)
         print(f"[DB] Connected to Supabase", flush=True)
         return True
+
+    def load_existing_product_ids(self):
+        """Load IDs of products that already have full detail data in the DB."""
+        if not self.supabase:
+            return
+        try:
+            # Products with details_scrape_status = 'success' are fully enriched
+            result = self.supabase.table('products').select('id') \
+                .eq('details_scrape_status', 'success') \
+                .execute()
+            if result.data:
+                self.existing_product_ids = {row['id'] for row in result.data}
+                print(f"[DB] {len(self.existing_product_ids)} products already fully scraped in DB", flush=True)
+        except Exception as e:
+            print(f"[WARN] Could not load existing products: {e}", flush=True)
         
     async def setup(self):
         """Initialize the browser (always headed for AH)."""
@@ -235,7 +276,7 @@ class AHFullScraper:
             return False
             
     async def scrape_category_products(self, category: Dict[str, str], max_products: int = 0) -> List[Dict[str, Any]]:
-        """Scrape product listings from a category page."""
+        """Scrape product listings from a category page with aggressive scrolling."""
         products = []
         category_url = f"https://www.ah.nl/{category['slug']}"
         
@@ -250,86 +291,144 @@ class AHFullScraper:
             # Handle popup on first category
             if self.stats['categories_scraped'] == 0:
                 await self.handle_privacy_popup()
-                
-            # Scroll to load more products
-            for _ in range(3):
+
+            # Check if page loaded correctly (not a 404 or empty page)
+            title = await self.page.title()
+            if '404' in title or 'niet gevonden' in title.lower():
+                print(f"  [SKIP] Category page not found (404)", flush=True)
+                return products
+
+            # --- Aggressive scroll: keep going until no new product links appear ---
+            prev_count = 0
+            stale_rounds = 0
+            max_stale = 3  # stop after 3 consecutive scrolls with no new products
+            scroll_round = 0
+
+            while stale_rounds < max_stale:
+                scroll_round += 1
+
+                # Click "Bekijk meer" / "Toon meer producten" buttons if present
+                try:
+                    load_more = await self.page.query_selector(
+                        'button:has-text("Bekijk meer"), '
+                        'button:has-text("Toon meer"), '
+                        'button:has-text("Laad meer"), '
+                        'a:has-text("Bekijk meer")'
+                    )
+                    if load_more and await load_more.is_visible():
+                        await load_more.click()
+                        await asyncio.sleep(2)
+                except Exception:
+                    pass
+
+                # Scroll to bottom
                 await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                await asyncio.sleep(1)
-                
-            # Find all product links
-            links = await self.page.query_selector_all('a[href*="/producten/product/"]')
-            print(f"  Found {len(links)} product links", flush=True)
-            
-            seen_on_page = set()
-            
-            for link in links:
+                await asyncio.sleep(1.5)
+
+                cur_count = await self.page.evaluate(
+                    'document.querySelectorAll(\'a[href*="/producten/product/"]\').length'
+                )
+
+                if cur_count > prev_count:
+                    stale_rounds = 0
+                    prev_count = cur_count
+                else:
+                    stale_rounds += 1
+
+                # Safety cap to avoid infinite scrolling on huge categories
+                if scroll_round >= 80:
+                    print(f"  [INFO] Reached scroll cap ({scroll_round} rounds, {cur_count} links)", flush=True)
+                    break
+
+            print(f"  Scrolled {scroll_round} rounds, found {prev_count} product links", flush=True)
+
+            # Extract product data via JS — walk up from each <a> to find the card
+            raw_products = await self.page.evaluate('''() => {
+                const links = document.querySelectorAll('a[href*="/producten/product/"]');
+                const results = [];
+                const seen = new Set();
+
+                for (const a of links) {
+                    const href = a.getAttribute('href');
+                    if (!href || seen.has(href)) continue;
+                    seen.add(href);
+
+                    // Walk up to the product card (typically 3-6 levels)
+                    let card = a;
+                    for (let i = 0; i < 6; i++) {
+                        if (card.parentElement) card = card.parentElement;
+                    }
+
+                    // Name: try multiple selectors
+                    let name = '';
+                    const nameEl = card.querySelector('[class*="title"], [data-testhook*="title"], [class*="product-title"]')
+                        || a.querySelector('[class*="title"], span');
+                    if (nameEl) name = nameEl.innerText.split('\\n')[0].trim();
+
+                    // Fallback: the link's own text content
+                    if (!name || name.length < 3) {
+                        const linkText = a.innerText.trim().split('\\n')[0].trim();
+                        if (linkText.length > 2) name = linkText;
+                    }
+
+                    // Price
+                    let price = null;
+                    const priceEl = card.querySelector('[class*="price"]');
+                    if (priceEl) {
+                        const m = priceEl.innerText.match(/(\\d+)[.,](\\d{2})/);
+                        if (m) price = parseFloat(m[1] + '.' + m[2]);
+                    }
+
+                    // Image
+                    let image = null;
+                    const img = card.querySelector('img');
+                    if (img && img.src && !img.src.startsWith('data:')) {
+                        image = img.src;
+                    }
+
+                    results.push({ href, name, price, image });
+                }
+                return results;
+            }''')
+
+            print(f"  Found {len(raw_products)} unique product links", flush=True)
+
+            for item in raw_products:
                 if max_products > 0 and len(products) >= max_products:
                     break
-                    
-                try:
-                    href = await link.get_attribute('href')
-                    if not href:
-                        continue
-                        
-                    product_id = extract_product_id(href)
-                    if not product_id or product_id in seen_on_page or product_id in self.seen_ids:
-                        continue
-                        
-                    seen_on_page.add(product_id)
-                    self.seen_ids.add(product_id)
-                    
-                    product = {
-                        'id': product_id,
-                        'url': f"https://www.ah.nl{href}" if href.startswith('/') else href,
-                        'category': category['name'],
-                    }
-                    
-                    # Try to get name from link or parent
-                    try:
-                        # Walk up to find product card
-                        card = link
-                        for _ in range(5):
-                            parent = await card.evaluate_handle('el => el.parentElement')
-                            if parent:
-                                card = parent
-                                
-                        name_elem = await card.query_selector('[class*="title"], [class*="name"], span')
-                        if name_elem:
-                            name = await name_elem.inner_text()
-                            if name and len(name) > 2:
-                                # Clean up multi-line names
-                                product['name'] = name.split('\n')[0].strip()
-                    except:
-                        pass
-                        
-                    # Get price
-                    try:
-                        price_elem = await card.query_selector('[class*="price"]')
-                        if price_elem:
-                            price_text = await price_elem.inner_text()
-                            match = re.search(r'(\d+)[.,](\d{2})', price_text)
-                            if match:
-                                product['price'] = float(f"{match.group(1)}.{match.group(2)}")
-                    except:
-                        pass
-                        
-                    # Get image
-                    try:
-                        img = await card.query_selector('img')
-                        if img:
-                            src = await img.get_attribute('src')
-                            if src and not src.startswith('data:'):
-                                product['image_url'] = src
-                    except:
-                        pass
-                        
-                    if product.get('name'):
-                        product['normalized_name'] = normalize_name(product['name'])
-                        products.append(product)
-                        self.stats['products_found'] += 1
-                        
-                except Exception as e:
-                    self.stats['errors'] += 1
+
+                href = item.get('href', '')
+                product_id = extract_product_id(href)
+                if not product_id or product_id in self.seen_ids:
+                    continue
+
+                self.seen_ids.add(product_id)
+
+                name = (item.get('name') or '').strip()
+
+                # Fallback: extract name from URL slug
+                if not name or len(name) < 3:
+                    url_match = re.search(r'/wi\d+/([^/?]+)', href)
+                    if url_match:
+                        name = url_match.group(1).replace('-', ' ').title()
+
+                if not name or len(name) < 3:
+                    continue
+
+                product = {
+                    'id': product_id,
+                    'url': f"https://www.ah.nl{href}" if href.startswith('/') else href,
+                    'category': category['name'],
+                    'name': name,
+                    'normalized_name': normalize_name(name),
+                }
+                if item.get('price'):
+                    product['price'] = item['price']
+                if item.get('image'):
+                    product['image_url'] = item['image']
+
+                products.append(product)
+                self.stats['products_found'] += 1
                     
             self.stats['categories_scraped'] += 1
             print(f"  Collected {len(products)} products from this category", flush=True)
@@ -341,172 +440,70 @@ class AHFullScraper:
         return products
         
     async def scrape_product_details(self, product: Dict[str, Any]) -> Dict[str, Any]:
-        """Scrape detailed information from a product page."""
+        """Scrape full product details by delegating to AHProductDetailScraper.
+        
+        Reuses the comprehensive extraction logic from product_detail_scraper.py
+        which handles JSON-LD, nutrition tables, ingredients, unit size,
+        allergens, origin, and all certifications.
+        """
         url = product.get('url')
         if not url:
             return product
-            
+
         try:
-            await self.page.goto(url, wait_until='domcontentloaded', timeout=20000)
-            await asyncio.sleep(2)
-            
-            # ===== GET PROPER NAME FROM PRODUCT PAGE =====
+            # Use the detail scraper with our existing page
+            if not hasattr(self, '_detail_scraper'):
+                self._detail_scraper = AHProductDetailScraper(headless=False)
+                # Inject our browser page so it doesn't open a second browser
+                self._detail_scraper.page = self.page
+
+            result = await self._detail_scraper.scrape_product(url)
+
+            print(f"  -> {product.get('name', product['id'])[:50]}", flush=True)
+
+            # Map the detail scraper result onto our product dict.
+            # Only overwrite with non-None values.
+            field_map = [
+                'is_vegan', 'is_vegetarian', 'is_organic', 'is_fairtrade',
+                'nutri_score', 'origin_country', 'origin_by_month',
+                'brand', 'unit_size', 'price', 'image_url',
+                'ingredients', 'nutrition_text', 'nutrition_json',
+                'allergens',
+            ]
+            for field in field_map:
+                val = result.get(field)
+                if val is not None and val != [] and val != '':
+                    product[field] = val
+
+            # Update name from detail page if we got a better one
+            # (the category listing names can be truncated)
+            # We only take it if the h1 was captured by the detail scraper
+            # (the detail scraper doesn't return 'name' so we read h1 ourselves)
             try:
-                # Try h1 or main title element
-                title_elem = await self.page.query_selector('h1, [data-testhook="product-title"], [class*="product-title"]')
+                title_elem = await self.page.query_selector('h1')
                 if title_elem:
-                    name = await title_elem.inner_text()
-                    if name and len(name.strip()) > 2:
-                        product['name'] = name.strip()
-                        product['normalized_name'] = normalize_name(product['name'])
+                    name = (await title_elem.inner_text()).strip()
+                    if name and len(name) > 2:
+                        product['name'] = name
+                        product['normalized_name'] = normalize_name(name)
             except:
                 pass
-                
-            # Fallback: extract name from URL if still missing/wrong
-            if not product.get('name') or product.get('name') == 'Snoepgroente':
-                # URL like /product/wi4164/ah-courgette -> "ah courgette"
-                url_match = re.search(r'/wi\d+/([^/?]+)', url)
-                if url_match:
-                    name_from_url = url_match.group(1).replace('-', ' ').title()
-                    product['name'] = name_from_url
-                    product['normalized_name'] = normalize_name(name_from_url)
-                    
-            print(f"  -> {product.get('name', product['id'])[:50]}...", flush=True)
-            
-            # ===== GET PROPER IMAGE FROM PRODUCT PAGE =====
-            try:
-                img_elem = await self.page.query_selector('[class*="product-image"] img, [data-testhook*="product-image"] img, main img')
-                if img_elem:
-                    src = await img_elem.get_attribute('src')
-                    if src and not src.startswith('data:') and 'static.ah.nl' in src:
-                        product['image_url'] = src
-            except:
-                pass
-            
-            content = await self.page.content()
-            content_lower = content.lower()
-            
-            # ===== VEGAN/VEGETARIAN =====
-            if any(x in content_lower for x in ['vegan', 'geschikt voor veganisten', 'plantaardig']):
-                product['is_vegan'] = True
-                product['is_vegetarian'] = True
-            elif any(x in content_lower for x in ['vegetarisch', 'geschikt voor vegetariërs']):
-                product['is_vegetarian'] = True
-                
-            # ===== ORGANIC =====
-            if any(x in content_lower for x in ['biologisch', 'bio ', 'ah biologisch', 'eko-keurmerk', 'organic', 'demeter']):
-                product['is_organic'] = True
-                
-            # ===== FAIRTRADE =====
-            if any(x in content_lower for x in ['fairtrade', 'fair trade', 'max havelaar', 'utz', 'rainforest alliance']):
-                product['is_fairtrade'] = True
-                
-            # ===== NUTRI-SCORE =====
-            nutri_match = re.search(r'nutri-?score["\s:]*([a-eA-E])', content, re.IGNORECASE)
-            if nutri_match:
-                product['nutri_score'] = nutri_match.group(1).upper()
-                
-            # ===== ORIGIN / HERKOMST =====
-            # Click the Herkomst accordion to expand it
-            try:
-                # Use JavaScript to click the Herkomst summary element
-                herkomst_clicked = await self.page.evaluate('''() => {
-                    const summaries = document.querySelectorAll('summary');
-                    for (const s of summaries) {
-                        if (s.innerText.includes('Herkomst')) {
-                            s.click();
-                            return true;
-                        }
-                    }
-                    return false;
-                }''')
-                
-                if herkomst_clicked:
-                    await asyncio.sleep(1)  # Wait for accordion to expand
-                    
-                    # Extract the content from the Herkomst details section
-                    herkomst_content = await self.page.evaluate('''() => {
-                        const details = document.querySelectorAll('details');
-                        for (const d of details) {
-                            const summary = d.querySelector('summary');
-                            if (summary && summary.innerText.includes('Herkomst')) {
-                                return d.innerText;
-                            }
-                        }
-                        return null;
-                    }''')
-                    
-                    if herkomst_content:
-                        # Parse month-country pairs from content like:
-                        # "januari       Nederland / Spanje"
-                        # "februari      Nederland / Spanje"
-                        origin_by_month = {}
-                        current_month = None
-                        
-                        # Split into lines and parse
-                        lines = herkomst_content.split('\n')
-                        for line in lines:
-                            line = line.strip()
-                            if not line or line == 'Herkomst' or 'Maand' in line or 'Oorsprong' in line:
-                                continue
-                            if 'kan door onvoorziene' in line.lower():
-                                continue
-                                
-                            # Check if line starts with a month name
-                            line_lower = line.lower()
-                            for month_nl, month_key in MONTH_NAMES.items():
-                                if line_lower.startswith(month_nl):
-                                    # Extract countries after the month name
-                                    country_part = line[len(month_nl):].strip()
-                                    
-                                    # Parse countries separated by /
-                                    countries = []
-                                    for country_raw in country_part.split('/'):
-                                        country_raw = country_raw.strip().lower()
-                                        if country_raw in COUNTRY_MAPPINGS:
-                                            countries.append(COUNTRY_MAPPINGS[country_raw])
-                                    
-                                    if countries:
-                                        origin_by_month[month_key] = countries
-                                    break
-                        
-                        if origin_by_month:
-                            product['origin_by_month'] = origin_by_month
-                            # Set origin_country to current month's first country
-                            current_month = datetime.now().strftime('%b').lower()
-                            if current_month in origin_by_month:
-                                product['origin_country'] = origin_by_month[current_month][0]
-                            
-            except Exception as e:
-                pass  # No Herkomst section for this product
-                
-            # Fallback: try simpler origin patterns if no monthly data found
-            if not product.get('origin_country'):
-                origin_patterns = [
-                    r'herkomst[:\s]+([A-Za-z\-]+)',
-                    r'land van herkomst[:\s]+([A-Za-z\-]+)',
-                    r'oorsprong[:\s]+([A-Za-z\-]+)',
-                ]
-                
-                for pattern in origin_patterns:
-                    match = re.search(pattern, content, re.IGNORECASE)
-                    if match:
-                        country_raw = match.group(1).strip().lower()
-                        # Only accept if it's a known country
-                        if country_raw in COUNTRY_MAPPINGS:
-                            product['origin_country'] = COUNTRY_MAPPINGS[country_raw]
-                            break
-                
+
+            # Mark scrape status
+            product['details_scrape_status'] = 'success' if result.get('success') else 'pending'
+            product['details_scraped_at'] = result.get('scraped_at') or datetime.now().isoformat()
+
             self.stats['details_scraped'] += 1
-            
+
         except Exception as e:
             print(f"    [ERROR] {e}", flush=True)
+            product['details_scrape_status'] = 'failed'
             self.stats['errors'] += 1
-            
+
         return product
         
     def save_product(self, product: Dict[str, Any]) -> bool:
-        """Save a product to Supabase."""
+        """Save a product to Supabase with all detail fields."""
         if not self.supabase:
             return False
             
@@ -525,11 +522,19 @@ class AHFullScraper:
                 'nutri_score': product.get('nutri_score'),
                 'origin_country': product.get('origin_country'),
                 'origin_by_month': product.get('origin_by_month'),
+                'brand': product.get('brand'),
+                'unit_size': product.get('unit_size'),
+                'ingredients': product.get('ingredients'),
+                'nutrition_text': product.get('nutrition_text'),
+                'nutrition_json': product.get('nutrition_json'),
+                'allergens': product.get('allergens'),
+                'details_scrape_status': product.get('details_scrape_status'),
+                'details_scraped_at': product.get('details_scraped_at'),
                 'source': 'scraped',
                 'last_seen_at': datetime.now().isoformat(),
             }
             
-            # Remove None values
+            # Remove None values (but keep False and empty lists)
             record = {k: v for k, v in record.items() if v is not None}
             
             self.supabase.table('products').upsert(record, on_conflict='id').execute()
@@ -540,7 +545,8 @@ class AHFullScraper:
             print(f"    [DB ERROR] {e}", flush=True)
             return False
             
-    async def run(self, limit: int = 0, delay: float = 1.5, categories: Optional[List[str]] = None):
+    async def run(self, limit: int = 0, delay: float = 1.5,
+                  categories: Optional[List[str]] = None, force: bool = False):
         """
         Run the full scraper.
         
@@ -548,17 +554,24 @@ class AHFullScraper:
             limit: Max products to scrape (0 = no limit)
             delay: Seconds between product detail requests
             categories: Specific categories to scrape (None = all)
+            force: Re-scrape details even if product already enriched in DB
         """
         print("\n" + "="*60, flush=True)
         print("  ALBERT HEIJN FULL CATALOG SCRAPER", flush=True)
         print("="*60, flush=True)
         print(f"  Product limit: {limit if limit > 0 else 'No limit'}", flush=True)
         print(f"  Delay between products: {delay}s", flush=True)
+        print(f"  Force re-scrape:  {force}", flush=True)
         print("="*60, flush=True)
         print("\n[INFO] A browser window will open. Keep it visible!", flush=True)
         print("[INFO] The scraper will handle the cookie popup automatically.\n", flush=True)
         
         self.connect_supabase()
+
+        # Load existing product IDs for resume support
+        if not force:
+            self.load_existing_product_ids()
+
         await self.setup()
         
         try:
@@ -569,7 +582,18 @@ class AHFullScraper:
             
             cats_to_scrape = AH_CATEGORIES
             if categories:
-                cats_to_scrape = [c for c in AH_CATEGORIES if c['slug'] in categories or c['name'].lower() in [x.lower() for x in categories]]
+                cats_to_scrape = [
+                    c for c in AH_CATEGORIES
+                    if c['slug'] in categories
+                    or c['slug'].split('/')[-1] in [x.lower().replace(' ', '-') for x in categories]
+                    or c['name'].lower() in [x.lower() for x in categories]
+                ]
+                if not cats_to_scrape:
+                    print(f"[ERROR] No matching categories for: {categories}", flush=True)
+                    print("  Available:", flush=True)
+                    for c in AH_CATEGORIES:
+                        print(f"    {c['slug'].split('/')[-1]:40s}  {c['name']}", flush=True)
+                    return
                 
             # For test mode, just scrape from first category to get all products
             if limit > 0 and limit <= 20:
@@ -601,6 +625,18 @@ class AHFullScraper:
             print("="*60, flush=True)
             
             for i, product in enumerate(self.products, 1):
+                pid = product.get('id', '?')
+
+                # Resume support: skip products already enriched in DB
+                if not force and pid in self.existing_product_ids:
+                    self.stats['details_skipped'] += 1
+                    # Still save the listing data (updates last_seen_at)
+                    if self.supabase:
+                        self.save_product(product)
+                    if i % 50 == 0:
+                        print(f"  [{i}/{len(self.products)}] skipped (already enriched)…", flush=True)
+                    continue
+
                 print(f"\n[{i}/{len(self.products)}]", flush=True)
                 
                 await self.scrape_product_details(product)
@@ -616,6 +652,9 @@ class AHFullScraper:
                 if product.get('is_fairtrade'): details.append('🤝 Fairtrade')
                 if product.get('origin_country'): details.append(f"📍 {product['origin_country']}")
                 if product.get('nutri_score'): details.append(f"NS: {product['nutri_score']}")
+                if product.get('unit_size'): details.append(f"📦 {product['unit_size']}")
+                if product.get('ingredients'): details.append(f"🧪 ingredients")
+                if product.get('nutrition_json'): details.append(f"📊 nutrition")
                 
                 if details:
                     print(f"    Found: {', '.join(details)}", flush=True)
@@ -635,11 +674,12 @@ class AHFullScraper:
         print("\n" + "="*60, flush=True)
         print("  SCRAPING COMPLETE", flush=True)
         print("="*60, flush=True)
-        print(f"  Categories scraped:  {self.stats['categories_scraped']}", flush=True)
-        print(f"  Products found:      {self.stats['products_found']}", flush=True)
-        print(f"  Details scraped:     {self.stats['details_scraped']}", flush=True)
+        print(f"  Categories scraped:   {self.stats['categories_scraped']}", flush=True)
+        print(f"  Products found:       {self.stats['products_found']}", flush=True)
+        print(f"  Details scraped:      {self.stats['details_scraped']}", flush=True)
+        print(f"  Details skipped:      {self.stats['details_skipped']}", flush=True)
         print(f"  Products saved to DB: {self.stats['products_saved']}", flush=True)
-        print(f"  Errors:              {self.stats['errors']}", flush=True)
+        print(f"  Errors:               {self.stats['errors']}", flush=True)
         print("="*60, flush=True)
         
         # Show some examples with details
@@ -655,7 +695,18 @@ class AHFullScraper:
 
 
 async def main():
-    parser = argparse.ArgumentParser(description='AH Full Catalog Scraper')
+    parser = argparse.ArgumentParser(
+        description='AH Full Catalog Scraper',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent("""\
+            examples:
+              %(prog)s --test                          Test with 10 products
+              %(prog)s --limit 200                     Scrape 200 products
+              %(prog)s -c diepvries -c bakkerij-banket  Only specific categories
+              %(prog)s --force                         Re-scrape even if already in DB
+              %(prog)s --list-categories                Show available categories
+        """),
+    )
     parser.add_argument('--test', action='store_true',
                         help='Test mode: scrape only 10 products')
     parser.add_argument('--limit', '-l', type=int, default=0,
@@ -663,14 +714,27 @@ async def main():
     parser.add_argument('--delay', '-d', type=float, default=1.5,
                         help='Delay between product detail requests (default: 1.5s)')
     parser.add_argument('--category', '-c', action='append',
-                        help='Specific category to scrape (can use multiple times)')
+                        help='Specific category slug or name (can use multiple times)')
+    parser.add_argument('--force', '-f', action='store_true',
+                        help='Force re-scrape of products already enriched in DB')
+    parser.add_argument('--list-categories', action='store_true',
+                        help='List all available categories and exit')
     
     args = parser.parse_args()
+
+    if args.list_categories:
+        print(f"\nAvailable AH categories ({len(AH_CATEGORIES)}):\n")
+        for c in AH_CATEGORIES:
+            slug = c['slug'].split('/')[-1]
+            print(f"  {slug:40s}  {c['name']}")
+        print(f"\nUse: {sys.argv[0]} -c <slug>")
+        return
     
     limit = 10 if args.test else args.limit
     
     scraper = AHFullScraper()
-    await scraper.run(limit=limit, delay=args.delay, categories=args.category)
+    await scraper.run(limit=limit, delay=args.delay, categories=args.category,
+                      force=args.force)
 
 
 if __name__ == '__main__':

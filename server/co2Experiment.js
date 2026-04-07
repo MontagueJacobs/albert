@@ -47,6 +47,37 @@ const GENERIC_POOL_B = [
   { name: 'Chocolade', nameNl: 'Chocolade', image: '🍫' },
 ]
 
+// ===========================================================================
+// AH-SPECIFIC PRODUCT POOLS (quiz 5 & 6)
+// Recognisable Albert Heijn products spanning low → high CO2
+// Pool C = quiz 5 (pre-intervention), Pool D = quiz 6 (post-intervention)
+// ===========================================================================
+const AH_POOL_C = [
+  { name: 'AH Rundergehakt',   nameNl: 'AH Rundergehakt',   image: '🥩' },
+  { name: 'AH Kipfilet',       nameNl: 'AH Kipfilet',       image: '🍗' },
+  { name: 'AH Geraspte Kaas',  nameNl: 'AH Geraspte Kaas',  image: '🧀' },
+  { name: 'AH Roomboter',      nameNl: 'AH Roomboter',      image: '🧈' },
+  { name: 'AH Halfvolle Melk', nameNl: 'AH Halfvolle Melk', image: '🥛' },
+  { name: 'AH Yoghurt',        nameNl: 'AH Yoghurt',        image: '🥛' },
+  { name: 'AH Spaghetti',      nameNl: 'AH Spaghetti',      image: '🍝' },
+  { name: 'AH Pindakaas',      nameNl: 'AH Pindakaas',      image: '🥜' },
+  { name: 'AH Tomaten',        nameNl: 'AH Tomaten',        image: '🍅' },
+  { name: 'AH Witte Bonen',    nameNl: 'AH Witte Bonen',    image: '🫘' },
+]
+
+const AH_POOL_D = [
+  { name: 'AH Lamsbout',        nameNl: 'AH Lamsbout',        image: '🍖' },
+  { name: 'AH Varkenshaas',     nameNl: 'AH Varkenshaas',     image: '🥓' },
+  { name: 'AH Garnalen',        nameNl: 'AH Garnalen',        image: '🦐' },
+  { name: 'AH Mozzarella',      nameNl: 'AH Mozzarella',      image: '🧀' },
+  { name: 'AH Eieren',          nameNl: 'AH Eieren',          image: '🥚' },
+  { name: 'AH Rijst',           nameNl: 'AH Rijst',           image: '🍚' },
+  { name: 'AH Broccoli',        nameNl: 'AH Broccoli',        image: '🥦' },
+  { name: 'AH Cashewnoten',     nameNl: 'AH Cashewnoten',     image: '🥜' },
+  { name: 'AH Havermout',       nameNl: 'AH Havermout',       image: '🥣' },
+  { name: 'AH Kikkererwten',    nameNl: 'AH Kikkererwten',    image: '🫘' },
+]
+
 /**
  * Calculate CO2/kg for a product name using the existing CO2 engine
  */
@@ -104,6 +135,34 @@ export function getGenericQuiz3Items() {
     .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
   
   // Shuffle
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]]
+  }
+  return items
+}
+
+/**
+ * Get AH-specific items for quiz 5 (pre-intervention AH knowledge)
+ */
+export function getAHQuiz5Items() {
+  const items = AH_POOL_C
+    .map(enrichPoolItem)
+    .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]]
+  }
+  return items
+}
+
+/**
+ * Get AH-specific items for quiz 6 (post-intervention AH knowledge)
+ */
+export function getAHQuiz6Items() {
+  const items = AH_POOL_D
+    .map(enrichPoolItem)
+    .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [items[i], items[j]] = [items[j], items[i]]
@@ -268,18 +327,102 @@ export const REFLECTION_QUESTIONS = [
 ]
 
 /**
- * Steps in the experiment flow (ordered)
+ * Steps in the V2 experiment flow (ordered, linear)
  */
 export const EXPERIMENT_STEPS = [
-  'intro',
-  'quiz1',
-  'quiz2',
-  'self_perception',
-  'intervention',
-  'quiz3',
-  'quiz4',
-  'reflection',
+  'consent',
+  'scrape',
+  'pre_quiz_general',
+  'pre_quiz_ah',
+  'pre_quiz_personal',
+  'pre_questionnaire',
+  'learning_dashboard',
+  'post_quiz_general',
+  'post_quiz_ah',
+  'post_quiz_personal',
+  'post_questionnaire',
+  'post_reflection',
   'complete'
+]
+
+/**
+ * Legacy steps (for backward compat with existing sessions)
+ */
+export const LEGACY_STEPS = [
+  'intro', 'quiz1', 'quiz2', 'self_perception',
+  'intervention', 'quiz3', 'quiz4', 'reflection', 'complete'
+]
+
+/**
+ * Pre-questionnaire: closed Likert questions (awareness + self-perception combined)
+ */
+export const PRE_QUESTIONNAIRE_QUESTIONS = [
+  {
+    id: 'pre_q1',
+    text_nl: 'Ik weet welke voedselproducten een hoge CO₂-uitstoot hebben.',
+    text_en: 'I know which food products have a high CO₂ footprint.',
+    type: 'likert'
+  },
+  {
+    id: 'pre_q2',
+    text_nl: 'Ik houd rekening met duurzaamheid bij het doen van boodschappen.',
+    text_en: 'I consider sustainability when grocery shopping.',
+    type: 'likert'
+  },
+  {
+    id: 'pre_q3',
+    text_nl: 'Ik weet wat de milieu-impact is van vlees ten opzichte van plantaardige producten.',
+    text_en: 'I know the environmental impact of meat compared to plant-based products.',
+    type: 'likert'
+  },
+  {
+    id: 'pre_q4',
+    text_nl: 'Ik ben bereid mijn eetgewoontes aan te passen voor het milieu.',
+    text_en: 'I am willing to change my eating habits for the environment.',
+    type: 'likert'
+  },
+  {
+    id: 'pre_q5',
+    text_nl: 'Ik vind het belangrijk om te weten hoeveel CO₂ mijn boodschappen veroorzaken.',
+    text_en: 'I think it is important to know how much CO₂ my groceries cause.',
+    type: 'likert'
+  }
+]
+
+/**
+ * Post-questionnaire: closed Likert questions (post-intervention self-assessment)
+ */
+export const POST_QUESTIONNAIRE_QUESTIONS = [
+  {
+    id: 'post_q1',
+    text_nl: 'Ik begrijp nu beter welke producten een hoge CO₂-uitstoot hebben.',
+    text_en: 'I now better understand which products have a high CO₂ footprint.',
+    type: 'likert'
+  },
+  {
+    id: 'post_q2',
+    text_nl: 'Ik ben van plan om duurzamere keuzes te maken bij mijn volgende boodschappen.',
+    text_en: 'I plan to make more sustainable choices in my next grocery shopping.',
+    type: 'likert'
+  },
+  {
+    id: 'post_q3',
+    text_nl: 'De informatie die ik heb gezien was nuttig en begrijpelijk.',
+    text_en: 'The information I saw was useful and understandable.',
+    type: 'likert'
+  },
+  {
+    id: 'post_q4',
+    text_nl: 'Ik voel me nu beter in staat om duurzame keuzes te maken in de supermarkt.',
+    text_en: 'I now feel better equipped to make sustainable choices in the supermarket.',
+    type: 'likert'
+  },
+  {
+    id: 'post_q5',
+    text_nl: 'Dit soort informatie zou standaard beschikbaar moeten zijn bij het boodschappen doen.',
+    text_en: 'This kind of information should be available by default when grocery shopping.',
+    type: 'likert'
+  }
 ]
 
 /**

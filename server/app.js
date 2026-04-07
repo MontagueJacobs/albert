@@ -36,11 +36,15 @@ import {
 import {
   getGenericQuiz1Items,
   getGenericQuiz3Items,
+  getAHQuiz5Items,
+  getAHQuiz6Items,
   calculateRankingScore,
   assignABVariant,
   getProductCO2,
   SELF_PERCEPTION_QUESTIONS,
   REFLECTION_QUESTIONS,
+  PRE_QUESTIONNAIRE_QUESTIONS,
+  POST_QUESTIONNAIRE_QUESTIONS,
   EXPERIMENT_STEPS,
   getNextStep
 } from './co2Experiment.js'
@@ -3480,7 +3484,7 @@ app.post('/api/experiment/start', async (req, res) => {
       .insert({
         bonus_card,
         ab_variant,
-        current_step: 'intro',
+        current_step: 'consent',
         consent_given: false
       })
       .select()
@@ -3538,7 +3542,32 @@ app.post('/api/experiment/:sessionId/consent', async (req, res) => {
       .from('experiment_sessions')
       .update({ 
         consent_given: true, 
-        current_step: 'quiz1',
+        current_step: 'scrape',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Mark scrape step complete and advance to first pre-quiz
+app.post('/api/experiment/:sessionId/scrape-complete', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        current_step: 'pre_quiz_general',
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)
@@ -3561,8 +3590,8 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
     const { sessionId, quizNumber } = req.params
     const quizNum = parseInt(quizNumber)
     
-    if (![1, 2, 3, 4].includes(quizNum)) {
-      return res.status(400).json({ error: 'Quiz number must be 1, 2, 3, or 4' })
+    if (![1, 2, 3, 4, 5, 6].includes(quizNum)) {
+      return res.status(400).json({ error: 'Quiz number must be 1-6' })
     }
 
     // Get session to check state and used items
@@ -3585,7 +3614,7 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
 
     // Collect already-used item IDs to prevent overlap
     const usedIds = new Set()
-    for (const qn of [1, 2, 3, 4]) {
+    for (const qn of [1, 2, 3, 4, 5, 6]) {
       const ids = session[`quiz${qn}_item_ids`]
       if (ids) ids.forEach(id => usedIds.add(id))
     }
@@ -3598,6 +3627,12 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
     } else if (quizNum === 3) {
       // Generic pool B
       items = getGenericQuiz3Items()
+    } else if (quizNum === 5) {
+      // AH-specific pool C
+      items = getAHQuiz5Items()
+    } else if (quizNum === 6) {
+      // AH-specific pool D
+      items = getAHQuiz6Items()
     } else if (quizNum === 2 || quizNum === 4) {
       // Personal products from user's purchases
       const { data: userPurchases } = await supabase
@@ -3696,8 +3731,8 @@ app.post('/api/experiment/:sessionId/quiz/:quizNumber/submit', async (req, res) 
     const { user_ranking } = req.body  // Array of item objects in user's order
     const quizNum = parseInt(quizNumber)
 
-    if (![1, 2, 3, 4].includes(quizNum)) {
-      return res.status(400).json({ error: 'Quiz number must be 1, 2, 3, or 4' })
+    if (![1, 2, 3, 4, 5, 6].includes(quizNum)) {
+      return res.status(400).json({ error: 'Quiz number must be 1-6' })
     }
 
     if (!user_ranking || !Array.isArray(user_ranking) || user_ranking.length === 0) {
@@ -3721,9 +3756,16 @@ app.post('/api/experiment/:sessionId/quiz/:quizNumber/submit', async (req, res) 
     // Calculate score
     const scoreResult = calculateRankingScore(user_ranking, originalItems)
     
-    // Determine next step
-    const stepMap = { 1: 'quiz1', 2: 'quiz2', 3: 'quiz3', 4: 'quiz4' }
-    const currentStep = stepMap[quizNum]
+    // Map quiz number → experiment step name (V2 flow)
+    const stepMap = {
+      1: 'pre_quiz_general',
+      5: 'pre_quiz_ah',
+      2: 'pre_quiz_personal',
+      3: 'post_quiz_general',
+      6: 'post_quiz_ah',
+      4: 'post_quiz_personal'
+    }
+    const currentStep = stepMap[quizNum] || session.current_step
     const nextStep = getNextStep(currentStep)
 
     // Update session
@@ -3766,7 +3808,38 @@ app.post('/api/experiment/:sessionId/quiz/:quizNumber/submit', async (req, res) 
   }
 })
 
-// Submit self-perception responses
+// Submit pre-questionnaire (closed Likert) and advance
+app.post('/api/experiment/:sessionId/pre-questionnaire', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { responses } = req.body
+
+    if (!responses || typeof responses !== 'object') {
+      return res.status(400).json({ error: 'responses object is required' })
+    }
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        pre_questionnaire: responses,
+        current_step: 'learning_dashboard',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Legacy: Submit self-perception responses (kept for backward compat)
 app.post('/api/experiment/:sessionId/self-perception', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -3780,7 +3853,7 @@ app.post('/api/experiment/:sessionId/self-perception', async (req, res) => {
       .from('experiment_sessions')
       .update({ 
         self_perception: responses,
-        current_step: 'intervention',
+        current_step: 'learning_dashboard',
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)
@@ -3797,7 +3870,32 @@ app.post('/api/experiment/:sessionId/self-perception', async (req, res) => {
   }
 })
 
-// Advance past intervention step
+// Advance past learning/dashboard step
+app.post('/api/experiment/:sessionId/learning-complete', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        current_step: 'post_quiz_general',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Legacy: Advance past intervention step (backward compat)
 app.post('/api/experiment/:sessionId/intervention-complete', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -3805,7 +3903,7 @@ app.post('/api/experiment/:sessionId/intervention-complete', async (req, res) =>
     const { data, error } = await supabase
       .from('experiment_sessions')
       .update({ 
-        current_step: 'quiz3',
+        current_step: 'post_quiz_general',
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)
@@ -3822,7 +3920,38 @@ app.post('/api/experiment/:sessionId/intervention-complete', async (req, res) =>
   }
 })
 
-// Submit reflection responses and complete experiment
+// Submit post-questionnaire (closed Likert) and advance to reflection
+app.post('/api/experiment/:sessionId/post-questionnaire', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { responses } = req.body
+
+    if (!responses || typeof responses !== 'object') {
+      return res.status(400).json({ error: 'responses object is required' })
+    }
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        post_questionnaire_closed: responses,
+        current_step: 'post_reflection',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Submit reflection responses (open-ended) and complete experiment
 app.post('/api/experiment/:sessionId/reflection', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -3836,6 +3965,7 @@ app.post('/api/experiment/:sessionId/reflection', async (req, res) => {
       .from('experiment_sessions')
       .update({ 
         reflection: responses,
+        post_questionnaire_open: responses,
         current_step: 'complete',
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -3859,6 +3989,8 @@ app.get('/api/experiment/config', (req, res) => {
   res.json({
     selfPerceptionQuestions: SELF_PERCEPTION_QUESTIONS,
     reflectionQuestions: REFLECTION_QUESTIONS,
+    preQuestionnaireQuestions: PRE_QUESTIONNAIRE_QUESTIONS,
+    postQuestionnaireQuestions: POST_QUESTIONNAIRE_QUESTIONS,
     steps: EXPERIMENT_STEPS
   })
 })

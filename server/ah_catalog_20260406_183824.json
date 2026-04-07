@@ -1,0 +1,20 @@
+[
+  {
+    "id": "wi54074",
+    "url": "https://www.ah.nl/producten/product/wi54074/ah-komkommer",
+    "category": "Aardappel, groente, fruit",
+    "name": "AH Komkommer",
+    "normalized_name": "ahkomkommer",
+    "image_url": "https://static.ah.nl/dam/product/AHI_75706767466c336f52572d5668754f38427130507851?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "nutri_score": "A",
+    "origin_country": "Netherlands",
+    "brand": "AH",
+    "unit_size": "1 Stuks",
+    "price": 0.85,
+    "nutrition_text": "voedingswaarden, dieet- of",
+    "details_scrape_status": "success",
+    "details_scraped_at": "2026-04-06T18:38:18.685877"
+  }
+]
