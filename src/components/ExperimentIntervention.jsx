@@ -5,7 +5,14 @@ import QuizResultsReview from './QuizResultsReview.jsx'
 
 // CO2 data for the learning page - values from Our World in Data (Poore & Nemecek 2018)
 // Must match the OWID_EMISSIONS values used by the quiz scoring engine (server/co2Emissions.js)
+// Sorted by CO2 descending (highest first)
 const CO2_CATEGORIES = [
+  { 
+    name: 'Beef', nameNl: 'Rundvlees', 
+    co2: 99.48, emoji: '🥩', color: '#ef4444',
+    tip: 'Beef has by far the highest CO₂ footprint due to methane, land use, and low feed efficiency.',
+    tipNl: 'Rundvlees heeft veruit de hoogste CO₂-voetafdruk door methaan, landgebruik en lage voederefficiëntie.'
+  },
   { 
     name: 'Dark Chocolate', nameNl: 'Pure Chocolade', 
     co2: 46.65, emoji: '🍫', color: '#ef4444',
@@ -17,12 +24,6 @@ const CO2_CATEGORIES = [
     co2: 39.72, emoji: '🍖', color: '#ef4444',
     tip: 'Lamb produces very high emissions due to methane from digestion and low feed efficiency.',
     tipNl: 'Lamsvlees produceert zeer hoge uitstoot door methaan uit de spijsvertering en lage voederefficiëntie.'
-  },
-  { 
-    name: 'Beef', nameNl: 'Rundvlees', 
-    co2: 99.48, emoji: '🥩', color: '#ef4444',
-    tip: 'Beef has by far the highest CO₂ footprint due to methane, land use, and low feed efficiency.',
-    tipNl: 'Rundvlees heeft veruit de hoogste CO₂-voetafdruk door methaan, landgebruik en lage voederefficiëntie.'
   },
   { 
     name: 'Cheese', nameNl: 'Kaas', 
