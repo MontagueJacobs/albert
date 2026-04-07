@@ -761,7 +761,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                 ? 'Bekijk hieronder de CO₂-impact van jouw eigen boodschappen.'
                 : 'View the CO₂ impact of your own groceries below.'}
             </p>
-            <Dashboard syncVersion={syncVersion} />
+            <Dashboard syncVersion={syncVersion} hideActions />
           </div>
 
           <button

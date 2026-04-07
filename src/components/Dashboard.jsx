@@ -100,7 +100,7 @@ const styles = {
   }
 }
 
-function Dashboard({ syncVersion }) {
+function Dashboard({ syncVersion, hideActions = false }) {
   const { t } = useI18n()
   const { user, isAuthenticated } = useAuth()
   const { sessionId, loading: sessionLoading } = useAHUser()
@@ -578,7 +578,8 @@ function Dashboard({ syncVersion }) {
         )}
       </div>
       
-      {/* Final Questionnaire CTA */}
+      {/* Final Questionnaire CTA — hidden when embedded in experiment flow */}
+      {!hideActions && (
       <div style={{
         marginTop: '2rem',
         padding: '1.5rem',
@@ -623,6 +624,7 @@ function Dashboard({ syncVersion }) {
           {t('take_survey') || 'Take Final Survey'} →
         </button>
       </div>
+      )}
       
       {/* Product Detail Modal */}
       {selectedPurchase && (
