@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, History, HelpCircle, FlaskConical } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, X, ChevronRight, Sparkles, Target, BarChart3, HelpCircle, FlaskConical } from 'lucide-react'
 import Dashboard from './components/Dashboard'
-import PurchaseList from './components/PurchaseList'
+import ProductCatalog from './components/ProductCatalog'
 import HowItWorks from './components/HowItWorks'
 import AccountSync from './components/AccountSync'
 import ScoreLookup from './components/ScoreLookup'
@@ -38,11 +38,11 @@ const features = [
     href: '/bookmarklet.html'
   },
   {
-    id: 'history',
-    emoji: '📜',
-    titleKey: 'tab_history',
-    descKey: 'feature_history_desc',
-    color: '#ec4899'
+    id: 'catalog',
+    emoji: '🛒',
+    titleKey: 'tab_catalog',
+    descKey: 'feature_catalog_desc',
+    color: '#16a34a'
   }
 ]
 
@@ -312,7 +312,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           {activeTab === 'dashboard' && <Dashboard syncVersion={syncVersion} />}
           {activeTab === 'lookup' && <ScoreLookup />}
           {activeTab === 'sync' && <AccountSync onSyncCompleted={onSyncCompleted} />}
-          {activeTab === 'history' && <PurchaseList syncVersion={syncVersion} />}
+          {activeTab === 'catalog' && <ProductCatalog />}
           {activeTab === 'how' && <HowItWorks />}
         </div>
       </main>
@@ -326,7 +326,7 @@ function App() {
     const hash = window.location.hash.slice(1) // Remove #
     // Handle questionnaire with params like #questionnaire?type=pre
     const tabPart = hash.split('?')[0]
-    const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'history', 'how', 'questionnaire', 'experiment']
+    const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'catalog', 'how', 'questionnaire', 'experiment']
     return validTabs.includes(tabPart) ? tabPart : 'home'
   })
   
@@ -381,7 +381,7 @@ function App() {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
       const tabPart = hash.split('?')[0]
-      const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'history', 'how', 'questionnaire', 'experiment']
+      const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'catalog', 'how', 'questionnaire', 'experiment']
       setActiveTab(validTabs.includes(tabPart) ? tabPart : 'home')
       
       // Update questionnaire type if on questionnaire page

@@ -2228,6 +2228,180 @@ app.get('/api/products/search', async (req, res) => {
 })
 
 // ============================================================================
+// FULL CATALOG BROWSE ENDPOINT
+// ============================================================================
+
+/**
+ * GET /api/catalog/browse
+ *
+ * Paginated, filterable product catalog.
+ * Query params:
+ *   q        — text search (ilike on normalized_name)
+ *   page     — 1-based page number (default 1)
+ *   limit    — items per page (default 24, max 100)
+ *   sort     — "name" | "score_asc" | "score_desc" | "price_asc" | "price_desc" (default "name")
+ *   score_min — minimum sustainability score (0-10)
+ *   score_max — maximum sustainability score (0-10)
+ *   has_image — "true" to only return products with images
+ *   category  — filter by AH product category substring
+ */
+app.get('/api/catalog/browse', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'database_unavailable' })
+    }
+
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 24), 100)
+    const offset = (page - 1) * limit
+    const searchQuery = req.query.q?.trim() || ''
+    const sort = req.query.sort || 'name'
+    const scoreMin = req.query.score_min != null ? parseInt(req.query.score_min) : null
+    const scoreMax = req.query.score_max != null ? parseInt(req.query.score_max) : null
+    const hasImage = req.query.has_image === 'true'
+
+    // Build the query
+    const selectFields = enrichedColumnsAvailable
+      ? 'id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, brand, ingredients, nutrition_text, nutrition_json, categories'
+      : 'id, name, normalized_name, url, image_url, price, categories'
+
+    let query = supabase.from('products').select(selectFields, { count: 'exact' })
+
+    // Text search
+    if (searchQuery) {
+      query = query.ilike('normalized_name', `%${searchQuery.toLowerCase()}%`)
+    }
+
+    // Only products with images (for a nicer catalog)
+    if (hasImage) {
+      query = query.not('image_url', 'is', null)
+    }
+
+    // Sort by name for the DB query (scoring sort happens in JS)
+    if (sort === 'price_asc') {
+      query = query.order('price', { ascending: true, nullsFirst: false })
+    } else if (sort === 'price_desc') {
+      query = query.order('price', { ascending: false, nullsFirst: false })
+    } else {
+      query = query.order('name', { ascending: true })
+    }
+
+    // We need to fetch more than `limit` when score-filtering or score-sorting
+    // because scores are computed in JS. For score filters we fetch a bigger batch.
+    const needsScoreProcessing = scoreMin != null || scoreMax != null || sort === 'score_asc' || sort === 'score_desc'
+    if (needsScoreProcessing) {
+      // Fetch a larger batch and filter/sort in JS
+      query = query.range(0, 999)
+    } else {
+      query = query.range(offset, offset + limit - 1)
+    }
+
+    const { data, error, count } = await query
+
+    if (error) throw error
+
+    // Add sustainability scores
+    const withScores = (data || []).map(p => {
+      const evalResult = enrichedColumnsAvailable
+        ? evaluateProductWithRecord(p.name, p)
+        : evaluateProduct(p.name)
+      const score = evalResult.score != null ? evalResult.score : null
+      return {
+        id: p.id,
+        name: p.name,
+        image_url: p.image_url || null,
+        url: p.url || null,
+        price: p.price || null,
+        brand: p.brand || null,
+        is_organic: p.is_organic || false,
+        is_vegan: p.is_vegan || false,
+        is_vegetarian: p.is_vegetarian || false,
+        is_fairtrade: p.is_fairtrade || false,
+        nutri_score: p.nutri_score || null,
+        origin_country: p.origin_country || null,
+        categories: p.categories || [],
+        sustainability_score: score,
+        co2_category: evalResult.co2Category || null,
+        rating: evalResult.rating || null
+      }
+    })
+
+    // Apply score filters in JS
+    let filtered = withScores
+    if (scoreMin != null) {
+      filtered = filtered.filter(p => p.sustainability_score >= scoreMin)
+    }
+    if (scoreMax != null) {
+      filtered = filtered.filter(p => p.sustainability_score <= scoreMax)
+    }
+
+    // Apply score sort in JS
+    if (sort === 'score_desc') {
+      filtered.sort((a, b) => b.sustainability_score - a.sustainability_score)
+    } else if (sort === 'score_asc') {
+      filtered.sort((a, b) => a.sustainability_score - b.sustainability_score)
+    }
+
+    // Paginate in JS if we fetched a bigger batch
+    let results, totalCount
+    if (needsScoreProcessing) {
+      totalCount = filtered.length
+      results = filtered.slice(offset, offset + limit)
+    } else {
+      totalCount = count
+      results = filtered
+    }
+
+    res.json({
+      products: results,
+      page,
+      limit,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit)
+    })
+  } catch (err) {
+    console.error('[Catalog Browse] Error:', err.message)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+/**
+ * GET /api/catalog/categories
+ *
+ * Returns distinct category values found in the products table.
+ */
+app.get('/api/catalog/categories', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'database_unavailable' })
+    }
+
+    // Get a sample of products to extract categories
+    const { data, error } = await supabase
+      .from('products')
+      .select('categories')
+      .not('categories', 'eq', '{}')
+      .limit(2000)
+
+    if (error) throw error
+
+    // Flatten and deduplicate
+    const categorySet = new Set()
+    for (const row of data || []) {
+      if (Array.isArray(row.categories)) {
+        row.categories.forEach(c => categorySet.add(c))
+      }
+    }
+
+    const sorted = [...categorySet].sort((a, b) => a.localeCompare(b, 'nl'))
+    res.json({ categories: sorted })
+  } catch (err) {
+    console.error('[Catalog Categories] Error:', err.message)
+    res.status(500).json({ error: 'fetch_failed', message: err.message })
+  }
+})
+
+// ============================================================================
 // BULK DATA FIX ENDPOINTS
 // ============================================================================
 
