@@ -328,7 +328,14 @@ const TRANSLATIONS = {
     modal_categories: 'Categorieën',
     modal_suggestions: '💡 Suggesties',
     modal_view_on_ah: 'Bekijk op Albert Heijn →',
-    modal_no_link: 'Geen productlink beschikbaar'
+    modal_no_link: 'Geen productlink beschikbaar',
+    modal_co2_title: 'CO₂-uitstoot',
+    modal_co2_range: 'Bereik',
+    co2_very_low: 'Zeer laag',
+    co2_low: 'Laag',
+    co2_medium: 'Gemiddeld',
+    co2_high: 'Hoog',
+    co2_very_high: 'Zeer hoog'
   },
   en: {
     app_title: 'Radboud Universiteit',
@@ -657,7 +664,14 @@ const TRANSLATIONS = {
     modal_categories: 'Categories',
     modal_suggestions: '💡 Suggestions',
     modal_view_on_ah: 'View on Albert Heijn →',
-    modal_no_link: 'No product link available'
+    modal_no_link: 'No product link available',
+    modal_co2_title: 'CO₂ Emissions',
+    modal_co2_range: 'Range',
+    co2_very_low: 'Very low',
+    co2_low: 'Low',
+    co2_medium: 'Medium',
+    co2_high: 'High',
+    co2_very_high: 'Very high'
   }
 }
 

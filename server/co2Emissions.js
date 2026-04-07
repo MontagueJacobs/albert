@@ -834,8 +834,9 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Baby food
   'baby_food': [
-    'baby', 'flesvoeding', 'nutrilon', 'bambix', 'olvarit',
-    'babyvoeding', 'opvolgmelk'
+    'flesvoeding', 'nutrilon', 'bambix', 'olvarit',
+    'babyvoeding', 'opvolgmelk', 'babyhapje', 'babymelk',
+    'baby fruithapje', 'baby groentemix'
   ]
 }
 
@@ -890,6 +891,10 @@ const NON_FOOD_KEYWORDS = [
   'kattensnack', 'whiskas', 'pedigree', 'vogelvoer', 'dierenvoer',
   // Baby non-food
   'luiers', 'babydoekjes', 'billendoekjes',
+  'babyzalf', 'baby zalf', 'bepanthen', 'sudocrem', 'babycreme',
+  'baby creme', 'babyolie', 'baby olie', 'babyshampoo', 'baby shampoo',
+  'baby bad', 'babybad', 'babyverzorging', 'luiercreme',
+  'babyfles', 'baby fles', 'fopspeen', 'speen',
   // Kitchen/household items
   'vershoudfolie', 'diepvrieszak', 'cadeaupapier', 'kaars', 'aansteker',
   'paperclip', 'elastiek', 'plakband', 'tape'

@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react'
-import { X, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, Minus, Leaf } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
+
+/* ---- CO₂ bar colour ---- */
+function co2Color(co2) {
+  if (co2 == null) return 'var(--text-muted)'
+  if (co2 < 2) return '#16a34a'
+  if (co2 < 6) return '#65a30d'
+  if (co2 < 15) return '#eab308'
+  if (co2 < 40) return '#f97316'
+  return '#ef4444'
+}
+
+function co2Label(co2, t) {
+  if (co2 == null) return ''
+  if (co2 < 2) return t('co2_very_low') || 'Very low'
+  if (co2 < 6) return t('co2_low') || 'Low'
+  if (co2 < 15) return t('co2_medium') || 'Medium'
+  if (co2 < 40) return t('co2_high') || 'High'
+  return t('co2_very_high') || 'Very high'
+}
 
 // Score breakdown modal component
 function ScoreBreakdownModal({ product, onClose }) {
@@ -172,24 +191,124 @@ function ScoreBreakdownModal({ product, onClose }) {
                 </div>
               </div>
 
-              {/* Enriched badges */}
+              {/* CO₂ Emissions */}
+              {data.co2PerKg != null && (
+                <div style={{
+                  marginBottom: '1rem',
+                  padding: '0.85rem',
+                  background: 'var(--bg-hover, #334155)',
+                  borderRadius: '10px'
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem'
+                  }}>
+                    <Leaf size={14} />
+                    {t('modal_co2_title') || 'CO₂ Emissions'}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                    <span style={{
+                      fontSize: '1.5rem', fontWeight: 700,
+                      color: co2Color(data.co2PerKg)
+                    }}>
+                      {data.co2PerKg.toFixed(1)}
+                    </span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      kg CO₂ / kg
+                    </span>
+                    <span style={{
+                      marginLeft: 'auto',
+                      padding: '0.15rem 0.45rem', borderRadius: '6px',
+                      fontSize: '0.75rem', fontWeight: 600,
+                      background: `${co2Color(data.co2PerKg)}22`,
+                      color: co2Color(data.co2PerKg)
+                    }}>
+                      {co2Label(data.co2PerKg, t)}
+                    </span>
+                  </div>
+
+                  {/* Visual bar */}
+                  {(() => {
+                    // Map CO₂ to a 0-100 scale (log-ish: 0→0, 2→20, 6→40, 15→60, 40→80, 100→100)
+                    const pct = Math.min(100, Math.max(2, Math.round(Math.log10(Math.max(0.1, data.co2PerKg)) * 50 + 50)))
+                    return (
+                      <div style={{
+                        width: '100%', height: '6px', borderRadius: '3px',
+                        background: 'var(--border, #4b5563)', overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${pct}%`, height: '100%', borderRadius: '3px',
+                          background: co2Color(data.co2PerKg),
+                          transition: 'width 0.4s ease'
+                        }} />
+                      </div>
+                    )
+                  })()}
+
+                  {/* Category & range */}
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--text-muted)'
+                  }}>
+                    {data.co2CategoryLabel && (
+                      <span>{data.ratingEmoji} {data.co2CategoryLabel}</span>
+                    )}
+                    {data.co2Min != null && data.co2Max != null && (
+                      <span>{t('modal_co2_range') || 'Range'}: {data.co2Min.toFixed(1)}–{data.co2Max.toFixed(1)} kg</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Enriched attribute tags */}
               {data.enriched && data.enriched.length > 0 && (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                     {t('modal_product_attributes')}
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {data.enriched.map((e, i) => (
-                      <span key={i} style={{
-                        background: e.delta > 0 ? 'rgba(34, 197, 94, 0.2)' : e.delta < 0 ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)',
-                        color: e.delta > 0 ? '#22c55e' : e.delta < 0 ? '#ef4444' : 'var(--text)',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem'
-                      }}>
-                        {e.icon} {e.label} ({e.delta > 0 ? '+' : ''}{e.delta})
-                      </span>
-                    ))}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {data.enriched.map((e, i) => {
+                      const hasDelta = e.delta != null && e.delta !== 0
+                      const isPositive = e.delta > 0
+                      const isNegative = e.delta < 0
+
+                      // Colour based on delta, or neutral
+                      const tagBg = isPositive ? 'rgba(34, 197, 94, 0.15)'
+                        : isNegative ? 'rgba(239, 68, 68, 0.15)'
+                        : 'var(--bg-hover, rgba(100, 116, 139, 0.2))'
+                      const tagColor = isPositive ? '#22c55e'
+                        : isNegative ? '#ef4444'
+                        : 'var(--text)'
+                      const tagBorder = isPositive ? 'rgba(34, 197, 94, 0.3)'
+                        : isNegative ? 'rgba(239, 68, 68, 0.3)'
+                        : 'var(--border, rgba(100, 116, 139, 0.3))'
+
+                      return (
+                        <span key={i} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                          padding: '0.25rem 0.55rem',
+                          borderRadius: '8px',
+                          border: `1px solid ${tagBorder}`,
+                          background: tagBg,
+                          color: tagColor,
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          lineHeight: 1.3
+                        }}>
+                          {e.icon && <span style={{ fontSize: '0.8rem' }}>{e.icon}</span>}
+                          <span>{e.label}</span>
+                          {hasDelta && (
+                            <span style={{
+                              fontSize: '0.72rem', fontWeight: 700,
+                              opacity: 0.85
+                            }}>
+                              {isPositive ? '+' : ''}{e.delta}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })}
                   </div>
                 </div>
               )}
