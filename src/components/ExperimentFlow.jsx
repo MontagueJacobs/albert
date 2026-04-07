@@ -622,8 +622,6 @@ export default function ExperimentFlow({ onComplete, onBack }) {
               </ol>
               <a
                 href="https://www.ah.nl/producten/eerder-gekocht"
-                target="_blank"
-                rel="noopener noreferrer"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
