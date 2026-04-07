@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, ChevronRight, ChevronLeft, FlaskConical, CheckCircle, ShoppingCart, BookOpen } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronLeft, FlaskConical, CheckCircle, ShoppingCart, BookOpen, ExternalLink } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 import ExperimentRanking from './ExperimentRanking.jsx'
@@ -7,7 +7,6 @@ import ExperimentLikert from './ExperimentLikert.jsx'
 import ExperimentIntervention from './ExperimentIntervention.jsx'
 import ExperimentReflection from './ExperimentReflection.jsx'
 import QuizResultsReview from './QuizResultsReview.jsx'
-import AccountSync from './AccountSync.jsx'
 import Dashboard from './Dashboard.jsx'
 
 const STEP_LABELS = {
@@ -582,12 +581,70 @@ export default function ExperimentFlow({ onComplete, onBack }) {
             <h2 style={{ ...styles.introTitle, fontSize: '1.25rem', justifyContent: 'flex-start' }}>
               {isNl ? 'Koppel je Albert Heijn account' : 'Connect your Albert Heijn account'}
             </h2>
-            <p style={{ ...styles.introText, marginBottom: '1rem' }}>
+            <p style={{ ...styles.introText, marginBottom: '1.5rem' }}>
               {isNl
-                ? 'Om het experiment te personaliseren, halen we je recente boodschappen op via je bonuskaart. Gebruik de onderstaande knop om je aankopen te synchroniseren.'
-                : 'To personalize the experiment, we will retrieve your recent groceries via your bonus card. Use the button below to sync your purchases.'}
+                ? 'Om het experiment te personaliseren, halen we je recente boodschappen op via je bonuskaart.'
+                : 'To personalize the experiment, we will retrieve your recent groceries via your bonus card.'}
             </p>
-            <AccountSync onSyncCompleted={() => {}} />
+
+            {/* Primary: direct link to eerder gekocht */}
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.08)',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+              borderRadius: '12px',
+              padding: '1.25rem',
+              marginBottom: '1rem'
+            }}>
+              <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: 'var(--text)' }}>
+                {isNl ? 'Stappen:' : 'Steps:'}
+              </h4>
+              <ol style={{ margin: '0 0 1rem', paddingLeft: '1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
+                <li>{isNl ? 'Klik op de knop hieronder om je "Eerder gekocht" pagina te openen' : 'Click the button below to open your "Previously purchased" page'}</li>
+                <li>{isNl ? 'Log in op je Albert Heijn account (als je dat nog niet bent)' : 'Log in to your Albert Heijn account (if not already)'}</li>
+                <li>{isNl ? 'Activeer de bookmarklet in je bladwijzerbalk' : 'Activate the bookmarklet in your bookmarks bar'}</li>
+                <li>{isNl ? 'Kom terug naar deze pagina en klik "Verder"' : 'Come back to this page and click "Continue"'}</li>
+              </ol>
+              <a
+                href="https://www.ah.nl/producten/eerder-gekocht"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.85rem 1.5rem',
+                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '1rem'
+                }}
+              >
+                <ExternalLink size={18} />
+                {isNl ? 'Open Eerder Gekocht' : 'Open Previously Purchased'}
+              </a>
+            </div>
+
+            {/* Secondary: bookmarklet setup for at-home use */}
+            <div style={{
+              borderTop: '1px solid var(--border, rgba(255,255,255,0.1))',
+              paddingTop: '1rem',
+              marginTop: '0.5rem',
+              fontSize: '0.85rem',
+              color: 'var(--text-muted)'
+            }}>
+              <span>{isNl ? 'Thuis op je eigen computer? ' : 'At home on your own computer? '}</span>
+              <a
+                href="/bookmarklet.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#22c55e', textDecoration: 'underline' }}
+              >
+                {isNl ? 'Stel de bookmarklet in' : 'Set up the bookmarklet'}
+              </a>
+            </div>
+
             <button
               style={{ ...styles.startBtn, marginTop: '1.5rem' }}
               onClick={handleScrapeComplete}
