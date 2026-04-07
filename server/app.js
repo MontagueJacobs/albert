@@ -4374,7 +4374,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
     // Query params must come BEFORE hash fragment
     // Redirect back to experiment flow after import (experiment handles next step)
     const appBase = process.env.APP_URL || 'https://www.bubblebrainz.com'
-    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#experiment` : null
+    const redirectUrl = bonusCard
+      ? `${appBase}/?card=${bonusCard}&scraped=1#experiment`
+      : `${appBase}/?scraped=1#experiment`
 
     return res.json({ 
       ok: true, 

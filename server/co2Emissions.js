@@ -546,7 +546,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   // Lamb
   'lamb_mutton': [
     'lam', 'lamsvlees', 'lamsrack', 'lamskotelet', 'lamsschouder',
-    'lamsbout', 'schaap', 'schapenvlees', 'lamb', 'mutton'
+    'lamsbout', 'lamsfilet', 'schaap', 'schapenvlees', 'lamb', 'mutton'
   ],
   
   // Pork

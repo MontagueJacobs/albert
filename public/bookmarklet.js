@@ -652,14 +652,14 @@
       countEl.innerHTML = message.replace(/\n/g, '<br>');
       countEl.style.fontSize = '1rem';
       
-      // Auto-redirect to dashboard with bonus card
-      if (bonusCard && data.redirect_url) {
-        statusEl.textContent = '✅ Gelukt! Doorsturen naar dashboard...';
+      // Auto-redirect back to experiment flow
+      if (data.redirect_url) {
+        statusEl.textContent = '✅ Gelukt! Doorsturen naar experiment...';
         setTimeout(() => {
           window.location.href = data.redirect_url;
         }, 1500);
       } else {
-        // No bonus card - show close button
+        // No redirect URL - show close button
         closeBtn.style.display = 'inline-block';
       }
       

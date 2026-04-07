@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, ChevronRight, ChevronLeft, FlaskConical, CheckCircle, ShoppingCart, BookOpen, ExternalLink } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
@@ -315,6 +315,23 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     startOrResume()
   }, [bonusCardNumber])
 
+  // Auto-advance past scrape step when redirected back from bookmarklet
+  const autoAdvancedRef = useRef(false)
+  useEffect(() => {
+    if (!session || session.current_step !== 'scrape' || autoAdvancedRef.current) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('scraped') === '1') {
+      autoAdvancedRef.current = true
+      // Clean the URL param so refresh doesn't re-trigger
+      params.delete('scraped')
+      const cleanUrl = params.toString()
+        ? `${window.location.pathname}?${params}${window.location.hash}`
+        : `${window.location.pathname}${window.location.hash}`
+      window.history.replaceState(null, '', cleanUrl)
+      handleScrapeComplete()
+    }
+  }, [session])
+
   const startOrResume = async () => {
     try {
       setLoading(true)
@@ -601,8 +618,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
               <ol style={{ margin: '0 0 1rem', paddingLeft: '1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
                 <li>{isNl ? 'Klik op de knop hieronder om je "Eerder gekocht" pagina te openen' : 'Click the button below to open your "Previously purchased" page'}</li>
                 <li>{isNl ? 'Log in op je Albert Heijn account (als je dat nog niet bent)' : 'Log in to your Albert Heijn account (if not already)'}</li>
-                <li>{isNl ? 'Activeer de bookmarklet in je bladwijzerbalk' : 'Activate the bookmarklet in your bookmarks bar'}</li>
-                <li>{isNl ? 'Kom terug naar deze pagina en klik "Verder"' : 'Come back to this page and click "Continue"'}</li>
+                <li>{isNl ? 'Activeer de bookmarklet in je bladwijzerbalk — je wordt automatisch teruggestuurd' : 'Activate the bookmarklet in your bookmarks bar — you will be redirected back automatically'}</li>
               </ol>
               <a
                 href="https://www.ah.nl/producten/eerder-gekocht"
@@ -634,7 +650,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
               fontSize: '0.85rem',
               color: 'var(--text-muted)'
             }}>
-              <span>{isNl ? 'Thuis op je eigen computer? ' : 'At home on your own computer? '}</span>
+              <span>{isNl ? 'Nog geen bookmarklet? ' : 'No bookmarklet yet? '}</span>
               <a
                 href="/bookmarklet.html"
                 target="_blank"
@@ -644,14 +660,6 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                 {isNl ? 'Stel de bookmarklet in' : 'Set up the bookmarklet'}
               </a>
             </div>
-
-            <button
-              style={{ ...styles.startBtn, marginTop: '1.5rem' }}
-              onClick={handleScrapeComplete}
-            >
-              {isNl ? 'Verder naar de quizzen' : 'Continue to the quizzes'}
-              <ChevronRight size={20} />
-            </button>
           </div>
         </div>
       )}
