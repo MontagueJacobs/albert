@@ -143,15 +143,18 @@ const styles = {
   }
 }
 
-export default function ExperimentLikert({ sessionId, onComplete }) {
+export default function ExperimentLikert({ sessionId, onComplete, questions: customQuestions, submitUrl, title: customTitle, subtitle: customSubtitle }) {
   const { lang } = useI18n()
   const isNl = lang === 'nl'
+
+  const actualQuestions = customQuestions || QUESTIONS
+  const endpoint = submitUrl || `/api/experiment/${sessionId}/self-perception`
 
   const [responses, setResponses] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
-  const allAnswered = QUESTIONS.every(q => responses[q.id] !== undefined)
+  const allAnswered = actualQuestions.every(q => responses[q.id] !== undefined)
 
   const handleSelect = (questionId, value) => {
     setResponses(prev => ({ ...prev, [questionId]: value }))
@@ -167,7 +170,7 @@ export default function ExperimentLikert({ sessionId, onComplete }) {
     try {
       setSubmitting(true)
       setError(null)
-      const res = await fetch(`/api/experiment/${sessionId}/self-perception`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ responses })
@@ -186,24 +189,24 @@ export default function ExperimentLikert({ sessionId, onComplete }) {
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>
-          {isNl ? 'Hoe schat je jezelf in?' : 'How do you rate yourself?'}
+          {customTitle || (isNl ? 'Hoe schat je jezelf in?' : 'How do you rate yourself?')}
         </h2>
         <p style={styles.subtitle}>
-          {isNl 
+          {customSubtitle || (isNl 
             ? 'Beantwoord deze vragen over je eigen kennis en bewustzijn.'
-            : 'Answer these questions about your own knowledge and awareness.'}
+            : 'Answer these questions about your own knowledge and awareness.')}
         </p>
       </div>
 
       {error && <div style={styles.errorMsg}>{error}</div>}
 
-      {QUESTIONS.map((q, idx) => (
+      {actualQuestions.map((q, idx) => (
         <div key={q.id} style={styles.questionCard}>
           <div style={styles.questionNum}>
-            {isNl ? `Vraag ${idx + 1} van ${QUESTIONS.length}` : `Question ${idx + 1} of ${QUESTIONS.length}`}
+            {isNl ? `Vraag ${idx + 1} van ${actualQuestions.length}` : `Question ${idx + 1} of ${actualQuestions.length}`}
           </div>
           <div style={styles.questionText}>
-            {isNl ? q.textNl : q.text}
+            {isNl ? (q.textNl || q.text_nl) : (q.text || q.text_en)}
           </div>
           <div style={styles.scaleContainer}>
             <div style={styles.scaleRow}>
@@ -220,10 +223,18 @@ export default function ExperimentLikert({ sessionId, onComplete }) {
                 </button>
               ))}
             </div>
-            <div style={styles.anchors}>
-              <span>{isNl ? q.lowNl : q.low}</span>
-              <span>{isNl ? q.highNl : q.high}</span>
-            </div>
+            {(q.low || q.lowNl) && (
+              <div style={styles.anchors}>
+                <span>{isNl ? (q.lowNl || q.low) : (q.low || q.lowNl)}</span>
+                <span>{isNl ? (q.highNl || q.high) : (q.high || q.highNl)}</span>
+              </div>
+            )}
+            {!(q.low || q.lowNl) && (
+              <div style={styles.anchors}>
+                <span>{isNl ? 'Helemaal oneens' : 'Strongly disagree'}</span>
+                <span>{isNl ? 'Helemaal eens' : 'Strongly agree'}</span>
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -250,7 +261,7 @@ export default function ExperimentLikert({ sessionId, onComplete }) {
       </button>
 
       <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '0.75rem', fontSize: '0.8rem' }}>
-        {Object.keys(responses).length} / {QUESTIONS.length} {isNl ? 'beantwoord' : 'answered'}
+        {Object.keys(responses).length} / {actualQuestions.length} {isNl ? 'beantwoord' : 'answered'}
       </p>
     </div>
   )

@@ -421,10 +421,12 @@ export default function ExperimentIntervention({ session, onComplete }) {
         </div>
       )}
 
-      <button style={styles.nextBtn} onClick={handleContinue}>
-        {isNl ? 'Ga door naar de volgende quiz' : 'Continue to the next quiz'}
-        <ChevronRight size={20} />
-      </button>
+      {onComplete && (
+        <button style={styles.nextBtn} onClick={handleContinue}>
+          {isNl ? 'Ga door naar de volgende quiz' : 'Continue to the next quiz'}
+          <ChevronRight size={20} />
+        </button>
+      )}
     </div>
   )
 }
