@@ -87,13 +87,13 @@ class BatchOriginScraper:
             return []
             
         # Query products missing key data (origin, unit_size, price, OR image).
-        # Only permanently exclude not_found and failed — allow re-scraping
-        # of 'success'/'pending' items that still have null key fields.
+        # Only permanently exclude not_found — allow re-scraping of failed,
+        # success, and pending items that still have null price or image.
         result = self.supabase.table('products') \
             .select('id, name, url, origin_country, origin_by_month, unit_size, price, image_url, details_scrape_status, details_scraped_at') \
             .not_.is_('url', 'null') \
             .or_('origin_country.is.null,unit_size.is.null,price.is.null,image_url.is.null') \
-            .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
+            .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found)') \
             .limit(limit) \
             .execute()
         
@@ -159,7 +159,7 @@ class BatchOriginScraper:
                 .select('id, name, url, origin_country, origin_by_month, unit_size, price, image_url, details_scrape_status, details_scraped_at') \
                 .in_('url', chunk_urls) \
                 .or_('origin_country.is.null,unit_size.is.null,price.is.null,image_url.is.null') \
-                .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
+                .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found)') \
                 .execute()
             
             if result.data:
@@ -186,6 +186,73 @@ class BatchOriginScraper:
         
         print(f"[INFO] Found {len(products)} user purchase products needing origin data", flush=True)
         return products
+
+    def _init_ah_api(self):
+        """Lazily initialise the AH mobile API client for price/image fallback."""
+        if hasattr(self, '_ah_api'):
+            return self._ah_api
+        try:
+            # ah_api.py lives in the project root (one level above server/)
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+            from ah_api import AHClient
+            client = AHClient()
+            client.get_anonymous_token()
+            self._ah_api = client
+            print("[INFO] AH API client initialised for price/image fallback", flush=True)
+            return self._ah_api
+        except Exception as e:
+            print(f"[WARN] Could not init AH API fallback: {e}", flush=True)
+            self._ah_api = None
+            return None
+
+    def fill_missing_from_api(self, product_name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        If the page scraper missed price or image, try the AH search API.
+        The API reliably returns both for virtually every product.
+        """
+        needs_price = result.get('price') is None
+        needs_image = not result.get('image_url')
+        if not needs_price and not needs_image:
+            return result
+
+        client = self._init_ah_api()
+        if not client:
+            return result
+
+        try:
+            data = client.search_products(product_name, size=3)
+            cards = data.get('products', data.get('cards', []))
+            if not cards:
+                return result
+
+            # Use the first result — it's the closest match
+            first = cards[0]
+            prod = first.get('products', [first])[0] if isinstance(first.get('products'), list) else first
+
+            if needs_price:
+                api_price = prod.get('currentPrice') or prod.get('priceBeforeBonus')
+                if api_price is not None:
+                    result['price'] = float(api_price)
+                    print(f"  [API] Got price: €{result['price']}", flush=True)
+
+            if needs_image:
+                images = prod.get('images', [])
+                for img in images:
+                    if img.get('width') == 200:
+                        result['image_url'] = img['url']
+                        break
+                if not result.get('image_url') and images:
+                    result['image_url'] = images[0].get('url', '').replace(
+                        '800x800_JPG_Q90', '200x200_JPG_Q85')
+                if result.get('image_url'):
+                    print(f"  [API] Got image URL", flush=True)
+
+        except Exception as e:
+            print(f"  [API] Fallback error: {e}", flush=True)
+
+        return result
     
     def mark_scrape_failed(self, product_id: str, error_type: str) -> bool:
         """
@@ -369,6 +436,8 @@ class BatchOriginScraper:
                     self.stats['scraped'] += 1
                     
                     if result['success']:
+                        # Fill in price/image via AH API if the page scraper missed them
+                        result = self.fill_missing_from_api(product['name'], result)
                         # Update the database
                         self.update_product_origin(product_id, result)
                     else:
