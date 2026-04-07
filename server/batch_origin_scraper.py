@@ -86,14 +86,13 @@ class BatchOriginScraper:
         if not self.supabase:
             return []
             
-        # Query products missing key data (origin, unit_size, OR price).
+        # Query products missing key data (origin, unit_size, price, OR image).
         # Only permanently exclude not_found and failed — allow re-scraping
-        # of 'success' items that still have null key fields (from older runs
-        # that marked success without checking all fields).
+        # of 'success'/'pending' items that still have null key fields.
         result = self.supabase.table('products') \
-            .select('id, name, url, origin_country, origin_by_month, unit_size, price, details_scrape_status, details_scraped_at') \
+            .select('id, name, url, origin_country, origin_by_month, unit_size, price, image_url, details_scrape_status, details_scraped_at') \
             .not_.is_('url', 'null') \
-            .or_('origin_country.is.null,unit_size.is.null,price.is.null') \
+            .or_('origin_country.is.null,unit_size.is.null,price.is.null,image_url.is.null') \
             .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
             .limit(limit) \
             .execute()
@@ -157,9 +156,9 @@ class BatchOriginScraper:
             chunk_urls = product_urls[i:i + chunk_size]
             
             result = self.supabase.table('products') \
-                .select('id, name, url, origin_country, origin_by_month, unit_size, price, details_scrape_status, details_scraped_at') \
+                .select('id, name, url, origin_country, origin_by_month, unit_size, price, image_url, details_scrape_status, details_scraped_at') \
                 .in_('url', chunk_urls) \
-                .or_('origin_country.is.null,unit_size.is.null,price.is.null') \
+                .or_('origin_country.is.null,unit_size.is.null,price.is.null,image_url.is.null') \
                 .or_('details_scrape_status.is.null,details_scrape_status.not.in.(not_found,failed)') \
                 .execute()
             
@@ -277,15 +276,14 @@ class BatchOriginScraper:
                 print(f"  [SKIP] No data extracted for product {product_id}", flush=True)
                 return False
                 
-            # Mark as success if we extracted anything useful.
-            # Previously this used 'pending' for incomplete scrapes, causing
-            # infinite re-scrape loops since pending items were never excluded.
+            # Mark as success only if we got BOTH price and image (essential fields).
+            # Items missing either are marked 'pending' and will be retried in
+            # future runs (the 1-hour cooldown on details_scraped_at prevents
+            # same-session re-scrape loops).
             update_payload['details_scraped_at'] = origin_data.get('scraped_at') or __import__('datetime').datetime.now().isoformat()
-            has_key_fields = bool(origin_data.get('price')) and bool(origin_data.get('image_url')) and bool(origin_data.get('ingredients'))
-            # Use 'success' for complete scrapes, 'pending' for incomplete ones.
-            # Pending items with a recent scraped_at are skipped in the query filter
-            # to prevent same-session re-scraping, but will be retried in future runs.
-            update_payload['details_scrape_status'] = 'success' if has_key_fields else 'pending'
+            has_price = origin_data.get('price') is not None
+            has_image = bool(origin_data.get('image_url'))
+            update_payload['details_scrape_status'] = 'success' if (has_price and has_image) else 'pending'
                 
             # Update the product
             result = self.supabase.table('products') \
