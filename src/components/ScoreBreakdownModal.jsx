@@ -184,10 +184,10 @@ function ScoreBreakdownModal({ product, onClose }) {
                   fontWeight: 700,
                   color: data.score >= 7 ? '#22c55e' : data.score >= 5 ? '#f59e0b' : '#ef4444'
                 }}>
-                  {data.score}
+                  {data.score != null ? data.score : '—'}
                 </div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  {data.rating || 'Score'} ({t('modal_base_score')}: 5)
+                  {data.rating || 'Score'} · {t('modal_score_scale') || '0–10'}
                 </div>
               </div>
 
