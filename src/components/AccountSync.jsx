@@ -220,13 +220,14 @@ function AccountSync({ onSyncCompleted }) {
   // Always show all sync methods
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+      background: 'var(--bg-card, #1e293b)',
       borderRadius: '16px',
       padding: '2rem',
-      color: 'white',
+      color: 'var(--text, white)',
+      border: '1px solid var(--border, transparent)',
       marginTop: '1rem'
     }}>
-      <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem' }}>
+      <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem', color: 'var(--text, white)' }}>
         {lang === 'nl' ? 'Sync Methodes' : 'Sync Methods'}
       </h3>
 
@@ -259,7 +260,7 @@ function AccountSync({ onSyncCompleted }) {
           gap: '0.75rem'
         }}>
           <AlertCircle size={24} style={{ color: '#ef4444' }} />
-          <div style={{ color: '#fca5a5' }}>{error}</div>
+          <div style={{ color: '#ef4444' }}>{error}</div>
         </div>
       )}
 
@@ -460,7 +461,7 @@ function AccountSync({ onSyncCompleted }) {
                     gap: '0.5rem',
                     padding: '0.75rem 1rem',
                     background: 'rgba(239, 68, 68, 0.2)',
-                    color: '#fca5a5',
+                    color: '#ef4444',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
@@ -477,11 +478,11 @@ function AccountSync({ onSyncCompleted }) {
       )}
 
       {/* Instructions */}
-      <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-        <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', opacity: 0.9 }}>
+      <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg-secondary, rgba(255,255,255,0.05))', borderRadius: '8px' }}>
+        <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', color: 'var(--text, inherit)', opacity: 0.9 }}>
           {lang === 'nl' ? 'Hoe het werkt:' : 'How it works:'}
         </h4>
-        <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.6 }}>
+        <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted, inherit)', lineHeight: 1.6 }}>
           <li>{lang === 'nl' ? 'Kies een sync methode hierboven' : 'Choose a sync method above'}</li>
           <li>{lang === 'nl' ? 'Ga naar ah.nl en log in op je account' : 'Go to ah.nl and log into your account'}</li>
           <li>{lang === 'nl' ? 'Ga naar "Eerder gekocht" pagina' : 'Go to "Previously purchased" page'}</li>
