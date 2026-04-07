@@ -4372,9 +4372,9 @@ app.post('/api/ingest/scrape', async (req, res) => {
     // Build redirect URL for bookmarklet
     // Use custom APP_URL env var, or default to production domain
     // Query params must come BEFORE hash fragment
-    // Redirect to carbon ranking game after import
+    // Redirect back to experiment flow after import (experiment handles next step)
     const appBase = process.env.APP_URL || 'https://www.bubblebrainz.com'
-    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#questionnaire?type=carbon_ranking` : null
+    const redirectUrl = bonusCard ? `${appBase}/?card=${bonusCard}#experiment` : null
 
     return res.json({ 
       ok: true, 
