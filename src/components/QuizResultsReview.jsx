@@ -56,7 +56,7 @@ const styles = {
     padding: '0.6rem 0.75rem',
     borderRadius: '10px',
     border: '1px solid var(--border, #374151)',
-    background: 'var(--card-bg, #1f2937)',
+    background: 'var(--bg-card, #1f2937)',
     fontSize: '0.85rem'
   },
   cardCorrect: {
@@ -91,7 +91,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '1.2rem',
-    background: 'var(--accent-bg, #374151)',
+    background: 'var(--bg-secondary, #374151)',
     flexShrink: 0
   },
   image: {
@@ -181,7 +181,7 @@ export default function QuizResultsReview({ quizData, quizLabel, defaultOpen = f
               <div key={item.id} style={cardStyle}>
                 <div style={{
                   ...styles.rank,
-                  background: item.distance === 0 ? '#22c55e' : 'var(--accent-bg, #374151)'
+                  background: item.distance === 0 ? '#22c55e' : 'var(--bg-secondary, #374151)'
                 }}>
                   {item.userRank}
                 </div>

@@ -49,7 +49,7 @@ const styles = {
     alignItems: 'center',
     gap: '0.75rem',
     padding: '0.75rem',
-    background: 'var(--card-bg, #1f2937)',
+    background: 'var(--bg-card, #1f2937)',
     borderRadius: '10px',
     border: '1px solid var(--border, #374151)',
     transition: 'all 0.2s ease'
@@ -62,7 +62,7 @@ const styles = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: 'var(--accent-bg, #374151)',
+    background: 'var(--bg-secondary, #374151)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -76,7 +76,7 @@ const styles = {
     height: '48px',
     borderRadius: '8px',
     objectFit: 'cover',
-    background: '#374151',
+    background: 'var(--bg-secondary, #374151)',
     flexShrink: 0
   },
   productName: {
@@ -94,7 +94,7 @@ const styles = {
   },
   moveBtn: {
     padding: '4px 8px',
-    background: 'var(--accent-bg, #374151)',
+    background: 'var(--bg-secondary, #374151)',
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
@@ -150,7 +150,7 @@ const styles = {
     alignItems: 'center',
     gap: '0.75rem',
     padding: '0.75rem',
-    background: 'var(--card-bg, #1f2937)',
+    background: 'var(--bg-card, #1f2937)',
     borderRadius: '10px',
     marginBottom: '0.5rem',
     border: '1px solid var(--border, #374151)'
@@ -192,7 +192,7 @@ const styles = {
   retryBtn: {
     marginTop: '1rem',
     padding: '0.75rem 1.5rem',
-    background: 'var(--accent-bg, #374151)',
+    background: 'var(--bg-secondary, #374151)',
     border: 'none',
     borderRadius: '8px',
     color: 'var(--text, #f3f4f6)',
@@ -462,8 +462,8 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
             <div style={{
               ...styles.rankNumber,
               background: submitted 
-                ? (product.isCorrect ? '#22c55e' : '#374151')
-                : 'var(--accent-bg, #374151)'
+                ? (product.isCorrect ? '#22c55e' : 'var(--bg-secondary, #374151)')
+                : 'var(--bg-secondary, #374151)'
             }}>
               {index + 1}
             </div>
