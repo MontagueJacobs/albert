@@ -296,6 +296,11 @@ export default function ExperimentFlow({ onComplete, onBack }) {
   const [consentChecked, setConsentChecked] = useState(false)
   const [syncVersion, setSyncVersion] = useState(0)
 
+  // Capture ?scraped=1 synchronously on mount (before bonusCardContext strips query params)
+  const returnedFromScrape = useRef(
+    new URLSearchParams(window.location.search).get('scraped') === '1'
+  )
+
   // Generate or retrieve a stable anonymous ID for sessions without bonus card
   const getAnonymousId = () => {
     try {
@@ -319,15 +324,9 @@ export default function ExperimentFlow({ onComplete, onBack }) {
   const autoAdvancedRef = useRef(false)
   useEffect(() => {
     if (!session || session.current_step !== 'scrape' || autoAdvancedRef.current) return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('scraped') === '1') {
+    if (returnedFromScrape.current) {
       autoAdvancedRef.current = true
-      // Clean the URL param so refresh doesn't re-trigger
-      params.delete('scraped')
-      const cleanUrl = params.toString()
-        ? `${window.location.pathname}?${params}${window.location.hash}`
-        : `${window.location.pathname}${window.location.hash}`
-      window.history.replaceState(null, '', cleanUrl)
+      returnedFromScrape.current = false
       handleScrapeComplete()
     }
   }, [session])
