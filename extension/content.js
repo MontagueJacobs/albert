@@ -28,7 +28,8 @@
   const SELECTORS = {
     // Product card containers - common patterns on AH website
     productCards: [
-      '[data-testhook="product-card"]',           // Main product cards
+      '[data-testid="product-card"]',              // Current AH product cards
+      '[data-testhook="product-card"]',            // Legacy product cards
       '.product-card',                             // Generic product card class
       '[class*="ProductCard"]',                    // React-style class names
       'article[data-product]',                     // Article with product data
@@ -39,6 +40,8 @@
     
     // Product name selectors (tried in order)
     productName: [
+      '[data-testid="product-title-line-clamp"]',
+      '[data-testid="product-title"]',
       '[data-testhook="product-title"]',
       '.product-title',
       '[class*="title"]',
@@ -178,9 +181,18 @@
                    (card.tagName === 'A' ? card : null);
     const url = linkEl?.href || null;
     
-    // Try to get product image
-    const imgEl = container.querySelector('img');
-    const imageUrl = imgEl?.src || null;
+    // Try to get product image - prefer data-testid, then src patterns
+    const imgEl = container.querySelector('img[data-testid="product-image"]') ||
+                  container.querySelector('img[src*="static.ah.nl"]') ||
+                  container.querySelector('img[src*="ah.nl"]') ||
+                  container.querySelector('img');
+    let imageUrl = imgEl?.src || null;
+    // Fallback: srcset or data-src for lazy-loaded images
+    if ((!imageUrl || imageUrl.includes('data:image')) && imgEl) {
+      const srcset = imgEl.getAttribute('srcset') || '';
+      if (srcset) imageUrl = srcset.split(',')[0].trim().split(/\s+/)[0] || null;
+      if (!imageUrl) imageUrl = imgEl.dataset?.src || imgEl.dataset?.lazySrc || null;
+    }
     
     return {
       name,

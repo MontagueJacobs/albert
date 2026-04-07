@@ -153,7 +153,8 @@
       if (!name) {
         const slugMatch = href.match(/\/producten\/product\/[^/]+\/([^/?#]+)/);
         if (slugMatch && slugMatch[1]) {
-          name = slugMatch[1].replace(/-/g, ' ');
+          try { name = decodeURIComponent(slugMatch[1]); } catch (_) { name = slugMatch[1]; }
+          name = name.replace(/-/g, ' ');
           name = name.replace(/\b[a-z]/g, c => c.toUpperCase());
         }
       }
@@ -161,6 +162,8 @@
       // Clean up name - remove common noise patterns
       name = name.replace(/\s+/g, ' ').trim();
       name = name.split(/,\s*(?:Nutri-Score|per stuk|per kg|€|\d+\s*voor|vandaag|morgen)/i)[0].trim();
+      // Normalize Unicode (decomposed é → composed é)
+      if (name.normalize) name = name.normalize('NFC');
 
       // ---- PRICE ----
       // AH now splits prices into separate elements (integer, dot, fractional)
@@ -222,15 +225,47 @@
 
       // ---- IMAGE ----
       let image = '';
-      const imgEl = card?.querySelector('img[src*="static.ah.nl"]') || 
+      // Strategy 1: data-testid="product-image" (current AH markup)
+      const imgEl = card?.querySelector('img[data-testid="product-image"]') ||
+                    a.querySelector('img[data-testid="product-image"]') ||
+                    card?.querySelector('img[src*="static.ah.nl"]') || 
                     card?.querySelector('img[src*="ah.nl"]') ||
                     a.querySelector('img') ||
                     card?.querySelector('img');
       if (imgEl) {
-        image = imgEl.src || imgEl.dataset?.src || '';
-        if (image && !image.startsWith('http')) {
-          image = new URL(image, location.origin).toString();
+        image = imgEl.src || '';
+        // Fallback: srcset (first URL), data-src (lazy-load)
+        if (!image || image.endsWith('/placeholder.png') || image.includes('data:image')) {
+          const srcset = imgEl.getAttribute('srcset') || '';
+          if (srcset) {
+            const firstSrc = srcset.split(',')[0].trim().split(/\s+/)[0];
+            if (firstSrc) image = firstSrc;
+          }
         }
+        if (!image || image.includes('data:image')) {
+          image = imgEl.dataset?.src || imgEl.dataset?.lazySrc || '';
+        }
+      }
+      // Strategy 2: <picture> > <source> with srcset
+      if (!image && card) {
+        const sourceEl = card.querySelector('picture source[srcset*="ah.nl"]') ||
+                         a.querySelector('picture source[srcset*="ah.nl"]');
+        if (sourceEl) {
+          const srcset = sourceEl.getAttribute('srcset') || '';
+          image = srcset.split(',')[0].trim().split(/\s+/)[0] || '';
+        }
+      }
+      // Strategy 3: widen search to entire article ancestor
+      if (!image) {
+        const article = a.closest('article');
+        if (article && article !== card) {
+          const articleImg = article.querySelector('img[data-testid="product-image"]') ||
+                             article.querySelector('img[src*="static.ah.nl"]');
+          if (articleImg) image = articleImg.src || '';
+        }
+      }
+      if (image && !image.startsWith('http')) {
+        try { image = new URL(image, location.origin).toString(); } catch (_) { image = ''; }
       }
 
       // ---- PRODUCT ID ----

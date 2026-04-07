@@ -348,6 +348,8 @@ function extractProductFromUrl(url, originalName, store = 'ah') {
     .replace(/,\s*(?:Nutri-Score|per stuk|per kg|€|\d+\s*voor|vandaag|morgen).*/i, '')
     .replace(/\s+/g, ' ')
     .trim()
+  // NFC-normalize: compose decomposed Unicode (e + combining accent → é)
+  if (name) name = name.normalize('NFC')
   
   const normalized = normalizeProductName(name)
   const storePrefix = store === 'jumbo' ? 'jumbo' : 'ah'
@@ -425,12 +427,15 @@ function extractProductFromUrl(url, originalName, store = 'ah') {
     // Strategy 1: /producten/product/<wi...>/<slug> format
     const match1 = u.pathname.match(/\/producten\/product\/[^/]+\/([^/?#]+)/)
     if (match1 && match1[1]) {
-      const slug = match1[1].toLowerCase()
-      if (/^[a-z0-9-]+$/.test(slug) && slug.length > 2) {
-        let displayName = slug.replace(/-/g, ' ')
+      let slug
+      try { slug = decodeURIComponent(match1[1]).toLowerCase() } catch (_) { slug = match1[1].toLowerCase() }
+      if (slug.length > 2) {
+        // Build ID from ASCII-only version of slug
+        const asciiSlug = slug.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '')
+        let displayName = slug.normalize('NFC').replace(/-/g, ' ')
         displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
         return {
-          id: slug,
+          id: asciiSlug.length > 2 ? asciiSlug : `ah-${asciiSlug}`.substring(0, 100),
           name: name || displayName,
           normalized: normalizeProductName(slug.replace(/-/g, ' '))
         }
@@ -441,12 +446,14 @@ function extractProductFromUrl(url, originalName, store = 'ah') {
     const match2 = u.pathname.match(/\/wi\/([^/]+)\/([^/?#]+)/)
     if (match2) {
       const wiId = match2[1]
-      const slug = match2[2].toLowerCase()
+      let slug
+      try { slug = decodeURIComponent(match2[2]).toLowerCase() } catch (_) { slug = match2[2].toLowerCase() }
       if (slug.length > 2) {
-        let displayName = slug.replace(/-/g, ' ')
+        const asciiSlug = slug.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '')
+        let displayName = slug.normalize('NFC').replace(/-/g, ' ')
         displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
         return {
-          id: `wi-${wiId}-${slug}`.substring(0, 100),  // Keep it reasonably short
+          id: `wi-${wiId}-${asciiSlug}`.substring(0, 100),
           name: name || displayName,
           normalized: normalizeProductName(slug.replace(/-/g, ' '))
         }
@@ -467,10 +474,11 @@ function extractProductFromUrl(url, originalName, store = 'ah') {
     // Strategy 4: Any URL with a slug at the end
     const pathParts = u.pathname.split('/').filter(p => p.length > 2)
     if (pathParts.length > 0) {
-      const lastPart = pathParts[pathParts.length - 1]
-      const cleanSlug = lastPart.toLowerCase().replace(/[^a-z0-9-]/g, '')
+      let lastPart
+      try { lastPart = decodeURIComponent(pathParts[pathParts.length - 1]) } catch (_) { lastPart = pathParts[pathParts.length - 1] }
+      const cleanSlug = lastPart.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '')
       if (cleanSlug.length > 3) {
-        let displayName = cleanSlug.replace(/-/g, ' ')
+        let displayName = lastPart.normalize('NFC').replace(/-/g, ' ')
         displayName = displayName.replace(/\b[a-z]/g, c => c.toUpperCase())
         return {
           id: `ah-${cleanSlug}`.substring(0, 100),
