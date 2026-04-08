@@ -200,7 +200,7 @@ export async function findSmartAlternatives({
     const related = RELATED_CATEGORIES[co2Category] || []
     const sameCategoryAlts = await queryCategoryProducts(supabase, [co2Category, ...related], productId, 50)
     if (sameCategoryAlts.length > 0) {
-      const scored = scoreAndSort(sameCategoryAlts, evaluateProduct, getEnrichedData, currentScore, false)
+      const scored = scoreAndSort(sameCategoryAlts, evaluateProduct, getEnrichedData, currentScore, false, [], productName)
       result.alternatives = scored.slice(0, maxResults)
     }
     return result
@@ -252,7 +252,7 @@ export async function findSmartAlternatives({
   })
 
   // Score all candidates, filter to better ones, and keep ONLY swap-category matches
-  const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, true, swapCategories)
+  const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, true, swapCategories, productName)
 
   // Prefer swap-category products; only include non-swap if we still have room
   const swapMatches = scored.filter(c => c.isSwapCategory)
@@ -347,13 +347,93 @@ async function queryPopularProducts(supabase, excludeId, limit) {
   return data || []
 }
 
-function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, mustBeBetter, preferredCategories = []) {
+// Words to ignore when computing name relevance (common Dutch/brand filler)
+const STOP_WORDS = new Set([
+  'ah', 'de', 'het', 'een', 'en', 'van', 'met', 'voor', 'op', 'in', 'uit',
+  'bio', 'biologisch', 'huismerk', 'merk', 'stuks', 'stuk', 'gram', 'ml',
+  'liter', 'kg', 'pack', 'mini', 'groot', 'klein', 'vers', 'vrij',
+  'terra', 'planted', 'garden', 'gourmet'
+])
+
+// Common Dutch food-form words that indicate culinary purpose
+// Used to detect shared function between e.g. "rundergehakt" and "rulgehakt"
+const FOOD_FORMS = [
+  'gehakt', 'burger', 'worst', 'filet', 'schnitzel', 'steak', 'bal', 'balletjes',
+  'stukjes', 'reepjes', 'plakjes', 'blokjes', 'sticks', 'nuggets', 'kroket',
+  'shoarma', 'gyros', 'kebab', 'ragout', 'stoofvlees', 'braadstuk',
+  'melk', 'yoghurt', 'kwark', 'kaas', 'boter', 'room', 'vla', 'pudding',
+  'spread', 'salade', 'soep', 'saus', 'pasta', 'rijst', 'brood',
+]
+
+/**
+ * Compute how relevant a candidate name is to the source product name.
+ * Returns 0-1 where 1 = perfect keyword overlap.
+ * Uses three strategies:
+ *   1. Exact token match
+ *   2. Substring/contains match
+ *   3. Shared food-form root (e.g. "rundergehakt" and "rulgehakt" share "gehakt")
+ */
+function nameRelevance(sourceName, candidateName) {
+  if (!sourceName || !candidateName) return 0
+  const tokenize = (s) => s.toLowerCase().replace(/[^a-z0-9àáâãäåèéêëìíîïòóôõöùúûüñç]+/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w))
+  const sourceTokens = tokenize(sourceName)
+  if (sourceTokens.length === 0) return 0
+  const candidateTokens = tokenize(candidateName)
+  const srcJoined = sourceName.toLowerCase()
+  const candJoined = candidateName.toLowerCase()
+
+  // Check for shared food-form words in both names
+  let formBonus = 0
+  for (const form of FOOD_FORMS) {
+    if (srcJoined.includes(form) && candJoined.includes(form)) {
+      formBonus = Math.max(formBonus, form.length >= 6 ? 0.8 : 0.5)
+    }
+  }
+
+  let matches = 0
+  for (const token of sourceTokens) {
+    // Exact token match
+    if (candidateTokens.includes(token)) { matches += 1; continue }
+    // Substring match: one token fully inside another
+    let found = false
+    for (const ct of candidateTokens) {
+      if (ct.includes(token) || token.includes(ct)) { matches += 0.8; found = true; break }
+    }
+    if (found) continue
+    // Shared root match: find longest common substring ≥ 4 chars
+    let bestRoot = 0
+    for (const ct of candidateTokens) {
+      const shorter = token.length < ct.length ? token : ct
+      const longer = token.length < ct.length ? ct : token
+      for (let len = shorter.length; len >= 4; len--) {
+        for (let start = 0; start <= shorter.length - len; start++) {
+          const sub = shorter.substring(start, start + len)
+          if (longer.includes(sub)) {
+            bestRoot = Math.max(bestRoot, len)
+            break
+          }
+        }
+        if (bestRoot >= len) break
+      }
+    }
+    if (bestRoot >= 4) {
+      matches += Math.min(0.7, bestRoot / token.length)
+    }
+  }
+
+  const tokenScore = matches / sourceTokens.length
+  // Combine: take the best of token-based score or food-form bonus
+  return Math.max(tokenScore, formBonus)
+}
+
+function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, mustBeBetter, preferredCategories = [], sourceName = '') {
   const preferredSet = new Set(preferredCategories)
 
   return candidates
     .map(c => {
       const enriched = getEnrichedData(c)
       const evaluation = evaluateProduct(c.name, enriched)
+      const relevance = nameRelevance(sourceName, c.name)
       return {
         id: c.id,
         name: c.name,
@@ -366,11 +446,11 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
         is_vegan: c.is_vegan,
         is_organic: c.is_organic,
         is_fairtrade: c.is_fairtrade,
-        // Relevance boost: products in preferred swap categories get priority
         isSwapCategory: preferredSet.has(evaluation.co2Category),
         improvement: evaluation.score != null && currentScore != null
           ? evaluation.score - currentScore
-          : 0
+          : 0,
+        relevance
       }
     })
     .filter(c => {
@@ -381,9 +461,11 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
     .sort((a, b) => {
       // 1. Swap category products first
       if (a.isSwapCategory !== b.isSwapCategory) return a.isSwapCategory ? -1 : 1
-      // 2. Higher score improvement
+      // 2. Name relevance — direct substitutes ("gehakt" → "vegan gehakt") first
+      if (Math.abs(a.relevance - b.relevance) > 0.1) return b.relevance - a.relevance
+      // 3. Higher score improvement
       if (b.improvement !== a.improvement) return b.improvement - a.improvement
-      // 3. Higher absolute score
+      // 4. Higher absolute score
       return b.score - a.score
     })
 }
