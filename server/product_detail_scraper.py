@@ -795,9 +795,26 @@ class AHProductDetailScraper:
             
             # ================================================================
             # STRATEGY: Infer EU origin from organic/bio certification
-            # Products with EU bio logo are at least from the EU
+            # Products with EU bio logo are at least from the EU.
+            # EXCEPT:
+            #  - Fairtrade products come from developing countries
+            #  - Tropical products (coconut, coffee, cocoa, banana, etc.)
+            #    can carry EU organic cert but are never grown in the EU
             # ================================================================
-            if not result['origin_country'] and result.get('is_organic'):
+            TROPICAL_KEYWORDS = [
+                'kokos', 'coconut', 'cacao', 'cocoa', 'chocola',
+                'koffie', 'coffee', 'banaan', 'banana', 'mango',
+                'ananas', 'pineapple', 'avocado', 'cashew', 'quinoa',
+                'chia', 'acai', 'goji', 'matcha', 'vanille', 'vanilla',
+                'kurkuma', 'turmeric', 'gember', 'ginger', 'soja', 'soy',
+                'pinda', 'peanut', 'sesam', 'sesame', 'rijst', 'rice',
+                'dadel', 'date', 'vijg', 'fig', 'limoen', 'lime',
+                'papaya', 'passievrucht', 'lychee', 'dragon fruit',
+            ]
+            name_lower = result.get('name', '').lower()
+            is_tropical = any(kw in name_lower for kw in TROPICAL_KEYWORDS)
+            
+            if not result['origin_country'] and result.get('is_organic') and not result.get('is_fairtrade') and not is_tropical:
                 result['origin_country'] = 'EU'
                 print(f"[DEBUG] Inferred EU origin from organic/bio certification", flush=True)
                     

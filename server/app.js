@@ -1111,7 +1111,16 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     }
     
     if (!effectiveOrigins && enrichedData.origin_country) {
-      effectiveOrigins = [translateCountryName(enrichedData.origin_country)]
+      // Don't show inferred "EU" origin when it's likely wrong:
+      // - Fairtrade products come from developing countries, not EU
+      // - Tropical products (coconut, coffee, cocoa, etc.) aren't grown in EU
+      const TROPICAL_KEYWORDS = ['kokos','coconut','cacao','cocoa','chocola','koffie','coffee','banaan','banana','mango','ananas','avocado','cashew','quinoa','chia','acai','matcha','vanille','soja','soy','pinda','rijst','rice','dadel','gember','kurkuma']
+      const nameLower = input.toLowerCase()
+      const isTropical = TROPICAL_KEYWORDS.some(kw => nameLower.includes(kw))
+      const skipInferredEU = enrichedData.origin_country === 'EU' && (enrichedData.is_fairtrade === true || isTropical)
+      if (!skipInferredEU) {
+        effectiveOrigins = [translateCountryName(enrichedData.origin_country)]
+      }
     }
     
     if (effectiveOrigins && effectiveOrigins.length > 0) {
