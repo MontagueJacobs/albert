@@ -79,30 +79,49 @@ const TRANSLATIONS = {
     rating_best_worst: 'Laagste & Hoogste CO₂',
     best_purchase: 'Laagste CO₂',
     worst_purchase: 'Hoogste CO₂',
-    how_title: 'Hoe bepalen we de CO₂-score?',
-    how_intro: 'Onze scores zijn gebaseerd op CO₂-emissies per kg voedsel, volgens onderzoeksdata van Our World in Data.',
+    how_title: 'Hoe bepalen we de duurzaamheidsscore?',
+    how_intro: 'Elk voedingsproduct krijgt een score van 0 tot 10. Deze score is volledig gebaseerd op de CO₂-uitstoot per kilogram product. Hoe lager de uitstoot, hoe hoger de score. Niet-voedingsmiddelen (schoonmaak, verzorging, etc.) worden automatisch herkend en krijgen geen score.',
     how_sections: [
       {
-        title: '1. CO₂-emissiedata',
-        body: 'We gebruiken wetenschappelijke data over CO₂-uitstoot per voedselcategorie (kg CO₂-eq per kg product). Fruit en groenten scoren het best, rundvlees het slechtst.'
+        title: '1. Wetenschappelijke emissiedata',
+        body: 'We combineren twee toonaangevende bronnen: Agribalyse v3.2, de Franse levenscyclusanalyse-database van ADEME, en data van Our World in Data (Poore & Nemecek, 2018). De waarden dekken de volledige keten: landgebruik, landbouw, diervoeder, verwerking, transport, verpakking en retail.'
       },
       {
-        title: '2. Scoreberekening',
-        body: 'Producten met minder dan 1 kg CO₂/kg krijgen score 10. Score daalt naarmate CO₂-uitstoot stijgt. Rundvlees (60+ kg CO₂/kg) scoort 0-2.'
+        title: '2. Hoe matchen we producten?',
+        body: 'We proberen eerst de ingrediëntenlijst te analyseren — dit is het nauwkeurigst voor samengestelde producten zoals sauzen of kant-en-klaarmaaltijden. Elke ingrediënt wordt gewogen op basis van de volgorde (eerste ingrediënt = grootste aandeel) en voedingswaarden (vet, eiwit, etc.). Wanneer er geen ingrediëntenlijst beschikbaar is, matchen we op productnaam met onze database van 60+ voedselcategorieën.'
       },
       {
-        title: '3. Frequentie & prijs',
-        body: 'Producten die je vaak koopt wegen zwaarder. Als een alternatief vergelijkbaar geprijsd is, krijgt het een bonus. Duurdere alternatieven worden lager gerankt tenzij de duurzaamheidwinst groot is.'
+        title: '3. Gewogen ingrediëntanalyse',
+        body: 'Bij samengestelde producten berekenen we een gewogen gemiddelde van de CO₂-uitstoot van alle ingrediënten. We gebruiken de volgorde op het etiket (EU-wetgeving vereist aflopend op gewicht) samen met voedingswaarden om het percentage van elk ingrediënt te schatten. Zo krijgt een pasta met kip een score die rekening houdt met zowel de tarwe als het vlees.'
       },
       {
-        title: '4. Alternatieven',
-        body: 'We zoeken producten met hogere scores in dezelfde categorie. Indien mogelijk gebruiken we embeddings om items te vinden die qua ingrediënten of etiketten op elkaar lijken.'
+        title: '4. De scoreschaal',
+        body: 'De uiteindelijke CO₂-waarde (kg CO₂-eq per kg product) wordt omgezet naar een score van 0 tot 10 volgens onderstaande tabel:'
       },
       {
-        title: '5. Aanbevelingen',
-        body: 'De topresultaten verschijnen in het tabblad Aanbevelingen, inclusief score, categorie en een link zodat je direct kunt vergelijken.'
+        title: '5. Beoordeling & labels',
+        body: 'Op basis van de score wordt een beoordeling gegeven: Uitstekend (9-10), Goed (7-8), Gemiddeld (5-6), Hoog (3-4), of Zeer hoog (0-2). Aanvullende informatie zoals biologisch, veganistisch, Fair Trade en herkomst wordt apart getoond als context maar beïnvloedt de score niet.'
+      },
+      {
+        title: '6. Landelijk gemiddelde',
+        body: 'Je gemiddelde CO₂ per kg wordt vergeleken met het Nederlandse dieetgemiddelde, berekend op basis van FAOSTAT-consumptiedata en USDA-voedingswaarden. Zo kun je zien hoe jouw boodschappen zich verhouden tot de gemiddelde Nederlander.'
       }
     ],
+    how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Voorbeeld' },
+    how_table_examples: {
+      10: 'Aardappelen, wortelen, appels',
+      9: 'Brood, bananen, citrusfruit',
+      8: 'Tomaten, rijst, tofu',
+      7: 'Kip, eieren, melk',
+      6: 'Vis, olijfolie, kaas (jong)',
+      5: 'Varkensvlees, garnalen',
+      4: 'Kaas (oud), boter',
+      3: 'Lamsvlees',
+      2: 'Rundvlees (zuivelrund)',
+      1: 'Rundvlees (vleesrund)',
+      0: '—'
+    },
+    how_sources: 'Databronnen: Agribalyse v3.2 (ADEME, 2023), Our World in Data — Poore & Nemecek (Science, 2018), FAOSTAT dieetsamenstelling (2021), USDA FoodData Central. Alle waarden zijn in kg CO₂-equivalenten en omvatten de gehele productieketen.',
     sync_title: 'Albert Heijn account synchroniseren',
     sync_description: 'Synchroniseer je Albert Heijn aankopen om je CO₂-profiel bij te werken.',
     sync_mode_auto: 'Automatisch',
@@ -415,30 +434,49 @@ const TRANSLATIONS = {
     rating_best_worst: 'Lowest & Highest CO₂',
     best_purchase: 'Lowest CO₂',
     worst_purchase: 'Highest CO₂',
-    how_title: 'How do we calculate CO₂ scores?',
-    how_intro: 'Our scores are based on CO₂ emissions per kg of food, using research data from Our World in Data.',
+    how_title: 'How do we calculate the sustainability score?',
+    how_intro: 'Every food product receives a score from 0 to 10. This score is based entirely on the CO₂ emissions per kilogram of product. Lower emissions means a higher score. Non-food items (cleaning supplies, personal care, etc.) are automatically detected and receive no score.',
     how_sections: [
       {
-        title: '1. CO₂ emissions data',
-        body: 'We use scientific data on CO₂ emissions per food category (kg CO₂-eq per kg product). Fruits and vegetables score best, beef scores worst.'
+        title: '1. Scientific emissions data',
+        body: 'We combine two leading sources: Agribalyse v3.2, the French life-cycle analysis database from ADEME, and data from Our World in Data (Poore & Nemecek, 2018). Values cover the full supply chain: land use, farming, animal feed, processing, transport, packaging, and retail.'
       },
       {
-        title: '2. Scoring',
-        body: 'Products with less than 1 kg CO₂/kg get score 10. Score decreases as CO₂ emissions increase. Beef (60+ kg CO₂/kg) scores 0-2.'
+        title: '2. How do we match products?',
+        body: 'We first try to analyze the ingredients list — this is the most accurate method for composite products like sauces or ready meals. Each ingredient is weighted based on its position (first ingredient = largest share) and nutritional values (fat, protein, etc.). When no ingredients list is available, we match by product name against our database of 60+ food categories.'
       },
       {
-        title: '3. Frequency & price',
-        body: 'Items you buy often get more weight. Alternatives at a similar price get a bonus, while much pricier swaps are ranked lower unless the sustainability gain is large.'
+        title: '3. Weighted ingredient analysis',
+        body: 'For composite products, we calculate a weighted average of the CO₂ emissions of all ingredients. We use the order on the label (EU law requires descending by weight) together with nutritional data to estimate each ingredient\'s percentage. This way, a pasta with chicken receives a score that accounts for both the wheat and the meat.'
       },
       {
-        title: '4. Alternatives',
-        body: 'We surface higher-scoring products in the same category and, when available, use embeddings to locate items with similar ingredients or labels.'
+        title: '4. The score scale',
+        body: 'The final CO₂ value (kg CO₂-eq per kg of product) is converted to a score from 0 to 10 using the following thresholds:'
       },
       {
-        title: '5. Recommendations',
-        body: 'We surface the top results in the Suggestions tab, including score, category, and a link so you can compare instantly.'
+        title: '5. Ratings & labels',
+        body: 'Based on the score, a rating is assigned: Excellent (9-10), Good (7-8), Average (5-6), High (3-4), or Very High (0-2). Supplementary information such as organic, vegan, Fair Trade, and origin is displayed separately as context but does not affect the score.'
+      },
+      {
+        title: '6. National baseline',
+        body: 'Your average CO₂ per kg is compared against the Dutch dietary average, calculated from FAOSTAT consumption data and USDA nutritional values. This lets you see how your groceries compare to those of the average Dutch consumer.'
       }
     ],
+    how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Example' },
+    how_table_examples: {
+      10: 'Potatoes, carrots, apples',
+      9: 'Bread, bananas, citrus fruit',
+      8: 'Tomatoes, rice, tofu',
+      7: 'Chicken, eggs, milk',
+      6: 'Fish, olive oil, young cheese',
+      5: 'Pork, shrimp',
+      4: 'Aged cheese, butter',
+      3: 'Lamb',
+      2: 'Beef (dairy herd)',
+      1: 'Beef (beef herd)',
+      0: '—'
+    },
+    how_sources: 'Data sources: Agribalyse v3.2 (ADEME, 2023), Our World in Data — Poore & Nemecek (Science, 2018), FAOSTAT dietary composition (2021), USDA FoodData Central. All values are in kg CO₂ equivalents and cover the entire production chain.',
     sync_title: 'Sync your Albert Heijn account',
     sync_description: 'Sync your Albert Heijn purchases to update your CO₂ profile.',
     sync_mode_auto: 'Automatic',
