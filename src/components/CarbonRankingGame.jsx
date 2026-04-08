@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Loader2, ArrowUp, ArrowDown, Check, AlertCircle, Trophy, Target } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Loader2, ArrowUp, ArrowDown, Check, AlertCircle, Trophy, Target, GripVertical } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 
@@ -52,11 +52,24 @@ const styles = {
     background: 'var(--bg-card, #1f2937)',
     borderRadius: '10px',
     border: '1px solid var(--border, #374151)',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    userSelect: 'none',
+    cursor: 'grab'
   },
-  productCardHighlight: {
+  productCardDragging: {
+    opacity: 0.4,
+    border: '1px dashed var(--border, #374151)'
+  },
+  productCardDragOver: {
     borderColor: '#3b82f6',
-    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.3)'
+    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.3)',
+    background: 'rgba(59, 130, 246, 0.08)'
+  },
+  dragHandle: {
+    color: 'var(--text-muted, #6b7280)',
+    cursor: 'grab',
+    flexShrink: 0,
+    touchAction: 'none'
   },
   rankNumber: {
     width: '28px',
@@ -72,8 +85,8 @@ const styles = {
     flexShrink: 0
   },
   productImage: {
-    width: '48px',
-    height: '48px',
+    width: '64px',
+    height: '64px',
     borderRadius: '8px',
     objectFit: 'cover',
     background: 'var(--bg-secondary, #374151)',
@@ -241,6 +254,92 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
   const [submitting, setSubmitting] = useState(false)
 
   const isNl = lang === 'nl'
+
+  // Drag-and-drop state
+  const dragItem = useRef(null)
+  const dragOverItem = useRef(null)
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+
+  const handleDragStart = useCallback((e, index) => {
+    dragItem.current = index
+    setDragIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    // Set a transparent drag image for cleaner look
+    if (e.target) {
+      e.dataTransfer.setDragImage(e.target, e.target.offsetWidth / 2, e.target.offsetHeight / 2)
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e, index) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    dragOverItem.current = index
+    setDragOverIndex(index)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      setProducts(prev => {
+        const newProducts = [...prev]
+        const [moved] = newProducts.splice(dragItem.current, 1)
+        newProducts.splice(dragOverItem.current, 0, moved)
+        return newProducts
+      })
+    }
+    dragItem.current = null
+    dragOverItem.current = null
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIndex(null)
+  }, [])
+
+  // Touch drag-and-drop support
+  const touchStartY = useRef(null)
+  const touchItemIndex = useRef(null)
+  const listRef = useRef(null)
+
+  const handleTouchStart = useCallback((e, index) => {
+    touchStartY.current = e.touches[0].clientY
+    touchItemIndex.current = index
+    dragItem.current = index
+    setDragIndex(index)
+  }, [])
+
+  const handleTouchMove = useCallback((e, index) => {
+    if (touchItemIndex.current === null || !listRef.current) return
+    e.preventDefault()
+    const touch = e.touches[0]
+    const cards = listRef.current.querySelectorAll('[data-drag-card]')
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect()
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        setDragOverIndex(i)
+        dragOverItem.current = i
+        break
+      }
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      setProducts(prev => {
+        const newProducts = [...prev]
+        const [moved] = newProducts.splice(dragItem.current, 1)
+        newProducts.splice(dragOverItem.current, 0, moved)
+        return newProducts
+      })
+    }
+    touchStartY.current = null
+    touchItemIndex.current = null
+    dragItem.current = null
+    dragOverItem.current = null
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }, [])
 
   useEffect(() => {
     fetchProducts()
@@ -422,8 +521,8 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
         <div style={styles.instructions}>
           <strong>{isNl ? '🎯 Opdracht:' : '🎯 Task:'}</strong><br />
           {isNl 
-            ? 'Sorteer deze producten van HOOGSTE naar LAAGSTE CO₂-uitstoot (kg CO₂ per kg product). Gebruik de pijltjes om producten te verplaatsen. Het product bovenaan heeft volgens jou de meeste CO₂-uitstoot.'
-            : 'Sort these products from HIGHEST to LOWEST CO₂ emissions (kg CO₂ per kg of product). Use the arrows to move products. The product at the top should have the highest CO₂ footprint.'}
+            ? 'Sorteer deze producten van HOOGSTE naar LAAGSTE CO₂-uitstoot (kg CO₂ per kg product). Sleep producten of gebruik de pijltjes om ze te verplaatsen. Het product bovenaan heeft volgens jou de meeste CO₂-uitstoot.'
+            : 'Sort these products from HIGHEST to LOWEST CO₂ emissions (kg CO₂ per kg of product). Drag products or use the arrows to reorder them. The product at the top should have the highest CO₂ footprint.'}
         </div>
       )}
 
@@ -449,16 +548,33 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
         </div>
       )}
 
-      <div style={styles.productList}>
+      <div style={styles.productList} ref={listRef}>
         {(submitted ? results?.results : products).map((product, index) => (
           <div 
-            key={product.id} 
+            key={product.id}
+            data-drag-card
+            draggable={!submitted}
+            onDragStart={!submitted ? (e) => handleDragStart(e, index) : undefined}
+            onDragOver={!submitted ? (e) => handleDragOver(e, index) : undefined}
+            onDragEnd={!submitted ? handleDragEnd : undefined}
+            onDragLeave={!submitted ? handleDragLeave : undefined}
+            onTouchStart={!submitted ? (e) => handleTouchStart(e, index) : undefined}
+            onTouchMove={!submitted ? (e) => handleTouchMove(e, index) : undefined}
+            onTouchEnd={!submitted ? handleTouchEnd : undefined}
             style={{
               ...styles.productCard,
               ...(submitted && product.isCorrect ? styles.resultCorrect : {}),
-              ...(submitted && !product.isCorrect ? styles.resultWrong : {})
+              ...(submitted && !product.isCorrect ? styles.resultWrong : {}),
+              ...(!submitted && dragIndex === index ? styles.productCardDragging : {}),
+              ...(!submitted && dragOverIndex === index && dragIndex !== index ? styles.productCardDragOver : {})
             }}
           >
+            {!submitted && (
+              <div style={styles.dragHandle}>
+                <GripVertical size={18} />
+              </div>
+            )}
+
             <div style={{
               ...styles.rankNumber,
               background: submitted 
@@ -476,7 +592,7 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
                 onError={(e) => { e.target.style.display = 'none' }}
               />
             ) : (
-              <div style={{...styles.productImage, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem'}}>
+              <div style={{...styles.productImage, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem'}}>
                 🛒
               </div>
             )}

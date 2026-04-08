@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, ArrowUp, ArrowDown, Check, AlertCircle, GripVertical } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 
@@ -50,7 +50,23 @@ const styles = {
     borderRadius: '10px',
     border: '1px solid var(--border, #374151)',
     transition: 'all 0.2s ease',
-    userSelect: 'none'
+    userSelect: 'none',
+    cursor: 'grab'
+  },
+  productCardDragging: {
+    opacity: 0.4,
+    border: '1px dashed var(--border, #374151)'
+  },
+  productCardDragOver: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.3)',
+    background: 'rgba(59, 130, 246, 0.08)'
+  },
+  dragHandle: {
+    color: 'var(--text-muted, #6b7280)',
+    cursor: 'grab',
+    flexShrink: 0,
+    touchAction: 'none'
   },
   rankNumber: {
     width: '28px',
@@ -66,19 +82,19 @@ const styles = {
     flexShrink: 0
   },
   productIcon: {
-    width: '44px',
-    height: '44px',
+    width: '64px',
+    height: '64px',
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '1.5rem',
+    fontSize: '1.75rem',
     background: 'var(--bg-secondary, #374151)',
     flexShrink: 0
   },
   productImage: {
-    width: '44px',
-    height: '44px',
+    width: '64px',
+    height: '64px',
     borderRadius: '8px',
     objectFit: 'cover',
     background: 'var(--bg-secondary, #374151)',
@@ -231,6 +247,91 @@ export default function ExperimentRanking({
   const [submitted, setSubmitted] = useState(false)
   const [scoreResult, setScoreResult] = useState(null)
 
+  // Drag-and-drop state
+  const dragItem = useRef(null)
+  const dragOverItem = useRef(null)
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+  const listRef = useRef(null)
+
+  const handleDragStart = useCallback((e, index) => {
+    dragItem.current = index
+    setDragIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    if (e.target) {
+      e.dataTransfer.setDragImage(e.target, e.target.offsetWidth / 2, e.target.offsetHeight / 2)
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e, index) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    dragOverItem.current = index
+    setDragOverIndex(index)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      setItems(prev => {
+        const newItems = [...prev]
+        const [moved] = newItems.splice(dragItem.current, 1)
+        newItems.splice(dragOverItem.current, 0, moved)
+        return newItems
+      })
+    }
+    dragItem.current = null
+    dragOverItem.current = null
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIndex(null)
+  }, [])
+
+  // Touch drag-and-drop support
+  const touchStartY = useRef(null)
+  const touchItemIndex = useRef(null)
+
+  const handleTouchStart = useCallback((e, index) => {
+    touchStartY.current = e.touches[0].clientY
+    touchItemIndex.current = index
+    dragItem.current = index
+    setDragIndex(index)
+  }, [])
+
+  const handleTouchMove = useCallback((e) => {
+    if (touchItemIndex.current === null || !listRef.current) return
+    e.preventDefault()
+    const touch = e.touches[0]
+    const cards = listRef.current.querySelectorAll('[data-drag-card]')
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect()
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        setDragOverIndex(i)
+        dragOverItem.current = i
+        break
+      }
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      setItems(prev => {
+        const newItems = [...prev]
+        const [moved] = newItems.splice(dragItem.current, 1)
+        newItems.splice(dragOverItem.current, 0, moved)
+        return newItems
+      })
+    }
+    touchStartY.current = null
+    touchItemIndex.current = null
+    dragItem.current = null
+    dragOverItem.current = null
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }, [])
+
   useEffect(() => {
     fetchItems()
   }, [sessionId, quizNumber])
@@ -349,8 +450,8 @@ export default function ExperimentRanking({
           <GripVertical size={18} style={{ flexShrink: 0 }} />
           <span>
             {isNl 
-              ? 'Gebruik de pijltjes om producten omhoog of omlaag te verplaatsen. #1 = hoogste CO₂.'
-              : 'Use the arrows to move products up or down. #1 = highest CO₂.'}
+              ? 'Sleep producten of gebruik de pijltjes om ze te verplaatsen. #1 = hoogste CO₂.'
+              : 'Drag products or use the arrows to reorder them. #1 = highest CO₂.'}
           </span>
         </div>
       )}
@@ -369,10 +470,11 @@ export default function ExperimentRanking({
       )}
 
       {/* Product list */}
-      <div style={styles.productList}>
+      <div style={styles.productList} ref={listRef}>
         {displayItems.map((item, index) => {
           let cardStyle = { ...styles.productCard }
           if (submitted && scoreResult && showResults) {
+            cardStyle.cursor = 'default'
             if (item.distance === 0) {
               cardStyle = { ...cardStyle, ...styles.resultCorrect }
             } else if (item.distance === 1) {
@@ -381,9 +483,33 @@ export default function ExperimentRanking({
               cardStyle = { ...cardStyle, ...styles.resultWrong }
             }
           }
+          if (!submitted && dragIndex === index) {
+            cardStyle = { ...cardStyle, ...styles.productCardDragging }
+          }
+          if (!submitted && dragOverIndex === index && dragIndex !== index) {
+            cardStyle = { ...cardStyle, ...styles.productCardDragOver }
+          }
 
           return (
-            <div key={item.id} style={cardStyle}>
+            <div
+              key={item.id}
+              data-drag-card
+              draggable={!submitted}
+              onDragStart={!submitted ? (e) => handleDragStart(e, index) : undefined}
+              onDragOver={!submitted ? (e) => handleDragOver(e, index) : undefined}
+              onDragEnd={!submitted ? handleDragEnd : undefined}
+              onDragLeave={!submitted ? handleDragLeave : undefined}
+              onTouchStart={!submitted ? (e) => handleTouchStart(e, index) : undefined}
+              onTouchMove={!submitted ? (e) => handleTouchMove(e) : undefined}
+              onTouchEnd={!submitted ? handleTouchEnd : undefined}
+              style={cardStyle}
+            >
+              {!submitted && (
+                <div style={styles.dragHandle}>
+                  <GripVertical size={18} />
+                </div>
+              )}
+
               <div style={{
                 ...styles.rankNumber,
                 background: (submitted && showResults && item.distance === 0) ? '#22c55e' : 'var(--bg-secondary, #374151)'
