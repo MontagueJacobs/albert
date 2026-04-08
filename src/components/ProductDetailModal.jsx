@@ -697,7 +697,20 @@ function ProductDetailModal({ purchase, onClose }) {
                 <div style={styles.sectionTitle}>
                   {lang === 'en' ? 'Better Alternatives' : 'Betere Alternatieven'} ({details.alternatives.length})
                 </div>
-                
+
+                {details.suggestionTip && (
+                  <p style={{
+                    margin: '0 0 0.75rem',
+                    padding: '0.6rem 0.8rem',
+                    background: 'var(--bg-secondary, rgba(255,255,255,0.04))',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    lineHeight: 1.5,
+                    color: 'var(--text-muted, #9ca3af)'
+                  }}>
+                    {details.suggestionTip}
+                  </p>
+                )}
                 {details.alternatives.map((alt, i) => (
                   <a 
                     key={i}

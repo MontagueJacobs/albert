@@ -33,6 +33,8 @@ import {
   getProductWeight
 } from './co2Emissions.js'
 
+import { findSmartAlternatives, getSmartSuggestions, CATEGORY_SWAPS } from './suggestionEngine.js'
+
 import {
   getGenericQuiz1Items,
   getGenericQuiz3Items,
@@ -858,40 +860,61 @@ function analyzeUserProfile(purchases) {
 }
 
 /**
- * Find sustainable replacement suggestions based on enriched data
+ * Find sustainable replacement suggestions based on CO₂ category swaps.
+ * Uses the category swap map to suggest genuinely relevant alternatives
+ * (e.g. beef → tofu, milk → oat milk) rather than random high-scoring items.
  */
 function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
   const suggestions = []
 
-  // Score all catalog products with enriched data
+  // Pre-score all catalog products
   const scoredCatalog = catalogProducts.map(p => {
     const enriched = getEnrichedData(p)
     const evaluation = evaluateProduct(p.name, enriched)
-    return { ...p, score: evaluation.score, enriched, evaluation }
-  }).filter(p => p.score >= 5) // Only suggest products with decent scores
+    return { ...p, score: evaluation.score, co2Category: evaluation.co2Category, enriched, evaluation }
+  }).filter(p => p.score != null && p.score >= 5)
 
   for (const product of lowScoreProducts) {
-    // Find higher-scoring alternatives
+    // Get the CO₂ category of the original product
+    const origEvaluation = evaluateProduct(product.name)
+    const origCategory = origEvaluation.co2Category
+    const swapInfo = CATEGORY_SWAPS[origCategory]
+    const swapCategories = new Set(swapInfo?.swaps || [])
+
+    // Prefer alternatives from swap categories, then any better product
     const alternatives = scoredCatalog
-      .filter(alt => alt.score > product.score + 1) // At least 2 points improvement
-      .sort((a, b) => b.score - a.score)
+      .filter(alt => alt.score > product.score + 1)
+      .sort((a, b) => {
+        // Swap-category products first
+        const aSwap = swapCategories.has(a.co2Category) ? 1 : 0
+        const bSwap = swapCategories.has(b.co2Category) ? 1 : 0
+        if (bSwap !== aSwap) return bSwap - aSwap
+        return b.score - a.score
+      })
       .slice(0, 3)
 
     if (alternatives.length > 0) {
       const bestAlt = alternatives[0]
       const improvement = bestAlt.score - product.score
+      const co2Reduction = origEvaluation.co2PerKg && bestAlt.evaluation.co2PerKg
+        ? Math.round((1 - bestAlt.evaluation.co2PerKg / origEvaluation.co2PerKg) * 100)
+        : null
 
       suggestions.push({
-        original: { name: product.name, score: product.score },
+        original: { name: product.name, score: product.score, co2Category: origCategory },
         replacement: {
           name: bestAlt.name,
           score: bestAlt.score,
           url: makeAbsoluteAhUrl(bestAlt.url),
           image_url: bestAlt.image_url,
-          price: bestAlt.price
+          price: bestAlt.price,
+          co2Category: bestAlt.co2Category
         },
         improvement,
-        reason: getReplacementReason(product.enriched, bestAlt.enriched)
+        co2Reduction,
+        reason: co2Reduction
+          ? `🌱 ${co2Reduction}% less CO₂ emissions`
+          : getReplacementReason(product.enriched, bestAlt.enriched)
       })
     }
   }
@@ -986,7 +1009,6 @@ function findCatalogMatch(productName = '') {
 function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const input = typeof productName === 'string' ? productName : ''
   const normalized = normalizeProductName(input)
-  let suggestions = getSuggestions(input, lang)
   
   // =========================================================================
   // CO2-BASED SCORING
@@ -1109,6 +1131,9 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
 
   // Final score is based on CO2 (null if unknown / non-food)
   const finalScore = co2Score  // null for unmatched → shown as N/A in UI
+  
+  // Generate smart suggestions based on CO2 category
+  const suggestions = getSmartSuggestions(input, co2Data.category, finalScore, lang)
   
   return {
     product: input,
@@ -1258,54 +1283,6 @@ function searchProducts(query = '') {
   })
 
   return results.slice(0, 10)
-}
-
-function getSuggestions(productName, lang = 'nl') {
-  const suggestions = []
-  const lowerProduct = productName.toLowerCase()
-
-  const i18n = {
-    nl: {
-      oat_milk: '🥬 Probeer havermelk of sojamelk - 75% minder CO2!',
-      tofu: '🥬 Probeer tofu of tempeh - 90% minder CO2!',
-      plant_chicken: '🥬 Probeer plantaardige kip alternatieven',
-      bio: '🌱 Zoek naar biologische of Fair Trade varianten',
-      packaging: '♻️ Kies voor producten met minder verpakking',
-      great_choice: 'Geweldig! Je maakt al een goede keuze! ✨'
-    },
-    en: {
-      oat_milk: '🥬 Try oat milk or soy milk - 75% less CO2!',
-      tofu: '🥬 Try tofu or tempeh - 90% less CO2!',
-      plant_chicken: '🥬 Try plant-based chicken alternatives',
-      bio: '🌱 Look for organic or Fair Trade options',
-      packaging: '♻️ Choose products with less packaging',
-      great_choice: 'Great! You\'re already making a good choice! ✨'
-    }
-  }
-
-  const t = i18n[lang] || i18n.nl
-
-  if ((lowerProduct.includes('melk') || lowerProduct.includes('milk')) && !lowerProduct.includes('haver') && !lowerProduct.includes('soja')) {
-    suggestions.push(t.oat_milk)
-  }
-
-  if (lowerProduct.includes('vlees') || lowerProduct.includes('beef') || lowerProduct.includes('rund')) {
-    suggestions.push(t.tofu)
-  }
-
-  if (lowerProduct.includes('kip') || lowerProduct.includes('chicken')) {
-    suggestions.push(t.plant_chicken)
-  }
-
-  if (!lowerProduct.includes('bio') && !lowerProduct.includes('organic') && !lowerProduct.includes('fair')) {
-    suggestions.push(t.bio)
-  }
-
-  if (lowerProduct.includes('plastic') || lowerProduct.includes('verpakt')) {
-    suggestions.push(t.packaging)
-  }
-
-  return suggestions.length > 0 ? suggestions : [t.great_choice]
 }
 
 function getRating(avgScore) {
@@ -3110,42 +3087,23 @@ app.get('/api/product/:productId/details', async (req, res) => {
       }
     }
     
-    // Find better alternatives from catalog
+    // Find better alternatives from catalog (category-aware)
     let alternatives = []
-    if (supabase && evaluation.score != null && evaluation.score < 9) {
-      // Get products with better scores from the same general category
-      let query = supabase
-        .from('products')
-        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, nutri_score, ingredients, nutrition_text, nutrition_json')
-        .neq('id', productId)
-        .order('seen_count', { ascending: false })
-        .limit(100)
-      
-      const { data: candidates } = await query
-      
-      if (candidates && candidates.length > 0) {
-        // Score all candidates and filter for better ones
-        const scored = candidates
-          .map(c => {
-            const enriched = getEnrichedData(c)
-            const productEval = evaluateProduct(c.name, enriched)
-            return {
-              id: c.id,
-              name: c.name,
-              url: c.url,
-              image_url: c.image_url,
-              price: c.price,
-              score: productEval.score,
-              is_vegan: c.is_vegan,
-              is_organic: c.is_organic
-            }
-          })
-          .filter(c => c.score != null && c.score > evaluation.score)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 5)
-        
-        alternatives = scored
-      }
+    let suggestionTip = null
+    if (supabase && evaluation.score != null) {
+      const smartResult = await findSmartAlternatives({
+        supabase,
+        productId,
+        productName,
+        co2Category: evaluation.co2Category,
+        currentScore: evaluation.score,
+        evaluateProduct,
+        getEnrichedData,
+        lang: 'nl',
+        maxResults: 5
+      })
+      alternatives = smartResult.alternatives
+      suggestionTip = smartResult.tip
     }
     
     res.json({
@@ -3156,6 +3114,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       breakdown,
       improvements,
       alternatives,
+      suggestionTip,
       enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
       hasEnrichedData: evaluation.hasEnrichedData,
@@ -3238,9 +3197,10 @@ app.post('/api/score', (req, res) => {
 })
 
 app.get('/api/suggestions', (req, res) => {
-  const { product } = req.query
-  const suggestions = getSuggestions(product || '')
-  res.json({ suggestions })
+  const { product, lang } = req.query
+  const language = lang === 'en' ? 'en' : 'nl'
+  const evaluation = evaluateProduct(product || '', null, language)
+  res.json({ suggestions: evaluation.suggestions })
 })
 
 // DEPRECATED: Legacy insights endpoint - now requires authentication
