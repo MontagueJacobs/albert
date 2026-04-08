@@ -3,7 +3,7 @@ import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf,
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 import { variantScoreClass } from '../lib/scoreUtils.js'
-import ScoreBreakdownModal from './ScoreBreakdownModal'
+import ProductDetailModal from './ProductDetailModal'
 
 /* ----------- score colour helpers ----------- */
 function scoreColor(score) {
@@ -215,9 +215,16 @@ function ProductCatalog() {
   // Open product detail
   const openProduct = useCallback((product) => {
     setSelectedProduct({
-      name: product.name,
+      product_id: product.id,
+      product_name: product.name,
       url: product.url || null,
-      image_url: product.image_url || null
+      image_url: product.image_url || null,
+      price: product.price || 0,
+      brand: product.brand || null,
+      is_vegan: product.is_vegan,
+      is_organic: product.is_organic,
+      is_fairtrade: product.is_fairtrade,
+      sustainability_score: product.sustainability_score
     })
   }, [])
 
@@ -647,10 +654,10 @@ function ProductCatalog() {
       {/* Pagination */}
       {!loading && !error && <Pagination />}
 
-      {/* Score breakdown modal */}
+      {/* Product detail modal with alternatives */}
       {selectedProduct && (
-        <ScoreBreakdownModal
-          product={selectedProduct}
+        <ProductDetailModal
+          purchase={selectedProduct}
           onClose={() => setSelectedProduct(null)}
         />
       )}

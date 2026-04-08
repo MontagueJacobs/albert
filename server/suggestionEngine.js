@@ -215,22 +215,33 @@ export async function findSmartAlternatives({
   const swapCategories = swapInfo?.swaps || []
   const searchKeywords = swapInfo?.keywords || []
 
-  // Strategy A: find products whose CO₂ category is in the swap list
-  // We do this by fetching products and scoring them, then filtering
+  // Find products whose CO₂ category is in the swap list.
+  // We query by keyword hints (from CATEGORY_SWAPS) to get relevant candidates,
+  // then score them and keep only those that actually land in a swap category.
   let candidates = []
 
-  if (swapCategories.length > 0) {
-    // Get products from related lower-emission categories
-    // We can't directly query by CO₂ category (it's computed), so we
-    // use the keyword hints + names to get relevant candidates
-    const keywordCandidates = await queryByKeywords(supabase, searchKeywords, productId, 80)
+  if (searchKeywords.length > 0) {
+    const keywordCandidates = await queryByKeywords(supabase, searchKeywords, productId, 120)
     candidates.push(...keywordCandidates)
   }
 
-  // Strategy B: also get popular products and filter to better-scoring ones
-  // (catches products the keyword search misses)
-  const popularCandidates = await queryPopularProducts(supabase, productId, 100)
-  candidates.push(...popularCandidates)
+  // Also pull from RELATED_CATEGORIES for same-group variety
+  const related = RELATED_CATEGORIES[co2Category] || []
+  if (related.length > 0) {
+    // Build extra keywords from related category names
+    const relatedKeywords = related.flatMap(cat => cat.replace(/_/g, ' ').split(' ')).filter(w => w.length > 3)
+    if (relatedKeywords.length > 0) {
+      const relatedCandidates = await queryByKeywords(supabase, relatedKeywords, productId, 40)
+      candidates.push(...relatedCandidates)
+    }
+  }
+
+  // Fallback: if keyword search yielded very few candidates, broaden the pool
+  // but we'll still filter to swap-category matches only below
+  if (candidates.length < maxResults * 2) {
+    const popularCandidates = await queryPopularProducts(supabase, productId, 100)
+    candidates.push(...popularCandidates)
+  }
 
   // Deduplicate by id
   const seen = new Set()
@@ -240,9 +251,19 @@ export async function findSmartAlternatives({
     return true
   })
 
-  // 4. Score all candidates, filter to better ones, prefer swap categories
+  // Score all candidates, filter to better ones, and keep ONLY swap-category matches
   const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, true, swapCategories)
-  result.alternatives = scored.slice(0, maxResults)
+
+  // Prefer swap-category products; only include non-swap if we still have room
+  const swapMatches = scored.filter(c => c.isSwapCategory)
+  const nonSwapBetter = scored.filter(c => !c.isSwapCategory)
+
+  if (swapMatches.length >= maxResults) {
+    result.alternatives = swapMatches.slice(0, maxResults)
+  } else {
+    // Only fill with strict swap-category matches — no generic high scorers
+    result.alternatives = swapMatches.slice(0, maxResults)
+  }
 
   return result
 }
