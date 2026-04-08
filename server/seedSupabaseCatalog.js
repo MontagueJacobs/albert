@@ -40,7 +40,6 @@ async function seed() {
     id: entry.id,
     name: toTextArray(entry.names)[0] || entry.id, // Use first name as primary name
     normalized_name: (toTextArray(entry.names)[0] || entry.id).toLowerCase().trim(),
-    base_score: entry.baseScore ?? 5,
     categories: toTextArray(entry.categories),
     source: 'curated'
   }))

@@ -2,7 +2,6 @@
  * Curated catalogue of everyday Albert Heijn grocery items with sustainability
  * heuristics. Each entry provides:
  *  - names: common labels and synonyms (nl/en) we match against
- *  - baseScore: starting point (0-10) before category adjustments
  *  - categories: sustainability flags (must map to SUSTAINABILITY_DB categories)
  *  - adjustments: additional nudges that capture nuances (e.g. high emissions)
  *  - suggestions: tailored tips we can surface in the UI
@@ -13,7 +12,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'bananas',
     names: ['bananas', 'banana', 'bananen'],
-    baseScore: 7,
     categories: ['fruit', 'imported'],
     adjustments: [],
     suggestions: [
@@ -25,7 +23,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'fairtrade_bananas',
     names: ['fair trade bananas', 'fairtrade bananas', 'bananen fair trade', 'fairtrade bananen'],
-    baseScore: 5,
     categories: ['fruit', 'imported', 'fair_trade'],
     adjustments: [],
     suggestions: [
@@ -37,7 +34,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'apples',
     names: ['apples', 'apple', 'appels', 'appel'],
-    baseScore: 5,
     categories: ['fruit', 'local'],
     adjustments: [],
     suggestions: [
@@ -49,7 +45,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'pears',
     names: ['pears', 'peer', 'peren'],
-    baseScore: 5,
     categories: ['fruit', 'local'],
     adjustments: [],
     suggestions: [
@@ -61,7 +56,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'oranges',
     names: ['oranges', 'orange', 'sinaasappels', 'sinaasappel'],
-    baseScore: 7,
     categories: ['fruit', 'imported'],
     adjustments: [],
     suggestions: [
@@ -73,7 +67,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'strawberries',
     names: ['strawberries', 'strawberry', 'aardbeien', 'aardbei'],
-    baseScore: 6,
     categories: ['fruit', 'imported'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -1 }
@@ -87,7 +80,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'blueberries',
     names: ['blueberries', 'blueberry', 'blauwe bessen'],
-    baseScore: 6,
     categories: ['fruit', 'imported'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -1 }
@@ -101,7 +93,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'potatoes',
     names: ['potatoes', 'potato', 'aardappelen', 'aardappel'],
-    baseScore: 5,
     categories: ['vegetable', 'local'],
     adjustments: [],
     suggestions: [
@@ -113,7 +104,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'carrots',
     names: ['carrots', 'carrot', 'wortels', 'wortel', 'winterpeen'],
-    baseScore: 5,
     categories: ['vegetable', 'local'],
     adjustments: [],
     suggestions: [
@@ -125,7 +115,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'broccoli',
     names: ['broccoli'],
-    baseScore: 5,
     categories: ['vegetable', 'local'],
     adjustments: [],
     suggestions: [
@@ -137,7 +126,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'spinach',
     names: ['spinach', 'spinazie'],
-    baseScore: 5,
     categories: ['vegetable', 'local'],
     adjustments: [],
     suggestions: [
@@ -149,7 +137,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'cucumber',
     names: ['cucumber', 'komkommer'],
-    baseScore: 5,
     categories: ['vegetable'],  // Removed 'local' - origin varies by season
     adjustments: [],
     suggestions: [
@@ -162,7 +149,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'cucumber_organic',
     names: ['organic cucumber', 'biologische komkommer', 'bio komkommer'],
-    baseScore: 7,
     categories: ['vegetable', 'organic'],  // Removed 'local' - origin varies by season (NL Apr-Oct, Spain/imports otherwise)
     adjustments: [],
     suggestions: [
@@ -175,7 +161,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'lettuce',
     names: ['lettuce', 'sla', 'kropsla'],
-    baseScore: 5,
     categories: ['vegetable', 'local'],
     adjustments: [],
     suggestions: [
@@ -187,7 +172,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'tomatoes',
     names: ['tomatoes', 'tomato', 'tomaten', 'tomaat'],
-    baseScore: 5,
     categories: ['vegetable', 'local'],
     adjustments: [],
     suggestions: [
@@ -199,7 +183,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'cherry_tomatoes',
     names: ['cherry tomatoes', 'tros tomaten', 'cherrytomaten'],
-    baseScore: 6,
     categories: ['vegetable', 'imported'],
     adjustments: [],
     suggestions: [
@@ -211,7 +194,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'avocado',
     names: ['avocado', 'avocados', 'avocado\'s'],
-    baseScore: 6,
     categories: ['fruit', 'imported'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -2 },
@@ -226,7 +208,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'oat_milk',
     names: ['oat milk', 'havermelk', 'haverdrank'],
-    baseScore: 7,
   categories: ['plant_based'],
     adjustments: [],
     suggestions: [
@@ -238,7 +219,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'soy_milk',
     names: ['soy milk', 'sojamelk', 'sojadrink', 'sojadrank'],
-    baseScore: 7,
   categories: ['plant_based'],
     adjustments: [],
     suggestions: [
@@ -250,7 +230,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'almond_milk',
     names: ['almond milk', 'amandelmelk', 'amandeldrank'],
-    baseScore: 6,
   categories: ['plant_based', 'imported'],
     adjustments: [
       { code: 'trait_water_intensive', delta: -1 }
@@ -264,7 +243,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'cow_milk',
     names: ['milk', 'melk', 'volle melk', 'halfvolle melk'],
-    baseScore: 5,
     categories: ['dairy'],
     adjustments: [
       { code: 'trait_high_methane', delta: -2 }
@@ -278,7 +256,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'organic_milk',
     names: ['organic milk', 'biologische melk', 'bio melk'],
-    baseScore: 4,
     categories: ['dairy', 'organic'],
     adjustments: [
       { code: 'trait_high_methane', delta: -2 }
@@ -292,7 +269,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'yoghurt',
     names: ['yoghurt', 'yogurt'],
-    baseScore: 5,
     categories: ['dairy'],
     adjustments: [
       { code: 'trait_high_methane', delta: -1 }
@@ -306,7 +282,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'greek_yoghurt',
     names: ['greek yoghurt', 'griekse yoghurt'],
-    baseScore: 5,
     categories: ['dairy'],
     adjustments: [
       { code: 'trait_high_methane', delta: -1 }
@@ -320,7 +295,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'cheese',
     names: ['cheese', 'kaas', 'goudse kaas'],
-    baseScore: 5,
     categories: ['dairy'],
     adjustments: [
       { code: 'trait_high_methane', delta: -2 }
@@ -334,7 +308,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'butter',
     names: ['butter', 'boter', 'roomboter'],
-    baseScore: 5,
     categories: ['dairy'],
     adjustments: [
       { code: 'trait_high_methane', delta: -2 }
@@ -348,7 +321,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'margarine',
     names: ['margarine', 'plantaardige margarine'],
-    baseScore: 6,
     categories: ['plant_based'],
     adjustments: [],
     suggestions: [
@@ -360,7 +332,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'eggs_free_range',
     names: ['free range eggs', 'vrije uitloop eieren', 'scharreleieren', 'eieren'],
-    baseScore: 5,
     categories: ['egg'],
     adjustments: [
       { code: 'trait_high_methane', delta: -1 }
@@ -374,7 +345,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'eggs_organic',
     names: ['organic eggs', 'biologische eieren'],
-    baseScore: 4,
     categories: ['egg', 'organic'],
     adjustments: [
       { code: 'trait_high_methane', delta: -1 }
@@ -388,7 +358,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'tofu',
     names: ['tofu'],
-    baseScore: 7,
     categories: ['plant_based', 'plant_protein'],
     adjustments: [],
     suggestions: [
@@ -400,7 +369,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'tempeh',
     names: ['tempeh'],
-    baseScore: 7,
     categories: ['plant_based', 'plant_protein'],
     adjustments: [],
     suggestions: [
@@ -412,7 +380,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'plant_based_burger',
     names: ['plant based burger', 'veggie burger', 'plantaardige burger'],
-    baseScore: 7,
     categories: ['plant_based', 'processed', 'plant_protein'],
     adjustments: [],
     suggestions: [
@@ -424,7 +391,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'veggie_sausage',
     names: ['veggie sausage', 'plantaardige worst', 'vegetarische worst'],
-    baseScore: 7,
     categories: ['plant_based', 'processed', 'plant_protein'],
     adjustments: [
       { code: 'trait_high_salt', delta: -1 }
@@ -438,7 +404,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'beef_steak',
     names: ['beef steak', 'rundvlees', 'biefstuk'],
-    baseScore: 6,
     categories: ['meat'],
     adjustments: [
       { code: 'trait_high_methane', delta: -2 },
@@ -453,7 +418,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'minced_beef',
     names: ['gehakt', 'rundergehakt', 'minced beef'],
-    baseScore: 6,
     categories: ['meat'],
     adjustments: [
       { code: 'trait_high_methane', delta: -2 },
@@ -468,7 +432,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'chicken_breast',
     names: ['chicken breast', 'kipfilet', 'kip'],
-    baseScore: 6,
     categories: ['meat'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -1 }
@@ -482,7 +445,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'pork_chop',
     names: ['pork chop', 'varkensvlees', 'karbonade'],
-    baseScore: 6,
     categories: ['meat'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -1 }
@@ -496,7 +458,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'salmon',
     names: ['salmon', 'zalm'],
-    baseScore: 6,
     categories: ['seafood', 'imported'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -1 }
@@ -510,7 +471,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'tuna_canned',
     names: ['tuna', 'tonijn', 'blik tonijn', 'canned tuna'],
-    baseScore: 5,
     categories: ['seafood'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -1 }
@@ -524,7 +484,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'shrimp',
     names: ['shrimp', 'garnalen'],
-    baseScore: 6,
     categories: ['seafood', 'imported'],
     adjustments: [
       { code: 'trait_high_emissions', delta: -2 }
@@ -538,7 +497,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'chocolate',
     names: ['chocolate', 'chocolade', 'chocolate bar'],
-    baseScore: 5,
     categories: ['snack', 'processed'],
     adjustments: [
       { code: 'trait_high_sugar', delta: -1 }
@@ -552,7 +510,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'chocolate_fairtrade',
     names: ['fair trade chocolate', 'fairtrade chocolade', 'tony\'s chocolade'],
-    baseScore: 5,
     categories: ['snack', 'processed', 'fair_trade'],
     adjustments: [
       { code: 'trait_high_sugar', delta: -1 }
@@ -566,7 +523,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'chips',
     names: ['chips', 'crisps', 'aardappelschips'],
-    baseScore: 4,
     categories: ['snack', 'processed'],
     adjustments: [
       { code: 'trait_high_salt', delta: -1 }
@@ -580,7 +536,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'soda',
     names: ['soda', 'frisdrank', 'cola'],
-    baseScore: 4,
     categories: ['beverage', 'processed'],
     adjustments: [
       { code: 'trait_high_sugar', delta: -1 }
@@ -594,7 +549,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'sparkling_water',
     names: ['sparkling water', 'bruiswater', 'spa rood'],
-    baseScore: 6,
     categories: ['beverage'],
     adjustments: [],
     suggestions: [
@@ -606,7 +560,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'pasta',
     names: ['pasta', 'spaghetti', 'penne'],
-    baseScore: 5,
     categories: ['grain', 'processed'],
     adjustments: [],
     suggestions: [
@@ -618,7 +571,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'rice',
     names: ['rice', 'rijst'],
-    baseScore: 5,
     categories: ['grain', 'imported'],
     adjustments: [
       { code: 'trait_high_methane', delta: -1 }
@@ -632,7 +584,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'quinoa',
     names: ['quinoa'],
-    baseScore: 6,
     categories: ['grain', 'imported', 'plant_protein'],
     adjustments: [],
     suggestions: [
@@ -644,7 +595,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'lentils',
     names: ['lentils', 'linzen'],
-    baseScore: 7,
     categories: ['plant_based', 'legume', 'plant_protein'],
     adjustments: [],
     suggestions: [
@@ -656,7 +606,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'chickpeas',
     names: ['chickpeas', 'kikkererwten'],
-    baseScore: 7,
     categories: ['plant_based', 'legume', 'plant_protein'],
     adjustments: [],
     suggestions: [
@@ -668,7 +617,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'frozen_pizza',
     names: ['frozen pizza', 'diepvriespizza'],
-    baseScore: 4,
     categories: ['processed'],
     adjustments: [
       { code: 'trait_high_salt', delta: -1 }
@@ -682,7 +630,6 @@ export const PRODUCT_CATALOG = [
   {
     id: 'ready_meal',
     names: ['ready meal', 'magnetronmaaltijd', 'kant en klare maaltijd'],
-    baseScore: 4,
     categories: ['processed'],
     adjustments: [
       { code: 'trait_high_salt', delta: -1 }

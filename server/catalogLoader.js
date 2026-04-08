@@ -58,8 +58,7 @@ async function fetchSupabaseCatalog() {
   // Fetch from unified 'products' table
   const { data, error } = await supabase
     .from(SUPABASE_TABLE)
-    .select('id, name, alt_names, base_score, categories')
-    .not('base_score', 'is', null)  // Only get products with sustainability scores
+    .select('id, name, alt_names, categories')
     .order('id', { ascending: true })
     .limit(2000)
 
@@ -94,11 +93,6 @@ async function fetchSupabaseCatalog() {
       return {
         id,
         names,
-        baseScore: typeof row.base_score === 'number'
-          ? row.base_score
-          : typeof row.baseScore === 'number'
-            ? row.baseScore
-            : 5,
         categories: toStringArray(row.categories)
       }
     })
