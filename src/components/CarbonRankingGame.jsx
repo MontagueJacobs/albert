@@ -3,6 +3,30 @@ import { Loader2, ArrowUp, ArrowDown, Check, AlertCircle, Trophy, Target, GripVe
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 
+// Color for rank position: #1 (highest CO₂) = red → last (lowest CO₂) = green
+function getRankColor(position, total) {
+  // position is 0-based index, total is number of items
+  if (total <= 1) return '#eab308'
+  const t = position / (total - 1) // 0 = top (worst) → 1 = bottom (best)
+  // Gradient: red → orange → yellow → lime → green
+  const stops = [
+    { at: 0,    r: 239, g: 68,  b: 68  }, // #ef4444 red
+    { at: 0.25, r: 249, g: 115, b: 22  }, // #f97316 orange
+    { at: 0.5,  r: 234, g: 179, b: 8   }, // #eab308 yellow
+    { at: 0.75, r: 132, g: 204, b: 22  }, // #84cc16 lime
+    { at: 1,    r: 34,  g: 197, b: 94  }, // #22c55e green
+  ]
+  let lo = stops[0], hi = stops[stops.length - 1]
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (t >= stops[i].at && t <= stops[i + 1].at) { lo = stops[i]; hi = stops[i + 1]; break }
+  }
+  const f = lo.at === hi.at ? 0 : (t - lo.at) / (hi.at - lo.at)
+  const r = Math.round(lo.r + (hi.r - lo.r) * f)
+  const g = Math.round(lo.g + (hi.g - lo.g) * f)
+  const b = Math.round(lo.b + (hi.b - lo.b) * f)
+  return `rgb(${r},${g},${b})`
+}
+
 const styles = {
   container: {
     maxWidth: '700px',
@@ -579,7 +603,8 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
               ...styles.rankNumber,
               background: submitted 
                 ? (product.isCorrect ? '#22c55e' : 'var(--bg-secondary, #374151)')
-                : 'var(--bg-secondary, #374151)'
+                : getRankColor(index, (submitted ? results?.results : products).length),
+              color: '#fff'
             }}>
               {index + 1}
             </div>
