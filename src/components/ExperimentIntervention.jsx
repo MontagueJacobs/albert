@@ -300,8 +300,9 @@ export default function ExperimentIntervention({ session, onComplete }) {
   const variant = session?.ab_variant || 'A'
   const maxCO2 = Math.max(...CO2_CATEGORIES.map(c => c.co2))
 
-  // Get quiz 1 & 2 results for summary
+  // Get pre-quiz results for summary
   const q1Score = session?.quiz1_data?.score
+  const q5Score = session?.quiz5_data?.score
   const q2Score = session?.quiz2_data?.score
 
   return (
@@ -320,8 +321,8 @@ export default function ExperimentIntervention({ session, onComplete }) {
 
       {/* Detailed quiz results shown above via QuizResultsReview */}
 
-      {/* Detailed quiz 1 & 2 results */}
-      {(session?.quiz1_data || session?.quiz2_data) && (
+      {/* Detailed pre-quiz results */}
+      {(session?.quiz1_data || session?.quiz5_data || session?.quiz2_data) && (
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text, #f3f4f6)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             📋 {isNl ? 'Jouw quiz resultaten' : 'Your quiz results'}
@@ -337,8 +338,13 @@ export default function ExperimentIntervention({ session, onComplete }) {
             defaultOpen={true}
           />
           <QuizResultsReview
+            quizData={session.quiz5_data}
+            quizLabel={isNl ? 'Quiz 2 – AH Producten' : 'Quiz 2 – AH Products'}
+            defaultOpen={false}
+          />
+          <QuizResultsReview
             quizData={session.quiz2_data}
-            quizLabel={isNl ? 'Quiz 2 – Jouw Aankopen' : 'Quiz 2 – Your Purchases'}
+            quizLabel={isNl ? 'Quiz 3 – Jouw Aankopen' : 'Quiz 3 – Your Purchases'}
             defaultOpen={false}
           />
         </div>

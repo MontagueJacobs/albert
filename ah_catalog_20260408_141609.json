@@ -1,0 +1,42 @@
+[
+  {
+    "id": "wi54074",
+    "url": "https://www.ah.nl/producten/product/wi54074/ah-komkommer",
+    "category": "Aardappel, groente, fruit",
+    "name": "Groente, aardappelen",
+    "normalized_name": "groenteaardappelen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323130333735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+  },
+  {
+    "id": "wi4117",
+    "url": "https://www.ah.nl/producten/product/wi4117/ah-paprika-rood",
+    "category": "Aardappel, groente, fruit",
+    "name": "Groente, aardappelen",
+    "normalized_name": "groenteaardappelen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323130333735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+  },
+  {
+    "id": "wi4164",
+    "url": "https://www.ah.nl/producten/product/wi4164/ah-courgette",
+    "category": "Aardappel, groente, fruit",
+    "name": "Groente, aardappelen",
+    "normalized_name": "groenteaardappelen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323130333735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+  },
+  {
+    "id": "wi101130",
+    "url": "https://www.ah.nl/producten/product/wi101130/ah-biologisch-komkommer",
+    "category": "Aardappel, groente, fruit",
+    "name": "Groente, aardappelen",
+    "normalized_name": "groenteaardappelen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323130333735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+  },
+  {
+    "id": "wi4177",
+    "url": "https://www.ah.nl/producten/product/wi4177/ah-broccoli",
+    "category": "Aardappel, groente, fruit",
+    "name": "Groente, aardappelen",
+    "normalized_name": "groenteaardappelen",
+    "image_url": "https://static.ah.nl/dam/product/AHI_4354523130323130333735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary"
+  }
+]
