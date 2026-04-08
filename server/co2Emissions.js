@@ -1072,6 +1072,11 @@ function parseIngredients(ingredientText) {
   // Remove trailing period
   text = text.replace(/\.\s*$/, '')
   
+  // Fix Dutch decimal commas in percentages before splitting:
+  // "1, 6% tomatenpuree" → "1.6% tomatenpuree", "7, 7% tomaat" → "7.7% tomaat"
+  // Also handles "7,7%" (no space) which some labels use
+  text = text.replace(/(\d+)\s*,\s*(\d+)\s*%/g, '$1.$2%')
+  
   // Split by commas, but not commas inside parentheses/brackets
   const parts = []
   let depth = 0
@@ -1099,7 +1104,12 @@ function parseIngredients(ingredientText) {
   const GENERIC_SECTIONS = new Set([
     'deeg', 'vulling', 'saus', 'coating', 'glazuur', 'crème', 'creme',
     'ragout', 'marinade', 'broodkruim', 'panering', 'topping', 'beleg',
-    'garnering', 'deksel', 'bodem', 'massa'
+    'garnering', 'deksel', 'bodem', 'massa',
+    // Composite ingredient groups (e.g. "groente (12% paprika, 12% courgette)")
+    'groente', 'groenten', 'vegetables', 'fruit', 'vruchten', 'fruits',
+    'vlees', 'meat', 'vis', 'fish', 'kaas', 'cheese', 'kruiden', 'herbs',
+    'specerijen', 'spices', 'noten', 'nuts', 'zaden', 'seeds',
+    'champignons', 'paddenstoelen', 'mushrooms'
   ])
   
   const ingredients = []
@@ -1107,25 +1117,22 @@ function parseIngredients(ingredientText) {
     let part = parts[i]
     if (!part) continue
     
-    // Extract percentage: "13% tomaten" or "tomaten 13%" or "tomaten (13%)"
-    let percentage = null
-    const pctMatch = part.match(/(\d+[\.,]?\d*)\s*%/) 
-    if (pctMatch) {
-      percentage = parseFloat(pctMatch[1].replace(',', '.'))
-      part = part.replace(pctMatch[0], '').trim()
-    }
-    
     // Check if this is a generic section with sub-ingredients in parentheses
-    // e.g. "Deeg (TARWEBLOEM, EIEREN, water)" → expand sub-ingredients
-    const parenMatch = part.match(/^(\w[\w\s-]*?)\s*\((.+)\)\s*$/)
-    if (parenMatch) {
-      const sectionName = parenMatch[1].trim().toLowerCase()
-      const subIngredientText = parenMatch[2]
+    // BEFORE extracting percentage, so sub-ingredient percentages aren't consumed.
+    // e.g. "groente (12% gele paprika, 12% courgette, 7.7% tomaat)" → expand sub-ingredients
+    // e.g. "Deeg 55% (TARWEBLOEM, EIEREN, water)" → expand sub-ingredients
+    const sectionMatch = part.match(/^(\w[\w\s-]*?)\s*(?:(\d+[\.,]?\d*)\s*%)?\s*\((.+)\)\s*$/)
+    if (sectionMatch) {
+      const sectionName = sectionMatch[1].trim().toLowerCase()
+      const sectionPct = sectionMatch[2] ? parseFloat(sectionMatch[2].replace(',', '.')) : null
+      const subIngredientText = sectionMatch[3]
       
       if (GENERIC_SECTIONS.has(sectionName)) {
         // Expand: split sub-ingredients by comma and add them individually
-        const subParts = subIngredientText.split(',').map(s => s.trim()).filter(Boolean)
-        const sectionWeight = percentage || null
+        // First, fix Dutch decimal commas in percentages: "7, 7%" or "7,7%" → "7.7%"
+        const fixedSubText = subIngredientText.replace(/(\d+)\s*,\s*(\d+)\s*%/g, '$1.$2%')
+        const subParts = fixedSubText.split(',').map(s => s.trim()).filter(Boolean)
+        const sectionWeight = sectionPct || null
         
         for (let j = 0; j < subParts.length; j++) {
           let subPart = subParts[j]
@@ -1163,6 +1170,14 @@ function parseIngredients(ingredientText) {
         }
         continue // Skip adding the generic section itself
       }
+    }
+    
+    // Extract percentage for non-section ingredients: "13% tomaten" or "tomaten 13%" or "tomaten (13%)"
+    let percentage = null
+    const pctMatch = part.match(/(\d+[\.,]?\d*)\s*%/) 
+    if (pctMatch) {
+      percentage = parseFloat(pctMatch[1].replace(',', '.'))
+      part = part.replace(pctMatch[0], '').trim()
     }
     
     // Remove sub-ingredient parenthetical notes: "mozzarella (MELK, zout)" → "mozzarella"

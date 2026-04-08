@@ -909,27 +909,42 @@ export default function ExperimentFlow({ onComplete, onBack }) {
             </p>
           )}
 
-          {/* Detailed results for post-quizzes */}
-          {(session.quiz3_data || session.quiz4_data || session.quiz6_data) && (
+          {/* Detailed results for all quizzes */}
+          {(session.quiz1_data || session.quiz5_data || session.quiz2_data || session.quiz3_data || session.quiz4_data || session.quiz6_data) && (
             <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #9ca3af)', marginBottom: '1rem', lineHeight: '1.5' }}>
                 {isNl
-                  ? 'Bekijk hieronder hoe je het deed op de post-quizzen:'
-                  : 'See below how you did on the post-quizzes:'}
+                  ? 'Bekijk hieronder hoe je het deed op alle quizzen:'
+                  : 'See below how you did on all quizzes:'}
               </p>
               <QuizResultsReview
+                quizData={session.quiz1_data}
+                quizLabel={isNl ? 'Quiz 1 – Algemene Producten (voor)' : 'Quiz 1 – General Products (pre)'}
+                defaultOpen={false}
+              />
+              <QuizResultsReview
+                quizData={session.quiz5_data}
+                quizLabel={isNl ? 'Quiz 2 – AH Producten (voor)' : 'Quiz 2 – AH Products (pre)'}
+                defaultOpen={false}
+              />
+              <QuizResultsReview
+                quizData={session.quiz2_data}
+                quizLabel={isNl ? 'Quiz 3 – Jouw Aankopen (voor)' : 'Quiz 3 – Your Purchases (pre)'}
+                defaultOpen={false}
+              />
+              <QuizResultsReview
                 quizData={session.quiz3_data}
-                quizLabel={isNl ? 'Quiz 4 – Algemene Producten' : 'Quiz 4 – General Products'}
+                quizLabel={isNl ? 'Quiz 4 – Algemene Producten (na)' : 'Quiz 4 – General Products (post)'}
                 defaultOpen={true}
               />
               <QuizResultsReview
                 quizData={session.quiz6_data}
-                quizLabel={isNl ? 'Quiz 5 – AH Producten' : 'Quiz 5 – AH Products'}
+                quizLabel={isNl ? 'Quiz 5 – AH Producten (na)' : 'Quiz 5 – AH Products (post)'}
                 defaultOpen={false}
               />
               <QuizResultsReview
                 quizData={session.quiz4_data}
-                quizLabel={isNl ? 'Quiz 6 – Jouw Aankopen' : 'Quiz 6 – Your Purchases'}
+                quizLabel={isNl ? 'Quiz 6 – Jouw Aankopen (na)' : 'Quiz 6 – Your Purchases (post)'}
                 defaultOpen={false}
               />
             </div>
