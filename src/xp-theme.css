@@ -70,9 +70,9 @@
   border: 1px outset #DDD8C4;
 }
 
-/* ============ APP HEADER → XP Title-bar gradient ============ */
+/* ============ APP HEADER → XP Title-bar ============ */
 [data-theme="xp"] .app-header {
-  background: linear-gradient(180deg, var(--xp-title-end) 0%, var(--xp-title-start) 45%, var(--xp-blue-dark) 100%);
+  background: var(--xp-title-start);
   border-bottom: 2px solid #002D80;
   border-radius: 8px 8px 0 0;
   color: #fff;
