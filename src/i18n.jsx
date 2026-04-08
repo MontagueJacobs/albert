@@ -105,6 +105,10 @@ const TRANSLATIONS = {
       {
         title: '6. Landelijk gemiddelde',
         body: 'Je gemiddelde CO₂ per kg wordt vergeleken met het Nederlandse dieetgemiddelde, berekend op basis van FAOSTAT-consumptiedata en USDA-voedingswaarden. Zo kun je zien hoe jouw boodschappen zich verhouden tot de gemiddelde Nederlander.'
+      },
+      {
+        title: '7. Slimme alternatieven',
+        body: 'Bij elk product tonen we relevante alternatieven met een lagere CO₂-uitstoot. We gebruiken een categorie-gebaseerd wisselsysteem: rundvlees krijgt plantaardige suggesties (tofu, tempeh, peulvruchten), zuivel wordt gekoppeld aan plantaardige varianten (havermelk, sojamelk), en koffie aan thee. Alleen producten uit een relevante wisselcategorie worden getoond — geen willekeurige hoge scoorders. Producten die al een uitstekende score (9-10) hebben, krijgen vergelijkbare producten in dezelfde categorie te zien.'
       }
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Voorbeeld' },
@@ -460,6 +464,10 @@ const TRANSLATIONS = {
       {
         title: '6. National baseline',
         body: 'Your average CO₂ per kg is compared against the Dutch dietary average, calculated from FAOSTAT consumption data and USDA nutritional values. This lets you see how your groceries compare to those of the average Dutch consumer.'
+      },
+      {
+        title: '7. Smart alternatives',
+        body: 'For each product we show relevant alternatives with a lower CO₂ footprint. We use a category-based swap system: beef gets plant-based suggestions (tofu, tempeh, legumes), dairy is matched with plant-based options (oat milk, soy milk), and coffee with tea. Only products from a relevant swap category are shown — no random high scorers. Products that already have an excellent score (9-10) are shown similar products within the same category.'
       }
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Example' },
