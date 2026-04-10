@@ -219,7 +219,7 @@ export default function QuizResultsReview({ quizData, quizLabel, defaultOpen = f
           {correctOrder.length > 0 && (
             <>
               <div style={styles.correctLabel}>
-                {isNl ? '✅ Juiste volgorde (hoogste → laagste CO₂):' : '✅ Correct order (highest → lowest CO₂):'}
+                {isNl ? '✅ Juiste volgorde (laagste → hoogste CO₂):' : '✅ Correct order (lowest → highest CO₂):'}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text, #d1d5db)', lineHeight: '1.6' }}>
                 {correctOrder.map((item, idx) => (

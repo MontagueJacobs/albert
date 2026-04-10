@@ -24,25 +24,19 @@ import {
 const GENERIC_POOL_A = [
   { name: 'Rundergehakt', nameNl: 'Rundergehakt', image: '🥩' },
   { name: 'Kipfilet', nameNl: 'Kipfilet', image: '🍗' },
-  { name: 'Zalm', nameNl: 'Zalm', image: '🐟' },
   { name: 'Kaas', nameNl: 'Kaas', image: '🧀' },
   { name: 'Melk', nameNl: 'Melk', image: '🥛' },
   { name: 'Rijst', nameNl: 'Rijst', image: '🍚' },
-  { name: 'Tomaat', nameNl: 'Tomaat', image: '🍅' },
   { name: 'Brood', nameNl: 'Brood', image: '🍞' },
-  { name: 'Appel', nameNl: 'Appel', image: '🍎' },
   { name: 'Aardappel', nameNl: 'Aardappel', image: '🥔' },
 ]
 
 const GENERIC_POOL_B = [
   { name: 'Lamsvlees', nameNl: 'Lamsvlees', image: '🍖' },
   { name: 'Varkensvlees', nameNl: 'Varkensvlees', image: '🥓' },
-  { name: 'Garnalen', nameNl: 'Garnalen', image: '🦐' },
   { name: 'Boter', nameNl: 'Boter', image: '🧈' },
   { name: 'Eieren', nameNl: 'Eieren', image: '🥚' },
-  { name: 'Pasta', nameNl: 'Pasta', image: '🍝' },
   { name: 'Banaan', nameNl: 'Banaan', image: '🍌' },
-  { name: 'Wortel', nameNl: 'Wortel', image: '🥕' },
   { name: 'Linzen', nameNl: 'Linzen', image: '🫘' },
   { name: 'Chocolade', nameNl: 'Chocolade', image: '🍫' },
 ]
@@ -56,11 +50,8 @@ const AH_POOL_C = [
   { name: 'AH Rundergehakt',           nameNl: 'AH Rundergehakt',           image: '🥩', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303937393037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Scharrel kipfilet',      nameNl: 'AH Scharrel kipfilet',      image: '🍗', image_url: 'https://static.ah.nl/dam/product/AHI_43545239393132353833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Geraspte kaas',          nameNl: 'AH Geraspte kaas',          image: '🧀', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313838303239?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Roomboter ongezouten',   nameNl: 'AH Roomboter ongezouten',   image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313032323032?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Halfvolle melk',         nameNl: 'AH Halfvolle melk',         image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303337393339?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Halfvolle yoghurt',      nameNl: 'AH Halfvolle yoghurt',      image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313832363731?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Spaghetti',              nameNl: 'AH Spaghetti',              image: '🍝', image_url: 'https://static.ah.nl/dam/product/AHI_43545239383939363230?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Pindakaas',              nameNl: 'AH Pindakaas',              image: '🥜', image_url: 'https://static.ah.nl/dam/product/AHI_47745967326d487a52362d416c34366f6d7367514577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Trostomaten',            nameNl: 'AH Trostomaten',            image: '🍅', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313637333535?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Witte bonen',            nameNl: 'AH Witte bonen',            image: '🫘', image_url: 'https://static.ah.nl/dam/product/AHI_523161594733674e536c474a58762d6270776e534c67?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
@@ -68,12 +59,9 @@ const AH_POOL_C = [
 const AH_POOL_D = [
   { name: 'AH Lamsfilet',              nameNl: 'AH Lamsfilet',              image: '🍖', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303937393430?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Varkenshaas',            nameNl: 'AH Varkenshaas',            image: '🥓', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303938303033?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Garnalen',              nameNl: 'AH Garnalen',              image: '🦐', image_url: 'https://static.ah.nl/dam/product/AHI_43545239393236303232?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Mozzarella',            nameNl: 'AH Mozzarella',            image: '🧀', image_url: 'https://static.ah.nl/dam/product/AHI_43545239373537333131?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Scharreleieren',        nameNl: 'AH Scharreleieren',        image: '🥚', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313931353932?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Pandan rijst',          nameNl: 'AH Pandan rijst',          image: '🍚', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323037383238?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Broccoliroosjes',       nameNl: 'AH Broccoliroosjes',       image: '🥦', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313836313439?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Cashewnoten',           nameNl: 'AH Cashewnoten',           image: '🥜', image_url: 'https://static.ah.nl/dam/product/AHI_524474596e624b785448696e736a5276724278676577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Havermout',             nameNl: 'AH Havermout',             image: '🥣', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313931343330?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Kikkererwten',          nameNl: 'AH Kikkererwten',          image: '🫘', image_url: 'https://static.ah.nl/dam/product/AHI_38597863424b726f534f4f6b32357370696331484841?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
@@ -192,7 +180,7 @@ export function calculateRankingScore(userRanking, items) {
   const correctOrder = [...items].sort((a, b) => {
     const aCO2 = a.co2PerKg ?? 0
     const bCO2 = b.co2PerKg ?? 0
-    return bCO2 - aCO2
+    return aCO2 - bCO2  // ascending: 1 = best (lowest CO₂), 7 = worst (highest CO₂)
   })
   
   // Build map: item id → correct rank (0-indexed)

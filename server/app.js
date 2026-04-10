@@ -3424,7 +3424,7 @@ function isLikelyFood(productName) {
   return !NON_FOOD_KEYWORDS.some(keyword => nameLower.includes(keyword))
 }
 
-// Get 10 products for carbon ranking game: 5 from user's purchases, 5 from products table
+// Get 7 products for carbon ranking game: up to 4 from user's purchases, rest from products table
 app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
   try {
     const { bonusCard } = req.params
@@ -3861,11 +3861,11 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
         }
       }))
 
-      // Filter valid CO2 data, shuffle, take up to 10
+      // Filter valid CO2 data, shuffle, take up to 7
       items = enriched
         .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
         .sort(() => Math.random() - 0.5)
-        .slice(0, 10)
+        .slice(0, 7)
     }
 
     // Filter out any used IDs (safety)

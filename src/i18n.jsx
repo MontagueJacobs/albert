@@ -108,7 +108,11 @@ const TRANSLATIONS = {
       },
       {
         title: '7. Slimme alternatieven',
-        body: 'Bij elk product tonen we relevante alternatieven met een lagere CO₂-uitstoot. We gebruiken een categorie-gebaseerd wisselsysteem: rundvlees krijgt plantaardige suggesties (tofu, tempeh, peulvruchten), zuivel wordt gekoppeld aan plantaardige varianten (havermelk, sojamelk), en koffie aan thee. Alleen producten uit een relevante wisselcategorie worden getoond — geen willekeurige hoge scoorders. Producten die al een uitstekende score (9-10) hebben, krijgen vergelijkbare producten in dezelfde categorie te zien.'
+        body: 'Ons aanbevelingssysteem zoekt actief naar duurzamere alternatieven via vier zoekstrategieën. Eerst doorzoeken we 25 wisselcategorieën: rundvlees → plantaardig gehakt, zuivel → havermelk/sojamelk, kaas → plantaardige kaas, boter → margarine, enzovoort. Daarna zoeken we in verwante categorieën (bijv. varkensvlees → kip). Vervolgens gebruiken we naam-herkenning om vergelijkbare productvormen te vinden — "gehakt" levert "vegan gehakt", "melk" levert "havermelk". Tot slot vullen we aan met populaire, duurzame producten. Alleen producten die daadwerkelijk beter scoren worden getoond.'
+      },
+      {
+        title: '8. Relevantie & tips',
+        body: 'Alternatieven worden gerangschikt op relevantie. We herkennen productvorm-woorden (gehakt, burger, melk, yoghurt, kaas, etc.) en geven bonuspunten aan alternatieven met een vergelijkbare productvorm. De uiteindelijke rangorde combineert: wisselcategorie-bonus, naamrelevantie, CO₂-verbetering, en absolute score. Bij elke categorie tonen we een gepersonaliseerde tip — bijvoorbeeld dat plantaardig gehakt tot 90% minder CO₂ uitstoot dan rundvlees, of dat havermelk slechts een derde van de uitstoot van zuivel heeft.'
       }
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Voorbeeld' },
@@ -467,7 +471,11 @@ const TRANSLATIONS = {
       },
       {
         title: '7. Smart alternatives',
-        body: 'For each product we show relevant alternatives with a lower CO₂ footprint. We use a category-based swap system: beef gets plant-based suggestions (tofu, tempeh, legumes), dairy is matched with plant-based options (oat milk, soy milk), and coffee with tea. Only products from a relevant swap category are shown — no random high scorers. Products that already have an excellent score (9-10) are shown similar products within the same category.'
+        body: 'Our recommendation engine actively searches for more sustainable alternatives using four search strategies. First, we search across 25 swap categories: beef → plant-based mince, dairy → oat milk/soy milk, cheese → plant-based cheese, butter → margarine, and so on. Next, we search related categories (e.g., pork → chicken). Then we use name recognition to find similar product forms — "gehakt" (mince) yields "vegan gehakt", "melk" (milk) yields "havermelk" (oat milk). Finally, we supplement with popular, sustainable products. Only products that genuinely score better are shown.'
+      },
+      {
+        title: '8. Relevance & tips',
+        body: 'Alternatives are ranked by relevance. We recognize product-form words (mince, burger, milk, yoghurt, cheese, etc.) and give bonus points to alternatives with a similar product form. The final ranking combines: swap-category bonus, name relevance, CO₂ improvement, and absolute score. For each category we show a personalized tip — for example, that plant-based mince produces up to 90% less CO₂ than beef, or that oat milk has only a third of dairy\'s emissions.'
       }
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Example' },

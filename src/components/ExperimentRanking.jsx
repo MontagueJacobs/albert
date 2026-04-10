@@ -2,16 +2,16 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, ArrowUp, ArrowDown, Check, AlertCircle, GripVertical } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 
-// Color for rank position: #1 (highest CO₂) = red → last (lowest CO₂) = green
+// Color for rank position: #1 (lowest CO₂) = green → last (highest CO₂) = red
 function getRankColor(position, total) {
   if (total <= 1) return '#eab308'
   const t = position / (total - 1)
   const stops = [
-    { at: 0,    r: 239, g: 68,  b: 68  }, // #ef4444 red
-    { at: 0.25, r: 249, g: 115, b: 22  }, // #f97316 orange
+    { at: 0,    r: 34,  g: 197, b: 94  }, // #22c55e green
+    { at: 0.25, r: 132, g: 204, b: 22  }, // #84cc16 lime
     { at: 0.5,  r: 234, g: 179, b: 8   }, // #eab308 yellow
-    { at: 0.75, r: 132, g: 204, b: 22  }, // #84cc16 lime
-    { at: 1,    r: 34,  g: 197, b: 94  }, // #22c55e green
+    { at: 0.75, r: 249, g: 115, b: 22  }, // #f97316 orange
+    { at: 1,    r: 239, g: 68,  b: 68  }, // #ef4444 red
   ]
   let lo = stops[0], hi = stops[stops.length - 1]
   for (let i = 0; i < stops.length - 1; i++) {
@@ -472,8 +472,8 @@ export default function ExperimentRanking({
           <GripVertical size={18} style={{ flexShrink: 0 }} />
           <span>
             {isNl 
-              ? 'Sleep producten of gebruik de pijltjes om ze te verplaatsen. #1 = hoogste CO₂.'
-              : 'Drag products or use the arrows to reorder them. #1 = highest CO₂.'}
+              ? 'Sleep producten of gebruik de pijltjes om ze te verplaatsen. #1 = laagste CO₂ (beste), #7 = hoogste CO₂ (slechtste).'
+              : 'Drag products or use the arrows to reorder them. #1 = lowest CO₂ (best), #7 = highest CO₂ (worst).'}
           </span>
         </div>
       )}

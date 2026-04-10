@@ -1,7 +1,7 @@
 import { useI18n } from '../i18n.jsx'
-import { Leaf, Database, FlaskConical, BarChart3, Search, Scale, Info, ArrowRightLeft } from 'lucide-react'
+import { Leaf, Database, FlaskConical, BarChart3, Search, Scale, Info, ArrowRightLeft, Lightbulb } from 'lucide-react';
 
-const sectionIcons = [Database, Search, FlaskConical, BarChart3, Scale, Leaf, ArrowRightLeft]
+const sectionIcons = [Database, Search, FlaskConical, BarChart3, Scale, Leaf, ArrowRightLeft, Lightbulb];
 
 const styles = {
   container: {
