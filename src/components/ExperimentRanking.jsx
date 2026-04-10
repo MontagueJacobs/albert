@@ -558,7 +558,7 @@ export default function ExperimentRanking({
               )}
 
               <div style={styles.productName}>
-                {item.name}
+                {isNl ? (item.nameNl || item.name) : item.name}
                 {item.source === 'purchased' && (
                   <span style={styles.badge}>
                     {isNl ? 'Jouw aankoop' : 'Your purchase'}

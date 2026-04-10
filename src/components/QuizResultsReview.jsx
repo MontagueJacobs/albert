@@ -195,7 +195,7 @@ export default function QuizResultsReview({ quizData, quizLabel, defaultOpen = f
                 )}
 
                 <div style={styles.name}>
-                  {item.name}
+                  {isNl ? (item.nameNl || item.name) : item.name}
                 </div>
 
                 <div style={styles.info}>
@@ -224,7 +224,7 @@ export default function QuizResultsReview({ quizData, quizLabel, defaultOpen = f
               <div style={{ fontSize: '0.8rem', color: 'var(--text, #d1d5db)', lineHeight: '1.6' }}>
                 {correctOrder.map((item, idx) => (
                   <span key={item.id}>
-                    {idx + 1}. {item.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>({item.co2PerKg} kg)</span>
+                    {idx + 1}. {isNl ? (item.nameNl || item.name) : item.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>({item.co2PerKg} kg)</span>
                     {idx < correctOrder.length - 1 && <span style={{ margin: '0 0.25rem' }}>·</span>}
                   </span>
                 ))}

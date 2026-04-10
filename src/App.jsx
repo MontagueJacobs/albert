@@ -3,7 +3,6 @@ import { TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, 
 import Dashboard from './components/Dashboard'
 import ProductCatalog from './components/ProductCatalog'
 import HowItWorks from './components/HowItWorks'
-import AccountSync from './components/AccountSync'
 import ScoreLookup from './components/ScoreLookup'
 import BonusCardLanding from './components/BonusCardLanding'
 import Questionnaire from './components/Questionnaire'
@@ -30,12 +29,11 @@ const features = [
     color: '#8b5cf6'
   },
   {
-    id: 'sync',
-    emoji: '�',
-    titleKey: 'tab_sync',
-    descKey: 'feature_sync_desc',
-    color: '#f59e0b',
-    href: '/bookmarklet.html'
+    id: 'experiment',
+    emoji: '🧪',
+    titleKey: 'tab_experiment',
+    descKey: 'feature_experiment_desc',
+    color: '#f59e0b'
   },
   {
     id: 'catalog',
@@ -193,11 +191,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
               <span className="menu-label">{t('tab_how_it_works')}</span>
               <ChevronRight size={18} className="menu-arrow" />
             </button>
-            <button className="menu-item" onClick={() => navigateTo('experiment')}>
-              <span className="menu-emoji">🧪</span>
-              <span className="menu-label">{isNl ? 'CO₂ Experiment' : 'CO₂ Experiment'}</span>
-              <ChevronRight size={18} className="menu-arrow" />
-            </button>
           </nav>
         </div>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
@@ -288,14 +281,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <span className="menu-label">{t('tab_how_it_works')}</span>
             <ChevronRight size={18} className="menu-arrow" />
           </button>
-          <button 
-            className={`menu-item ${activeTab === 'experiment' ? 'active' : ''}`}
-            onClick={() => navigateTo('experiment')}
-          >
-            <span className="menu-emoji">🧪</span>
-            <span className="menu-label">{isNl ? 'CO₂ Experiment' : 'CO₂ Experiment'}</span>
-            <ChevronRight size={18} className="menu-arrow" />
-          </button>
         </nav>
       </div>
       {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
@@ -311,7 +296,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         <div className="content-card">
           {activeTab === 'dashboard' && <Dashboard syncVersion={syncVersion} />}
           {activeTab === 'lookup' && <ScoreLookup />}
-          {activeTab === 'sync' && <AccountSync onSyncCompleted={onSyncCompleted} />}
           {activeTab === 'catalog' && <ProductCatalog />}
           {activeTab === 'how' && <HowItWorks />}
         </div>
@@ -326,7 +310,7 @@ function App() {
     const hash = window.location.hash.slice(1) // Remove #
     // Handle questionnaire with params like #questionnaire?type=pre
     const tabPart = hash.split('?')[0]
-    const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'catalog', 'how', 'questionnaire', 'experiment']
+    const validTabs = ['home', 'dashboard', 'lookup', 'catalog', 'how', 'questionnaire', 'experiment']
     return validTabs.includes(tabPart) ? tabPart : 'home'
   })
   
@@ -381,7 +365,7 @@ function App() {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
       const tabPart = hash.split('?')[0]
-      const validTabs = ['home', 'dashboard', 'lookup', 'sync', 'catalog', 'how', 'questionnaire', 'experiment']
+      const validTabs = ['home', 'dashboard', 'lookup', 'catalog', 'how', 'questionnaire', 'experiment']
       setActiveTab(validTabs.includes(tabPart) ? tabPart : 'home')
       
       // Update questionnaire type if on questionnaire page

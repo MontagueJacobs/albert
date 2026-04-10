@@ -22,23 +22,23 @@ import {
 // Each pool has items spanning low → high CO2 for meaningful ranking
 // ===========================================================================
 const GENERIC_POOL_A = [
-  { name: 'Rundergehakt', nameNl: 'Rundergehakt', image: '🥩' },
-  { name: 'Kipfilet', nameNl: 'Kipfilet', image: '🍗' },
-  { name: 'Kaas', nameNl: 'Kaas', image: '🧀' },
-  { name: 'Melk', nameNl: 'Melk', image: '🥛' },
-  { name: 'Rijst', nameNl: 'Rijst', image: '🍚' },
-  { name: 'Brood', nameNl: 'Brood', image: '🍞' },
-  { name: 'Aardappel', nameNl: 'Aardappel', image: '🥔' },
+  { name: 'Ground Beef', nameNl: 'Rundergehakt', image: '🥩' },
+  { name: 'Chicken Breast', nameNl: 'Kipfilet', image: '🍗' },
+  { name: 'Cheese', nameNl: 'Kaas', image: '🧀' },
+  { name: 'Milk', nameNl: 'Melk', image: '🥛' },
+  { name: 'Rice', nameNl: 'Rijst', image: '🍚' },
+  { name: 'Bread', nameNl: 'Brood', image: '🍞' },
+  { name: 'Potato', nameNl: 'Aardappel', image: '🥔' },
 ]
 
 const GENERIC_POOL_B = [
-  { name: 'Lamsvlees', nameNl: 'Lamsvlees', image: '🍖' },
-  { name: 'Varkensvlees', nameNl: 'Varkensvlees', image: '🥓' },
-  { name: 'Boter', nameNl: 'Boter', image: '🧈' },
-  { name: 'Eieren', nameNl: 'Eieren', image: '🥚' },
-  { name: 'Banaan', nameNl: 'Banaan', image: '🍌' },
-  { name: 'Linzen', nameNl: 'Linzen', image: '🫘' },
-  { name: 'Chocolade', nameNl: 'Chocolade', image: '🍫' },
+  { name: 'Lamb', nameNl: 'Lamsvlees', image: '🍖' },
+  { name: 'Pork', nameNl: 'Varkensvlees', image: '🥓' },
+  { name: 'Butter', nameNl: 'Boter', image: '🧈' },
+  { name: 'Eggs', nameNl: 'Eieren', image: '🥚' },
+  { name: 'Banana', nameNl: 'Banaan', image: '🍌' },
+  { name: 'Lentils', nameNl: 'Linzen', image: '🫘' },
+  { name: 'Chocolate', nameNl: 'Chocolade', image: '🍫' },
 ]
 
 // ===========================================================================
@@ -82,9 +82,10 @@ export function getProductCO2(productName) {
  * Enrich a generic pool item with CO2 data
  */
 function enrichPoolItem(item) {
-  const co2 = getProductCO2(item.name)
+  // Always use Dutch name for CO2 lookup (the CO2 engine uses Dutch keywords)
+  const co2 = getProductCO2(item.nameNl || item.name)
   return {
-    id: `generic_${item.name.toLowerCase().replace(/\s+/g, '_')}`,
+    id: `generic_${(item.nameNl || item.name).toLowerCase().replace(/\s+/g, '_')}`,
     name: item.name,
     nameNl: item.nameNl,
     image_emoji: item.image,
@@ -199,6 +200,7 @@ export function calculateRankingScore(userRanking, items) {
     return {
       id: item.id,
       name: item.name,
+      nameNl: item.nameNl || item.name,
       userRank: userRank + 1,  // 1-indexed for display
       correctRank: correctRank + 1,
       distance,
@@ -225,6 +227,7 @@ export function calculateRankingScore(userRanking, items) {
     correctOrder: correctOrder.map((item, idx) => ({
       id: item.id,
       name: item.name,
+      nameNl: item.nameNl || item.name,
       rank: idx + 1,
       co2PerKg: item.co2PerKg
     }))

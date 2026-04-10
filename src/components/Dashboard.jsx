@@ -330,7 +330,20 @@ function Dashboard({ syncVersion }) {
             <TrendingUp size={18} style={{ display: 'inline', marginRight: '5px' }} />
             {t('avg_score_label')}
           </h3>
-          <div className="value">{(insights.average_score || 0).toFixed(1)}{t('score_suffix')}</div>
+          {(() => {
+            const score = insights.average_score || 0
+            // 1=best (green), 7=worst (red)
+            const scoreColor = score <= 2 ? '#22c55e' : score <= 3 ? '#84cc16' : score <= 4 ? '#eab308' : score <= 5 ? '#f97316' : '#ef4444'
+            return (
+              <div className="value" style={{ color: scoreColor }}>
+                {score.toFixed(1)}{t('score_suffix')}
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: '0.25rem' }}>
+                  {score <= 2 ? '🌿' : score <= 3 ? '🌱' : score <= 4 ? '🌍' : score <= 5 ? '⚠️' : '🔴'}
+                  {' '}{score <= 2 ? (t('rating_excellent') || 'Excellent') : score <= 3 ? (t('rating_good') || 'Good') : score <= 4 ? (t('rating_average') || 'Average') : score <= 5 ? (t('rating_high') || 'High') : (t('rating_very_high') || 'Very high')}
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
         <div className="stat-card">
