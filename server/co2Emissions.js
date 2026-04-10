@@ -840,20 +840,16 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   ]
 }
 
-// Score thresholds (kg CO2/kg to 0-10 score)
-// Lower CO2 = higher score
+// Score thresholds (kg CO2/kg to 1-7 score)
+// Lower CO2 = lower score (better). 1 = best, 7 = worst.
 const SCORE_THRESHOLDS = [
-  { maxCO2: 1.0, score: 10 },   // < 1 kg CO2/kg = score 10 (excellent)
-  { maxCO2: 2.0, score: 9 },    // 1-2 kg = score 9
-  { maxCO2: 4.0, score: 8 },    // 2-4 kg = score 8
-  { maxCO2: 6.0, score: 7 },    // 4-6 kg = score 7
-  { maxCO2: 10.0, score: 6 },   // 6-10 kg = score 6
-  { maxCO2: 15.0, score: 5 },   // 10-15 kg = score 5
-  { maxCO2: 25.0, score: 4 },   // 15-25 kg = score 4
-  { maxCO2: 40.0, score: 3 },   // 25-40 kg = score 3
-  { maxCO2: 60.0, score: 2 },   // 40-60 kg = score 2
-  { maxCO2: 100.0, score: 1 },  // 60-100 kg = score 1
-  { maxCO2: Infinity, score: 0 } // > 100 kg = score 0 (worst)
+  { maxCO2: 2.0, score: 1 },     // < 2 kg CO2/kg = score 1 (excellent)
+  { maxCO2: 5.0, score: 2 },     // 2-5 kg = score 2 (good)
+  { maxCO2: 12.0, score: 3 },    // 5-12 kg = score 3 (average)
+  { maxCO2: 25.0, score: 4 },    // 12-25 kg = score 4 (above average)
+  { maxCO2: 45.0, score: 5 },    // 25-45 kg = score 5 (high)
+  { maxCO2: 80.0, score: 6 },    // 45-80 kg = score 6 (very high)
+  { maxCO2: Infinity, score: 7 }  // > 80 kg = score 7 (worst)
 ]
 
 /**
@@ -1882,10 +1878,10 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
 }
 
 /**
- * Convert CO2 emissions to a 0-10 sustainability score
- * Lower CO2 = higher score
+ * Convert CO2 emissions to a 1-7 sustainability score
+ * Lower CO2 = lower score (better). 1 = best, 7 = worst.
  * @param {number} co2PerKg - CO2 emissions in kg CO2/kg food
- * @returns {number} - Score from 0-10
+ * @returns {number} - Score from 1-7 (1 = best)
  */
 function co2ToScore(co2PerKg) {
   if (co2PerKg === null || co2PerKg === undefined) return null
@@ -1896,22 +1892,22 @@ function co2ToScore(co2PerKg) {
     }
   }
   
-  return 0
+  return 7
 }
 
 /**
  * Get rating label based on score
- * @param {number} score - Score 0-10
+ * @param {number} score - Score 1-7 (1 = best, 7 = worst)
  * @returns {Object} - { label, emoji, color }
  */
 function getCO2Rating(score) {
   if (score === null) {
     return { label: 'Unknown', emoji: '❓', color: '#6b7280' }
   }
-  if (score >= 9) return { label: 'Excellent', emoji: '🌿', color: '#22c55e' }
-  if (score >= 7) return { label: 'Good', emoji: '🌱', color: '#84cc16' }
-  if (score >= 5) return { label: 'Average', emoji: '🌍', color: '#eab308' }
-  if (score >= 3) return { label: 'High', emoji: '⚠️', color: '#f97316' }
+  if (score <= 1) return { label: 'Excellent', emoji: '🌿', color: '#22c55e' }
+  if (score <= 2) return { label: 'Good', emoji: '🌱', color: '#84cc16' }
+  if (score <= 3) return { label: 'Average', emoji: '🌍', color: '#eab308' }
+  if (score <= 5) return { label: 'High', emoji: '⚠️', color: '#f97316' }
   return { label: 'Very High', emoji: '🔴', color: '#ef4444' }
 }
 

@@ -768,7 +768,7 @@ function ProductDetailModal({ purchase, onClose }) {
                         color: '#22c55e', 
                         fontSize: '0.75rem' 
                       }}>
-                        +{alt.score - details.score}
+                        -{details.score - alt.score}
                       </span>
                       {alt.url && <ExternalLink size={14} style={{ color: 'var(--text-muted)' }} />}
                     </div>

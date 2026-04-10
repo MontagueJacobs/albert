@@ -80,7 +80,7 @@ const TRANSLATIONS = {
     best_purchase: 'Laagste CO₂',
     worst_purchase: 'Hoogste CO₂',
     how_title: 'Hoe bepalen we de duurzaamheidsscore?',
-    how_intro: 'Elk voedingsproduct krijgt een score van 0 tot 10. Deze score is volledig gebaseerd op de CO₂-uitstoot per kilogram product. Hoe lager de uitstoot, hoe hoger de score. Niet-voedingsmiddelen (schoonmaak, verzorging, etc.) worden automatisch herkend en krijgen geen score.',
+    how_intro: 'Elk voedingsproduct krijgt een score van 1 tot 7. Score 1 = beste (laagste CO₂-uitstoot), score 7 = slechtste (hoogste uitstoot). Niet-voedingsmiddelen (schoonmaak, verzorging, etc.) worden automatisch herkend en krijgen geen score.',
     how_sections: [
       {
         title: '1. Wetenschappelijke emissiedata',
@@ -96,11 +96,11 @@ const TRANSLATIONS = {
       },
       {
         title: '4. De scoreschaal',
-        body: 'De uiteindelijke CO₂-waarde (kg CO₂-eq per kg product) wordt omgezet naar een score van 0 tot 10 volgens onderstaande tabel:'
+        body: 'De uiteindelijke CO₂-waarde (kg CO₂-eq per kg product) wordt omgezet naar een score van 1 tot 7 (1 = best, 7 = slechtst) volgens onderstaande tabel:'
       },
       {
         title: '5. Beoordeling & labels',
-        body: 'Op basis van de score wordt een beoordeling gegeven: Uitstekend (9-10), Goed (7-8), Gemiddeld (5-6), Hoog (3-4), of Zeer hoog (0-2). Aanvullende informatie zoals biologisch, veganistisch, Fair Trade en herkomst wordt apart getoond als context maar beïnvloedt de score niet.'
+        body: 'Op basis van de score wordt een beoordeling gegeven: Uitstekend (1), Goed (2), Gemiddeld (3), Hoog (4-5), of Zeer hoog (6-7). Aanvullende informatie zoals biologisch, veganistisch, Fair Trade en herkomst wordt apart getoond als context maar beïnvloedt de score niet.'
       },
       {
         title: '6. Landelijk gemiddelde',
@@ -117,17 +117,13 @@ const TRANSLATIONS = {
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Voorbeeld' },
     how_table_examples: {
-      10: 'Aardappelen, wortelen, appels',
-      9: 'Brood, bananen, citrusfruit',
-      8: 'Tomaten, rijst, tofu',
-      7: 'Kip, eieren, melk',
-      6: 'Vis, olijfolie, kaas (jong)',
-      5: 'Varkensvlees, garnalen',
-      4: 'Kaas (oud), boter',
-      3: 'Lamsvlees',
-      2: 'Rundvlees (zuivelrund)',
-      1: 'Rundvlees (vleesrund)',
-      0: '—'
+      1: 'Aardappelen, wortelen, appels, brood, bananen',
+      2: 'Tomaten, rijst, tofu, melk, eieren',
+      3: 'Kipfilet, varkensvlees, vis',
+      4: 'Kaas, garnalen, chocolade',
+      5: 'Lamsvlees, boter',
+      6: 'Rundvlees (zuivelrund)',
+      7: 'Rundvlees (vleesrund)'
     },
     how_sources: 'Databronnen: Agribalyse v3.2 (ADEME, 2023), Our World in Data — Poore & Nemecek (Science, 2018), FAOSTAT dieetsamenstelling (2021), USDA FoodData Central. Alle waarden zijn in kg CO₂-equivalenten en omvatten de gehele productieketen.',
     sync_title: 'Albert Heijn account synchroniseren',
@@ -301,8 +297,8 @@ const TRANSLATIONS = {
     catalog_retry: 'Opnieuw proberen',
     catalog_empty_title: 'Geen producten gevonden',
     catalog_empty_desc: 'Probeer een andere zoekterm of filter.',
-    catalog_sort_score_high: 'Score (hoog → laag)',
-    catalog_sort_score_low: 'Score (laag → hoog)',
+    catalog_sort_score_high: 'Score (best eerst)',
+    catalog_sort_score_low: 'Score (slechtst eerst)',
     catalog_sort_name: 'Naam (A-Z)',
     catalog_sort_price_low: 'Prijs (laag → hoog)',
     catalog_sort_price_high: 'Prijs (hoog → laag)',
@@ -349,7 +345,7 @@ const TRANSLATIONS = {
     modal_score_breakdown: 'Score opbouw',
     modal_loading: 'Laden...',
     modal_error: 'Fout',
-    modal_score_scale: '0–10',
+    modal_score_scale: '1–7',
     modal_product_attributes: 'Product eigenschappen',
     modal_score_adjustments: 'Score aanpassingen',
     modal_categories: 'Categorieën',
@@ -443,7 +439,7 @@ const TRANSLATIONS = {
     best_purchase: 'Lowest CO₂',
     worst_purchase: 'Highest CO₂',
     how_title: 'How do we calculate the sustainability score?',
-    how_intro: 'Every food product receives a score from 0 to 10. This score is based entirely on the CO₂ emissions per kilogram of product. Lower emissions means a higher score. Non-food items (cleaning supplies, personal care, etc.) are automatically detected and receive no score.',
+    how_intro: 'Every food product receives a score from 1 to 7. Score 1 = best (lowest CO₂ emissions), score 7 = worst (highest emissions). Non-food items (cleaning supplies, personal care, etc.) are automatically detected and receive no score.',
     how_sections: [
       {
         title: '1. Scientific emissions data',
@@ -459,11 +455,11 @@ const TRANSLATIONS = {
       },
       {
         title: '4. The score scale',
-        body: 'The final CO₂ value (kg CO₂-eq per kg of product) is converted to a score from 0 to 10 using the following thresholds:'
+        body: 'The final CO₂ value (kg CO₂-eq per kg of product) is converted to a score from 1 to 7 (1 = best, 7 = worst) using the following thresholds:'
       },
       {
         title: '5. Ratings & labels',
-        body: 'Based on the score, a rating is assigned: Excellent (9-10), Good (7-8), Average (5-6), High (3-4), or Very High (0-2). Supplementary information such as organic, vegan, Fair Trade, and origin is displayed separately as context but does not affect the score.'
+        body: 'Based on the score, a rating is assigned: Excellent (1), Good (2), Average (3), High (4-5), or Very High (6-7). Supplementary information such as organic, vegan, Fair Trade, and origin is displayed separately as context but does not affect the score.'
       },
       {
         title: '6. National baseline',
@@ -480,17 +476,13 @@ const TRANSLATIONS = {
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Example' },
     how_table_examples: {
-      10: 'Potatoes, carrots, apples',
-      9: 'Bread, bananas, citrus fruit',
-      8: 'Tomatoes, rice, tofu',
-      7: 'Chicken, eggs, milk',
-      6: 'Fish, olive oil, young cheese',
-      5: 'Pork, shrimp',
-      4: 'Aged cheese, butter',
-      3: 'Lamb',
-      2: 'Beef (dairy herd)',
-      1: 'Beef (beef herd)',
-      0: '—'
+      1: 'Potatoes, carrots, apples, bread, bananas',
+      2: 'Tomatoes, rice, tofu, milk, eggs',
+      3: 'Chicken, pork, fish',
+      4: 'Cheese, shrimp, chocolate',
+      5: 'Lamb, butter',
+      6: 'Beef (dairy herd)',
+      7: 'Beef (beef herd)'
     },
     how_sources: 'Data sources: Agribalyse v3.2 (ADEME, 2023), Our World in Data — Poore & Nemecek (Science, 2018), FAOSTAT dietary composition (2021), USDA FoodData Central. All values are in kg CO₂ equivalents and cover the entire production chain.',
     sync_title: 'Sync your Albert Heijn account',
@@ -664,8 +656,8 @@ const TRANSLATIONS = {
     catalog_retry: 'Retry',
     catalog_empty_title: 'No products found',
     catalog_empty_desc: 'Try a different search term or filter.',
-    catalog_sort_score_high: 'Score (high → low)',
-    catalog_sort_score_low: 'Score (low → high)',
+    catalog_sort_score_high: 'Score (best first)',
+    catalog_sort_score_low: 'Score (worst first)',
     catalog_sort_name: 'Name (A-Z)',
     catalog_sort_price_low: 'Price (low → high)',
     catalog_sort_price_high: 'Price (high → low)',
@@ -712,7 +704,7 @@ const TRANSLATIONS = {
     modal_score_breakdown: 'Score breakdown',
     modal_loading: 'Loading...',
     modal_error: 'Error',
-    modal_score_scale: '0–10',
+    modal_score_scale: '1–7',
     modal_product_attributes: 'Product attributes',
     modal_score_adjustments: 'Score adjustments',
     modal_categories: 'Categories',

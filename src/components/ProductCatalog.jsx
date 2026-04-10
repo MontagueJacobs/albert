@@ -8,28 +8,28 @@ import ProductDetailModal from './ProductDetailModal'
 /* ----------- score colour helpers ----------- */
 function scoreColor(score) {
   if (score == null) return 'var(--text-muted, #9ca3af)'
-  if (score >= 8) return '#16a34a'
-  if (score >= 6) return '#65a30d'
-  if (score >= 4) return '#eab308'
-  if (score >= 2) return '#f97316'
+  if (score <= 1) return '#16a34a'
+  if (score <= 2) return '#65a30d'
+  if (score <= 3) return '#eab308'
+  if (score <= 5) return '#f97316'
   return '#ef4444'
 }
 
 function scoreBg(score) {
   if (score == null) return 'rgba(156, 163, 175, 0.15)'
-  if (score >= 8) return 'rgba(22, 163, 74, 0.15)'
-  if (score >= 6) return 'rgba(101, 163, 13, 0.15)'
-  if (score >= 4) return 'rgba(234, 179, 8, 0.15)'
-  if (score >= 2) return 'rgba(249, 115, 22, 0.15)'
+  if (score <= 1) return 'rgba(22, 163, 74, 0.15)'
+  if (score <= 2) return 'rgba(101, 163, 13, 0.15)'
+  if (score <= 3) return 'rgba(234, 179, 8, 0.15)'
+  if (score <= 5) return 'rgba(249, 115, 22, 0.15)'
   return 'rgba(239, 68, 68, 0.15)'
 }
 
 function scoreLabel(score, t) {
   if (score == null) return t('catalog_score_na') || 'N/A'
-  if (score >= 8) return t('catalog_score_great') || 'Great'
-  if (score >= 6) return t('catalog_score_good') || 'Good'
-  if (score >= 4) return t('catalog_score_ok') || 'OK'
-  if (score >= 2) return t('catalog_score_poor') || 'Poor'
+  if (score <= 1) return t('catalog_score_great') || 'Great'
+  if (score <= 2) return t('catalog_score_good') || 'Good'
+  if (score <= 3) return t('catalog_score_ok') || 'OK'
+  if (score <= 5) return t('catalog_score_poor') || 'Poor'
   return t('catalog_score_bad') || 'Bad'
 }
 
@@ -37,8 +37,8 @@ function scoreLabel(score, t) {
 function ScoreRing({ score, size = 52 }) {
   const radius = (size - 6) / 2
   const circumference = 2 * Math.PI * radius
-  const effectiveScore = score != null ? score : 0
-  const pct = (effectiveScore / 10) * circumference
+  const effectiveScore = score != null ? score : 7
+  const pct = ((8 - effectiveScore) / 7) * circumference
   const color = scoreColor(score)
 
   return (
@@ -105,10 +105,10 @@ const SORT_OPTIONS = [
 /* ----------- score filter presets ----------- */
 const SCORE_PRESETS = [
   { min: null, max: null, labelKey: 'catalog_filter_all' },
-  { min: 8, max: 10, labelKey: 'catalog_filter_great', color: '#16a34a' },
-  { min: 6, max: 7, labelKey: 'catalog_filter_good', color: '#65a30d' },
+  { min: 1, max: 2, labelKey: 'catalog_filter_great', color: '#16a34a' },
+  { min: 3, max: 3, labelKey: 'catalog_filter_good', color: '#65a30d' },
   { min: 4, max: 5, labelKey: 'catalog_filter_ok', color: '#eab308' },
-  { min: 0, max: 3, labelKey: 'catalog_filter_low', color: '#ef4444' },
+  { min: 6, max: 7, labelKey: 'catalog_filter_low', color: '#ef4444' },
 ]
 
 /* =========================================================================

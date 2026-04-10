@@ -799,11 +799,11 @@ function analyzeUserProfile(purchases) {
     const score = evaluation.score
     totalScore += score
 
-    // Score distribution (based on new 0-10 scale)
-    if (score <= 2) {
+    // Score distribution (based on 1-7 scale, 1 = best)
+    if (score >= 5) {
       profile.scoreDistribution.low++
       lowScoreProducts.push({ name: purchase.product_name, score, evaluation, enriched })
-    } else if (score <= 5) {
+    } else if (score >= 3) {
       profile.scoreDistribution.medium++
     } else {
       profile.scoreDistribution.high++
@@ -853,8 +853,8 @@ function analyzeUserProfile(purchases) {
     profile.profileType = 'balanced'
   }
 
-  profile.improvements = lowScoreProducts.sort((a, b) => a.score - b.score).slice(0, 5)
-  profile.strengths = highScoreProducts.sort((a, b) => b.score - a.score).slice(0, 3)
+  profile.improvements = lowScoreProducts.sort((a, b) => b.score - a.score).slice(0, 5)
+  profile.strengths = highScoreProducts.sort((a, b) => a.score - b.score).slice(0, 3)
 
   return profile
 }
@@ -872,7 +872,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     const enriched = getEnrichedData(p)
     const evaluation = evaluateProduct(p.name, enriched)
     return { ...p, score: evaluation.score, co2Category: evaluation.co2Category, enriched, evaluation }
-  }).filter(p => p.score != null && p.score >= 5)
+  }).filter(p => p.score != null && p.score <= 3)
 
   for (const product of lowScoreProducts) {
     // Get the CO₂ category of the original product
@@ -883,19 +883,19 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
 
     // Prefer alternatives from swap categories, then any better product
     const alternatives = scoredCatalog
-      .filter(alt => alt.score > product.score + 1)
+      .filter(alt => alt.score < product.score - 1)
       .sort((a, b) => {
         // Swap-category products first
         const aSwap = swapCategories.has(a.co2Category) ? 1 : 0
         const bSwap = swapCategories.has(b.co2Category) ? 1 : 0
         if (bSwap !== aSwap) return bSwap - aSwap
-        return b.score - a.score
+        return a.score - b.score
       })
       .slice(0, 3)
 
     if (alternatives.length > 0) {
       const bestAlt = alternatives[0]
-      const improvement = bestAlt.score - product.score
+      const improvement = product.score - bestAlt.score
       const co2Reduction = origEvaluation.co2PerKg && bestAlt.evaluation.co2PerKg
         ? Math.round((1 - bestAlt.evaluation.co2PerKg / origEvaluation.co2PerKg) * 100)
         : null
@@ -1287,7 +1287,7 @@ function searchProducts(query = '') {
 
   results.sort((a, b) => {
     if (b.rank !== a.rank) return b.rank - a.rank
-    if (b.score !== a.score) return b.score - a.score
+    if (a.score !== b.score) return a.score - b.score
     return a.name.localeCompare(b.name)
   })
 
@@ -1295,16 +1295,16 @@ function searchProducts(query = '') {
 }
 
 function getRating(avgScore) {
-  // CO2-based scale: 0-10 where higher = more sustainable (lower CO2)
-  // 9-10: < 2 kg CO2/kg (vegetables, fruits, legumes)
-  // 7-8: 2-6 kg CO2/kg (milk, eggs, grains)
-  // 5-6: 6-15 kg CO2/kg (chicken, fish, pork)
-  // 3-4: 15-40 kg CO2/kg (cheese, chocolate, coffee)
-  // 0-2: > 40 kg CO2/kg (beef, lamb)
-  if (avgScore >= 9) return "🌿 Excellent! Very low carbon footprint!"
-  if (avgScore >= 7) return "🌱 Good! Low environmental impact."
-  if (avgScore >= 5) return "🌍 Average. Consider lower-emission alternatives."
-  if (avgScore >= 3) return "⚠️ High emissions. Try plant-based options."
+  // CO2-based scale: 1-7 where 1 = most sustainable (lowest CO2)
+  // 1: < 2 kg CO2/kg (vegetables, fruits, legumes)
+  // 2: 2-5 kg CO2/kg (milk, eggs, grains)
+  // 3: 5-12 kg CO2/kg (chicken, fish, pork)
+  // 4-5: 12-45 kg CO2/kg (cheese, chocolate, coffee, lamb)
+  // 6-7: > 45 kg CO2/kg (beef)
+  if (avgScore <= 1) return "🌿 Excellent! Very low carbon footprint!"
+  if (avgScore <= 2) return "🌱 Good! Low environmental impact."
+  if (avgScore <= 3) return "🌍 Average. Consider lower-emission alternatives."
+  if (avgScore <= 5) return "⚠️ High emissions. Try plant-based options."
   return "🔴 Very high carbon footprint."
 }
 
@@ -1875,7 +1875,7 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     if (!purchases || purchases.length === 0) {
       return res.json({
         total_purchases: 0,
-        average_score: 0,
+        average_score: null,
         rating: 'Start Shopping!',
         best_purchase: null,
         worst_purchase: null,
@@ -2068,8 +2068,8 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
           origin_country: p.origin_country
         }
       })
-      .filter(s => s.sustainability_score >= 7)
-      .sort((a, b) => b.sustainability_score - a.sustainability_score)
+      .filter(s => s.sustainability_score <= 2)
+      .sort((a, b) => a.sustainability_score - b.sustainability_score)
       .slice(0, 6)
     
     res.json({
@@ -2220,8 +2220,8 @@ app.get('/api/products/search', async (req, res) => {
  *   page     — 1-based page number (default 1)
  *   limit    — items per page (default 24, max 100)
  *   sort     — "name" | "score_asc" | "score_desc" | "price_asc" | "price_desc" (default "name")
- *   score_min — minimum sustainability score (0-10)
- *   score_max — maximum sustainability score (0-10)
+ *   score_min — minimum sustainability score (1-7, 1 = best)
+ *   score_max — maximum sustainability score (1-7, 7 = worst)
  *   has_image — "true" to only return products with images
  *   category  — filter by AH product category substring
  */
@@ -2315,11 +2315,11 @@ app.get('/api/catalog/browse', async (req, res) => {
       filtered = filtered.filter(p => p.sustainability_score <= scoreMax)
     }
 
-    // Apply score sort in JS
+    // Apply score sort in JS (1 = best, 7 = worst)
     if (sort === 'score_desc') {
-      filtered.sort((a, b) => b.sustainability_score - a.sustainability_score)
-    } else if (sort === 'score_asc') {
       filtered.sort((a, b) => a.sustainability_score - b.sustainability_score)
+    } else if (sort === 'score_asc') {
+      filtered.sort((a, b) => b.sustainability_score - a.sustainability_score)
     }
 
     // Paginate in JS if we fetched a bigger batch

@@ -387,7 +387,7 @@ export const RELATED_CATEGORIES = {
  * @param {string} options.productId - Current product ID (to exclude from results)
  * @param {string} options.productName - Current product name
  * @param {string} options.co2Category - CO₂ category of the current product
- * @param {number|null} options.currentScore - Current product's score (0-10)
+ * @param {number|null} options.currentScore - Current product's score (1-7, 1 = best)
  * @param {Function} options.evaluateProduct - evaluateProduct function reference
  * @param {Function} options.getEnrichedData - getEnrichedData function reference
  * @param {string} options.lang - Language ('nl' or 'en')
@@ -414,7 +414,7 @@ export async function findSmartAlternatives({
   const isLowEmission = LOW_EMISSION_CATEGORIES.has(co2Category)
 
   // For already excellent products, return positive tip and in-category alternatives
-  if (isLowEmission || currentScore >= 9) {
+  if (isLowEmission || currentScore <= 2) {
     result.tip = lang === 'nl'
       ? '🌿 Uitstekende keuze! Dit product heeft al een zeer lage CO₂-uitstoot.'
       : '🌿 Excellent choice! This product already has very low CO₂ emissions.'
@@ -523,7 +523,7 @@ export function getSmartSuggestions(productName, co2Category, score, lang = 'nl'
   if (score == null) return tips
 
   // For excellent products, congratulate
-  if (score >= 9 || LOW_EMISSION_CATEGORIES.has(co2Category)) {
+  if (score <= 2 || LOW_EMISSION_CATEGORIES.has(co2Category)) {
     tips.push(lang === 'nl'
       ? '✨ Geweldige keuze! Dit product heeft een zeer lage CO₂-uitstoot.'
       : '✨ Great choice! This product has very low CO₂ emissions.')
@@ -536,16 +536,16 @@ export function getSmartSuggestions(productName, co2Category, score, lang = 'nl'
     tips.push(swapInfo.tip[lang] || swapInfo.tip.nl)
   }
 
-  // Generic tips based on score range
-  if (score <= 3) {
+  // Generic tips based on score range (1 = best, 7 = worst)
+  if (score >= 5) {
     tips.push(lang === 'nl'
       ? '🔄 Bekijk de alternatieven hieronder — er zijn producten die tot 90% minder CO₂ uitstoten.'
       : '🔄 Check the alternatives below — there are products with up to 90% less CO₂ emissions.')
-  } else if (score <= 5) {
+  } else if (score >= 4) {
     tips.push(lang === 'nl'
       ? '🔄 Bekijk de alternatieven hieronder voor producten met een lagere CO₂-uitstoot.'
       : '🔄 Check the alternatives below for products with a lower CO₂ footprint.')
-  } else if (score <= 7) {
+  } else if (score >= 3) {
     tips.push(lang === 'nl'
       ? '💡 Er zijn vergelijkbare producten met een betere score beschikbaar.'
       : '💡 Similar products with a better score are available.')
@@ -768,8 +768,8 @@ function nameRelevance(sourceName, candidateName) {
  * Scoring factors (in priority order):
  *   1. Is this a swap-category product? (highest priority)
  *   2. Name relevance — direct substitutes first
- *   3. CO₂ improvement (candidate score - current score)
- *   4. Absolute CO₂ score
+ *   3. CO₂ improvement (current score - candidate score; positive = candidate is better)
+ *   4. Absolute CO₂ score (lower = better)
  *
  * Also filters out candidates whose score is null or (if mustBeBetter) not better.
  */
@@ -782,7 +782,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       const evaluation = evaluateProduct(c.name, enriched)
       const relevance = nameRelevance(sourceName, c.name)
       const improvement = (evaluation.score != null && currentScore != null)
-        ? evaluation.score - currentScore
+        ? currentScore - evaluation.score  // positive = candidate is better (lower score)
         : 0
 
       return {
@@ -807,7 +807,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
     })
     .filter(c => {
       if (c.score == null) return false
-      if (mustBeBetter && c.score <= currentScore) return false
+      if (mustBeBetter && c.score >= currentScore) return false  // lower score = better
       return true
     })
     .sort((a, b) => b.rankScore - a.rankScore)
@@ -822,18 +822,18 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
  *   - Swap category match: +50 (ensures they bubble to the top)
  *   - Name relevance: ×20 (food-form match strongly preferred)
  *   - CO₂ improvement: ×3 (bigger improvements preferred)
- *   - Absolute score: ×1 (tie-break)
+ *   - Absolute score: ×1 (lower score = better, so we invert)
  */
 function computeRankScore(candidateScore, currentScore, relevance, isSwapCategory) {
   if (candidateScore == null) return -999
 
-  const improvement = currentScore != null ? (candidateScore - currentScore) : 0
+  const improvement = currentScore != null ? (currentScore - candidateScore) : 0
 
   let score = 0
   if (isSwapCategory) score += 50
   score += relevance * 20
   score += improvement * 3
-  score += candidateScore * 1
+  score += (8 - candidateScore) * 1  // invert: score 1 = +7, score 7 = +1
 
   return score
 }
