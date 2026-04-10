@@ -33,7 +33,7 @@ import {
   getProductWeight
 } from './co2Emissions.js'
 
-import { findSmartAlternatives, getSmartSuggestions, CATEGORY_SWAPS } from './suggestionEngine.js'
+import { findSmartAlternatives, getSmartSuggestions, CATEGORY_SWAPS, RECOMMENDABLE_CATEGORIES } from './suggestionEngine.js'
 
 import {
   getGenericQuiz1Items,
@@ -861,34 +861,41 @@ function analyzeUserProfile(purchases) {
 
 /**
  * Find sustainable replacement suggestions based on CO₂ category swaps.
- * Uses the category swap map to suggest genuinely relevant alternatives
- * (e.g. beef → tofu, milk → oat milk) rather than random high-scoring items.
+ * Only recommends plant-based alternatives for meat, fish, and dairy products.
+ * All recommendations come from the AH "Vegetarisch, vegan en plantaardig" section.
  */
 function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
   const suggestions = []
 
-  // Pre-score all catalog products
-  const scoredCatalog = catalogProducts.map(p => {
-    const enriched = getEnrichedData(p)
-    const evaluation = evaluateProduct(p.name, enriched)
-    return { ...p, score: evaluation.score, co2Category: evaluation.co2Category, enriched, evaluation }
-  }).filter(p => p.score != null && p.score <= 3)
+  // Pre-score only plant-based catalog products as the alternative pool
+  const scoredPlantBased = catalogProducts
+    .filter(p => p.source === 'api_plantbased')
+    .map(p => {
+      const enriched = getEnrichedData(p)
+      const evaluation = evaluateProduct(p.name, enriched)
+      return { ...p, score: evaluation.score, co2Category: evaluation.co2Category, enriched, evaluation }
+    })
+    .filter(p => p.score != null && p.score <= 3)
 
   for (const product of lowScoreProducts) {
     // Get the CO₂ category of the original product
     const origEvaluation = evaluateProduct(product.name)
     const origCategory = origEvaluation.co2Category
-    const swapInfo = CATEGORY_SWAPS[origCategory]
-    const swapCategories = new Set(swapInfo?.swaps || [])
 
-    // Prefer alternatives from swap categories, then any better product
-    const alternatives = scoredCatalog
+    // Only recommend for meat/fish/dairy categories
+    if (!RECOMMENDABLE_CATEGORIES.has(origCategory)) continue
+
+    const swapInfo = CATEGORY_SWAPS[origCategory]
+    const preferredSubs = new Set((swapInfo?.ahSubCategories || []).map(s => 'ah_sub:' + s))
+
+    // Prefer alternatives from matching subcategories, then any plant-based
+    const alternatives = scoredPlantBased
       .filter(alt => alt.score < product.score - 1)
       .sort((a, b) => {
-        // Swap-category products first
-        const aSwap = swapCategories.has(a.co2Category) ? 1 : 0
-        const bSwap = swapCategories.has(b.co2Category) ? 1 : 0
-        if (bSwap !== aSwap) return bSwap - aSwap
+        // Preferred-subcategory products first
+        const aPref = a.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
+        const bPref = b.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
+        if (bPref !== aPref) return bPref - aPref
         return a.score - b.score
       })
       .slice(0, 3)
@@ -2024,7 +2031,7 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
     if (enrichedColumnsAvailable) {
       const { data, error: productsError } = await supabase
         .from('products')
-        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text, nutrition_json')
+        .select('id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text, nutrition_json, source, categories')
         .order('seen_count', { ascending: false })
         .limit(200)
       
@@ -2038,7 +2045,7 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
     if (!enrichedColumnsAvailable || catalogProducts.length === 0) {
       const { data, error: productsError } = await supabase
         .from('products')
-        .select('id, name, url, image_url, price')
+        .select('id, name, url, image_url, price, source, categories')
         .order('seen_count', { ascending: false })
         .limit(200)
       
