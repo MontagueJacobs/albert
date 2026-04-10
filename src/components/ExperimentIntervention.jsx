@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronRight, ChevronDown, ChevronUp, Lightbulb, BarChart3, Leaf, Flame } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronUp, Lightbulb, BarChart3, Leaf } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import QuizResultsReview from './QuizResultsReview.jsx'
 
@@ -232,25 +232,6 @@ const styles = {
     flexShrink: 0,
     marginTop: '1px'
   },
-  // Detailed section (variant B only)
-  detailedSection: {
-    background: 'var(--bg-card, #1e293b)',
-    borderRadius: '16px',
-    padding: '1.25rem',
-    marginBottom: '1.5rem',
-    border: '1px solid var(--border, #334155)'
-  },
-  detailedTitle: {
-    fontSize: '1rem',
-    fontWeight: '600',
-    color: 'var(--text, #f3f4f6)',
-    marginBottom: '0.75rem'
-  },
-  detailedText: {
-    color: 'var(--text-muted, #9ca3af)',
-    fontSize: '0.85rem',
-    lineHeight: '1.6'
-  },
   nextBtn: {
     width: '100%',
     padding: '1rem',
@@ -399,34 +380,6 @@ export default function ExperimentIntervention({ session, onComplete }) {
         ))}
       </div>
 
-      {/* Variant B: Extended detailed explanation */}
-      {variant === 'B' && (
-        <div style={styles.detailedSection}>
-          <div style={styles.detailedTitle}>
-            <Flame size={18} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.5rem' }} />
-            {isNl ? 'Waarom verschilt de uitstoot zo?' : 'Why does emission vary so much?'}
-          </div>
-          <div style={styles.detailedText}>
-            {isNl ? (
-              <>
-                <p>De CO₂-uitstoot van voedsel wordt bepaald door meerdere factoren:</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>🐄 Dierlijke producten:</strong> Koeien en schapen produceren methaan (een sterk broeikasgas) tijdens de spijsvertering. Daarnaast is er veel land en voer nodig, wat leidt tot ontbossing.</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>🌾 Plantaardige producten:</strong> Over het algemeen veel efficiënter. Er is minder land, water en energie nodig. Uitzondering: rijst produceert methaan door natte teelt.</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>🚚 Transport:</strong> Verrassend genoeg is transport vaak maar 5-10% van de totale voetafdruk. Wát je eet is belangrijker dan waar het vandaan komt.</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>💡 Tip:</strong> Eén dag per week geen vlees eten heeft meer impact dan een heel jaar alleen lokaal te kopen!</p>
-              </>
-            ) : (
-              <>
-                <p>The CO₂ footprint of food is determined by multiple factors:</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>🐄 Animal products:</strong> Cows and sheep produce methane (a potent greenhouse gas) during digestion. They also require lots of land and feed, driving deforestation.</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>🌾 Plant-based foods:</strong> Generally much more efficient. They need less land, water, and energy. Exception: rice produces methane through wet cultivation.</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>🚚 Transport:</strong> Surprisingly, transport is often only 5-10% of the total footprint. What you eat matters more than where it comes from.</p>
-                <p style={{ marginTop: '0.5rem' }}><strong>💡 Tip:</strong> Going meat-free one day per week has more impact than buying only local products for a whole year!</p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {onComplete && (
         <button style={styles.nextBtn} onClick={handleContinue}>
