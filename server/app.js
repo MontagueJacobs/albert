@@ -1027,7 +1027,26 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const ingredientText = enrichedData?.ingredients || null
   const nutritionText = enrichedData?.nutrition_text || null
   const nutritionJson = enrichedData?.nutrition_json || null
-  const co2Data = getCO2Emissions(input, ingredientText, nutritionText, nutritionJson)
+  let co2Data = getCO2Emissions(input, ingredientText, nutritionText, nutritionJson)
+  
+  // Safety net: if enrichedData says product is vegan/vegetarian but CO2 matched
+  // a meat/fish category, override to 'tofu' (plant-based protein).
+  // This catches vegan brands with meat-like names (e.g. "redefine meat pulled beef")
+  const ANIMAL_CATEGORIES = new Set([
+    'beef_herd', 'beef_dairy', 'lamb_mutton', 'pig_meat', 'poultry_meat',
+    'shrimps_farmed', 'fish_farmed'
+  ])
+  if (co2Data.matched && ANIMAL_CATEGORIES.has(co2Data.category) &&
+      enrichedData && (enrichedData.is_vegan === true || enrichedData.is_vegetarian === true)) {
+    // Re-evaluate as plant-based protein
+    const tofuCO2 = 3.16  // tofu CO2 per kg from our data
+    co2Data = {
+      ...co2Data,
+      co2PerKg: tofuCO2,
+      category: 'tofu',
+      method: 'vegan_override'
+    }
+  }
   
   // Handle non-food items
   if (co2Data.isNonFood) {
@@ -2961,6 +2980,7 @@ app.get('/api/products/:productId', async (req, res) => {
 app.get('/api/product/:productId/details', async (req, res) => {
   try {
     const { productId } = req.params
+    const lang = req.query.lang === 'en' ? 'en' : 'nl'
     
     // Get product from database (if available)
     let product = null
@@ -2993,7 +3013,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
     const enrichedData = product ? getEnrichedData(product) : null
     
     // Evaluate product with full scoring breakdown
-    const evaluation = evaluateProduct(productName, enrichedData)
+    const evaluation = evaluateProduct(productName, enrichedData, lang)
     
     // Create user-friendly breakdown
     const breakdown = []
@@ -3115,7 +3135,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
         currentScore: evaluation.score,
         evaluateProduct,
         getEnrichedData,
-        lang: 'nl',
+        lang,
         maxResults: 5
       })
       alternatives = smartResult.alternatives

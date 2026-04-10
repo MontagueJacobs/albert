@@ -648,8 +648,14 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'vegan burger', 'vegan gehakt', 'vegaburger', 'vegetarische schnitzel',
     'beyond meat', 'impossible', 'vivera', 'garden gourmet', 'terra',
     'vega stuk', 'vega schnitzel', 'vega burger', 'vega gehakt',
-    'sojaprotein', 'soja-eiwit', 'tarwe-eiwit', 'erwtenprotein'
+    'sojaprotein', 'soja-eiwit', 'tarwe-eiwit', 'erwtenprotein',
+    // Vegan brands that use meat-like names (must beat 'beef', 'gehakt' etc.)
+    'redefine meat', 'vegetarische slager', 'de vegetarische slager',
+    'the vegetarian butcher', 'planted chicken', 'planted pork',
+    'likemeat', 'like meat', 'no meat', 'next level meat',
+    'green cuisine', 'valess', 'quorn', 'beter leven plantaardig'
   ],
+
   
   // Fruits
   'berries_grapes': [
@@ -936,7 +942,9 @@ const FALLBACK_CATEGORIES = [
 // Category priority - higher priority wins when keywords from multiple categories match
 // Processed/composite categories should beat raw ingredient categories
 const CATEGORY_PRIORITY = {
-  // Highest priority: processed food categories (product type > ingredient)
+  // Highest: plant-based overrides (vegan brand names must beat meat keywords)
+  'tofu': 11,
+  // High priority: processed food categories (product type > ingredient)
   'ready_meals': 10,
   'soup': 10,
   'snacks': 9,

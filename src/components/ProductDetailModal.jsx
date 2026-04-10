@@ -388,7 +388,7 @@ function ProductDetailModal({ purchase, onClose }) {
       setError(null)
       
       try {
-        const res = await authFetch(`/api/product/${encodeURIComponent(purchase.product_id)}/details`)
+        const res = await authFetch(`/api/product/${encodeURIComponent(purchase.product_id)}/details?lang=${lang}`)
         if (!res.ok) {
           throw new Error('Failed to load product details')
         }
