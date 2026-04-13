@@ -1217,6 +1217,7 @@ class AHProductDetailScraper:
     async def scrape_multiple(self, urls: List[str], delay: float = 2.0) -> List[Dict[str, Any]]:
         """
         Scrape multiple product pages with a delay between requests.
+        Emits a [PRODUCT_RESULT] JSON line after each product for incremental processing.
         
         Args:
             urls: List of product URLs to scrape
@@ -1232,6 +1233,8 @@ class AHProductDetailScraper:
             print(f"[INFO] Progress: {i}/{total}", flush=True)
             result = await self.scrape_product(url)
             results.append(result)
+            # Emit per-product result so callers can save incrementally
+            print(f"[PRODUCT_RESULT] {json.dumps(result, ensure_ascii=False)}", flush=True)
             
             if i < total:
                 await asyncio.sleep(delay)

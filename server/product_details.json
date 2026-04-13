@@ -1,20 +1,33 @@
 [
   {
-    "url": "https://www.ah.nl/producten/product/wi471313/ah-biologisch-komkommer",
+    "url": "https://www.ah.nl/producten/product/wi457669",
     "success": true,
-    "is_vegan": null,
-    "is_vegetarian": null,
+    "is_vegan": true,
+    "is_vegetarian": true,
     "is_organic": null,
     "is_fairtrade": null,
-    "nutri_score": null,
+    "nutri_score": "B",
     "origin_country": null,
     "origin_by_month": null,
-    "brand": null,
-    "unit_size": null,
-    "price": null,
+    "brand": "Beyond Meat",
+    "unit_size": "2 Stuks",
+    "price": 4.69,
+    "image_url": "https://static.ah.nl/dam/product/AHI_64697061634f446f5361654f6251786a6c38715a7441?revLabel=1&rendition=800x800_JPG_Q90&fileType=binary",
     "allergens": [],
-    "ingredients": null,
+    "ingredients": "Ingrediënten\n\nIngrediënten: water, erwteneiwit (15%), raapzaadolie, aroma, rijsteiwit, kokosolie, gedroogde gist, conserveermiddel (kaliumlactaat), azijn, stabilisatoren (methylcellulose, calciumchloride), aardappelzetmeel, zout, appelextract, kleurstof (bietenrood), geconcentreerd granaatappelsap, kaliumzout.",
+    "nutrition_text": "Energie 820 kJ (196 kcal)\nVet 12 g\nwaarvan verzadigd 2,9 g\nKoolhydraten 5,6 g\nwaarvan suikers 0,6 g\nVoedingsvezel 1,2 g\nEiwitten 16 g\nZout 0,75 g",
+    "nutrition_json": {
+      "energy_kcal": 196.0,
+      "fat": 12.0,
+      "saturated_fat": 2.9,
+      "carbs": 5.6,
+      "sugars": 0.6,
+      "fiber": 1.2,
+      "protein": 16.0,
+      "salt": 0.75,
+      "unsaturated_fat": 9.1
+    },
     "error": null,
-    "scraped_at": "2026-03-19T19:38:33.491859"
+    "scraped_at": "2026-04-10T13:41:48.773282"
   }
 ]

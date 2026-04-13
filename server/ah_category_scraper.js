@@ -16,6 +16,13 @@
  *   --taxonomy 18041              Scrape a single taxonomy ID
  *   --taxonomy 18041,5282         Scrape multiple taxonomy IDs
  *
+ * Ingredient enrichment (uses Playwright-based product_detail_scraper.py):
+ *   --enrich                      Enrich products missing ingredients (standalone)
+ *   --enrich-after                Auto-enrich after running the API scrape
+ *   --enrich-limit 50             Max products to enrich (default: 20)
+ *   --enrich-delay 5              Seconds between requests (default: 3)
+ *   --enrich-force                Re-try previously failed products
+ *
  * Options:
  *   --dry-run              Scrape and save JSON but don't upsert to Supabase
  *   --json-only            Only save JSON, skip Supabase entirely
@@ -30,16 +37,17 @@
  *   node server/ah_category_scraper.js --all                   # Scrape ALL categories
  *   node server/ah_category_scraper.js --all-food              # All food categories
  *   node server/ah_category_scraper.js --taxonomy 18041        # Just meat substitutes
- *   node server/ah_category_scraper.js --taxonomy 18041,5282   # Multiple taxonomies
  *   node server/ah_category_scraper.js --dry-run               # Scrape but don't import
  *   node server/ah_category_scraper.js --list                  # Show available presets
+ *   node server/ah_category_scraper.js --enrich --enrich-limit 50  # Enrich 50 products
+ *   node server/ah_category_scraper.js --preset zuivel --enrich-after  # Scrape + enrich
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync } from 'fs'
-import { writeFileSync } from 'fs'
-import { join, dirname } from 'path'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { join, dirname, resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { spawn } from 'child_process'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -308,6 +316,8 @@ function getPresetsByGroup(group) {
 }
 
 const FOOD_PRESETS = getPresetsByGroup('food')
+const DRINK_PRESETS = ['koffie_thee', 'frisdrank', 'bier_wijn']
+const FOOD_NO_DRINK_PRESETS = FOOD_PRESETS.filter(p => !DRINK_PRESETS.includes(p))
 const NONFOOD_PRESETS = getPresetsByGroup('nonfood')
 const ALL_PRESETS = Object.keys(PRESETS)
 
@@ -522,6 +532,274 @@ async function upsertToSupabase(supabase, products, source) {
 }
 
 // ---------------------------------------------------------------
+// Enrichment: fetch ingredients/nutrition via product_detail_scraper.py
+// ---------------------------------------------------------------
+
+const DEFAULT_VENV_PYTHON = resolve(__dirname, '../../AH/bin/python')
+const PYTHON_CMD = process.env.PYTHON || (existsSync(DEFAULT_VENV_PYTHON) ? DEFAULT_VENV_PYTHON : 'python3')
+const PRODUCT_DETAIL_SCRIPT = join(__dirname, 'product_detail_scraper.py')
+
+/**
+ * Spawn the Playwright-based Python scraper for a batch of product URLs.
+ * Uses --batch mode: one browser session for all products (no restart per page).
+ *
+ * Results are streamed: every time the Python scraper finishes a product it
+ * emits a `[PRODUCT_RESULT] {...}` line on stdout.  We parse those lines
+ * as they arrive and call `onResult(detail)` immediately so the caller can
+ * persist each result to Supabase right away — no data lost on Ctrl-C.
+ *
+ * @param {string[]}  urls      - Product URLs to scrape
+ * @param {object}    opts      - { headless, delay, verbose, onResult }
+ * @param {Function}  opts.onResult - Called with each parsed result object as it streams in
+ * @returns {Promise<number>}   - Number of results streamed (0 on total failure)
+ */
+function scrapeProductDetailsBatch(urls, { headless = true, delay = 3, verbose = false, onResult } = {}) {
+  return new Promise((res) => {
+    if (!existsSync(PRODUCT_DETAIL_SCRIPT)) {
+      console.error('  ✗ product_detail_scraper.py not found at', PRODUCT_DETAIL_SCRIPT)
+      res(0)
+      return
+    }
+
+    const args = [
+      PRODUCT_DETAIL_SCRIPT,
+      '--batch',
+      '--delay', String(delay),
+      '--output', join(__dirname, '_enrich_results.json'),
+    ]
+    if (headless) args.push('--headless')
+    else args.push('--no-headless')
+
+    if (verbose) console.log(`  Spawning: ${PYTHON_CMD} ${args.join(' ')}`)
+
+    const proc = spawn(PYTHON_CMD, args, {
+      cwd: dirname(PRODUCT_DETAIL_SCRIPT),
+      env: { ...process.env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+
+    // Feed URLs via stdin, then close
+    proc.stdin.write(urls.join('\n') + '\n')
+    proc.stdin.end()
+
+    let stderr = ''
+    let streamed = 0
+    let lineBuf = ''   // buffer for partial lines
+
+    // Stream scraper progress to console and parse [PRODUCT_RESULT] lines live
+    proc.stdout.on('data', d => {
+      lineBuf += d.toString()
+      const lines = lineBuf.split('\n')
+      lineBuf = lines.pop() // keep incomplete trailing line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('[PRODUCT_RESULT] ')) {
+          try {
+            const detail = JSON.parse(line.slice('[PRODUCT_RESULT] '.length))
+            streamed++
+            if (onResult) onResult(detail)
+          } catch (e) {
+            console.error('  ✗ Failed to parse [PRODUCT_RESULT] line:', e.message)
+          }
+        } else if (line.startsWith('[INFO]') || line.startsWith('[SUCCESS]') || line.startsWith('[WARN]')) {
+          console.log(`    ${line}`)
+        }
+      }
+    })
+    proc.stderr.on('data', d => { stderr += d.toString() })
+
+    proc.on('close', (code) => {
+      // Process any remaining data in the line buffer
+      if (lineBuf.startsWith('[PRODUCT_RESULT] ')) {
+        try {
+          const detail = JSON.parse(lineBuf.slice('[PRODUCT_RESULT] '.length))
+          streamed++
+          if (onResult) onResult(detail)
+        } catch {}
+      }
+
+      if (code !== 0 && code !== null) {
+        console.error(`  ✗ Scraper exited with code ${code}`)
+        if (stderr) console.error('    stderr:', stderr.slice(-400))
+      }
+      res(streamed)
+    })
+
+    // Timeout: 5 min per product headless, 10 min per product non-headless
+    const perProductTimeout = headless ? 300000 : 600000
+    const totalTimeout = Math.max(perProductTimeout, urls.length * (headless ? 60000 : 120000))
+    setTimeout(() => {
+      proc.kill()
+      console.error(`  ✗ Scraper timeout (${Math.round(totalTimeout / 1000)}s)`)
+      res(streamed)
+    }, totalTimeout)
+  })
+}
+
+/**
+ * Enrich products in Supabase that are missing ingredient data.
+ * Uses the Playwright-based product_detail_scraper.py in batch mode —
+ * one browser session for all products (no restart between pages).
+ *
+ * @param {object} supabase  - Supabase client
+ * @param {object} opts      - { limit, delay, source, verbose, force, headless }
+ */
+async function enrichProducts(supabase, opts = {}) {
+  const {
+    limit = 20,
+    delay = 3,
+    source = null,
+    verbose = false,
+    force = false,
+    headless = true,
+  } = opts
+
+  console.log('╔══════════════════════════════════════════════════════╗')
+  console.log('║       Ingredient Enrichment                        ║')
+  console.log('╚══════════════════════════════════════════════════════╝')
+  console.log()
+
+  // Query products missing ingredients (paginate to bypass Supabase 1000-row limit)
+  const PAGE = 1000
+  let products = []
+
+  for (let offset = 0; products.length < limit; offset += PAGE) {
+    const batchSize = Math.min(PAGE, limit - products.length)
+    let query = supabase
+      .from('products')
+      .select('id, name, url, ingredients, details_scrape_status')
+
+    if (!force) {
+      query = query
+        .is('ingredients', null)
+        .not('details_scrape_status', 'eq', 'failed')
+        .not('details_scrape_status', 'eq', 'non_food')
+    }
+
+    if (source) {
+      query = query.eq('source', source)
+    }
+
+    query = query.order('updated_at', { ascending: false }).range(offset, offset + batchSize - 1)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('  ✗ Supabase query error:', error.message)
+      return
+    }
+
+    if (!data || data.length === 0) break
+    products.push(...data)
+    if (data.length < batchSize) break // no more rows
+  }
+
+  if (!products || products.length === 0) {
+    console.log('  ✓ No products need enrichment!')
+    return
+  }
+
+  // Build URL list and index by URL for later matching
+  const urlToProduct = new Map()
+  const urls = []
+  for (const p of products) {
+    const productUrl = p.url || `https://www.ah.nl/producten/product/${p.id}`
+    urls.push(productUrl)
+    urlToProduct.set(productUrl, p)
+  }
+
+  console.log(`  Found ${products.length} products missing ingredients (limit: ${limit})`)
+  console.log(`  Delay between requests: ${delay}s`)
+  console.log(`  Browser: ${headless ? 'headless' : 'VISIBLE — log in when the browser opens'}`)
+  console.log(`  Python: ${PYTHON_CMD}`)
+  console.log(`  Mode: single browser session (batch)`)
+  console.log(`  Saving: incremental — each product saved to Supabase as it completes`)
+  console.log()
+
+  for (let i = 0; i < products.length; i++) {
+    console.log(`  ${(i + 1).toString().padStart(3)}. ${products[i].name}`)
+  }
+  console.log()
+
+  // Counters updated live as results stream in
+  let success = 0, failed = 0, partial = 0
+
+  // onResult callback — saves each product to Supabase the moment it arrives
+  const onResult = async (detail) => {
+    const p = urlToProduct.get(detail.url)
+    if (!p) {
+      console.log(`    ? No matching product for URL: ${detail.url}`)
+      return
+    }
+
+    if (!detail.success) {
+      console.log(`  ✗ ${p.name}: Failed${detail.error ? ' — ' + detail.error : ''}`)
+      await supabase
+        .from('products')
+        .update({
+          details_scrape_status: 'failed',
+          details_scraped_at: new Date().toISOString(),
+        })
+        .eq('id', p.id)
+      failed++
+    } else {
+      const updateData = {}
+      if (detail.ingredients) updateData.ingredients = detail.ingredients
+      if (detail.nutrition_text) updateData.nutrition_text = detail.nutrition_text
+      if (detail.nutrition_json) updateData.nutrition_json = detail.nutrition_json
+      if (detail.is_vegan != null) updateData.is_vegan = detail.is_vegan
+      if (detail.is_vegetarian != null) updateData.is_vegetarian = detail.is_vegetarian
+      if (detail.is_organic != null) updateData.is_organic = detail.is_organic
+      if (detail.is_fairtrade != null) updateData.is_fairtrade = detail.is_fairtrade
+      if (detail.nutri_score) updateData.nutri_score = detail.nutri_score
+      if (detail.origin_country) updateData.origin_country = detail.origin_country
+      if (detail.origin_by_month) updateData.origin_by_month = detail.origin_by_month
+      if (detail.brand) updateData.brand = detail.brand
+      if (detail.allergens && detail.allergens.length) updateData.allergens = detail.allergens
+
+      const hasIngredients = !!detail.ingredients
+      updateData.details_scrape_status = hasIngredients ? 'success' : 'incomplete'
+      updateData.details_scraped_at = new Date().toISOString()
+
+      const { error: updateError } = await supabase
+        .from('products')
+        .update(updateData)
+        .eq('id', p.id)
+
+      if (updateError) {
+        console.log(`  ✗ ${p.name}: DB error — ${updateError.message}`)
+        failed++
+      } else if (hasIngredients) {
+        console.log(`  ✓ ${p.name}: ${detail.ingredients.substring(0, 70)}...`)
+        success++
+      } else {
+        console.log(`  ~ ${p.name}: no ingredients found on page`)
+        partial++
+      }
+    }
+  }
+
+  // Run the scraper — results stream in via onResult and are saved immediately
+  const streamed = await scrapeProductDetailsBatch(urls, { headless, delay, verbose, onResult })
+
+  // Mark any products that got no result at all (e.g. scraper crashed mid-batch)
+  const processedUrls = new Set()
+  // We can't easily track which URLs were processed inside onResult without state,
+  // so use the counters: if streamed < total, some were never processed
+  if (streamed < products.length) {
+    console.log(`  ⚠ ${products.length - streamed} products did not produce a result (scraper interrupted?)`)
+  }
+
+  console.log()
+  console.log(`  ── Enrichment summary ──`)
+  console.log(`     Success:    ${success}`)
+  console.log(`     Partial:    ${partial} (no ingredients on page)`)
+  console.log(`     Failed:     ${failed}`)
+  console.log(`     Streamed:   ${streamed} / ${products.length}`)
+  console.log(`     ★ All saved results are already in Supabase`)
+}
+
+// ---------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------
 
@@ -536,6 +814,13 @@ function parseArgs() {
     source: null,
     verbose: false,
     list: false,
+    // Enrichment options
+    enrich: false,          // standalone enrichment mode
+    enrichAfter: false,     // auto-enrich after scrape
+    enrichLimit: 20,        // max products to enrich
+    enrichDelay: 3,         // seconds between enrichment requests
+    enrichForce: false,     // re-enrich even previously failed products
+    headless: false,        // visible browser by default (AH blocks headless)
   }
 
   let presetExplicitlySet = false
@@ -553,6 +838,10 @@ function parseArgs() {
         break
       case '--all-food':
         opts.presets = FOOD_PRESETS
+        presetExplicitlySet = true
+        break
+      case '--all-food-no-drinks':
+        opts.presets = FOOD_NO_DRINK_PRESETS
         presetExplicitlySet = true
         break
       case '--all-nonfood':
@@ -585,6 +874,26 @@ function parseArgs() {
       case '-l':
         opts.list = true
         break
+      case '--enrich':
+        opts.enrich = true
+        break
+      case '--enrich-after':
+        opts.enrichAfter = true
+        break
+      case '--enrich-limit':
+      case '--limit':
+        opts.enrichLimit = parseInt(args[++i], 10) || 20
+        break
+      case '--enrich-delay':
+      case '--delay':
+        opts.enrichDelay = parseFloat(args[++i]) || 3
+        break
+      case '--enrich-force':
+        opts.enrichForce = true
+        break
+      case '--headless':
+        opts.headless = true
+        break
       case '--help':
       case '-h':
         console.log(`
@@ -597,10 +906,19 @@ Preset selection:
   --preset <names>    One or more presets, comma-separated (default: plantbased)
   --all               Scrape ALL categories (~34,000 products)
   --all-food          Scrape all food categories (~21 presets)
+  --all-food-no-drinks  All food except drinks (no koffie/thee, frisdrank, bier/wijn)
   --all-nonfood       Scrape all non-food categories (~6 presets)
 
 Custom categories:
   --taxonomy <ids>    Scrape specific taxonomy IDs (comma-separated)
+
+Ingredient enrichment (uses Playwright browser scraper):
+  --enrich            Enrich products missing ingredients (standalone, no API scrape)
+  --enrich-after      Auto-enrich after running the API scrape
+  --enrich-limit <n>  Max products to enrich per run (default: 20)
+  --enrich-delay <s>  Seconds between enrichment requests (default: 3)
+  --enrich-force      Re-try products that previously failed enrichment
+  --headless          Run browser headless (default: visible, AH blocks headless)
 
 Options:
   --dry-run           Scrape & save JSON, skip Supabase upsert
@@ -612,10 +930,12 @@ Options:
   --help              Show this help
 
 Examples:
-  node server/ah_category_scraper.js                         # Default: plant-based
-  node server/ah_category_scraper.js --preset vlees,vis      # Meat + fish
-  node server/ah_category_scraper.js --all-food --dry-run    # All food, no DB write
-  node server/ah_category_scraper.js --all                   # Everything
+  node server/ah_category_scraper.js                           # Default: plant-based
+  node server/ah_category_scraper.js --preset vlees,vis        # Meat + fish
+  node server/ah_category_scraper.js --all-food --dry-run      # All food, no DB write
+  node server/ah_category_scraper.js --all                     # Everything
+  node server/ah_category_scraper.js --enrich --enrich-limit 50  # Enrich 50 products
+  node server/ah_category_scraper.js --preset zuivel --enrich-after  # Scrape + enrich
 `)
         process.exit(0)
         break
@@ -660,8 +980,28 @@ async function main() {
     console.log('  Meta-groups:')
     console.log(`    --all            ${ALL_PRESETS.length} presets (all categories)`)
     console.log(`    --all-food       ${FOOD_PRESETS.length} presets (food only)`)
+    console.log(`    --all-food-no-drinks  ${FOOD_NO_DRINK_PRESETS.length} presets (food, no drinks)`)
     console.log(`    --all-nonfood    ${NONFOOD_PRESETS.length} presets (non-food only)`)
     console.log()
+    return
+  }
+
+  // ── Standalone enrichment mode ────────────────────────────────────
+  if (opts.enrich) {
+    const supabase = connectSupabase()
+    if (!supabase) {
+      console.error('Missing Supabase credentials. Cannot enrich.')
+      process.exit(1)
+    }
+    await enrichProducts(supabase, {
+      limit: opts.enrichLimit,
+      delay: opts.enrichDelay,
+      source: opts.source || null,
+      verbose: opts.verbose,
+      force: opts.enrichForce,
+      headless: opts.headless,
+    })
+    console.log('\n── Done! ──────────────────────────────────────────────\n')
     return
   }
 
@@ -841,6 +1181,19 @@ async function main() {
       .from('products')
       .select('*', { count: 'exact', head: true })
     console.log(`\n  Total products in DB: ${count}`)
+  }
+
+  // ── Optional enrichment after scrape ──────────────────────────────
+  if (opts.enrichAfter && supabase) {
+    console.log()
+    await enrichProducts(supabase, {
+      limit: opts.enrichLimit,
+      delay: opts.enrichDelay,
+      source: opts.source || null,
+      verbose: opts.verbose,
+      force: opts.enrichForce,
+      headless: opts.headless,
+    })
   }
 
   console.log('\n── Done! ──────────────────────────────────────────────\n')
