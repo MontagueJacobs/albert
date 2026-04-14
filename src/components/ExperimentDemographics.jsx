@@ -26,16 +26,16 @@ const DEMOGRAPHICS_QUESTIONS = [
     ]
   },
   {
-    id: 'demo_education',
-    text: 'What is your highest level of education?',
-    textNl: 'Wat is uw hoogst afgeronde opleiding?',
+    id: 'demo_occupation',
+    text: 'What is your current occupation?',
+    textNl: 'Wat is uw huidige beroep?',
     type: 'select',
     options: [
-      { value: 'secondary', label: 'Secondary school', labelNl: 'Middelbare school' },
-      { value: 'mbo', label: 'MBO', labelNl: 'MBO' },
-      { value: 'hbo', label: 'HBO', labelNl: 'HBO' },
-      { value: 'university', label: 'University (WO)', labelNl: 'Universiteit (WO)' },
-      { value: 'other', label: 'Other', labelNl: 'Anders' }
+      { value: 'University_HBO', label: 'University (HBO)', labelNl: 'Universiteit (HBO)' },
+      { value: 'University_WO', label: 'University (WO)', labelNl: 'Universiteit (WO)' },
+      { value: 'Employed', label: 'Employed', labelNl: 'Werkzaam' },
+      { value: 'Unemployed', label: 'Unemployed', labelNl: 'Werkloos' },
+      { value: 'Other', label: 'Other', labelNl: 'Anders' },
     ]
   },
   {
