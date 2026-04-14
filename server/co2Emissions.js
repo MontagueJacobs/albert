@@ -187,6 +187,8 @@ const CATEGORY_DEFAULT_WEIGHTS = {
   // Dairy
   'cheese': 400,
   'milk': 1000,         // 1L
+  'butter': 250,        // typical block
+  'margarine': 500,     // typical tub
   'eggs': 600,          // 10 stuks
   
   // Oils
@@ -330,7 +332,7 @@ const OWID_EMISSIONS = {
   'beef_herd': 99.48, 'beef_dairy': 33.30, 'lamb_mutton': 39.72,
   'pig_meat': 12.31, 'poultry_meat': 9.87,
   'shrimps_farmed': 26.87, 'fish_farmed': 13.63,
-  'cheese': 23.88, 'milk': 3.15, 'eggs': 4.67,
+  'cheese': 23.88, 'milk': 3.15, 'eggs': 4.67, 'butter': 8.70, 'margarine': 3.30,
   'palm_oil': 7.32, 'soybean_oil': 6.32, 'olive_oil': 5.42,
   'rapeseed_oil': 3.77, 'sunflower_oil': 3.60,
   'rice': 4.45, 'wheat_rye': 1.57, 'barley': 1.18, 'maize': 1.70, 'oatmeal': 2.48,
@@ -807,10 +809,15 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'melk', 'milk', 'slagroom', 'koffiemelk',
     'yoghurt', 'yogurt', 'kwark', 'vla', 'custard',
     'karnemelk', 'buttermilk', 'creme fraiche', 'zure room',
-    'boter', 'butter', 'margarine', 'roomboter',
     'zuivel', 'drinkyoghurt', 'optimel', 'chocomel',
     'wei', 'whey', 'weipoeder', 'lactose', 'caseïne', 'caseine',
     'room', 'magere melk', 'volle melk', 'halfvolle melk'
+  ],
+  'butter': [
+    'boter', 'butter', 'roomboter', 'kruidenboter', 'knoflookboter'
+  ],
+  'margarine': [
+    'margarine', 'halvarine', 'bakboter', 'plantaardige boter'
   ],
   'eggs': [
     'ei', 'eieren', 'eggs', 'omelet', 'roerei', 'gebakken ei',
@@ -959,7 +966,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Sugar
   'cane_sugar': ['rietsuiker', 'cane sugar', 'ruwe suiker', 'muscovado'],
-  'beet_sugar': ['suiker', 'sugar', 'kristalsuiker', 'poedersuiker', 'basterdsuiker'],
+  'beet_sugar': ['suiker', 'sugar', 'kristalsuiker', 'poedersuiker', 'basterdsuiker', 'bietsuiker'],
   
   // Beverages & Other
   'coffee': ['koffie', 'coffee', 'espresso', 'cappuccino', 'latte'],
@@ -1182,6 +1189,8 @@ const CATEGORY_PRIORITY = {
   'coffee': 7,
   'wine': 7,
   'dark_chocolate': 7,
+  'butter': 6,
+  'margarine': 6,
   // Default priority for raw ingredients/foods
   // (everything else gets priority 5)
 }
@@ -2250,6 +2259,8 @@ const CATEGORY_LABELS = {
   'beet_sugar': 'Bietsuiker',
   'coffee': 'Koffie',
   'dark_chocolate': 'Chocolade',
+  'butter': 'Boter',
+  'margarine': 'Margarine',
   'wine': 'Wijn',
   'soy_milk': 'Plantaardige Melk',
   'cassava': 'Cassave',

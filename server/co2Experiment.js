@@ -23,22 +23,20 @@ import {
 // ===========================================================================
 const GENERIC_POOL_A = [
   { name: 'Ground Beef', nameNl: 'Rundergehakt', image: '🥩' },
+  { name: 'Coffee', nameNl: 'Koffie', image: '☕' },
   { name: 'Chicken Breast', nameNl: 'Kipfilet', image: '🍗' },
-  { name: 'Cheese', nameNl: 'Kaas', image: '🧀' },
   { name: 'Milk', nameNl: 'Melk', image: '🥛' },
   { name: 'Rice', nameNl: 'Rijst', image: '🍚' },
-  { name: 'Bread', nameNl: 'Brood', image: '🍞' },
-  { name: 'Potato', nameNl: 'Aardappel', image: '🥔' },
+  { name: 'Orange', nameNl: 'Sinaasappel', image: '🍊' },
 ]
 
 const GENERIC_POOL_B = [
   { name: 'Lamb', nameNl: 'Lamsvlees', image: '🍖' },
-  { name: 'Pork', nameNl: 'Varkensvlees', image: '🥓' },
-  { name: 'Butter', nameNl: 'Boter', image: '🧈' },
+  { name: 'Soybean Oil', nameNl: 'Sojaolie', image: '🫗' },
+  { name: 'Yogurt', nameNl: 'Yoghurt', image: '🥛' },
   { name: 'Eggs', nameNl: 'Eieren', image: '🥚' },
-  { name: 'Banana', nameNl: 'Banaan', image: '🍌' },
-  { name: 'Lentils', nameNl: 'Linzen', image: '🫘' },
-  { name: 'Chocolate', nameNl: 'Chocolade', image: '🍫' },
+  { name: 'Bread', nameNl: 'Brood', image: '🍞' },
+  { name: 'Apple', nameNl: 'Appel', image: '🍎' },
 ]
 
 // ===========================================================================
@@ -47,23 +45,21 @@ const GENERIC_POOL_B = [
 // Pool C = quiz 5 (pre-intervention), Pool D = quiz 6 (post-intervention)
 // ===========================================================================
 const AH_POOL_C = [
-  { name: 'AH Rundergehakt',           nameNl: 'AH Rundergehakt',           image: '🥩', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303937393037?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Scharrel kipfilet',      nameNl: 'AH Scharrel kipfilet',      image: '🍗', image_url: 'https://static.ah.nl/dam/product/AHI_43545239393132353833?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Chocoladereep puur',     nameNl: 'AH Chocoladereep puur',     image: '🍫', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313732313633?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Geraspte kaas',          nameNl: 'AH Geraspte kaas',          image: '🧀', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313838303239?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Halfvolle melk',         nameNl: 'AH Halfvolle melk',         image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303337393339?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Spaghetti',              nameNl: 'AH Spaghetti',              image: '🍝', image_url: 'https://static.ah.nl/dam/product/AHI_43545239383939363230?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Trostomaten',            nameNl: 'AH Trostomaten',            image: '🍅', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313637333535?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Witte bonen',            nameNl: 'AH Witte bonen',            image: '🫘', image_url: 'https://static.ah.nl/dam/product/AHI_523161594733674e536c474a58762d6270776e534c67?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Zonnebloemolie',         nameNl: 'AH Zonnebloemolie',         image: '🌻', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313632313433?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Tofu naturel',           nameNl: 'AH Tofu naturel',           image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323137383236?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Bietsuiker',             nameNl: 'AH Bietsuiker',             image: '🍬' },
+  { name: 'AH Sojadrink ongezoet',     nameNl: 'AH Sojadrink ongezoet',     image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323035363233?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
 
 const AH_POOL_D = [
-  { name: 'AH Lamsfilet',              nameNl: 'AH Lamsfilet',              image: '🍖', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303937393430?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Varkenshaas',            nameNl: 'AH Varkenshaas',            image: '🥓', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303938303033?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Mozzarella',            nameNl: 'AH Mozzarella',            image: '🧀', image_url: 'https://static.ah.nl/dam/product/AHI_43545239373537333131?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Scharreleieren',        nameNl: 'AH Scharreleieren',        image: '🥚', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313931353932?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Broccoliroosjes',       nameNl: 'AH Broccoliroosjes',       image: '🥦', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313836313439?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Havermout',             nameNl: 'AH Havermout',             image: '🥣', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313931343330?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Kikkererwten',          nameNl: 'AH Kikkererwten',          image: '🫘', image_url: 'https://static.ah.nl/dam/product/AHI_38597863424b726f534f4f6b32357370696331484841?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Garnalen',               nameNl: 'AH Garnalen',               image: '🦐', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313637383039?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Roomboter ongezouten',   nameNl: 'AH Roomboter ongezouten',   image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313832323531?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Pindakaas',              nameNl: 'AH Pindakaas',              image: '🥜' },
+  { name: 'AH Margarine',              nameNl: 'AH Margarine',              image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313832323439?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Rietsuiker',             nameNl: 'AH Rietsuiker',             image: '🍯' },
+  { name: 'AH Haverdrink',             nameNl: 'AH Haverdrink',             image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323130353735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
 
 /**
@@ -250,6 +246,17 @@ export function assignABVariant(bonusCard) {
 }
 
 /**
+ * Demographics questions (asked after consent, before experiment)
+ */
+export const DEMOGRAPHICS_QUESTIONS = [
+  { id: 'demo_age', type: 'number' },
+  { id: 'demo_gender', type: 'select', options: ['man', 'woman', 'non_binary', 'prefer_not_to_say'] },
+  { id: 'demo_education', type: 'select', options: ['secondary', 'mbo', 'hbo', 'university', 'other'] },
+  { id: 'demo_diet', type: 'select', options: ['omnivore', 'flexitarian', 'vegetarian', 'vegan', 'other'] },
+  { id: 'demo_shopping_frequency', type: 'select', options: ['daily', '2_3_per_week', 'weekly', 'less_than_weekly'] }
+]
+
+/**
  * Self-perception questions (Likert 1-5)
  * Asked pre-intervention to gauge self-assessment
  */
@@ -286,33 +293,33 @@ export const SELF_PERCEPTION_QUESTIONS = [
  */
 export const REFLECTION_QUESTIONS = [
   {
-    id: 'ref_surprised',
-    text: 'Were you surprised by any of the correct CO₂ rankings?',
-    textNl: 'Was u verrast door een van de juiste CO₂-rangschikkingen?',
-    type: 'yesno'
-  },
-  {
-    id: 'ref_learned',
-    text: 'Did you learn something new about the environmental impact of food?',
-    textNl: 'Heeft u iets nieuws geleerd over de milieu-impact van voedsel?',
-    type: 'yesno'
-  },
-  {
-    id: 'ref_change_intent',
-    text: 'Do you think this information will change how you shop for groceries?',
-    textNl: 'Denkt u dat deze informatie zal veranderen hoe u boodschappen doet?',
-    type: 'yesno'
-  },
-  {
-    id: 'ref_most_surprising',
-    text: 'What surprised you the most about the CO₂ impact of food products?',
-    textNl: 'Wat verbaasde u het meest over de CO₂-impact van voedselproducten?',
+    id: 'ref_reflection',
+    text: 'What did you learn from this study?',
+    textNl: 'Wat heeft u geleerd van dit onderzoek?',
     type: 'open'
   },
   {
-    id: 'ref_feedback',
-    text: 'Do you have any other thoughts or feedback about this experiment?',
-    textNl: 'Heeft u nog andere gedachten of feedback over dit experiment?',
+    id: 'ref_surprise',
+    text: 'Did any of the results about your purchases surprise you? If yes, how?',
+    textNl: 'Hebben de resultaten over uw aankopen u verrast? Zo ja, hoe?',
+    type: 'open'
+  },
+  {
+    id: 'ref_system_feedback',
+    text: 'What did you like or dislike about the ranking system?',
+    textNl: 'Wat vond u goed of minder goed aan het rangschikkingssysteem?',
+    type: 'open'
+  },
+  {
+    id: 'ref_trust_comparison',
+    text: 'How does this system compare to eco-labels you have seen before?',
+    textNl: 'Hoe verhoudt dit systeem zich tot keurmerken die u eerder heeft gezien?',
+    type: 'open'
+  },
+  {
+    id: 'ref_improvement',
+    text: 'What would you improve about this tool?',
+    textNl: 'Wat zou u verbeteren aan deze tool?',
     type: 'open'
   }
 ]
@@ -322,6 +329,7 @@ export const REFLECTION_QUESTIONS = [
  */
 export const EXPERIMENT_STEPS = [
   'consent',
+  'demographics',
   'scrape',
   'pre_quiz_general',
   'pre_quiz_ah',
@@ -345,37 +353,43 @@ export const LEGACY_STEPS = [
 ]
 
 /**
- * Pre-questionnaire: closed Likert questions (awareness + self-perception combined)
+ * Pre-questionnaire: closed Likert questions (awareness & self-perception)
  */
 export const PRE_QUESTIONNAIRE_QUESTIONS = [
   {
     id: 'pre_q1',
-    text_nl: 'Ik weet welke voedselproducten een hoge CO₂-uitstoot hebben.',
-    text_en: 'I know which food products have a high CO₂ footprint.',
+    text_nl: 'Ik beschouw mijn voedselkeuzes als milieuvriendelijk.',
+    text_en: 'I consider my food choices to be environmentally sustainable.',
     type: 'likert'
   },
   {
     id: 'pre_q2',
-    text_nl: 'Ik houd rekening met duurzaamheid bij het doen van boodschappen.',
-    text_en: 'I consider sustainability when grocery shopping.',
+    text_nl: 'Ik heb vertrouwen in mijn kennis over de milieu-impact van voedselproducten.',
+    text_en: 'I feel confident in my knowledge of the environmental impact of food products.',
     type: 'likert'
   },
   {
     id: 'pre_q3',
-    text_nl: 'Ik weet wat de milieu-impact is van vlees ten opzichte van plantaardige producten.',
-    text_en: 'I know the environmental impact of meat compared to plant-based products.',
+    text_nl: 'Ik vertrouw op keurmerken bij het maken van aankoopbeslissingen voor voedsel.',
+    text_en: 'I trust eco-labels when making food purchasing decisions.',
     type: 'likert'
   },
   {
     id: 'pre_q4',
-    text_nl: 'Ik ben bereid mijn eetgewoontes aan te passen voor het milieu.',
-    text_en: 'I am willing to change my eating habits for the environment.',
+    text_nl: 'Keurmerken zijn gemakkelijk te begrijpen.',
+    text_en: 'Eco-labels are easy to understand.',
     type: 'likert'
   },
   {
     id: 'pre_q5',
-    text_nl: 'Ik vind het belangrijk om te weten hoeveel CO₂ mijn boodschappen veroorzaken.',
-    text_en: 'I think it is important to know how much CO₂ my groceries cause.',
+    text_nl: 'Ik vind het gemakkelijk om producten te vergelijken op basis van hun milieu-impact.',
+    text_en: 'I find it easy to compare products based on their environmental impact.',
+    type: 'likert'
+  },
+  {
+    id: 'pre_q6',
+    text_nl: 'Ik houd actief rekening met de milieu-impact bij het kopen van voedsel.',
+    text_en: 'I actively consider environmental impact when buying food.',
     type: 'likert'
   }
 ]
@@ -386,32 +400,44 @@ export const PRE_QUESTIONNAIRE_QUESTIONS = [
 export const POST_QUESTIONNAIRE_QUESTIONS = [
   {
     id: 'post_q1',
-    text_nl: 'Ik begrijp nu beter welke producten een hoge CO₂-uitstoot hebben.',
-    text_en: 'I now better understand which products have a high CO₂ footprint.',
+    text_nl: 'Ik heb een beter begrip van de milieu-impact van voedselproducten na dit onderzoek.',
+    text_en: 'I have a better understanding of the environmental impact of food products after this study.',
     type: 'likert'
   },
   {
     id: 'post_q2',
-    text_nl: 'Ik ben van plan om duurzamere keuzes te maken bij mijn volgende boodschappen.',
-    text_en: 'I plan to make more sustainable choices in my next grocery shopping.',
+    text_nl: 'Het rangschikkingssysteem in dit onderzoek was duidelijk en gemakkelijk te begrijpen.',
+    text_en: 'The ranking system used in this study was clear and easy to understand.',
     type: 'likert'
   },
   {
     id: 'post_q3',
-    text_nl: 'De informatie die ik heb gezien was nuttig en begrijpelijk.',
-    text_en: 'The information I saw was useful and understandable.',
+    text_nl: 'Ik vertrouw het CO₂-rangschikkingssysteem dat in dit onderzoek is gepresenteerd.',
+    text_en: 'I trust the CO₂ ranking system presented in this study.',
     type: 'likert'
   },
   {
     id: 'post_q4',
-    text_nl: 'Ik voel me nu beter in staat om duurzame keuzes te maken in de supermarkt.',
-    text_en: 'I now feel better equipped to make sustainable choices in the supermarket.',
+    text_nl: 'Ik vind dit rangschikkingssysteem duidelijker dan bestaande keurmerken.',
+    text_en: 'I find this ranking system clearer than existing eco-labels.',
     type: 'likert'
   },
   {
     id: 'post_q5',
-    text_nl: 'Dit soort informatie zou standaard beschikbaar moeten zijn bij het boodschappen doen.',
-    text_en: 'This kind of information should be available by default when grocery shopping.',
+    text_nl: 'De feedback over mijn persoonlijke aankopen was nuttig.',
+    text_en: 'The feedback on my personal purchases was useful.',
+    type: 'likert'
+  },
+  {
+    id: 'post_q6',
+    text_nl: 'Ik zou dit soort informatie gebruiken bij het maken van toekomstige voedselkeuzes.',
+    text_en: 'I would use this type of information when making future food choices.',
+    type: 'likert'
+  },
+  {
+    id: 'post_q7',
+    text_nl: 'De quizzen hebben me geholpen om te leren over de milieu-impact van voedsel.',
+    text_en: 'The quizzes helped me learn about the environmental impact of food.',
     type: 'likert'
   }
 ]

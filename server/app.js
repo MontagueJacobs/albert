@@ -47,6 +47,7 @@ import {
   REFLECTION_QUESTIONS,
   PRE_QUESTIONNAIRE_QUESTIONS,
   POST_QUESTIONNAIRE_QUESTIONS,
+  DEMOGRAPHICS_QUESTIONS,
   EXPERIMENT_STEPS,
   getNextStep
 } from './co2Experiment.js'
@@ -3743,6 +3744,37 @@ app.post('/api/experiment/:sessionId/consent', async (req, res) => {
       .from('experiment_sessions')
       .update({ 
         consent_given: true, 
+        current_step: 'demographics',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.json({ session: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Submit demographics and advance to scrape step
+app.post('/api/experiment/:sessionId/demographics', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { responses } = req.body
+
+    if (!responses || typeof responses !== 'object') {
+      return res.status(400).json({ error: 'responses object is required' })
+    }
+
+    const { data, error } = await supabase
+      .from('experiment_sessions')
+      .update({ 
+        demographics: responses,
         current_step: 'scrape',
         updated_at: new Date().toISOString()
       })
@@ -3892,11 +3924,11 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
         }
       }))
 
-      // Filter valid CO2 data, shuffle, take up to 7
+      // Filter valid CO2 data, shuffle, take up to 6
       items = enriched
         .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
         .sort(() => Math.random() - 0.5)
-        .slice(0, 7)
+        .slice(0, 6)
     }
 
     // Filter out any used IDs (safety)
@@ -4199,6 +4231,7 @@ app.get('/api/experiment/config', (req, res) => {
     reflectionQuestions: REFLECTION_QUESTIONS,
     preQuestionnaireQuestions: PRE_QUESTIONNAIRE_QUESTIONS,
     postQuestionnaireQuestions: POST_QUESTIONNAIRE_QUESTIONS,
+    demographicsQuestions: DEMOGRAPHICS_QUESTIONS,
     steps: EXPERIMENT_STEPS
   })
 })

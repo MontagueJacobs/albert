@@ -51,8 +51,10 @@ const AGRIBALYSE_EMISSIONS = {
   shrimps_farmed:  { mean: 24.15, min:  7.57, max: 41.60, n:   9, note: 'Shrimp, prawn, lobster, crab' },
 
   // Dairy & Eggs
-  cheese:          { mean:  5.22, min:  1.87, max:  9.02, n: 187, note: 'All cheese types (France-specific; lower than global avg)' },
-  milk:            { mean:  3.22, min:  1.15, max: 12.50, n:  94, note: 'Includes butter, cream, yoghurt, dairy desserts' },
+  cheese:          { mean: 12.00, min:  1.87, max: 23.88, n: 187, note: 'Hard/semi-hard cheese; blended: Agribalyse FR avg 5.22 underestimates due to French dairy efficiency, OWID global 23.88, literature consensus ~10-14 for Dutch supermarket cheese (Poore & Nemecek 2018)' },
+  milk:            { mean:  3.22, min:  1.15, max:  5.50, n:  94, note: 'Liquid dairy: milk, yoghurt, cream, vla, custard' },
+  butter:          { mean: 11.52, min:  8.60, max: 12.50, n:  12, note: 'Butter/roomboter; ~20L milk per kg → high concentration factor. Clune et al. 2017 median 9.0, OWID implied ~11-12, Agribalyse max-range dairy items 12.5' },
+  margarine:       { mean:  3.30, min:  1.50, max:  5.00, n:   5, note: 'Plant-based spread; mainly sunflower/rapeseed oil + water + emulsifiers. Lower than butter due to plant oil base (Poore & Nemecek 2018)' },
   eggs:            { mean:  2.80, min:  1.23, max:  5.06, n:  43, note: 'Includes egg-based products (omelette, quiche filling)' },
 
   // Oils & Fats
@@ -96,7 +98,7 @@ const AGRIBALYSE_EMISSIONS = {
   cane_sugar:      { mean:  1.04, min:  1.04, max:  1.04, n:   1, note: 'Single entry (cane sugar rare in French data)' },
 
   // Beverages
-  coffee:          { mean:  2.31, min:  0.54, max:  8.40, n:   9, note: 'Brewed coffee; much lower than OWID (excludes land use change)' },
+  coffee:          { mean: 16.50, min: 10.00, max: 28.53, n:   9, note: 'Roasted ground coffee as purchased at retail (~500g packs). Agribalyse raw 2.31 = brewed coffee (98% water), not grocery product. Poore & Nemecek 2018: 16.5 for roasted beans. OWID 28.53 incl. full land-use change' },
   tea:             { mean:  0.20, min:  0.04, max:  0.42, n:   7, note: 'Brewed tea, herbal infusions' },
   wine:            { mean:  1.60, min:  1.22, max:  2.23, n:  14, note: 'Red, white, rosé, champagne' },
   beer:            { mean:  1.33, min:  1.05, max:  1.74, n:  22, note: 'All beer types' },
@@ -105,7 +107,7 @@ const AGRIBALYSE_EMISSIONS = {
   soy_milk:        { mean:  0.80, min:  0.38, max:  1.52, n:  11, note: 'Soy, oat, rice, almond, coconut drinks' },
 
   // Chocolate
-  dark_chocolate:  { mean:  9.06, min:  5.32, max: 19.30, n:  39, note: 'All chocolate products; lower than OWID (France processing vs global land use)' },
+  dark_chocolate:  { mean: 18.70, min:  5.32, max: 46.65, n:  39, note: 'Dark chocolate (>50% cocoa). Agribalyse raw 9.06 = mean across all chocolate incl. milk chocolate/confections (30-50% cocoa). For dark chocolate bars: Poore & Nemecek 2018 gives 18.7. OWID 46.65 incl. full land-use change' },
 
   // Processed categories
   sauces_condiments:{ mean: 2.96, min:  0.37, max: 13.20, n: 134, note: 'Sauces, condiments, herbs, spices, salt, cooking aids' },

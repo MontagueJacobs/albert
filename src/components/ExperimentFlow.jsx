@@ -6,11 +6,13 @@ import ExperimentRanking from './ExperimentRanking.jsx'
 import ExperimentLikert from './ExperimentLikert.jsx'
 import ExperimentIntervention from './ExperimentIntervention.jsx'
 import ExperimentReflection from './ExperimentReflection.jsx'
+import ExperimentDemographics from './ExperimentDemographics.jsx'
 import QuizResultsReview from './QuizResultsReview.jsx'
 import Dashboard from './Dashboard.jsx'
 
 const STEP_LABELS = {
   consent: { en: 'Consent', nl: 'Toestemming' },
+  demographics: { en: 'About You', nl: 'Over Jou' },
   scrape: { en: 'Connect Account', nl: 'Account Koppelen' },
   pre_quiz_general: { en: 'Quiz 1 – General Products', nl: 'Quiz 1 – Algemene Producten' },
   pre_quiz_ah: { en: 'Quiz 2 – Albert Heijn Products', nl: 'Quiz 2 – Albert Heijn Producten' },
@@ -26,7 +28,7 @@ const STEP_LABELS = {
 }
 
 const STEPS = [
-  'consent', 'scrape',
+  'consent', 'demographics', 'scrape',
   'pre_quiz_general', 'pre_quiz_ah', 'pre_quiz_personal',
   'pre_questionnaire',
   'learning_dashboard',
@@ -39,36 +41,43 @@ const STEPS = [
 const PRE_LIKERT_QUESTIONS = [
   {
     id: 'pre_q1',
-    text: 'I know which food products have a high CO₂ footprint.',
-    textNl: 'Ik weet welke voedselproducten een hoge CO₂-uitstoot hebben.',
+    text: 'I consider my food choices to be environmentally sustainable.',
+    textNl: 'Ik beschouw mijn voedselkeuzes als milieuvriendelijk.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'pre_q2',
-    text: 'I consider sustainability when grocery shopping.',
-    textNl: 'Ik houd rekening met duurzaamheid bij het doen van boodschappen.',
+    text: 'I feel confident in my knowledge of the environmental impact of food products.',
+    textNl: 'Ik heb vertrouwen in mijn kennis over de milieu-impact van voedselproducten.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'pre_q3',
-    text: 'I know the environmental impact of meat compared to plant-based products.',
-    textNl: 'Ik weet wat de milieu-impact is van vlees ten opzichte van plantaardige producten.',
+    text: 'I trust eco-labels when making food purchasing decisions.',
+    textNl: 'Ik vertrouw op keurmerken bij het maken van aankoopbeslissingen voor voedsel.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'pre_q4',
-    text: 'I am willing to change my eating habits for the environment.',
-    textNl: 'Ik ben bereid mijn eetgewoontes aan te passen voor het milieu.',
+    text: 'Eco-labels are easy to understand.',
+    textNl: 'Keurmerken zijn gemakkelijk te begrijpen.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'pre_q5',
-    text: 'I think it is important to know how much CO₂ my groceries cause.',
-    textNl: 'Ik vind het belangrijk om te weten hoeveel CO₂ mijn boodschappen veroorzaken.',
+    text: 'I find it easy to compare products based on their environmental impact.',
+    textNl: 'Ik vind het gemakkelijk om producten te vergelijken op basis van hun milieu-impact.',
+    low: 'Strongly disagree', lowNl: 'Helemaal oneens',
+    high: 'Strongly agree', highNl: 'Helemaal eens'
+  },
+  {
+    id: 'pre_q6',
+    text: 'I actively consider environmental impact when buying food.',
+    textNl: 'Ik houd actief rekening met de milieu-impact bij het kopen van voedsel.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   }
@@ -78,36 +87,50 @@ const PRE_LIKERT_QUESTIONS = [
 const POST_LIKERT_QUESTIONS = [
   {
     id: 'post_q1',
-    text: 'I now better understand which products have a high CO₂ footprint.',
-    textNl: 'Ik begrijp nu beter welke producten een hoge CO₂-uitstoot hebben.',
+    text: 'I have a better understanding of the environmental impact of food products after this study.',
+    textNl: 'Ik heb een beter begrip van de milieu-impact van voedselproducten na dit onderzoek.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'post_q2',
-    text: 'I plan to make more sustainable choices in my next grocery shopping.',
-    textNl: 'Ik ben van plan om duurzamere keuzes te maken bij mijn volgende boodschappen.',
+    text: 'The ranking system used in this study was clear and easy to understand.',
+    textNl: 'Het rangschikkingssysteem in dit onderzoek was duidelijk en gemakkelijk te begrijpen.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'post_q3',
-    text: 'The information I saw was useful and understandable.',
-    textNl: 'De informatie die ik heb gezien was nuttig en begrijpelijk.',
+    text: 'I trust the CO₂ ranking system presented in this study.',
+    textNl: 'Ik vertrouw het CO₂-rangschikkingssysteem dat in dit onderzoek is gepresenteerd.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'post_q4',
-    text: 'I now feel better equipped to make sustainable choices in the supermarket.',
-    textNl: 'Ik voel me nu beter in staat om duurzame keuzes te maken in de supermarkt.',
+    text: 'I find this ranking system clearer than existing eco-labels.',
+    textNl: 'Ik vind dit rangschikkingssysteem duidelijker dan bestaande keurmerken.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   },
   {
     id: 'post_q5',
-    text: 'This kind of information should be available by default when grocery shopping.',
-    textNl: 'Dit soort informatie zou standaard beschikbaar moeten zijn bij het boodschappen doen.',
+    text: 'The feedback on my personal purchases was useful.',
+    textNl: 'De feedback over mijn persoonlijke aankopen was nuttig.',
+    low: 'Strongly disagree', lowNl: 'Helemaal oneens',
+    high: 'Strongly agree', highNl: 'Helemaal eens'
+  },
+  {
+    id: 'post_q6',
+    text: 'I would use this type of information when making future food choices.',
+    textNl: 'Ik zou dit soort informatie gebruiken bij het maken van toekomstige voedselkeuzes.',
+    low: 'Strongly disagree', lowNl: 'Helemaal oneens',
+    high: 'Strongly agree', highNl: 'Helemaal eens'
+  },
+  {
+    id: 'post_q7',
+    text: 'The quizzes helped me learn about the environmental impact of food.',
+    textNl: 'De quizzen hebben me geholpen om te leren over de milieu-impact van voedsel.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   }
@@ -125,19 +148,24 @@ const styles = {
   progressBar: {
     background: 'var(--bg-secondary, #334155)',
     borderRadius: '9999px',
-    height: '8px',
+    height: '12px',
     overflow: 'hidden',
-    marginBottom: '0.5rem'
+    marginBottom: '0.5rem',
+    border: '1px solid var(--border, rgba(255,255,255,0.15))',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)'
   },
   progressFill: {
     background: 'linear-gradient(90deg, #22c55e, #3b82f6)',
     height: '100%',
-    transition: 'width 0.5s ease'
+    transition: 'width 0.5s ease',
+    borderRadius: '9999px',
+    minWidth: '12px'
   },
   stepIndicator: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '0.75rem',
+    fontSize: '0.8rem',
+    fontWeight: '500',
     color: 'var(--text-muted, #9ca3af)'
   },
   introCard: {
@@ -295,6 +323,8 @@ export default function ExperimentFlow({ onComplete, onBack }) {
   const [error, setError] = useState(null)
   const [consentChecked, setConsentChecked] = useState(false)
   const [syncVersion, setSyncVersion] = useState(0)
+  const [stepVisible, setStepVisible] = useState(true)
+  const prevStepRef = useRef(null)
 
   // Capture ?scraped=1 synchronously on mount (before bonusCardContext strips query params)
   const returnedFromScrape = useRef(
@@ -322,6 +352,20 @@ export default function ExperimentFlow({ onComplete, onBack }) {
 
   // Auto-advance past scrape step when redirected back from bookmarklet
   const autoAdvancedRef = useRef(false)
+
+  // Smooth fade transition when step changes
+  useEffect(() => {
+    if (!session) return
+    const currentStep = session.current_step
+    if (prevStepRef.current && prevStepRef.current !== currentStep) {
+      setStepVisible(false)
+      const timer = setTimeout(() => {
+        setStepVisible(true)
+      }, 80)
+      return () => clearTimeout(timer)
+    }
+    prevStepRef.current = currentStep
+  }, [session?.current_step])
   useEffect(() => {
     if (!session || session.current_step !== 'scrape' || autoAdvancedRef.current) return
     if (returnedFromScrape.current) {
@@ -403,6 +447,10 @@ export default function ExperimentFlow({ onComplete, onBack }) {
   }, [])
 
   const handlePreQuestionnaireComplete = useCallback((updatedSession) => {
+    setSession(updatedSession)
+  }, [])
+
+  const handleDemographicsComplete = useCallback((updatedSession) => {
     setSession(updatedSession)
   }, [])
 
@@ -511,6 +559,9 @@ export default function ExperimentFlow({ onComplete, onBack }) {
         </div>
       )}
 
+      {/* Step content with transition */}
+      <div className={`step-transition ${stepVisible ? 'visible' : 'hidden'}`}>
+
       {/* ====================== CONSENT ====================== */}
       {(step === 'consent' || step === 'intro') && (
         <div style={styles.introCard}>
@@ -525,26 +576,28 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                 <p>Welkom bij dit experiment over de CO₂-impact van voedsel!</p>
                 <p style={{ marginTop: '0.75rem' }}>In dit experiment ga je:</p>
                 <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                  <li>Een paar vragen over jezelf beantwoorden</li>
                   <li>Je Albert Heijn account koppelen (bonuskaart-aankopen)</li>
                   <li>6 rangschikkingsopdrachten maken over CO₂-uitstoot van producten</li>
                   <li>Vragenlijsten invullen over je kennis en bewustzijn</li>
                   <li>Informatie bekijken over de CO₂-impact van voedsel en je eigen aankopen</li>
                   <li>Reflecteren op wat je hebt geleerd</li>
                 </ul>
-                <p style={{ marginTop: '0.75rem' }}>Het duurt ongeveer <strong>15-20 minuten</strong>. Je antwoorden worden anoniem opgeslagen voor wetenschappelijk onderzoek.</p>
+                <p style={{ marginTop: '0.75rem' }}>Het duurt ongeveer <strong>15-25 minuten</strong>. Je antwoorden worden anoniem opgeslagen voor wetenschappelijk onderzoek.</p>
               </>
             ) : (
               <>
                 <p>Welcome to this experiment about the CO₂ impact of food!</p>
                 <p style={{ marginTop: '0.75rem' }}>In this experiment you will:</p>
                 <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                  <li>Answer a few questions about yourself</li>
                   <li>Connect your Albert Heijn account (bonus card purchases)</li>
                   <li>Complete 6 ranking tasks about CO₂ emissions of products</li>
                   <li>Fill in questionnaires about your knowledge and awareness</li>
                   <li>View information about food CO₂ impact and your own purchases</li>
                   <li>Reflect on what you have learned</li>
                 </ul>
-                <p style={{ marginTop: '0.75rem' }}>It takes about <strong>15-20 minutes</strong>. Your answers are stored anonymously for scientific research.</p>
+                <p style={{ marginTop: '0.75rem' }}>It takes about <strong>15-25 minutes</strong>. Your answers are stored anonymously for scientific research.</p>
               </>
             )}
           </div>
@@ -584,6 +637,19 @@ export default function ExperimentFlow({ onComplete, onBack }) {
             </button>
           )}
         </div>
+      )}
+
+      {/* ====================== DEMOGRAPHICS ====================== */}
+      {step === 'demographics' && (
+        <>
+          <div style={styles.stepBadge}>
+            {isNl ? '👤 Over Jou' : '👤 About You'}
+          </div>
+          <ExperimentDemographics
+            sessionId={session.id}
+            onComplete={handleDemographicsComplete}
+          />
+        </>
       )}
 
       {/* ====================== SCRAPE ====================== */}
@@ -956,12 +1022,29 @@ export default function ExperimentFlow({ onComplete, onBack }) {
         </div>
       )}
 
+      {/* End step content transition wrapper */}
+      </div>
+
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         .spin { animation: spin 1s linear infinite; }
+        .step-transition {
+          transition: opacity 0.15s ease;
+        }
+        .step-transition.visible {
+          opacity: 1;
+          animation: fadeSlideIn 0.3s ease forwards;
+        }
+        .step-transition.hidden {
+          opacity: 0;
+        }
         button:hover:not(:disabled) { transform: translateY(-1px); }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
       `}</style>
