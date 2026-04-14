@@ -81,3 +81,19 @@ export function variantScoreClass(variant, score) {
   if (score <= 4) return 'score-medium'
   return 'score-low'
 }
+
+// ─── Confidence helpers ───────────────────────────────────────
+
+export function getConfidenceColor(confidence) {
+  if (confidence == null) return '#6b7280'
+  if (confidence >= 70) return '#22c55e'
+  if (confidence >= 55) return '#eab308'
+  return '#ef4444'
+}
+
+export function getConfidenceBg(confidence) {
+  if (confidence == null) return 'rgba(107, 114, 128, 0.1)'
+  if (confidence >= 70) return 'rgba(34, 197, 94, 0.12)'
+  if (confidence >= 55) return 'rgba(234, 179, 8, 0.12)'
+  return 'rgba(239, 68, 68, 0.12)'
+}

@@ -258,6 +258,35 @@ function ScoreBreakdownModal({ product, onClose }) {
                       <span>{t('modal_co2_range') || 'Range'}: {data.co2Min.toFixed(1)}–{data.co2Max.toFixed(1)} kg</span>
                     )}
                   </div>
+
+                  {/* Confidence & methodology */}
+                  {data.confidence != null && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      marginTop: '0.5rem', fontSize: '0.72rem',
+                      padding: '0.2rem 0.45rem',
+                      background: data.confidence >= 70 ? 'rgba(34, 197, 94, 0.1)'
+                        : data.confidence >= 55 ? 'rgba(234, 179, 8, 0.1)'
+                        : 'rgba(239, 68, 68, 0.1)',
+                      borderRadius: '5px'
+                    }}>
+                      <span style={{
+                        fontWeight: '600',
+                        color: data.confidence >= 70 ? '#22c55e'
+                          : data.confidence >= 55 ? '#eab308' : '#ef4444'
+                      }}>
+                        {data.confidence}%
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {lang === 'en' ? 'confidence' : 'betrouwbaarheid'}
+                      </span>
+                      {data.methodology?.primary && (
+                        <span style={{ color: 'var(--text-muted)', marginLeft: 'auto', fontSize: '0.65rem' }}>
+                          {data.methodology.primary}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

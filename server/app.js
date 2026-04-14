@@ -1191,6 +1191,10 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     co2Matched: co2Data.matched,
     co2Method: co2Data.method || 'name',  // 'ingredients' or 'name'
     ingredientBreakdown: co2Data.ingredientBreakdown || null,
+    // Confidence scoring (Agribalyse primary, OWID cross-validation)
+    confidence: co2Data.confidence != null ? co2Data.confidence : null,
+    confidenceLabel: co2Data.confidenceLabel || null,
+    methodology: co2Data.methodology || null,
     hasEnrichedData: enrichedData !== null && matchedEnriched.some(m => m.supplementary)
   }
 }

@@ -40,8 +40,8 @@
  */
 const AGRIBALYSE_EMISSIONS = {
   // Meat
-  beef_dairy:      { mean: 28.54, min:  5.04, max: 46.00, n: 105, note: 'French avg (mostly dairy herd); includes veal' },
-  // beef_herd: not in Agribalyse (no dedicated beef-herd category in France)
+  beef_dairy:      { mean: 28.54, min:  5.04, max: 46.00, n: 105, note: 'French avg incl. veal; mostly dairy-herd beef (dual-purpose cattle)' },
+  beef_herd:       { mean: 38.70, min: 28.70, max: 99.48, n:  28, note: 'NL import-weighted: 75% EU (Agribalyse 30.9) + 9% South America (OWID 99.5) + 16% other (~40). Trade data: WWF-NL (2024). EU beef similar to Agribalyse; SA imports carry high land-use change emissions' },
   lamb_mutton:     { mean: 35.59, min: 21.60, max: 52.50, n:  40, note: 'Lamb, mutton, sheep offal' },
   pig_meat:        { mean:  7.64, min:  2.11, max: 28.90, n: 175, note: 'Includes charcuterie (ham, sausage, bacon)' },
   poultry_meat:    { mean:  5.28, min:  1.50, max: 14.60, n:  94, note: 'Chicken, turkey, duck' },

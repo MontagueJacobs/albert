@@ -624,8 +624,46 @@ function ProductDetailModal({ purchase, onClose }) {
                         display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%',
                         background: details.co2Valid === false ? '#f97316' : '#22c55e'
                       }} />
-                      {lang === 'en' ? 'Source: Agribalyse v3.1' : 'Bron: Agribalyse v3.1'}
+                      {details.methodology
+                        ? `${lang === 'en' ? 'Source' : 'Bron'}: ${details.methodology.primary}`
+                        : (lang === 'en' ? 'Source: Agribalyse v3.2' : 'Bron: Agribalyse v3.2')}
                     </div>
+                    {/* Confidence badge */}
+                    {details.confidence != null && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
+                        fontSize: '0.7rem', marginTop: '6px',
+                        padding: '0.25rem 0.5rem',
+                        background: details.confidence >= 70 ? 'rgba(34, 197, 94, 0.12)'
+                          : details.confidence >= 55 ? 'rgba(234, 179, 8, 0.12)'
+                          : 'rgba(239, 68, 68, 0.12)',
+                        borderRadius: '6px',
+                        border: `1px solid ${details.confidence >= 70 ? 'rgba(34, 197, 94, 0.25)' : details.confidence >= 55 ? 'rgba(234, 179, 8, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`
+                      }}>
+                        <span style={{
+                          fontWeight: '600',
+                          color: details.confidence >= 70 ? '#22c55e'
+                            : details.confidence >= 55 ? '#eab308'
+                            : '#ef4444'
+                        }}>
+                          {details.confidence}%
+                        </span>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {lang === 'en' ? 'confidence' : 'betrouwbaarheid'}
+                          {details.confidenceLabel && ` · ${details.confidenceLabel}`}
+                        </span>
+                      </div>
+                    )}
+                    {/* Cross-validation info */}
+                    {details.methodology?.validation && details.methodology?.validationValue != null && (
+                      <div style={{
+                        fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px',
+                        fontStyle: 'italic'
+                      }}>
+                        {lang === 'en' ? 'Cross-validated' : 'Gevalideerd'}: {details.methodology.validation}
+                        {' '}({details.methodology.validationValue.toFixed(1)} kg CO₂/kg)
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
