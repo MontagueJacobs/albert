@@ -81,13 +81,17 @@ const styles = {
     cursor: 'grab'
   },
   productCardDragging: {
-    opacity: 0.4,
-    border: '1px dashed var(--border, #374151)'
+    opacity: 0.3,
+    border: '1px dashed var(--border, #374151)',
+    transform: 'scale(0.97)'
   },
-  productCardDragOver: {
-    borderColor: '#3b82f6',
-    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.3)',
-    background: 'rgba(59, 130, 246, 0.08)'
+  insertIndicator: {
+    height: '3px',
+    background: 'linear-gradient(90deg, transparent, #3b82f6, #3b82f6, transparent)',
+    borderRadius: '2px',
+    margin: '0 0.5rem',
+    transition: 'opacity 0.15s ease',
+    boxShadow: '0 0 8px rgba(59, 130, 246, 0.4)'
   },
   dragHandle: {
     color: 'var(--text-muted, #6b7280)',
@@ -283,13 +287,12 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
   const dragItem = useRef(null)
   const dragOverItem = useRef(null)
   const [dragIndex, setDragIndex] = useState(null)
-  const [dragOverIndex, setDragOverIndex] = useState(null)
+  const [insertBeforeIndex, setInsertBeforeIndex] = useState(null)
 
   const handleDragStart = useCallback((e, index) => {
     dragItem.current = index
     setDragIndex(index)
     e.dataTransfer.effectAllowed = 'move'
-    // Set a transparent drag image for cleaner look
     if (e.target) {
       e.dataTransfer.setDragImage(e.target, e.target.offsetWidth / 2, e.target.offsetHeight / 2)
     }
@@ -298,27 +301,38 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
   const handleDragOver = useCallback((e, index) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    dragOverItem.current = index
-    setDragOverIndex(index)
+    if (dragItem.current === null) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    const insertAt = e.clientY < midY ? index : index + 1
+    dragOverItem.current = insertAt
+    setInsertBeforeIndex(insertAt)
   }, [])
 
   const handleDragEnd = useCallback(() => {
-    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
-      setProducts(prev => {
-        const newProducts = [...prev]
-        const [moved] = newProducts.splice(dragItem.current, 1)
-        newProducts.splice(dragOverItem.current, 0, moved)
-        return newProducts
-      })
+    if (dragItem.current !== null && dragOverItem.current !== null) {
+      const from = dragItem.current
+      let to = dragOverItem.current
+      if (from !== to && from !== to - 1) {
+        setProducts(prev => {
+          const newProducts = [...prev]
+          const [moved] = newProducts.splice(from, 1)
+          const adjustedTo = to > from ? to - 1 : to
+          newProducts.splice(adjustedTo, 0, moved)
+          return newProducts
+        })
+      }
     }
     dragItem.current = null
     dragOverItem.current = null
     setDragIndex(null)
-    setDragOverIndex(null)
+    setInsertBeforeIndex(null)
   }, [])
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverIndex(null)
+  const handleDragLeave = useCallback((e) => {
+    // Only clear if leaving the list entirely
+    const related = e.relatedTarget
+    if (related && e.currentTarget.contains(related)) return
   }, [])
 
   // Touch drag-and-drop support
@@ -341,28 +355,35 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
     for (let i = 0; i < cards.length; i++) {
       const rect = cards[i].getBoundingClientRect()
       if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-        setDragOverIndex(i)
-        dragOverItem.current = i
+        const midY = rect.top + rect.height / 2
+        const insertAt = touch.clientY < midY ? i : i + 1
+        dragOverItem.current = insertAt
+        setInsertBeforeIndex(insertAt)
         break
       }
     }
   }, [])
 
   const handleTouchEnd = useCallback(() => {
-    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
-      setProducts(prev => {
-        const newProducts = [...prev]
-        const [moved] = newProducts.splice(dragItem.current, 1)
-        newProducts.splice(dragOverItem.current, 0, moved)
-        return newProducts
-      })
+    if (dragItem.current !== null && dragOverItem.current !== null) {
+      const from = dragItem.current
+      let to = dragOverItem.current
+      if (from !== to && from !== to - 1) {
+        setProducts(prev => {
+          const newProducts = [...prev]
+          const [moved] = newProducts.splice(from, 1)
+          const adjustedTo = to > from ? to - 1 : to
+          newProducts.splice(adjustedTo, 0, moved)
+          return newProducts
+        })
+      }
     }
     touchStartY.current = null
     touchItemIndex.current = null
     dragItem.current = null
     dragOverItem.current = null
     setDragIndex(null)
-    setDragOverIndex(null)
+    setInsertBeforeIndex(null)
   }, [])
 
   useEffect(() => {
@@ -574,25 +595,27 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
 
       <div style={styles.productList} ref={listRef}>
         {(submitted ? results?.results : products).map((product, index) => (
-          <div 
-            key={product.id}
-            data-drag-card
-            draggable={!submitted}
-            onDragStart={!submitted ? (e) => handleDragStart(e, index) : undefined}
-            onDragOver={!submitted ? (e) => handleDragOver(e, index) : undefined}
-            onDragEnd={!submitted ? handleDragEnd : undefined}
-            onDragLeave={!submitted ? handleDragLeave : undefined}
-            onTouchStart={!submitted ? (e) => handleTouchStart(e, index) : undefined}
-            onTouchMove={!submitted ? (e) => handleTouchMove(e, index) : undefined}
-            onTouchEnd={!submitted ? handleTouchEnd : undefined}
-            style={{
-              ...styles.productCard,
-              ...(submitted && product.isCorrect ? styles.resultCorrect : {}),
-              ...(submitted && !product.isCorrect ? styles.resultWrong : {}),
-              ...(!submitted && dragIndex === index ? styles.productCardDragging : {}),
-              ...(!submitted && dragOverIndex === index && dragIndex !== index ? styles.productCardDragOver : {})
-            }}
-          >
+          <div key={product.id}>
+            {/* Insertion indicator before this item */}
+            {!submitted && insertBeforeIndex === index && dragIndex !== null && dragIndex !== index && dragIndex !== index - 1 && (
+              <div style={styles.insertIndicator} />
+            )}
+            <div 
+              data-drag-card
+              draggable={!submitted}
+              onDragStart={!submitted ? (e) => handleDragStart(e, index) : undefined}
+              onDragOver={!submitted ? (e) => handleDragOver(e, index) : undefined}
+              onDragEnd={!submitted ? handleDragEnd : undefined}
+              onTouchStart={!submitted ? (e) => handleTouchStart(e, index) : undefined}
+              onTouchMove={!submitted ? (e) => handleTouchMove(e, index) : undefined}
+              onTouchEnd={!submitted ? handleTouchEnd : undefined}
+              style={{
+                ...styles.productCard,
+                ...(submitted && product.isCorrect ? styles.resultCorrect : {}),
+                ...(submitted && !product.isCorrect ? styles.resultWrong : {}),
+                ...(!submitted && dragIndex === index ? styles.productCardDragging : {})
+              }}
+            >
             {!submitted && (
               <div style={styles.dragHandle}>
                 <GripVertical size={18} />
@@ -671,6 +694,11 @@ export default function CarbonRankingGame({ onComplete, onBack }) {
                     : (isNl ? 'Onbekend' : 'Unknown')}
                 </span>
               </div>
+            )}
+            </div>
+            {/* Insertion indicator after last item */}
+            {!submitted && insertBeforeIndex === index + 1 && index === (submitted ? results?.results : products).length - 1 && dragIndex !== null && dragIndex !== index && dragIndex !== index + 1 && (
+              <div style={styles.insertIndicator} />
             )}
           </div>
         ))}

@@ -119,7 +119,7 @@ function PurchaseList({ syncVersion }) {
             </div>
           </div>
           <div className={`score-badge ${getScoreClass(purchase.sustainability_score)}`}>
-            {purchase.sustainability_score != null ? `${purchase.sustainability_score}/7` : '—'}
+            {purchase.sustainability_score != null ? `${purchase.sustainability_score}/10` : '—'}
           </div>
         </div>
       ))}

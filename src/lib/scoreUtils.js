@@ -77,8 +77,8 @@ export function variantScoreLabel(variant, score) {
 export function variantScoreClass(variant, score) {
   if (variant === 'B') return 'score-neutral'
   if (score == null) return 'score-na'
-  if (score <= 2) return 'score-high'
-  if (score <= 4) return 'score-medium'
+  if (score >= 7) return 'score-high'
+  if (score >= 4) return 'score-medium'
   return 'score-low'
 }
 

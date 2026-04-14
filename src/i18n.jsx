@@ -85,11 +85,11 @@ const TRANSLATIONS = {
     best_purchase: 'Laagste CO₂',
     worst_purchase: 'Hoogste CO₂',
     how_title: 'Hoe bepalen we de duurzaamheidsscore?',
-    how_intro: 'Elk voedingsproduct krijgt een score van 1 tot 7. Score 1 = beste (laagste CO₂-uitstoot), score 7 = slechtste (hoogste uitstoot). Niet-voedingsmiddelen (schoonmaak, verzorging, etc.) worden automatisch herkend en krijgen geen score.',
+    how_intro: 'Elk voedingsproduct krijgt een score van 1 tot 10. Score 10 = beste (laagste CO₂-uitstoot), score 1 = slechtste (hoogste uitstoot). Niet-voedingsmiddelen (schoonmaak, verzorging, etc.) worden automatisch herkend en krijgen geen score.',
     how_sections: [
       {
         title: '1. Wetenschappelijke emissiedata',
-        body: 'We combineren twee toonaangevende bronnen: Agribalyse v3.2, de Franse levenscyclusanalyse-database van ADEME, en data van Our World in Data (Poore & Nemecek, 2018). De waarden dekken de volledige keten: landgebruik, landbouw, diervoeder, verwerking, transport, verpakking en retail.'
+        body: 'We gebruiken Agribalyse v3.2, de Franse levenscyclusanalyse-database van ADEME, als primaire bron voor CO₂-waarden. Data van Our World in Data (Poore & Nemecek, 2018) wordt gebruikt als kruisvalidatie om de betrouwbaarheid te beoordelen. De waarden dekken de volledige keten: landgebruik, landbouw, diervoeder, verwerking, transport, verpakking en retail.'
       },
       {
         title: '2. Hoe matchen we producten?',
@@ -101,11 +101,11 @@ const TRANSLATIONS = {
       },
       {
         title: '4. De scoreschaal',
-        body: 'De uiteindelijke CO₂-waarde (kg CO₂-eq per kg product) wordt omgezet naar een score van 1 tot 7 (1 = best, 7 = slechtst) volgens onderstaande tabel:'
+        body: 'De uiteindelijke CO₂-waarde (kg CO₂-eq per kg product) wordt omgezet naar een score van 1 tot 10 (10 = best, 1 = slechtst) volgens onderstaande tabel:'
       },
       {
         title: '5. Beoordeling & labels',
-        body: 'Op basis van de score wordt een beoordeling gegeven: Uitstekend (1), Goed (2), Gemiddeld (3), Hoog (4-5), of Zeer hoog (6-7). Aanvullende informatie zoals biologisch, veganistisch, Fair Trade en herkomst wordt apart getoond als context maar beïnvloedt de score niet.'
+        body: 'Op basis van de score wordt een beoordeling gegeven: Uitstekend (9-10), Goed (7-8), Gemiddeld (5-6), Hoog (3-4), of Zeer hoog (1-2). Elk product krijgt ook een betrouwbaarheidsscore (0-100%) op basis van kruisvalidatie tussen bronnen, steekproefgrootte en datavariantie. Aanvullende informatie zoals biologisch, veganistisch, Fair Trade en herkomst wordt apart getoond als context maar beïnvloedt de score niet.'
       },
       {
         title: '6. Landelijk gemiddelde',
@@ -122,15 +122,18 @@ const TRANSLATIONS = {
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Voorbeeld' },
     how_table_examples: {
-      1: 'Aardappelen, wortelen, appels, brood, bananen',
-      2: 'Tomaten, rijst, tofu, melk, eieren',
-      3: 'Kipfilet, varkensvlees, vis',
-      4: 'Kaas, garnalen, chocolade',
-      5: 'Lamsvlees, boter',
-      6: 'Rundvlees (zuivelrund)',
-      7: 'Rundvlees (vleesrund)'
+      10: 'Water, sla, komkommer, wortelen',
+      9: 'Aardappelen, appels, brood, bananen',
+      8: 'Tomaten, rijst, tofu, havermelk',
+      7: 'Kip, pindakaas, geitenkaas',
+      6: 'Varkensvlees, vis, eieren',
+      5: 'Kaas, garnalen, chocolade',
+      4: 'Lamsvlees, boter',
+      3: 'Rundvlees',
+      2: 'Rundvlees (import)',
+      1: '—'
     },
-    how_sources: 'Databronnen: Agribalyse v3.2 (ADEME, 2023), Our World in Data — Poore & Nemecek (Science, 2018), FAOSTAT dieetsamenstelling (2021), USDA FoodData Central. Alle waarden zijn in kg CO₂-equivalenten en omvatten de gehele productieketen.',
+    how_sources: 'Primaire databron: Agribalyse v3.2 (ADEME, 2023). Kruisvalidatie: Our World in Data — Poore & Nemecek (Science, 2018). Dieetbasislijn: FAOSTAT (2021), USDA FoodData Central. Rundvlees gecorrigeerd voor Nederlandse importmix (WWF-NL, 2024). Alle waarden zijn in kg CO₂-equivalenten en omvatten de gehele productieketen.',
     sync_title: 'Albert Heijn account synchroniseren',
     sync_description: 'Synchroniseer je Albert Heijn aankopen om je CO₂-profiel bij te werken.',
     sync_mode_auto: 'Automatisch',
@@ -449,11 +452,11 @@ const TRANSLATIONS = {
     best_purchase: 'Lowest CO₂',
     worst_purchase: 'Highest CO₂',
     how_title: 'How do we calculate the sustainability score?',
-    how_intro: 'Every food product receives a score from 1 to 7. Score 1 = best (lowest CO₂ emissions), score 7 = worst (highest emissions). Non-food items (cleaning supplies, personal care, etc.) are automatically detected and receive no score.',
+    how_intro: 'Every food product receives a score from 1 to 10. Score 10 = best (lowest CO₂ emissions), score 1 = worst (highest emissions). Non-food items (cleaning supplies, personal care, etc.) are automatically detected and receive no score.',
     how_sections: [
       {
         title: '1. Scientific emissions data',
-        body: 'We combine two leading sources: Agribalyse v3.2, the French life-cycle analysis database from ADEME, and data from Our World in Data (Poore & Nemecek, 2018). Values cover the full supply chain: land use, farming, animal feed, processing, transport, packaging, and retail.'
+        body: 'We use Agribalyse v3.2, the French life-cycle analysis database from ADEME, as the primary source for CO₂ values. Data from Our World in Data (Poore & Nemecek, 2018) is used as cross-validation to assess data reliability. Values cover the full supply chain: land use, farming, animal feed, processing, transport, packaging, and retail.'
       },
       {
         title: '2. How do we match products?',
@@ -465,11 +468,11 @@ const TRANSLATIONS = {
       },
       {
         title: '4. The score scale',
-        body: 'The final CO₂ value (kg CO₂-eq per kg of product) is converted to a score from 1 to 7 (1 = best, 7 = worst) using the following thresholds:'
+        body: 'The final CO₂ value (kg CO₂-eq per kg of product) is converted to a score from 1 to 10 (10 = best, 1 = worst) using the following thresholds:'
       },
       {
         title: '5. Ratings & labels',
-        body: 'Based on the score, a rating is assigned: Excellent (1), Good (2), Average (3), High (4-5), or Very High (6-7). Supplementary information such as organic, vegan, Fair Trade, and origin is displayed separately as context but does not affect the score.'
+        body: 'Based on the score, a rating is assigned: Excellent (9-10), Good (7-8), Average (5-6), High (3-4), or Very High (1-2). Each product also receives a confidence score (0-100%) based on cross-validation between sources, sample size, and data variance. Supplementary information such as organic, vegan, Fair Trade, and origin is displayed separately as context but does not affect the score.'
       },
       {
         title: '6. National baseline',
@@ -486,15 +489,18 @@ const TRANSLATIONS = {
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Example' },
     how_table_examples: {
-      1: 'Potatoes, carrots, apples, bread, bananas',
-      2: 'Tomatoes, rice, tofu, milk, eggs',
-      3: 'Chicken, pork, fish',
-      4: 'Cheese, shrimp, chocolate',
-      5: 'Lamb, butter',
-      6: 'Beef (dairy herd)',
-      7: 'Beef (beef herd)'
+      10: 'Water, lettuce, cucumber, carrots',
+      9: 'Potatoes, apples, bread, bananas',
+      8: 'Tomatoes, rice, tofu, oat milk',
+      7: 'Chicken, peanut butter, goat cheese',
+      6: 'Pork, fish, eggs',
+      5: 'Cheese, shrimp, chocolate',
+      4: 'Lamb, butter',
+      3: 'Beef',
+      2: 'Beef (imported)',
+      1: '—'
     },
-    how_sources: 'Data sources: Agribalyse v3.2 (ADEME, 2023), Our World in Data — Poore & Nemecek (Science, 2018), FAOSTAT dietary composition (2021), USDA FoodData Central. All values are in kg CO₂ equivalents and cover the entire production chain.',
+    how_sources: 'Primary data source: Agribalyse v3.2 (ADEME, 2023). Cross-validation: Our World in Data — Poore & Nemecek (Science, 2018). Dietary baseline: FAOSTAT (2021), USDA FoodData Central. Beef adjusted for Dutch import mix (WWF-NL, 2024). All values are in kg CO₂ equivalents and cover the entire production chain.',
     sync_title: 'Sync your Albert Heijn account',
     sync_description: 'Sync your Albert Heijn purchases to update your CO₂ profile.',
     sync_mode_auto: 'Automatic',

@@ -190,7 +190,7 @@ export const RELATED_CATEGORIES = {
  * @param {string} options.productId - Current product ID (to exclude)
  * @param {string} options.productName - Current product name
  * @param {string} options.co2Category - CO2 category of the current product
- * @param {number|null} options.currentScore - Current product's score (1-7, 1=best)
+ * @param {number|null} options.currentScore - Current product's score (1-10, 10=best)
  * @param {Function} options.evaluateProduct - evaluateProduct function reference
  * @param {Function} options.getEnrichedData - getEnrichedData function reference
  * @param {string} options.lang - Language ('nl' or 'en')
@@ -488,7 +488,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       const evaluation = evaluateProduct(c.name, enriched)
       const relevance = nameRelevance(sourceName, c.name)
       const improvement = (evaluation.score != null && currentScore != null)
-        ? currentScore - evaluation.score
+        ? evaluation.score - currentScore
         : 0
       const inPreferred = isInPreferredSubcategory(c, preferredSubCategories || [])
 
@@ -496,7 +496,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       if (inPreferred) rankScore += 40
       rankScore += relevance * 25
       rankScore += improvement * 3
-      rankScore += (evaluation.score != null) ? (8 - evaluation.score) * 1 : 0
+      rankScore += (evaluation.score != null) ? evaluation.score * 1 : 0
 
       return {
         id: c.id,
@@ -519,7 +519,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
     })
     .filter(c => {
       if (c.score == null) return false
-      if (c.score >= currentScore) return false
+      if (c.score <= currentScore) return false
       return true
     })
     .sort((a, b) => b.rankScore - a.rankScore)

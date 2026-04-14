@@ -76,13 +76,17 @@ const styles = {
     cursor: 'grab'
   },
   productCardDragging: {
-    opacity: 0.4,
-    border: '1px dashed var(--border, #374151)'
+    opacity: 0.3,
+    border: '1px dashed var(--border, #374151)',
+    transform: 'scale(0.97)'
   },
-  productCardDragOver: {
-    borderColor: '#3b82f6',
-    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.3)',
-    background: 'rgba(59, 130, 246, 0.08)'
+  insertIndicator: {
+    height: '3px',
+    background: 'linear-gradient(90deg, transparent, #3b82f6, #3b82f6, transparent)',
+    borderRadius: '2px',
+    margin: '0 0.5rem',
+    transition: 'opacity 0.15s ease',
+    boxShadow: '0 0 8px rgba(59, 130, 246, 0.4)'
   },
   dragHandle: {
     color: 'var(--text-muted, #6b7280)',
@@ -273,7 +277,7 @@ export default function ExperimentRanking({
   const dragItem = useRef(null)
   const dragOverItem = useRef(null)
   const [dragIndex, setDragIndex] = useState(null)
-  const [dragOverIndex, setDragOverIndex] = useState(null)
+  const [insertBeforeIndex, setInsertBeforeIndex] = useState(null)
   const listRef = useRef(null)
 
   const handleDragStart = useCallback((e, index) => {
@@ -288,27 +292,37 @@ export default function ExperimentRanking({
   const handleDragOver = useCallback((e, index) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    dragOverItem.current = index
-    setDragOverIndex(index)
+    if (dragItem.current === null) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    const insertAt = e.clientY < midY ? index : index + 1
+    dragOverItem.current = insertAt
+    setInsertBeforeIndex(insertAt)
   }, [])
 
   const handleDragEnd = useCallback(() => {
-    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
-      setItems(prev => {
-        const newItems = [...prev]
-        const [moved] = newItems.splice(dragItem.current, 1)
-        newItems.splice(dragOverItem.current, 0, moved)
-        return newItems
-      })
+    if (dragItem.current !== null && dragOverItem.current !== null) {
+      const from = dragItem.current
+      let to = dragOverItem.current
+      if (from !== to && from !== to - 1) {
+        setItems(prev => {
+          const newItems = [...prev]
+          const [moved] = newItems.splice(from, 1)
+          const adjustedTo = to > from ? to - 1 : to
+          newItems.splice(adjustedTo, 0, moved)
+          return newItems
+        })
+      }
     }
     dragItem.current = null
     dragOverItem.current = null
     setDragIndex(null)
-    setDragOverIndex(null)
+    setInsertBeforeIndex(null)
   }, [])
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverIndex(null)
+  const handleDragLeave = useCallback((e) => {
+    const related = e.relatedTarget
+    if (related && e.currentTarget.contains(related)) return
   }, [])
 
   // Touch drag-and-drop support
@@ -330,28 +344,35 @@ export default function ExperimentRanking({
     for (let i = 0; i < cards.length; i++) {
       const rect = cards[i].getBoundingClientRect()
       if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-        setDragOverIndex(i)
-        dragOverItem.current = i
+        const midY = rect.top + rect.height / 2
+        const insertAt = touch.clientY < midY ? i : i + 1
+        dragOverItem.current = insertAt
+        setInsertBeforeIndex(insertAt)
         break
       }
     }
   }, [])
 
   const handleTouchEnd = useCallback(() => {
-    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
-      setItems(prev => {
-        const newItems = [...prev]
-        const [moved] = newItems.splice(dragItem.current, 1)
-        newItems.splice(dragOverItem.current, 0, moved)
-        return newItems
-      })
+    if (dragItem.current !== null && dragOverItem.current !== null) {
+      const from = dragItem.current
+      let to = dragOverItem.current
+      if (from !== to && from !== to - 1) {
+        setItems(prev => {
+          const newItems = [...prev]
+          const [moved] = newItems.splice(from, 1)
+          const adjustedTo = to > from ? to - 1 : to
+          newItems.splice(adjustedTo, 0, moved)
+          return newItems
+        })
+      }
     }
     touchStartY.current = null
     touchItemIndex.current = null
     dragItem.current = null
     dragOverItem.current = null
     setDragIndex(null)
-    setDragOverIndex(null)
+    setInsertBeforeIndex(null)
   }, [])
 
   useEffect(() => {
@@ -508,24 +529,24 @@ export default function ExperimentRanking({
           if (!submitted && dragIndex === index) {
             cardStyle = { ...cardStyle, ...styles.productCardDragging }
           }
-          if (!submitted && dragOverIndex === index && dragIndex !== index) {
-            cardStyle = { ...cardStyle, ...styles.productCardDragOver }
-          }
 
           return (
-            <div
-              key={item.id}
-              data-drag-card
-              draggable={!submitted}
-              onDragStart={!submitted ? (e) => handleDragStart(e, index) : undefined}
-              onDragOver={!submitted ? (e) => handleDragOver(e, index) : undefined}
-              onDragEnd={!submitted ? handleDragEnd : undefined}
-              onDragLeave={!submitted ? handleDragLeave : undefined}
-              onTouchStart={!submitted ? (e) => handleTouchStart(e, index) : undefined}
-              onTouchMove={!submitted ? (e) => handleTouchMove(e) : undefined}
-              onTouchEnd={!submitted ? handleTouchEnd : undefined}
-              style={cardStyle}
-            >
+            <div key={item.id}>
+              {/* Insertion indicator before this item */}
+              {!submitted && insertBeforeIndex === index && dragIndex !== null && dragIndex !== index && dragIndex !== index - 1 && (
+                <div style={styles.insertIndicator} />
+              )}
+              <div
+                data-drag-card
+                draggable={!submitted}
+                onDragStart={!submitted ? (e) => handleDragStart(e, index) : undefined}
+                onDragOver={!submitted ? (e) => handleDragOver(e, index) : undefined}
+                onDragEnd={!submitted ? handleDragEnd : undefined}
+                onTouchStart={!submitted ? (e) => handleTouchStart(e, index) : undefined}
+                onTouchMove={!submitted ? (e) => handleTouchMove(e) : undefined}
+                onTouchEnd={!submitted ? handleTouchEnd : undefined}
+                style={cardStyle}
+              >
               {!submitted && (
                 <div style={styles.dragHandle}>
                   <GripVertical size={18} />
@@ -599,6 +620,11 @@ export default function ExperimentRanking({
                     {item.co2PerKg != null ? `${item.co2PerKg} kg CO₂/kg` : '?'}
                   </span>
                 </div>
+              )}
+              </div>
+              {/* Insertion indicator after last item */}
+              {!submitted && insertBeforeIndex === index + 1 && index === displayItems.length - 1 && dragIndex !== null && dragIndex !== index && dragIndex !== index + 1 && (
+                <div style={styles.insertIndicator} />
               )}
             </div>
           )

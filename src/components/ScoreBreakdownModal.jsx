@@ -182,7 +182,7 @@ function ScoreBreakdownModal({ product, onClose }) {
                 <div style={{ 
                   fontSize: '3rem', 
                   fontWeight: 700,
-                  color: data.score <= 2 ? '#22c55e' : data.score <= 4 ? '#f59e0b' : '#ef4444'
+                  color: data.score >= 7 ? '#22c55e' : data.score >= 4 ? '#f59e0b' : '#ef4444'
                 }}>
                   {data.score != null ? data.score : '—'}
                 </div>

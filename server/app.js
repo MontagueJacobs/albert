@@ -799,11 +799,11 @@ function analyzeUserProfile(purchases) {
     const score = evaluation.score
     totalScore += score
 
-    // Score distribution (based on 1-7 scale, 1 = best)
-    if (score >= 5) {
+    // Score distribution (based on 1-10 scale, 10 = best)
+    if (score <= 3) {
       profile.scoreDistribution.low++
       lowScoreProducts.push({ name: purchase.product_name, score, evaluation, enriched })
-    } else if (score >= 3) {
+    } else if (score <= 6) {
       profile.scoreDistribution.medium++
     } else {
       profile.scoreDistribution.high++
@@ -843,7 +843,7 @@ function analyzeUserProfile(purchases) {
   const organicRatio = profile.enrichedBreakdown.organic / total
   const localRatio = profile.enrichedBreakdown.local / total
 
-  if (profile.avgScore >= 6) {
+  if (profile.avgScore >= 8) {
     profile.profileType = 'eco_champion'
   } else if (veganRatio > 0.15 || organicRatio > 0.2) {
     profile.profileType = 'plant_forward'
@@ -853,8 +853,8 @@ function analyzeUserProfile(purchases) {
     profile.profileType = 'balanced'
   }
 
-  profile.improvements = lowScoreProducts.sort((a, b) => b.score - a.score).slice(0, 5)
-  profile.strengths = highScoreProducts.sort((a, b) => a.score - b.score).slice(0, 3)
+  profile.improvements = lowScoreProducts.sort((a, b) => a.score - b.score).slice(0, 5)
+  profile.strengths = highScoreProducts.sort((a, b) => b.score - a.score).slice(0, 3)
 
   return profile
 }
@@ -875,7 +875,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
       const evaluation = evaluateProduct(p.name, enriched)
       return { ...p, score: evaluation.score, co2Category: evaluation.co2Category, enriched, evaluation }
     })
-    .filter(p => p.score != null && p.score <= 3)
+    .filter(p => p.score != null && p.score >= 7)
 
   for (const product of lowScoreProducts) {
     // Get the CO₂ category of the original product
@@ -890,13 +890,13 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
 
     // Prefer alternatives from matching subcategories, then any plant-based
     const alternatives = scoredPlantBased
-      .filter(alt => alt.score < product.score - 1)
+      .filter(alt => alt.score > product.score + 1)
       .sort((a, b) => {
         // Preferred-subcategory products first
         const aPref = a.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
         const bPref = b.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
         if (bPref !== aPref) return bPref - aPref
-        return a.score - b.score
+        return b.score - a.score
       })
       .slice(0, 3)
 
@@ -1317,7 +1317,7 @@ function searchProducts(query = '') {
 
   results.sort((a, b) => {
     if (b.rank !== a.rank) return b.rank - a.rank
-    if (a.score !== b.score) return a.score - b.score
+    if (a.score !== b.score) return b.score - a.score
     return a.name.localeCompare(b.name)
   })
 
@@ -1325,16 +1325,16 @@ function searchProducts(query = '') {
 }
 
 function getRating(avgScore) {
-  // CO2-based scale: 1-7 where 1 = most sustainable (lowest CO2)
-  // 1: < 2 kg CO2/kg (vegetables, fruits, legumes)
-  // 2: 2-5 kg CO2/kg (milk, eggs, grains)
-  // 3: 5-12 kg CO2/kg (chicken, fish, pork)
-  // 4-5: 12-45 kg CO2/kg (cheese, chocolate, coffee, lamb)
-  // 6-7: > 45 kg CO2/kg (beef)
-  if (avgScore <= 1) return "🌿 Excellent! Very low carbon footprint!"
-  if (avgScore <= 2) return "🌱 Good! Low environmental impact."
-  if (avgScore <= 3) return "🌍 Average. Consider lower-emission alternatives."
-  if (avgScore <= 5) return "⚠️ High emissions. Try plant-based options."
+  // CO2-based scale: 1-10 where 10 = most sustainable (lowest CO2)
+  // 10: < 1 kg CO2/kg (water, plain vegetables)
+  // 8-9: 1-4 kg CO2/kg (fruits, legumes, grains)
+  // 6-7: 4-10 kg CO2/kg (poultry, fish, pork)
+  // 4-5: 10-28 kg CO2/kg (cheese, chocolate, coffee)
+  // 1-3: > 28 kg CO2/kg (beef, lamb)
+  if (avgScore >= 9) return "🌿 Excellent! Very low carbon footprint!"
+  if (avgScore >= 7) return "🌱 Good! Low environmental impact."
+  if (avgScore >= 5) return "🌍 Average. Consider lower-emission alternatives."
+  if (avgScore >= 3) return "⚠️ High emissions. Try plant-based options."
   return "🔴 Very high carbon footprint."
 }
 
