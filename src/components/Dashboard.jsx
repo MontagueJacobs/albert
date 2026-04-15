@@ -741,7 +741,7 @@ function PurchaseItem({ purchase, onClick, variant }) {
               background: 'rgba(34, 197, 94, 0.2)', 
               color: '#22c55e' 
             }}>
-              🌿 Bio
+              🌿 Bio (−45% CO₂)
             </span>
           )}
           

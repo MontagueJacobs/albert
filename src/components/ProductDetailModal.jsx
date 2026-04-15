@@ -369,6 +369,33 @@ function translateCategory(label, lang) {
   return CATEGORY_LABEL_TRANSLATIONS[label] || label
 }
 
+/* Map CO₂ category code → Dutch label (same as server CATEGORY_LABELS) */
+const CATEGORY_CODE_LABELS = {
+  'beef_herd': 'Rundvlees (vleesrund)', 'beef_dairy': 'Rundvlees (zuivelrund)',
+  'lamb_mutton': 'Lamsvlees', 'pig_meat': 'Varkensvlees', 'poultry_meat': 'Gevogelte',
+  'shrimps_farmed': 'Garnalen', 'fish_farmed': 'Vis', 'cheese': 'Kaas',
+  'milk': 'Zuivelproducten', 'eggs': 'Eieren', 'palm_oil': 'Palmolie',
+  'soybean_oil': 'Sojaolie', 'olive_oil': 'Olijfolie', 'rapeseed_oil': 'Raapzaadolie',
+  'sunflower_oil': 'Zonnebloemolie', 'rice': 'Rijst', 'wheat_rye': 'Tarwe & Rogge',
+  'barley': 'Gerst', 'maize': 'Maïs', 'oatmeal': 'Haver', 'groundnuts': "Pinda's",
+  'other_pulses': 'Peulvruchten', 'peas': 'Erwten', 'nuts': 'Noten',
+  'tofu': 'Tofu & Plantaardig', 'berries_grapes': 'Bessen & Druiven',
+  'citrus_fruit': 'Citrusfruit', 'bananas': 'Bananen', 'apples': 'Appels & Peren',
+  'other_fruit': 'Overig Fruit', 'tomatoes': 'Tomaten', 'brassicas': 'Koolsoorten',
+  'onions_leeks': 'Uien & Prei', 'potatoes': 'Aardappelen', 'root_vegetables': 'Wortelgroenten',
+  'other_vegetables': 'Overige Groenten', 'cane_sugar': 'Rietsuiker', 'beet_sugar': 'Bietsuiker',
+  'coffee': 'Koffie', 'dark_chocolate': 'Chocolade', 'butter': 'Boter', 'margarine': 'Margarine',
+  'wine': 'Wijn', 'soy_milk': 'Plantaardige Melk', 'cassava': 'Cassave',
+  'beer': 'Bier', 'spirits': 'Sterke Drank', 'tea': 'Thee', 'soft_drinks': 'Frisdranken',
+  'sauces_condiments': 'Sauzen & Kruiden', 'ready_meals': 'Kant-en-klaar', 'soup': 'Soep',
+  'candy_sweets': 'Snoep & Drop', 'ice_cream': 'IJs', 'baked_goods': 'Gebak & Koek',
+  'desserts': 'Desserts', 'spreads': 'Broodbeleg', 'baby_food': 'Babyvoeding', 'snacks': 'Snacks',
+}
+
+function getCategoryLabelFromCode(code) {
+  return CATEGORY_CODE_LABELS[code] || code
+}
+
 function ProductDetailModal({ purchase, onClose }) {
   const { t, lang } = useI18n()
   const authFetch = useAuthenticatedFetch()
@@ -718,10 +745,17 @@ function ProductDetailModal({ purchase, onClose }) {
                             <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
                                 <span style={{ fontWeight: '600', fontSize: '0.85rem', textTransform: 'capitalize' }}>
-                                  {translateIngredient(ing.name, lang)}
+                                  {ing.category
+                                    ? translateCategory(getCategoryLabelFromCode(ing.category), lang)
+                                    : translateIngredient(ing.name, lang)}
                                 </span>
+                                {ing.category && (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginLeft: '0.35rem', fontWeight: 400, textTransform: 'capitalize' }}>
+                                    ({translateIngredient(ing.name, lang)})
+                                  </span>
+                                )}
                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
-                                  {(ing.weightFraction * 100).toFixed(2)}%
+                                  {(ing.weightFraction * 100).toFixed(0)}%
                                 </span>
                               </div>
                               <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
