@@ -94,8 +94,8 @@ const AGRIBALYSE_EMISSIONS = {
   other_vegetables:{ mean:  2.39, min:  0.42, max: 11.80, n: 140, note: 'Peppers, courgette, spinach, mushroom, etc.' },
 
   // Sugar
-  beet_sugar:      { mean:  1.18, min:  0.75, max:  1.92, n:   6, note: 'Sugar, honey, syrup (mostly beet-origin in France)' },
-  cane_sugar:      { mean:  1.04, min:  1.04, max:  1.04, n:   1, note: 'Single entry (cane sugar rare in French data)' },
+  beet_sugar:      { mean:  1.81, min:  1.20, max:  2.50, n:   6, note: 'Beet sugar — using OWID (Poore & Nemecek 2018) value; Agribalyse French mean was 1.18 but beet is locally produced in EU' },
+  cane_sugar:      { mean:  3.20, min:  2.00, max:  4.50, n:   1, note: 'Cane sugar — using OWID (Poore & Nemecek 2018) value; Agribalyse had only n=1 (1.04) which omits tropical land-use change' },
 
   // Beverages
   coffee:          { mean: 16.50, min: 10.00, max: 28.53, n:   9, note: 'Roasted ground coffee as purchased at retail (~500g packs). Agribalyse raw 2.31 = brewed coffee (98% water), not grocery product. Poore & Nemecek 2018: 16.5 for roasted beans. OWID 28.53 incl. full land-use change' },

@@ -10,8 +10,8 @@ const CO2_CATEGORIES = [
   { 
     name: 'Beef', nameNl: 'Rundvlees', 
     co2: 99.48, emoji: '🥩', color: '#ef4444',
-    tip: 'Beef has by far the highest CO₂ footprint due to methane, land use, and low feed efficiency.',
-    tipNl: 'Rundvlees heeft veruit de hoogste CO₂-voetafdruk door methaan, landgebruik en lage voederefficiëntie.'
+    tip: '1kg of beef produces up to 100kg of CO₂. An efficient car produces this after driving 1000 kilometers (Nijmegen to Geneva)',
+    tipNl: '1 k g rundvlees produceert tot 100 kg CO₂. Een zuinige auto stoot dit uit na 1000 kilometer rijden (Nijmegen naar Genève).'
   },
   { 
     name: 'Dark Chocolate', nameNl: 'Pure Chocolade', 
@@ -330,6 +330,28 @@ export default function ExperimentIntervention({ session, onComplete }) {
           />
         </div>
       )}
+
+      {/* Factoid callout */}
+      <div style={{
+        background: 'rgba(239, 68, 68, 0.08)',
+        border: '1px solid rgba(239, 68, 68, 0.25)',
+        borderRadius: '12px',
+        padding: '1rem 1.25rem',
+        marginBottom: '1.5rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        fontSize: '0.95rem',
+        lineHeight: '1.5',
+        color: 'var(--text, #f3f4f6)'
+      }}>
+        <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🚗</span>
+        <span>
+          {isNl
+            ? <><strong>Wist je dat?</strong> 1 kg rundvlees produceert ongeveer evenveel CO₂ als met de auto rijden van Nijmegen naar Genève.</>
+            : <><strong>Did you know?</strong> 1 kg of beef can produce around the same amount of CO₂ as driving from Nijmegen to Geneva.</>}
+        </span>
+      </div>
 
       {/* CO2 Bar Chart */}
       <div style={styles.chartSection}>

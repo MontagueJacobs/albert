@@ -45,7 +45,7 @@ const GENERIC_POOL_B = [
 // Pool C = quiz 5 (pre-intervention), Pool D = quiz 6 (post-intervention)
 // ===========================================================================
 const AH_POOL_C = [
-  { name: 'Delicata Reep puur 75% cacao', nameNl: 'Delicata Reep puur 75% cacao', image: '🍫', image_url: 'https://static.ah.nl/dam/product/AHI_6930435a3935565a5461654e354e6571484535725277?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'Tony\'s Chocolonely Reep puur 70%', nameNl: 'Tony\'s Chocolonely Reep puur 70%', image: '🍫', image_url: 'https://static.ah.nl/dam/product/AHI_4f304b6359415553547732714a704e35314969507551?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Geraspte kaas',          nameNl: 'AH Geraspte kaas',          image: '🧀', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313838303239?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Zonnebloemolie',         nameNl: 'AH Zonnebloemolie',         image: '🌻', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323034303136?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Terra Biologische tofu', nameNl: 'AH Terra Biologische tofu', image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_75575961636c4571525461785a58486e576970774467?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },

@@ -144,6 +144,16 @@ export const CATEGORY_SWAPS = {
       en: 'Dairy desserts have high emissions. Plant-based desserts are better.'
     }
   },
+
+  // -- Sugar
+  cane_sugar: {
+    ahSubCategories: [],
+    keywords: ['bietsuiker', 'kristalsuiker'],
+    tip: {
+      nl: 'Rietsuiker heeft bijna 2x zoveel CO₂-uitstoot als bietsuiker. Kies bietsuiker (zoals AH Kristalsuiker) voor een lagere voetafdruk.',
+      en: 'Cane sugar has nearly 2x the CO₂ emissions of beet sugar. Choose beet sugar (like AH Kristalsuiker) for a lower footprint.'
+    }
+  },
 }
 
 /** Set of all CO2 categories that qualify for recommendations */

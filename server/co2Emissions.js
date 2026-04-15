@@ -869,7 +869,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'tofu', 'tahoe', 'tempeh', 'seitan',
     'plantaardig', 'plantaardige', 'plant-based', 'vegan schnitzel',
     'vegan burger', 'vegan gehakt', 'vegaburger', 'vegetarische schnitzel',
-    'beyond meat', 'impossible', 'vivera', 'garden gourmet', 'terra',
+    'beyond meat', 'impossible', 'vivera', 'garden gourmet',
     'vega stuk', 'vega schnitzel', 'vega burger', 'vega gehakt',
     'sojaprotein', 'soja-eiwit', 'tarwe-eiwit', 'erwtenprotein',
     // Vegan brands that use meat-like names (must beat 'beef', 'gehakt' etc.)
