@@ -2281,10 +2281,11 @@ function isDrinkProduct(product) {
   // Fallback: check product name for common drink keywords
   const name = (product.name || '').toLowerCase()
   const drinkWords = ['cola', 'fanta', 'sprite', 'pepsi', 'limonade', 'ice tea',
-    'energy drink', 'sportdrank', 'tonic', 'bier', 'wijn', 'whisky', 'vodka',
-    'rum ', 'gin ', 'cognac', 'jenever', 'likeur', 'prosecco', 'champagne',
-    'cava', 'sap ', 'jus ', 'smoothie', 'koffie', 'coffee', 'thee ', 'tea ',
-    'espresso', 'cappuccino', 'latte', 'siroop', 'sirop']
+    'energy drink', 'sportdrank', 'tonic', 'bier', 'beer', 'wijn', 'wine',
+    'whisky', 'vodka', 'rum ', 'gin ', 'cognac', 'jenever', 'likeur', 'prosecco',
+    'champagne', 'cava', 'sap ', 'jus ', 'smoothie', 'koffie', 'coffee',
+    'thee ', 'tea ', 'espresso', 'cappuccino', 'latte', 'siroop', 'sirop',
+    'root beer', 'ginger ale', 'cider', 'shandy', 'radler', 'mocktail']
   return drinkWords.some(w => name.includes(w))
 }
 
