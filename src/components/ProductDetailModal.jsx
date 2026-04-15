@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Leaf, Apple, MapPin, ArrowRight, ExternalLink, Loader2, TrendingUp, TrendingDown, Minus, ShoppingCart } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useAuthenticatedFetch } from '../lib/authContext'
@@ -387,6 +388,13 @@ function ProductDetailModal({ purchase, onClose }) {
     return () => { document.body.style.overflow = orig }
   }, [])
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
   useEffect(() => {
     async function fetchDetails() {
       if (!purchase) return
@@ -423,7 +431,7 @@ function ProductDetailModal({ purchase, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div style={styles.overlay} onClick={handleOverlayClick}>
       <div style={styles.modal}>
         <button style={styles.closeButton} onClick={onClose}>
@@ -902,7 +910,8 @@ function ProductDetailModal({ purchase, onClose }) {
           </>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

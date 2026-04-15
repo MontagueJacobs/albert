@@ -45,20 +45,20 @@ const GENERIC_POOL_B = [
 // Pool C = quiz 5 (pre-intervention), Pool D = quiz 6 (post-intervention)
 // ===========================================================================
 const AH_POOL_C = [
-  { name: 'AH Chocoladereep puur',     nameNl: 'AH Chocoladereep puur',     image: '🍫', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313732313633?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'Delicata Reep puur 75% cacao', nameNl: 'Delicata Reep puur 75% cacao', image: '🍫', image_url: 'https://static.ah.nl/dam/product/AHI_6930435a3935565a5461654e354e6571484535725277?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Geraspte kaas',          nameNl: 'AH Geraspte kaas',          image: '🧀', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313838303239?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Zonnebloemolie',         nameNl: 'AH Zonnebloemolie',         image: '🌻', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313632313433?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Tofu naturel',           nameNl: 'AH Tofu naturel',           image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323137383236?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Bietsuiker',             nameNl: 'AH Bietsuiker',             image: '🍬' },
-  { name: 'AH Sojadrink ongezoet',     nameNl: 'AH Sojadrink ongezoet',     image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323035363233?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Zonnebloemolie',         nameNl: 'AH Zonnebloemolie',         image: '🌻', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323034303136?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Terra Biologische tofu', nameNl: 'AH Terra Biologische tofu', image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_75575961636c4571525461785a58486e576970774467?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Kristalsuiker',          nameNl: 'AH Kristalsuiker',          image: '🍬', image_url: 'https://static.ah.nl/dam/product/AHI_43545239383337393137?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Terra Sojadrink ongezoet', nameNl: 'AH Terra Sojadrink ongezoet', image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313832393437?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
 
 const AH_POOL_D = [
   { name: 'AH Garnalen',               nameNl: 'AH Garnalen',               image: '🦐', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313637383039?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Roomboter ongezouten',   nameNl: 'AH Roomboter ongezouten',   image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313832323531?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Pindakaas',              nameNl: 'AH Pindakaas',              image: '🥜' },
+  { name: 'AH Smeuïge pindakaas',     nameNl: 'AH Smeuïge pindakaas',     image: '🥜', image_url: 'https://static.ah.nl/dam/product/AHI_47745967326d487a52362d416c34366f6d7367514577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Margarine',              nameNl: 'AH Margarine',              image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313832323439?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'AH Rietsuiker',             nameNl: 'AH Rietsuiker',             image: '🍯' },
+  { name: 'AH Rietsuiker',             nameNl: 'AH Rietsuiker',             image: '🍯', image_url: 'https://static.ah.nl/dam/product/AHI_546a4757394b424e52704734627245437059566a6b41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Haverdrink',             nameNl: 'AH Haverdrink',             image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130323130353735?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
 
