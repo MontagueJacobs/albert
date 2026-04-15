@@ -778,6 +778,131 @@ async function enrichImages(supabase, opts = {}) {
 }
 
 /**
+ * Enrich products missing prices by scraping their product pages.
+ * Similar to enrichImages but targets price IS NULL.
+ */
+async function enrichPrices(supabase, opts = {}) {
+  const {
+    limit = 50,
+    delay = 3,
+    source = null,
+    verbose = false,
+    headless = true,
+  } = opts
+
+  console.log('╔══════════════════════════════════════════════════════╗')
+  console.log('║       Price Enrichment                              ║')
+  console.log('╚══════════════════════════════════════════════════════╝')
+  console.log()
+
+  // Query products missing price
+  const PAGE = 1000
+  let products = []
+
+  for (let offset = 0; products.length < limit; offset += PAGE) {
+    const batchSize = Math.min(PAGE, limit - products.length)
+    let query = supabase
+      .from('products')
+      .select('id, name, url')
+      .is('price', null)
+
+    if (source) {
+      query = query.eq('source', source)
+    }
+
+    query = query.order('updated_at', { ascending: false }).range(offset, offset + batchSize - 1)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('  ✗ Supabase query error:', error.message)
+      return
+    }
+
+    if (!data || data.length === 0) break
+    products.push(...data)
+    if (data.length < batchSize) break
+  }
+
+  if (!products || products.length === 0) {
+    console.log('  ✓ No products missing prices!')
+    return
+  }
+
+  const urlToProduct = new Map()
+  const urls = []
+  for (const p of products) {
+    const productUrl = p.url || `https://www.ah.nl/producten/product/${p.id}`
+    urls.push(productUrl)
+    urlToProduct.set(productUrl, p)
+  }
+
+  console.log(`  Found ${products.length} products missing prices (limit: ${limit})`)
+  console.log(`  Delay between requests: ${delay}s`)
+  console.log(`  Browser: ${headless ? 'headless' : 'VISIBLE — log in when the browser opens'}`)
+  console.log()
+
+  let success = 0, failed = 0, skipped = 0
+
+  const onResult = async (detail) => {
+    const p = urlToProduct.get(detail.url)
+    if (!p) return
+
+    if (!detail.success) {
+      console.log(`  ✗ ${p.name}: Failed${detail.error ? ' — ' + detail.error : ''}`)
+      failed++
+      return
+    }
+
+    const updateData = {}
+    if (detail.price != null) updateData.price = detail.price
+    if (detail.image_url) updateData.image_url = detail.image_url
+    if (detail.is_vegan != null) updateData.is_vegan = detail.is_vegan
+    if (detail.is_vegetarian != null) updateData.is_vegetarian = detail.is_vegetarian
+    if (detail.is_organic != null) updateData.is_organic = detail.is_organic
+    if (detail.is_fairtrade != null) updateData.is_fairtrade = detail.is_fairtrade
+    if (detail.nutri_score) updateData.nutri_score = detail.nutri_score
+    if (detail.origin_country) updateData.origin_country = detail.origin_country
+    if (detail.brand) updateData.brand = detail.brand
+
+    if (detail.price == null || detail.price === 0 || detail.price === 0.0) {
+      console.log(`  ~ ${p.name}: no price found on page`)
+      skipped++
+      return
+    }
+
+    updateData.updated_at = new Date().toISOString()
+
+    const { error: updateError } = await supabase
+      .from('products')
+      .update(updateData)
+      .eq('id', p.id)
+
+    if (updateError) {
+      console.log(`  ✗ ${p.name}: DB error — ${updateError.message}`)
+      failed++
+    } else {
+      console.log(`  ✓ ${p.name}: €${detail.price.toFixed(2)} saved`)
+      success++
+    }
+  }
+
+  const streamed = await scrapeProductDetailsBatch(urls, { headless, delay, verbose, onResult })
+
+  if (streamed < products.length) {
+    console.log(`  ⚠ ${products.length - streamed} products did not produce a result`)
+  }
+
+  console.log()
+  console.log(`  ── Price enrichment summary ──`)
+  console.log(`     Prices found: ${success}`)
+  console.log(`     No price:     ${skipped}`)
+  console.log(`     Failed:       ${failed}`)
+  console.log(`     Scraped:      ${streamed} / ${products.length}`)
+  console.log(`     ★ All saved results are already in Supabase`)
+}
+
+/**
  * Enrich products in Supabase that are missing ingredient data.
  * Uses the Playwright-based product_detail_scraper.py in batch mode —
  * one browser session for all products (no restart between pages).
@@ -967,6 +1092,7 @@ function parseArgs() {
     // Enrichment options
     enrich: false,          // standalone enrichment mode
     enrichImages: false,     // rescrape products missing images
+    enrichPrices: false,     // rescrape products missing prices
     enrichAfter: false,     // auto-enrich after scrape
     enrichLimit: 20,        // max products to enrich
     enrichDelay: 3,         // seconds between enrichment requests
@@ -1031,6 +1157,9 @@ function parseArgs() {
       case '--enrich-images':
         opts.enrichImages = true
         break
+      case '--enrich-prices':
+        opts.enrichPrices = true
+        break
       case '--enrich-after':
         opts.enrichAfter = true
         break
@@ -1069,6 +1198,7 @@ Custom categories:
 Ingredient enrichment (uses Playwright browser scraper):
   --enrich            Enrich products missing ingredients (standalone, no API scrape)
   --enrich-images     Rescrape products missing images (standalone)
+  --enrich-prices     Rescrape products missing prices (standalone)
   --enrich-after      Auto-enrich after running the API scrape
   --enrich-limit <n>  Max products to enrich per run (default: 20)
   --enrich-delay <s>  Seconds between enrichment requests (default: 3)
@@ -1091,6 +1221,7 @@ Examples:
   node server/ah_category_scraper.js --all                     # Everything
   node server/ah_category_scraper.js --enrich --enrich-limit 50  # Enrich 50 products
   node server/ah_category_scraper.js --enrich-images --enrich-limit 100  # Rescrape 100 missing images
+  node server/ah_category_scraper.js --enrich-prices --enrich-limit 200  # Rescrape 200 missing prices
   node server/ah_category_scraper.js --preset zuivel --enrich-after  # Scrape + enrich
 `)
         process.exit(0)
@@ -1143,13 +1274,21 @@ async function main() {
   }
 
   // ── Standalone enrichment mode ────────────────────────────────────
-  if (opts.enrich || opts.enrichImages) {
+  if (opts.enrich || opts.enrichImages || opts.enrichPrices) {
     const supabase = connectSupabase()
     if (!supabase) {
       console.error('Missing Supabase credentials. Cannot enrich.')
       process.exit(1)
     }
-    if (opts.enrichImages) {
+    if (opts.enrichPrices) {
+      await enrichPrices(supabase, {
+        limit: opts.enrichLimit,
+        delay: opts.enrichDelay,
+        source: opts.source || null,
+        verbose: opts.verbose,
+        headless: opts.headless,
+      })
+    } else if (opts.enrichImages) {
       await enrichImages(supabase, {
         limit: opts.enrichLimit,
         delay: opts.enrichDelay,
