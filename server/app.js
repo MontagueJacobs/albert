@@ -3808,14 +3808,17 @@ app.post('/api/experiment/start', async (req, res) => {
     }
 
     // Create new session with A/B assignment
-    const ab_variant = assignABVariant(bonus_card || anonymous_id)
+    const ab_variant = assignABVariant(anonymous_id || bonus_card)
     
     const insertData = {
       ab_variant,
       current_step: 'consent',
       consent_given: false
     }
-    if (bonus_card) insertData.bonus_card = bonus_card
+    // NOTE: bonus_card is intentionally NOT set on new sessions.
+    // It gets attached during scrape-complete with the card freshly extracted
+    // from the user's actual AH session. This prevents localStorage contamination
+    // when consecutive users share the same browser (e.g. in a lab).
     if (anonymous_id) insertData.anonymous_id = anonymous_id
 
     const { data, error } = await supabase

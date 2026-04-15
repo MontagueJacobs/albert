@@ -406,6 +406,17 @@ export default function ExperimentFlow({ onComplete, onBack }) {
       if (!res.ok) throw new Error(data.error)
       setSession(data.session)
       if (data.session.consent_given) setConsentChecked(true)
+
+      // When a brand-new session is created, clear any stale localStorage
+      // from a previous user on the same browser (lab / shared-device scenario).
+      if (!data.resumed) {
+        try {
+          localStorage.removeItem('ah_bonus_card')
+          // Generate a fresh anonymous_id for this new participant
+          const freshId = 'anon-' + crypto.randomUUID()
+          localStorage.setItem('experiment_anonymous_id', freshId)
+        } catch (_) {}
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -1028,7 +1039,16 @@ export default function ExperimentFlow({ onComplete, onBack }) {
             </div>
           )}
 
-          <button style={styles.doneBtn} onClick={onComplete || onBack}>
+          <button style={styles.doneBtn} onClick={() => {
+            // Auto-clear experiment localStorage so the next user on this
+            // browser starts fresh (important for lab / shared-device setups)
+            try {
+              localStorage.removeItem('ah_bonus_card')
+              localStorage.removeItem('experiment_anonymous_id')
+              localStorage.removeItem('ah_session_id')
+            } catch (_) {}
+            ;(onComplete || onBack)?.()
+          }}>
             {isNl ? 'Terug naar Dashboard' : 'Back to Dashboard'}
           </button>
         </div>
