@@ -355,85 +355,55 @@
       return { doc, text: doc.body?.textContent || '' };
     }
 
-    // Method 0: Try AH member API (returns JSON — most reliable, no HTML noise)
+    // Method 1: Try /klantenkaarten/bonuskaart page (most specific)
     try {
       statusEl.textContent = 'Retrieving bonus card from AH...';
-      log('Method 0: Trying AH member API');
-      const apiRes = await fetch('https://www.ah.nl/gql', {
-        method: 'POST',
+      log('Method 1: Fetching from /klantenkaarten/bonuskaart');
+      const res = await fetch('https://www.ah.nl/klantenkaarten/bonuskaart', { 
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: '{ member { bonusCard { cardNumber } } }'
-        })
+        cache: 'no-store'
       });
-      if (apiRes.ok) {
-        const json = await apiRes.json();
-        const cardNum = json?.data?.member?.bonusCard?.cardNumber;
-        if (cardNum && isValidBonusCard(cardNum)) {
-          foundCard = cleanCardNumber(cardNum);
-          source = 'graphql_api';
-          log(`Method 0: Got card from GraphQL API`);
-        } else {
-          log('Method 0: GraphQL response did not contain card:', JSON.stringify(json?.data?.member?.bonusCard));
-        }
-      } else {
-        log(`Method 0: API returned ${apiRes.status}`);
-      }
-    } catch (e) {
-      log('Method 0: API error:', e.message);
-    }
-
-    // Method 1: Try /klantenkaarten/bonuskaart page (more specific than /klantenkaarten)
-    if (!foundCard) {
-      try {
-        log('Method 1: Fetching from /klantenkaarten/bonuskaart');
-        const res = await fetch('https://www.ah.nl/klantenkaarten/bonuskaart', { 
-          credentials: 'include',
-          cache: 'no-store'
-        });
+      
+      if (res.ok) {
+        const html = await res.text();
+        const { doc, text } = getVisibleText(html);
         
-        if (res.ok) {
-          const html = await res.text();
-          const { doc, text } = getVisibleText(html);
-          
-          // Look for "Kaartnummer" label and grab the number near it
-          const labels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
-          for (const label of labels) {
-            if (label.textContent?.trim() === 'Kaartnummer') {
-              const parent = label.closest('tr, div, dl, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
-              if (parent) {
-                const cards = extractBonusCards(parent.textContent || '');
-                log('Method 1: Found Kaartnummer row, extracted:', cards.map(c => '****' + c.slice(-4)));
-                if (cards.length > 0) {
-                  foundCard = cards[0];
-                  source = 'bonuskaart_page_kaartnummer';
-                  break;
-                }
+        // Look for "Kaartnummer" label and grab the number near it
+        const labels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
+        for (const label of labels) {
+          if (label.textContent?.trim() === 'Kaartnummer') {
+            const parent = label.closest('tr, div, dl, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
+            if (parent) {
+              const cards = extractBonusCards(parent.textContent || '');
+              log('Method 1: Found Kaartnummer row, extracted:', cards.map(c => '****' + c.slice(-4)));
+              if (cards.length > 0) {
+                foundCard = cards[0];
+                source = 'bonuskaart_page_kaartnummer';
+                break;
               }
             }
           }
-          
-          // Fallback: scan visible text only (NOT raw HTML with JS bundles)
-          if (!foundCard) {
-            const cards = extractBonusCards(text);
-            log(`Method 1: Visible text scan found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
-            if (cards.length === 1) {
-              foundCard = cards[0];
-              source = 'bonuskaart_page_visible_text';
-            } else if (cards.length >= 2 && cards.length <= 5) {
-              // Few candidates — likely real; use the first one
-              foundCard = cards[0];
-              source = 'bonuskaart_page_first_of_few';
-            }
-            // If > 5, too noisy — skip
-          }
-        } else {
-          log(`Method 1: Fetch failed with status ${res.status}`);
         }
-      } catch (e) {
-        log('Method 1: Fetch error:', e.message);
+        
+        // Fallback: scan visible text only (NOT raw HTML with JS bundles)
+        if (!foundCard) {
+          const cards = extractBonusCards(text);
+          log(`Method 1: Visible text scan found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
+          if (cards.length === 1) {
+            foundCard = cards[0];
+            source = 'bonuskaart_page_visible_text';
+          } else if (cards.length >= 2 && cards.length <= 5) {
+            // Few candidates — likely real; use the first one
+            foundCard = cards[0];
+            source = 'bonuskaart_page_first_of_few';
+          }
+          // If > 5, too noisy — skip
+        }
+      } else {
+        log(`Method 1: Fetch failed with status ${res.status}`);
       }
+    } catch (e) {
+      log('Method 1: Fetch error:', e.message);
     }
     
     // Method 2: Try /klantenkaarten page (broader, but same visible-text filtering)

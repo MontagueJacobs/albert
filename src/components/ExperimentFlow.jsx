@@ -409,14 +409,13 @@ export default function ExperimentFlow({ onComplete, onBack }) {
       setSession(data.session)
       if (data.session.consent_given) setConsentChecked(true)
 
-      // When a brand-new session is created, clear any stale localStorage
+      // When a brand-new session is created, clear any stale bonus card
       // from a previous user on the same browser (lab / shared-device scenario).
+      // NOTE: Do NOT clear experiment_anonymous_id here — the session was just
+      // created with it, and we need it to resume after the bookmarklet redirect.
       if (!data.resumed) {
         try {
           localStorage.removeItem('ah_bonus_card')
-          // Generate a fresh anonymous_id for this new participant
-          const freshId = 'anon-' + crypto.randomUUID()
-          localStorage.setItem('experiment_anonymous_id', freshId)
         } catch (_) {}
       }
     } catch (e) {
