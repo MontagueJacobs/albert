@@ -609,6 +609,15 @@
         body: JSON.stringify(payload)
       });
       
+      // Handle non-JSON responses (e.g. Vercel timeout pages)
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await res.text();
+        log('Non-JSON response:', text.slice(0, 200));
+        throw new Error(res.status >= 500 
+          ? 'Server timed out — try again with fewer products loaded on the page'
+          : `Server error (${res.status})`);
+      }
       const data = await res.json();
       progressEl.style.width = '100%';
       

@@ -4634,25 +4634,28 @@ app.post('/api/ingest/scrape', async (req, res) => {
           console.log(`[Ingest] Sample purchase record:`, JSON.stringify(purchaseRecords[0], null, 2))
         }
 
-        // Step A: INSERT new products (duplicates will fail with 23505, that's fine)
-        const { data, error: insertError } = await supabase
-          .from('user_purchases')
-          .insert(purchaseRecords)
-          .select()
-        
+        // Step A: Smart batch insert — find which products are new vs existing
+        //   instead of the old approach of insert-all → one-by-one fallback on conflict
+        const allProductIds = purchaseRecords.map(r => r.product_id).filter(Boolean)
+        let existingIds = new Set()
+        if (allProductIds.length > 0) {
+          const { data: existingRows } = await supabase
+            .from('user_purchases')
+            .select('product_id')
+            .eq('bonus_card_number', bonusCard)
+            .in('product_id', allProductIds)
+          existingIds = new Set((existingRows || []).map(r => r.product_id))
+        }
+
+        const newRecords = purchaseRecords.filter(r => !existingIds.has(r.product_id))
         let newlyInserted = 0
-        if (insertError) {
-          if (insertError.code === '23505') {
-            // Some or all are duplicates — try inserting one by one to get the new ones in
-            console.log('[Ingest] Batch insert hit duplicates — inserting individually...')
-            for (const record of purchaseRecords) {
-              const { error: singleErr } = await supabase
-                .from('user_purchases')
-                .insert([record])
-              if (!singleErr) newlyInserted++
-            }
-            console.log(`[Ingest] Individual insert: ${newlyInserted} new, ${purchaseRecords.length - newlyInserted} already existed`)
-          } else {
+
+        if (newRecords.length > 0) {
+          const { data: insertedData, error: insertError } = await supabase
+            .from('user_purchases')
+            .insert(newRecords)
+            .select()
+          if (insertError) {
             purchaseError = insertError
             console.error('[Ingest] Purchase insert FAILED:', JSON.stringify({
               code: insertError.code,
@@ -4660,44 +4663,25 @@ app.post('/api/ingest/scrape', async (req, res) => {
               details: insertError.details,
               hint: insertError.hint
             }, null, 2))
+          } else {
+            newlyInserted = insertedData?.length || newRecords.length
           }
-        } else {
-          newlyInserted = data?.length || purchaseRecords.length
-          console.log(`[Ingest] SUCCESS: Inserted ${newlyInserted} new purchase records`)
         }
 
-        // Step B: UPDATE last_seen_at (and price) for ALL products in this scrape
-        // This keeps track of which items are still in the user's history
-        const productIds = cleaned.map(p => p.id).filter(Boolean)
-        if (productIds.length > 0) {
-          const { error: updateError } = await supabase
+        // Update last_seen_at for ALL products (new + existing) in one batch call
+        if (allProductIds.length > 0) {
+          await supabase
             .from('user_purchases')
             .update({ last_seen_at: now })
             .eq('bonus_card_number', bonusCard)
-            .in('product_id', productIds)
-
-          if (updateError) {
-            console.error('[Ingest] last_seen_at update error:', updateError.message)
-          } else {
-            console.log(`[Ingest] Updated last_seen_at for ${productIds.length} products`)
-          }
-
-          // Also update price if it changed (non-null new price)
-          for (const p of cleaned) {
-            if (p.id && p.price != null) {
-              await supabase
-                .from('user_purchases')
-                .update({ price: p.price })
-                .eq('bonus_card_number', bonusCard)
-                .eq('product_id', p.id)
-            }
-          }
+            .in('product_id', allProductIds)
         }
 
+        console.log(`[Ingest] Purchases: ${newlyInserted} new, ${existingIds.size} already existed`)
         purchasesRecorded = purchaseRecords.length
 
-        // Backfill null prices in user_purchases from products table
-        // (eerder-gekocht page often doesn't show prices)
+        // Step B: Backfill null prices from products table (single batch query + batch update)
+        // The bookmarklet can't scrape prices from "eerder gekocht" so most come in as null
         try {
           const nullPriceIds = cleaned.filter(p => p.price == null && p.id).map(p => p.id)
           if (nullPriceIds.length > 0) {
@@ -4707,15 +4691,25 @@ app.post('/api/ingest/scrape', async (req, res) => {
               .in('id', nullPriceIds)
               .not('price', 'is', null)
             if (pricedProducts?.length > 0) {
+              // Group products by price to batch-update efficiently
+              const byPrice = new Map()
               for (const pp of pricedProducts) {
-                await supabase
-                  .from('user_purchases')
-                  .update({ price: pp.price })
-                  .eq('bonus_card_number', bonusCard)
-                  .eq('product_id', pp.id)
-                  .is('price', null)
+                const key = pp.price.toString()
+                if (!byPrice.has(key)) byPrice.set(key, [])
+                byPrice.get(key).push(pp.id)
               }
-              console.log(`[Ingest] Backfilled ${pricedProducts.length} prices from products table`)
+              // One UPDATE per unique price value (typically much fewer than N products)
+              let backfilled = 0
+              for (const [price, ids] of byPrice) {
+                const { error: bfErr } = await supabase
+                  .from('user_purchases')
+                  .update({ price: parseFloat(price) })
+                  .eq('bonus_card_number', bonusCard)
+                  .in('product_id', ids)
+                  .is('price', null)
+                if (!bfErr) backfilled += ids.length
+              }
+              console.log(`[Ingest] Backfilled prices for ${backfilled} purchases (${byPrice.size} batch updates)`)
             }
           }
         } catch (e) {
