@@ -226,12 +226,14 @@ export default function ExperimentLikert({ sessionId, onComplete, questions: cus
             {(q.low || q.lowNl) && (
               <div style={styles.anchors}>
                 <span>{isNl ? (q.lowNl || q.low) : (q.low || q.lowNl)}</span>
+                <span>{isNl ? 'Neutraal' : 'Neutral'}</span>
                 <span>{isNl ? (q.highNl || q.high) : (q.high || q.highNl)}</span>
               </div>
             )}
             {!(q.low || q.lowNl) && (
               <div style={styles.anchors}>
                 <span>{isNl ? 'Helemaal oneens' : 'Strongly disagree'}</span>
+                <span>{isNl ? 'Neutraal' : 'Neutral'}</span>
                 <span>{isNl ? 'Helemaal eens' : 'Strongly agree'}</span>
               </div>
             )}
