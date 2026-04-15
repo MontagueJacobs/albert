@@ -67,7 +67,7 @@ function ScoreRing({ score, size = 52 }) {
 /* ----------- badge pills ----------- */
 function AttributeBadges({ product, compact = false }) {
   const badges = []
-  if (product.is_organic) badges.push({ label: 'Bio (−45% CO₂)', color: '#16a34a', icon: '🌿' })
+  if (product.is_organic) badges.push({ label: 'Bio', color: '#16a34a', icon: '🌿' })
   if (product.is_vegan) badges.push({ label: 'Vegan', color: '#7c3aed', icon: '🌱' })
   else if (product.is_vegetarian) badges.push({ label: 'Vegetarisch', color: '#059669', icon: '🥬' })
   if (product.is_fairtrade) badges.push({ label: 'Fairtrade', color: '#d97706', icon: '🤝' })

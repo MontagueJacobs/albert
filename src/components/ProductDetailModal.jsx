@@ -541,7 +541,7 @@ function ProductDetailModal({ purchase, onClose }) {
                   background: 'rgba(34, 197, 94, 0.2)', 
                   color: '#22c55e' 
                 }}>
-                  🌿 Bio (−45% CO₂)
+                  🌿 Bio
                 </span>
               )}
               
@@ -653,19 +653,6 @@ function ProductDetailModal({ purchase, onClose }) {
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
                       {details.co2PerKg.toFixed(1)} kg CO₂ per kg
                     </div>
-                    {/* Bio/organic CO₂ reduction notice */}
-                    {details.co2Method && details.co2Method.includes('organic') && (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '0.35rem',
-                        marginTop: '6px', padding: '0.3rem 0.55rem',
-                        background: 'rgba(34, 197, 94, 0.12)',
-                        border: '1px solid rgba(34, 197, 94, 0.25)',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem', fontWeight: 600, color: '#22c55e'
-                      }}>
-                        🌿 {lang === 'en' ? 'Bio: −45% CO₂ applied' : 'Bio: −45% CO₂ toegepast'}
-                      </div>
-                    )}
                     {/* Source + confidence in one line */}
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '0.35rem',
