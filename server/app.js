@@ -1926,7 +1926,7 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
     if (productIds.length > 0) {
       const { data: products, error: prodError } = await supabase
         .from('products')
-        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, price, unit_size, ingredients, nutrition_text, nutrition_json')
+        .select('id, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, price, unit_size, ingredients, nutrition_text, nutrition_json, image_url')
         .in('id', productIds)
       
       if (prodError) {
