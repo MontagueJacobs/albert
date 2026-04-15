@@ -55,7 +55,6 @@ const TRANSLATIONS = {
     tips: [
       '🌱 Kies vaker voor plantaardige producten',
       '🥬 Verminder rood vlees consumptie',
-      '🏡 Koop lokale en seizoensproducten',
       '🥜 Probeer peulvruchten als eiwitbron',
       '🧀 Kies zuivel met mate'
     ],
@@ -65,6 +64,8 @@ const TRANSLATIONS = {
     total_co2: 'Totale CO₂',
     total_food_weight: 'voedsel',
     total_spent: 'Totaal uitgegeven',
+    sort_worst: 'Slechtste eerst',
+    sort_best: 'Beste eerst',
     price_coverage: 'Op basis van producten met bekende prijs',
     your_rating: 'Je CO₂ rating',
     rating_excellent: 'Uitstekend',
@@ -430,7 +431,6 @@ const TRANSLATIONS = {
     tips: [
       '🌱 Choose more plant-based products',
       '🥬 Reduce red meat consumption',
-      '🏡 Buy local and seasonal produce',
       '🥜 Try legumes as protein source',
       '🧀 Consume dairy in moderation'
     ],
@@ -440,6 +440,8 @@ const TRANSLATIONS = {
     total_co2: 'Total CO₂',
     total_food_weight: 'food',
     total_spent: 'Total spent',
+    sort_worst: 'Worst first',
+    sort_best: 'Best first',
     price_coverage: 'Based on products with known prices',
     your_rating: 'Your CO₂ rating',
     rating_excellent: 'Excellent',

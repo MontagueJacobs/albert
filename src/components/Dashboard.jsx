@@ -133,6 +133,7 @@ function Dashboard({ syncVersion }) {
   const [purchaseTotalPages, setPurchaseTotalPages] = useState(0)
   const [showHistory, setShowHistory] = useState(false)
   const [selectedPurchase, setSelectedPurchase] = useState(null)
+  const [purchaseSort, setPurchaseSort] = useState('worst') // 'worst' or 'best'
 
   const fetchInsights = useCallback(async () => {
     console.log('[Dashboard] fetchInsights called, isUserConnected:', isUserConnected, 'bonusCardNumber:', bonusCardNumber, 'isAuthenticated:', isAuthenticated)
@@ -192,8 +193,8 @@ function Dashboard({ syncVersion }) {
     try {
       // Use bonus card API if available
       const url = bonusCardNumber
-        ? `/api/bonus/${bonusCardNumber}/purchases?page=${page}&limit=20`
-        : `/api/user/purchases/history?page=${page}&limit=20`
+        ? `/api/bonus/${bonusCardNumber}/purchases?page=${page}&limit=100`
+        : `/api/user/purchases/history?page=${page}&limit=100`
       const res = bonusCardNumber
         ? await fetch(url)
         : await authFetch(url)
@@ -569,7 +570,44 @@ function Dashboard({ syncVersion }) {
               </p>
             ) : (
               <>
-                {purchases.map((purchase) => (
+                {/* Sort toggle */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem', gap: '0.25rem' }}>
+                  <button
+                    onClick={() => setPurchaseSort('worst')}
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      fontSize: '0.75rem',
+                      fontWeight: purchaseSort === 'worst' ? 700 : 400,
+                      background: purchaseSort === 'worst' ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
+                      color: purchaseSort === 'worst' ? '#ef4444' : 'var(--text-muted)',
+                      border: `1px solid ${purchaseSort === 'worst' ? 'rgba(239, 68, 68, 0.3)' : 'var(--border, #334155)'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {t('sort_worst') || 'Worst first'}
+                  </button>
+                  <button
+                    onClick={() => setPurchaseSort('best')}
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      fontSize: '0.75rem',
+                      fontWeight: purchaseSort === 'best' ? 700 : 400,
+                      background: purchaseSort === 'best' ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+                      color: purchaseSort === 'best' ? '#22c55e' : 'var(--text-muted)',
+                      border: `1px solid ${purchaseSort === 'best' ? 'rgba(34, 197, 94, 0.3)' : 'var(--border, #334155)'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {t('sort_best') || 'Best first'}
+                  </button>
+                </div>
+                {[...purchases].sort((a, b) => {
+                  const aScore = a.sustainability_score ?? (purchaseSort === 'worst' ? 999 : -1)
+                  const bScore = b.sustainability_score ?? (purchaseSort === 'worst' ? 999 : -1)
+                  return purchaseSort === 'worst' ? aScore - bScore : bScore - aScore
+                }).map((purchase) => (
                   <PurchaseItem 
                     key={purchase.id} 
                     purchase={purchase} 

@@ -85,14 +85,14 @@ const KEY_INSIGHTS = {
   en: [
     'Beef (99.5 kg), dark chocolate (46.7 kg) and lamb (39.7 kg) top the emissions chart',
     'Cheese (23.9 kg) is surprisingly high because it concentrates milk emissions',
-    'Switching one beef meal per week to chicken saves ~24 kg CO₂/year',
+    <>Switching from beef to chicken can reduce CO₂ emissions by up to 35.7% <a href="https://www.sciencedirect.com/science/article/pii/S2542519620300553" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'underline' }}>(source)</a></>,
     'Local vs. imported matters less than what you eat — transport is usually <10% of food\'s footprint',
     'Plant proteins (lentils, beans, tofu) have the lowest emissions per gram of protein'
   ],
   nl: [
     'Rundvlees (99,5 kg), pure chocolade (46,7 kg) en lam (39,7 kg) staan bovenaan de uitstootlijst',
     'Kaas (23,9 kg) is verrassend hoog omdat het de melkuitstoot concentreert',
-    'Eén rundvleesmaaltijd per week vervangen door kip bespaart ~24 kg CO₂/jaar',
+    <>Overstappen van rundvlees naar kip kan de CO₂-uitstoot met wel 35,7% verminderen <a href="https://www.sciencedirect.com/science/article/pii/S2542519620300553" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'underline' }}>(bron)</a></>,
     'Lokaal vs. geïmporteerd maakt minder uit dan wát je eet — transport is meestal <10% van de voetafdruk',
     'Plantaardige eiwitten (linzen, bonen, tofu) hebben de laagste uitstoot per gram eiwit'
   ]
