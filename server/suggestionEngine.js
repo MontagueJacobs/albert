@@ -106,8 +106,8 @@ export const CATEGORY_SWAPS = {
     ahSubCategories: ['Plantaardige kaas voor beleg', 'Plantaardige spreads', 'Hummus naturel', 'Hummus met smaakje'],
     keywords: ['kaas', 'spread', 'hummus', 'cashew', 'smeerbaar'],
     tip: {
-      nl: 'Kaas heeft een verrassend hoge CO\u2082-uitstoot. Plantaardige kaas of hummus bespaart tot 80%.',
-      en: 'Cheese has a surprisingly high CO\u2082 footprint. Plant-based cheese or hummus saves up to 80%.'
+      nl: 'Kaas heeft een verrassend hoge CO₂-uitstoot. Plantaardige kaas bespaart tot 80%.',
+      en: 'Cheese has a surprisingly high CO₂ footprint. Plant-based cheese saves up to 80%.'
     }
   },
   milk: {

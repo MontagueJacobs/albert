@@ -58,7 +58,7 @@ const AH_POOL_D = [
   { name: 'AH Roomboter ongezouten',   nameNl: 'AH Roomboter ongezouten',   image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130313032323032?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Smeuïge pindakaas',     nameNl: 'AH Smeuïge pindakaas',     image: '🥜', image_url: 'https://static.ah.nl/dam/product/AHI_47745967326d487a52362d416c34366f6d7367514577?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Margarine',              nameNl: 'AH Margarine',              image: '🧈', image_url: 'https://static.ah.nl/dam/product/AHI_4354523130303734363834?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
-  { name: 'Van Gilse Kristalsuiker',   nameNl: 'Van Gilse Kristalsuiker',   image: '🍬', image_url: 'https://static.ah.nl/dam/product/AHI_43545239353730363932?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
+  { name: 'AH Rietsuiker',             nameNl: 'AH Rietsuiker',             image: '🍬', image_url: 'https://static.ah.nl/dam/product/AHI_546a4757394b424e52704734627245437059566a6b41?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
   { name: 'AH Haverdrink ongezoet',    nameNl: 'AH Haverdrink ongezoet',    image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_43545239393536393239?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
 
@@ -331,10 +331,10 @@ export const EXPERIMENT_STEPS = [
   'consent',
   'demographics',
   'scrape',
+  'pre_questionnaire',
   'pre_quiz_general',
   'pre_quiz_ah',
   'pre_quiz_personal',
-  'pre_questionnaire',
   'learning_dashboard',
   'post_quiz_general',
   'post_quiz_ah',

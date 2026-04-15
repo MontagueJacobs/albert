@@ -29,8 +29,8 @@ const STEP_LABELS = {
 
 const STEPS = [
   'consent', 'demographics', 'scrape',
-  'pre_quiz_general', 'pre_quiz_ah', 'pre_quiz_personal',
   'pre_questionnaire',
+  'pre_quiz_general', 'pre_quiz_ah', 'pre_quiz_personal',
   'learning_dashboard',
   'post_quiz_general', 'post_quiz_ah', 'post_quiz_personal',
   'post_questionnaire', 'post_reflection',
