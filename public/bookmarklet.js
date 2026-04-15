@@ -525,118 +525,249 @@
       }
     }
     
-    // Method 4: MANUAL ENTRY FALLBACK — prompt user to type their card number
-    // This is the guaranteed fallback when all automatic methods fail.
+    // Method 4: Scan localStorage and sessionStorage (AH SPA stores user data here)
     if (!foundCard) {
-      log('All automatic methods failed — asking user for manual entry');
-      foundCard = await promptForBonusCard();
-      if (foundCard) {
-        source = 'manual_entry';
+      log('Method 4: Scanning localStorage and sessionStorage');
+      for (const store of [localStorage, sessionStorage]) {
+        try {
+          for (let i = 0; i < store.length; i++) {
+            const key = store.key(i);
+            const val = store.getItem(key);
+            if (!val) continue;
+            // Look for keys that hint at bonus/loyalty/member/card
+            const keyLower = key.toLowerCase();
+            if (keyLower.includes('bonus') || keyLower.includes('card') || keyLower.includes('kaart') || 
+                keyLower.includes('loyalty') || keyLower.includes('member') || keyLower.includes('user') ||
+                keyLower.includes('auth') || keyLower.includes('profile') || keyLower.includes('account')) {
+              const cards = extractBonusCards(val);
+              if (cards.length === 1) {
+                foundCard = cards[0];
+                source = `storage:${key}`;
+                log(`Method 4: Found card in ${store === localStorage ? 'localStorage' : 'sessionStorage'} key "${key}"`);
+                break;
+              } else if (cards.length >= 2 && cards.length <= 3) {
+                foundCard = cards[0];
+                source = `storage:${key}_first`;
+                log(`Method 4: Found ${cards.length} candidates in key "${key}", using first`);
+                break;
+              }
+            }
+          }
+        } catch (e) { /* storage access denied */ }
+        if (foundCard) break;
       }
+      // If nothing found in targeted keys, do a full scan of all storage values
+      if (!foundCard) {
+        for (const store of [localStorage, sessionStorage]) {
+          try {
+            for (let i = 0; i < store.length; i++) {
+              const key = store.key(i);
+              const val = store.getItem(key);
+              if (!val || val.length > 50000) continue; // skip huge blobs
+              const cards = extractBonusCards(val);
+              if (cards.length === 1) {
+                foundCard = cards[0];
+                source = `storage_scan:${key}`;
+                log(`Method 4: Found card in full scan of key "${key}"`);
+                break;
+              }
+            }
+          } catch (e) { /* storage access denied */ }
+          if (foundCard) break;
+        }
+      }
+    }
+    
+    // Method 5: Scan cookies for bonus card number
+    if (!foundCard) {
+      log('Method 5: Scanning cookies');
+      try {
+        const cookieStr = document.cookie || '';
+        // Check individual cookies
+        const cookies = cookieStr.split(';');
+        for (const cookie of cookies) {
+          const [name, ...valParts] = cookie.split('=');
+          const cookieName = (name || '').trim().toLowerCase();
+          const cookieVal = decodeURIComponent(valParts.join('=') || '');
+          if (cookieName.includes('bonus') || cookieName.includes('card') || cookieName.includes('kaart') ||
+              cookieName.includes('loyalty') || cookieName.includes('member')) {
+            const cards = extractBonusCards(cookieVal);
+            if (cards.length > 0 && cards.length <= 3) {
+              foundCard = cards[0];
+              source = `cookie:${cookieName}`;
+              log(`Method 5: Found card in cookie "${cookieName}"`);
+              break;
+            }
+          }
+        }
+        // Full cookie scan
+        if (!foundCard) {
+          const cards = extractBonusCards(cookieStr);
+          if (cards.length === 1) {
+            foundCard = cards[0];
+            source = 'cookie_full_scan';
+            log('Method 5: Found card in full cookie scan');
+          }
+        }
+      } catch (e) {
+        log('Method 5: Cookie error:', e.message);
+      }
+    }
+    
+    // Method 6: __NEXT_DATA__ / Next.js initial props (AH uses Next.js)
+    if (!foundCard) {
+      log('Method 6: Checking __NEXT_DATA__ and script data');
+      try {
+        // Check window.__NEXT_DATA__
+        if (window.__NEXT_DATA__) {
+          const nextStr = JSON.stringify(window.__NEXT_DATA__);
+          const cards = extractBonusCards(nextStr);
+          if (cards.length === 1) {
+            foundCard = cards[0];
+            source = '__NEXT_DATA__';
+            log('Method 6: Found card in __NEXT_DATA__');
+          } else if (cards.length >= 2 && cards.length <= 5) {
+            foundCard = cards[0];
+            source = '__NEXT_DATA__first';
+            log(`Method 6: Found ${cards.length} candidates in __NEXT_DATA__, using first`);
+          }
+        }
+        // Check script#__NEXT_DATA__ tag
+        if (!foundCard) {
+          const nextScript = document.getElementById('__NEXT_DATA__');
+          if (nextScript) {
+            const cards = extractBonusCards(nextScript.textContent || '');
+            if (cards.length === 1) {
+              foundCard = cards[0];
+              source = '__NEXT_DATA__script';
+            } else if (cards.length >= 2 && cards.length <= 5) {
+              foundCard = cards[0];
+              source = '__NEXT_DATA__script_first';
+            }
+          }
+        }
+      } catch (e) {
+        log('Method 6: error:', e.message);
+      }
+    }
+    
+    // Method 7: Window global objects (Redux stores, Apollo cache, etc.)
+    if (!foundCard) {
+      log('Method 7: Scanning window global objects');
+      const globalKeys = ['__APOLLO_STATE__', '__REDUX_STATE__', '__INITIAL_STATE__', 
+                          '__APP_STATE__', '__store__', '__userData__', '__user__',
+                          '__ah__', '__member__', 'appState', 'memberData'];
+      for (const key of globalKeys) {
+        try {
+          if (window[key]) {
+            const str = JSON.stringify(window[key]);
+            if (str.length > 200000) continue; // skip massive objects
+            const cards = extractBonusCards(str);
+            if (cards.length === 1) {
+              foundCard = cards[0];
+              source = `window.${key}`;
+              log(`Method 7: Found card in window.${key}`);
+              break;
+            }
+          }
+        } catch (e) { /* circular ref or access denied */ }
+      }
+    }
+    
+    // Method 8: Try additional AH API endpoints
+    if (!foundCard) {
+      log('Method 8: Trying additional AH API endpoints');
+      const apiEndpoints = [
+        '/service/rest/delegate?url=/mobile-services/member/v4/info',
+        '/service/rest/delegate?url=/mobile-services/loyalty/v2/card',
+        '/service/rest/delegate?url=/mobile-services/bonuscard/v1/card',
+        '/api/member/info',
+        '/gql', // AH GraphQL — we'll try a member query
+      ];
+      
+      for (const endpoint of apiEndpoints) {
+        if (foundCard) break;
+        try {
+          const url = endpoint.startsWith('/') ? `https://www.ah.nl${endpoint}` : endpoint;
+          let fetchOpts = { credentials: 'include', cache: 'no-store' };
+          
+          // For GQL, try a member query
+          if (endpoint === '/gql') {
+            fetchOpts.method = 'POST';
+            fetchOpts.headers = { 'Content-Type': 'application/json' };
+            fetchOpts.body = JSON.stringify({
+              query: '{ member { bonusCard { cardNumber } loyaltyCard { cardNumber } } }'
+            });
+          }
+          
+          const res = await fetch(url, fetchOpts);
+          if (res.ok) {
+            const text = await res.text();
+            // Only scan if response is reasonably sized
+            if (text.length < 100000) {
+              const cards = extractBonusCards(text);
+              if (cards.length === 1) {
+                foundCard = cards[0];
+                source = `api:${endpoint}`;
+                log(`Method 8: Found card from ${endpoint}`);
+              } else if (cards.length >= 2 && cards.length <= 3) {
+                foundCard = cards[0];
+                source = `api:${endpoint}_first`;
+                log(`Method 8: Found ${cards.length} candidates from ${endpoint}`);
+              } else {
+                log(`Method 8: ${endpoint} returned ${cards.length} candidates`);
+              }
+            }
+          } else {
+            log(`Method 8: ${endpoint} returned ${res.status}`);
+          }
+        } catch (e) {
+          log(`Method 8: ${endpoint} error: ${e.message}`);
+        }
+      }
+    }
+    
+    // Method 9: Scan all <script> tags for embedded user/member data
+    if (!foundCard) {
+      log('Method 9: Scanning inline <script> tags for user data');
+      const scripts = document.querySelectorAll('script:not([src])');
+      for (const script of scripts) {
+        const content = script.textContent || '';
+        if (content.length > 200000 || content.length < 20) continue;
+        // Only scan scripts that mention bonus/card/member/user/kaart/loyalty
+        if (/bonus|card|kaart|member|user|loyalty/i.test(content)) {
+          const cards = extractBonusCards(content);
+          if (cards.length === 1) {
+            foundCard = cards[0];
+            source = 'inline_script';
+            log('Method 9: Found card in inline script');
+            break;
+          }
+        }
+      }
+    }
+    
+    // Method 10: Check URL params on current page
+    if (!foundCard) {
+      log('Method 10: Checking URL params');
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const cardParam = urlParams.get('bonuskaart') || urlParams.get('card') || urlParams.get('bonusCard');
+        if (isValidBonusCard(cardParam)) {
+          foundCard = cleanCardNumber(cardParam);
+          source = 'url_param';
+        }
+      } catch (e) {}
     }
     
     // Log final result
     if (foundCard) {
       log(`SUCCESS: Found bonus card ****${foundCard.slice(-4)} via ${source}`);
     } else {
-      log('FAILED: No bonus card found by any method (user cancelled manual entry)');
+      log('FAILED: No bonus card found by any method');
     }
     
     return foundCard;
-  }
-  
-  // Prompt the user to manually enter their bonus card number
-  function promptForBonusCard() {
-    return new Promise((resolve) => {
-      // Create modal overlay
-      const modal = document.createElement('div');
-      modal.style.cssText = `
-        position: fixed; inset: 0; z-index: 2147483647;
-        background: rgba(15, 23, 42, 0.95);
-        display: flex; align-items: center; justify-content: center;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      `;
-      
-      modal.innerHTML = `
-        <div style="
-          background: #1e293b; border-radius: 16px; padding: 2rem;
-          max-width: 420px; width: 90%; color: #f3f4f6;
-          box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-        ">
-          <h3 style="margin: 0 0 0.5rem; font-size: 1.2rem; color: #22c55e;">
-            🎫 Bonuskaartnummer nodig
-          </h3>
-          <p style="margin: 0 0 0.5rem; font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">
-            We konden je bonuskaartnummer niet automatisch ophalen.
-            Vul het hieronder in (13 cijfers).
-          </p>
-          <p style="margin: 0 0 1rem; font-size: 0.8rem; color: #64748b; line-height: 1.4;">
-            Je vindt het op <a href="https://www.ah.nl/klantenkaarten/bonuskaart" target="_blank" 
-            style="color: #38bdf8; text-decoration: underline;">ah.nl/klantenkaarten/bonuskaart</a>,
-            op je fysieke bonuskaart, of in de AH app onder "Bonuskaart".
-          </p>
-          <input id="ss-card-input" type="text" inputmode="numeric" maxlength="17" 
-            placeholder="bijv. 2621 0000 12345"
-            style="
-              width: 100%; padding: 0.75rem 1rem; font-size: 1.1rem;
-              border: 2px solid #334155; border-radius: 10px;
-              background: #0f172a; color: #f3f4f6;
-              letter-spacing: 2px; text-align: center;
-              outline: none; box-sizing: border-box;
-            " />
-          <p id="ss-card-error" style="
-            margin: 0.5rem 0 0; font-size: 0.8rem; color: #ef4444;
-            min-height: 1.2rem;
-          "></p>
-          <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
-            <button id="ss-card-skip" style="
-              flex: 1; padding: 0.7rem; border: 1px solid #334155;
-              border-radius: 10px; background: transparent;
-              color: #94a3b8; cursor: pointer; font-size: 0.9rem;
-            ">Overslaan</button>
-            <button id="ss-card-submit" style="
-              flex: 2; padding: 0.7rem; border: none;
-              border-radius: 10px; background: #22c55e;
-              color: white; cursor: pointer; font-weight: 600;
-              font-size: 0.9rem;
-            ">Bevestigen</button>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(modal);
-      
-      const input = modal.querySelector('#ss-card-input');
-      const errorEl = modal.querySelector('#ss-card-error');
-      const submitBtn = modal.querySelector('#ss-card-submit');
-      const skipBtn = modal.querySelector('#ss-card-skip');
-      
-      input.focus();
-      
-      const trySubmit = () => {
-        const cleaned = input.value.replace(/[\s\-\.]/g, '');
-        if (!/^\d{13}$/.test(cleaned)) {
-          errorEl.textContent = 'Voer een geldig 13-cijferig kaartnummer in';
-          input.style.borderColor = '#ef4444';
-          return;
-        }
-        modal.remove();
-        resolve(cleaned);
-      };
-      
-      submitBtn.addEventListener('click', trySubmit);
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') trySubmit();
-      });
-      input.addEventListener('input', () => {
-        errorEl.textContent = '';
-        input.style.borderColor = '#334155';
-      });
-      skipBtn.addEventListener('click', () => {
-        modal.remove();
-        resolve(null);
-      });
-    });
   }
   
   // ============================================
