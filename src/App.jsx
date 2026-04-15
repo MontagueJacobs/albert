@@ -205,17 +205,40 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </div>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
 
-        {/* Bonus Card Landing - Main Entry Point */}
-        <BonusCardLanding 
-          onBonusCardSubmit={(cardNumber, userInfo) => {
-            bonusLogin(cardNumber, userInfo)
-            navigateTo('dashboard')
-          }}
-          onAutoLogin={(cardNumber, userInfo) => {
-            bonusLogin(cardNumber, userInfo)
-          }}
-          onStartScrape={() => window.location.href = '/bookmarklet.html'}
-        />
+        {/* Experiment CTA - Main Entry Point */}
+        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
+          <div style={{ marginBottom: '2rem' }}>
+            <h1 style={{ fontSize: '2rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              🌿 Duurzaam Winkelen
+            </h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginBottom: '1.5rem' }}>
+              {isNl
+                ? 'Bekijk de duurzaamheid van je boodschappen'
+                : 'View the sustainability of your groceries'}
+            </p>
+          </div>
+          <button
+            onClick={() => navigateTo('experiment')}
+            style={{
+              width: '100%',
+              padding: '1rem 1.5rem',
+              fontSize: '1.1rem',
+              fontWeight: '600',
+              border: 'none',
+              borderRadius: '12px',
+              background: 'var(--primary)',
+              color: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            🧪 {isNl ? 'Start het experiment' : 'Start the experiment'}
+            <ChevronRight size={20} />
+          </button>
+        </div>
 
         {/* Feature Cards - shown below landing */}
         <section className="features-section" style={{ marginTop: '1rem' }}>
