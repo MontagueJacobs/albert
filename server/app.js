@@ -1049,6 +1049,21 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     }
   }
   
+  // Organic/Bio keurmerk: 45% lower GHG emissions
+  // Source: EU research — organic farming produces significantly less CO₂
+  // per kg due to no synthetic fertilizers, better soil carbon sequestration, etc.
+  const ORGANIC_CO2_REDUCTION = 0.45
+  let organicAdjusted = false
+  if (co2Data.matched && co2Data.co2PerKg != null &&
+      enrichedData && enrichedData.is_organic === true) {
+    co2Data = {
+      ...co2Data,
+      co2PerKg: co2Data.co2PerKg * (1 - ORGANIC_CO2_REDUCTION),
+      method: co2Data.method === 'vegan_override' ? 'vegan_override+organic' : (co2Data.method || 'name') + '+organic'
+    }
+    organicAdjusted = true
+  }
+
   // Handle non-food items
   if (co2Data.isNonFood) {
     return {
@@ -1089,15 +1104,15 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
     })
   }
   
-  // Supplementary info from enriched data (doesn't affect score)
+  // Supplementary info from enriched data (organic affects score, others are informational)
   if (enrichedData && typeof enrichedData === 'object') {
     // Organic/Bio
     if (enrichedData.is_organic === true) {
       matchedEnriched.push({ 
         code: 'organic', 
         icon: '🌿', 
-        label: 'Biologisch',
-        supplementary: true 
+        label: organicAdjusted ? 'Biologisch (−45% CO₂)' : 'Biologisch',
+        supplementary: !organicAdjusted
       })
     }
 
