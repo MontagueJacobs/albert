@@ -970,7 +970,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Beverages & Other
   'coffee': ['koffie', 'coffee', 'espresso', 'cappuccino', 'latte'],
-  'dark_chocolate': ['chocola', 'chocolate', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella'],
+  'dark_chocolate': ['chocola', 'chocolate', 'chocolonely', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella'],
   'wine': [
     'wijn', 'wine', 'prosecco', 'champagne', 'port', 'sherry',
     'cabernet', 'sauvignon', 'merlot', 'syrah', 'shiraz', 'pinot',

@@ -4499,11 +4499,15 @@ app.post('/api/ingest/scrape', async (req, res) => {
         name: extracted.name,
         normalized_name: extracted.normalized,
         url: url || null,
-        price: parsedPrice,
         source,
         // NOTE: Enriched fields (is_vegan, is_organic, origin, etc.) are set by the scraper
         // not auto-detected from product names
         updated_at: new Date().toISOString()
+      }
+
+      // Only include price if we have one (preserve existing catalog price on re-sync)
+      if (parsedPrice != null) {
+        productRecord.price = parsedPrice
       }
       
       // Only include image_url if we have one (preserve existing on re-sync)
@@ -5854,6 +5858,85 @@ app.post('/api/auto-scrape/with-cookies', async (req, res) => {
 // - POST /api/admin/scrape/:userId - ran scrapes using stored credentials
 //
 // Use the bookmarklet method instead which doesn't require storing credentials.
+
+// Admin: Backfill null prices in products table from local AH JSON catalog files
+app.post('/api/admin/backfill-prices', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ error: 'No Supabase' })
+
+    const serverDir = new URL('.', import.meta.url).pathname
+    const jsonFiles = (await fs.readdir(serverDir)).filter(f => f.startsWith('ah_') && f.endsWith('_products.json'))
+
+    // Build price map from all JSON files
+    const priceMap = new Map()
+    for (const file of jsonFiles) {
+      try {
+        const raw = await fs.readFile(path.join(serverDir, file), 'utf-8')
+        const products = JSON.parse(raw)
+        for (const p of products) {
+          if (p.id && p.price != null) {
+            priceMap.set(p.id, p.price)
+          }
+        }
+      } catch (e) { /* skip bad files */ }
+    }
+
+    // Get products with null prices
+    const { data: nullPriceProducts } = await supabase
+      .from('products')
+      .select('id')
+      .is('price', null)
+
+    if (!nullPriceProducts?.length) {
+      return res.json({ message: 'No products with null prices', catalogPrices: priceMap.size })
+    }
+
+    // Update prices from catalog
+    let updated = 0
+    for (const p of nullPriceProducts) {
+      const catalogPrice = priceMap.get(p.id)
+      if (catalogPrice != null) {
+        await supabase.from('products').update({ price: catalogPrice }).eq('id', p.id)
+        updated++
+      }
+    }
+
+    // Also backfill user_purchases prices from products table
+    const { data: nullPricePurchases } = await supabase
+      .from('user_purchases')
+      .select('id, product_id')
+      .is('price', null)
+
+    let purchasesFixed = 0
+    if (nullPricePurchases?.length) {
+      const prodIds = [...new Set(nullPricePurchases.map(p => p.product_id).filter(Boolean))]
+      const { data: prods } = await supabase
+        .from('products')
+        .select('id, price')
+        .in('id', prodIds)
+        .not('price', 'is', null)
+
+      const prodPriceMap = new Map((prods || []).map(p => [p.id, p.price]))
+      for (const purchase of nullPricePurchases) {
+        const price = prodPriceMap.get(purchase.product_id)
+        if (price != null) {
+          await supabase.from('user_purchases').update({ price }).eq('id', purchase.id)
+          purchasesFixed++
+        }
+      }
+    }
+
+    res.json({
+      catalogPrices: priceMap.size,
+      nullPriceProducts: nullPriceProducts.length,
+      productsUpdated: updated,
+      nullPricePurchases: nullPricePurchases?.length || 0,
+      purchasesFixed
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
 
 // Serve built frontend (if present) so http://localhost:3001 serves the SPA in production/local builds
 // Global Express error handler - must be last middleware
