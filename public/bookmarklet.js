@@ -350,178 +350,388 @@
     function getVisibleText(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      // Remove noise elements that contain random digit sequences
       doc.querySelectorAll('script, style, svg, noscript, link, meta').forEach(el => el.remove());
       return { doc, text: doc.body?.textContent || '' };
     }
-
-    // Method 0: Try AH member REST API (returns JSON — most reliable if available)
-    try {
-      statusEl.textContent = 'Retrieving bonus card from AH...';
-      log('Method 0: Trying AH member REST API');
-      const apiRes = await fetch('https://www.ah.nl/service/rest/delegate?url=/mobile-services/member/v3/info', {
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      if (apiRes.ok) {
-        const json = await apiRes.json();
-        // The member info may contain bonusCard or loyaltyCard
-        const cardNum = json?.bonusCard?.cardNumber || json?.bonusCardNumber 
-          || json?.loyaltyCard?.cardNumber || json?.member?.bonusCard?.cardNumber;
-        log('Method 0: API response keys:', Object.keys(json || {}));
-        if (cardNum && isValidBonusCard(cardNum.toString())) {
-          foundCard = cleanCardNumber(cardNum.toString());
-          source = 'member_api';
-          log(`Method 0: Got card from member API`);
-        } else {
-          // Scan entire JSON for any 13-digit number
-          const jsonStr = JSON.stringify(json);
-          const cards = extractBonusCards(jsonStr);
-          if (cards.length === 1) {
-            foundCard = cards[0];
-            source = 'member_api_scan';
-            log(`Method 0: Found card by scanning API response`);
-          } else if (cards.length > 1) {
-            log(`Method 0: Found ${cards.length} candidates in API, skipping`);
-          }
-        }
-      } else {
-        log(`Method 0: API returned ${apiRes.status}`);
-      }
-    } catch (e) {
-      log('Method 0: API error:', e.message);
-    }
-
-    // Method 1: Try /klantenkaarten/bonuskaart page (most specific)
-    if (!foundCard) {
-      try {
-        log('Method 1: Fetching from /klantenkaarten/bonuskaart');
-        const res = await fetch('https://www.ah.nl/klantenkaarten/bonuskaart', { 
-          credentials: 'include',
-          cache: 'no-store'
-        });
-        
-        if (res.ok) {
-          const html = await res.text();
-          const { doc, text } = getVisibleText(html);
-          
-          // Look for "Kaartnummer" label and grab the number near it
-          const labels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
-          for (const label of labels) {
-            const labelText = label.textContent?.trim().toLowerCase();
-            if (labelText === 'kaartnummer' || labelText === 'bonuskaartnummer' || labelText === 'card number') {
-              const parent = label.closest('tr, div, dl, section, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
-              if (parent) {
-                const cards = extractBonusCards(parent.textContent || '');
-                log('Method 1: Found label row, extracted:', cards.map(c => '****' + c.slice(-4)));
-                if (cards.length > 0) {
-                  foundCard = cards[0];
-                  source = 'bonuskaart_page_label';
-                  break;
-                }
-              }
-            }
-          }
-          
-          // Fallback: scan visible text only (NOT raw HTML with JS bundles)
-          if (!foundCard) {
-            const cards = extractBonusCards(text);
-            log(`Method 1: Visible text scan found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
-            if (cards.length === 1) {
-              foundCard = cards[0];
-              source = 'bonuskaart_page_visible_text';
-            } else if (cards.length >= 2 && cards.length <= 5) {
-              foundCard = cards[0];
-              source = 'bonuskaart_page_first_of_few';
-            }
-          }
-        } else {
-          log(`Method 1: Fetch failed with status ${res.status}`);
-        }
-      } catch (e) {
-        log('Method 1: Fetch error:', e.message);
-      }
-    }
     
-    // Method 2: Try /klantenkaarten page
-    if (!foundCard) {
-      try {
-        log('Method 2: Fetching from /klantenkaarten');
-        const res = await fetch('https://www.ah.nl/klantenkaarten', { 
-          credentials: 'include',
-          cache: 'no-store'
-        });
-        
-        if (res.ok) {
-          const html = await res.text();
-          const { doc, text } = getVisibleText(html);
-          
-          const labels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
-          for (const label of labels) {
-            const labelText = label.textContent?.trim().toLowerCase();
-            if (labelText === 'kaartnummer' || labelText === 'bonuskaartnummer' || labelText === 'card number') {
-              const parent = label.closest('tr, div, dl, section, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
-              if (parent) {
-                const cards = extractBonusCards(parent.textContent || '');
-                if (cards.length > 0) {
-                  foundCard = cards[0];
-                  source = 'klantenkaarten_label';
-                  break;
-                }
-              }
+    // Helper: scan a DOM document for the bonus card using known AH page structure
+    // On ah.nl/klantenkaarten, the card is shown as:
+    //   <span class="table-block_label__XXXX">Kaartnummer</span>
+    //   <span/div with the card number as text>
+    function scanDomForCard(doc) {
+      // Strategy A: Find "Kaartnummer" label by class pattern "table-block_label__"
+      const labelsByClass = doc.querySelectorAll('[class*="table-block_label"]');
+      for (const label of labelsByClass) {
+        const text = label.textContent?.trim().toLowerCase();
+        if (text === 'kaartnummer' || text === 'bonuskaartnummer') {
+          // The value is typically the next sibling element or in a sibling with class "table-block_value__"
+          const parent = label.parentElement;
+          if (parent) {
+            // Look for sibling with "table-block_value" class
+            const valueEl = parent.querySelector('[class*="table-block_value"]');
+            if (valueEl) {
+              const cards = extractBonusCards(valueEl.textContent || '');
+              if (cards.length > 0) return { card: cards[0], src: 'table_block_value' };
             }
+            // Or just scan the parent's text content (minus the label)
+            const parentText = parent.textContent || '';
+            const cards = extractBonusCards(parentText);
+            if (cards.length > 0) return { card: cards[0], src: 'table_block_parent' };
           }
-          
-          if (!foundCard) {
-            const cardEl = doc.querySelector('[data-testid="bonus-card-number"], .bonus-card-number, [class*="cardNumber"], [class*="bonusCard"]');
-            if (cardEl) {
-              const cards = extractBonusCards(cardEl.textContent || '');
-              if (cards.length > 0) {
-                foundCard = cards[0];
-                source = 'klantenkaarten_specific_element';
-              }
-            }
+          // Try next sibling
+          let sibling = label.nextElementSibling;
+          if (sibling) {
+            const cards = extractBonusCards(sibling.textContent || '');
+            if (cards.length > 0) return { card: cards[0], src: 'table_block_sibling' };
           }
-          
-          if (!foundCard) {
-            const cards = extractBonusCards(text);
-            log(`Method 2: Visible text scan found ${cards.length} cards:`, cards.map(c => '****' + c.slice(-4)));
-            if (cards.length === 1) {
-              foundCard = cards[0];
-              source = 'klantenkaarten_visible_text';
-            } else if (cards.length >= 2 && cards.length <= 5) {
-              foundCard = cards[0];
-              source = 'klantenkaarten_first_of_few';
+          // Try next text node
+          let next = label.nextSibling;
+          while (next) {
+            if (next.nodeType === 3 && next.textContent?.trim()) { // text node
+              const cards = extractBonusCards(next.textContent);
+              if (cards.length > 0) return { card: cards[0], src: 'table_block_textnode' };
             }
+            if (next.nodeType === 1) { // element node
+              const cards = extractBonusCards(next.textContent || '');
+              if (cards.length > 0) return { card: cards[0], src: 'table_block_nextelem' };
+            }
+            next = next.nextSibling;
           }
         }
-      } catch (e) {
-        log('Method 2: error:', e.message);
       }
-    }
-    
-    // Method 3: Check current page DOM
-    if (!foundCard) {
-      log('Method 3: Checking current page DOM');
-      const selectors = [
+      
+      // Strategy B: Generic label search (span, td, div, etc.)
+      const allLabels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
+      for (const label of allLabels) {
+        const text = label.textContent?.trim().toLowerCase();
+        if (text === 'kaartnummer' || text === 'bonuskaartnummer' || text === 'card number') {
+          // Check parent container
+          const parent = label.closest('tr, div, dl, section, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
+          if (parent) {
+            const cards = extractBonusCards(parent.textContent || '');
+            if (cards.length > 0) return { card: cards[0], src: 'label_parent' };
+          }
+          // Check next sibling
+          let sibling = label.nextElementSibling;
+          if (sibling) {
+            const cards = extractBonusCards(sibling.textContent || '');
+            if (cards.length > 0) return { card: cards[0], src: 'label_sibling' };
+          }
+        }
+      }
+      
+      // Strategy C: Data-testid selectors
+      const testIdSelectors = [
         '[data-testid="bonus-card-number"]',
         '[data-testid*="bonuskaart"]',
+        '[data-testid*="bonus-card"]',
+        '[data-testid*="cardNumber"]',
         '.bonus-card-number',
         '[class*="bonusCardNumber"]',
         '[class*="bonus-card"] [class*="number"]'
       ];
-      
-      for (const selector of selectors) {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          const cards = extractBonusCards(el.textContent || '');
-          if (cards.length > 0) {
-            foundCard = cards[0];
-            source = `dom:${selector}`;
-            break;
+      for (const sel of testIdSelectors) {
+        try {
+          const el = doc.querySelector(sel);
+          if (el) {
+            const cards = extractBonusCards(el.textContent || '');
+            if (cards.length > 0) return { card: cards[0], src: `selector:${sel}` };
           }
+        } catch (e) { /* invalid selector */ }
+      }
+      
+      return null;
+    }
+
+    // ========================================================
+    // Method 1 (PRIMARY): Load /klantenkaarten in hidden iframe
+    // This is the most reliable method because the SPA renders
+    // the card number client-side — fetch() only gets the SSR shell.
+    // We also intercept fetch() calls the iframe makes to catch
+    // the API response that contains the card data.
+    // ========================================================
+    try {
+      statusEl.textContent = 'Bonuskaart ophalen...';
+      log('Method 1: Loading /klantenkaarten in hidden iframe + fetch intercept');
+      
+      // Set up a fetch interceptor to capture any card data from API calls
+      let interceptedCard = null;
+      const originalFetch = window.fetch;
+      
+      const result = await new Promise((resolve) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;top:-9999px;left:-9999px;';
+        iframe.src = 'https://www.ah.nl/klantenkaarten';
+        
+        let resolved = false;
+        let pollCount = 0;
+        const maxPolls = 20; // 20 * 500ms = 10 seconds max
+        
+        const cleanup = () => {
+          resolved = true;
+          if (pollInterval) clearInterval(pollInterval);
+          try { iframe.remove(); } catch (e) {}
+        };
+        
+        // Poll the iframe DOM for the card number
+        let pollInterval = null;
+        
+        iframe.onload = () => {
+          log('Method 1: Iframe loaded, starting DOM polling');
+          
+          // Try to intercept fetch calls inside the iframe
+          try {
+            const iframeWindow = iframe.contentWindow;
+            if (iframeWindow && iframeWindow.fetch) {
+              const iframeOriginalFetch = iframeWindow.fetch;
+              iframeWindow.fetch = function(...args) {
+                const promise = iframeOriginalFetch.apply(this, args);
+                promise.then(response => {
+                  try {
+                    const url = (typeof args[0] === 'string' ? args[0] : args[0]?.url) || '';
+                    // Intercept API calls that might return card data
+                    if (url.includes('member') || url.includes('loyalty') || url.includes('bonus') || 
+                        url.includes('card') || url.includes('kaart') || url.includes('klant')) {
+                      response.clone().text().then(text => {
+                        if (text.length < 100000) {
+                          const cards = extractBonusCards(text);
+                          if (cards.length >= 1 && cards.length <= 3 && !interceptedCard) {
+                            interceptedCard = cards[0];
+                            log(`Method 1: Intercepted card from iframe fetch: ${url.substring(0, 80)}`);
+                          }
+                        }
+                      }).catch(() => {});
+                    }
+                  } catch (e) {}
+                }).catch(() => {});
+                return promise;
+              };
+              log('Method 1: Installed iframe fetch interceptor');
+            }
+          } catch (e) {
+            log('Method 1: Cannot access iframe window (cross-origin?): ' + e.message);
+          }
+          
+          pollInterval = setInterval(() => {
+            pollCount++;
+            if (resolved) return;
+            
+            try {
+              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+              if (!iframeDoc) {
+                log('Method 1: Cannot access iframe document (cross-origin?)');
+                cleanup();
+                resolve(null);
+                return;
+              }
+              
+              // Try our scanDomForCard on the iframe document
+              const result = scanDomForCard(iframeDoc);
+              if (result) {
+                log(`Method 1: Found card via iframe DOM (${result.src}) after ${pollCount} polls`);
+                cleanup();
+                resolve(result);
+                return;
+              }
+              
+              // Also check if all visible text has a 13-digit number
+              const body = iframeDoc.body;
+              if (body) {
+                // Remove noise elements
+                const clone = body.cloneNode(true);
+                clone.querySelectorAll('script, style, svg, noscript').forEach(el => el.remove());
+                const visibleText = clone.textContent || '';
+                const cards = extractBonusCards(visibleText);
+                if (cards.length === 1) {
+                  log(`Method 1: Found single card in iframe visible text after ${pollCount} polls`);
+                  cleanup();
+                  resolve({ card: cards[0], src: 'iframe_visible_text' });
+                  return;
+                }
+              }
+              
+              if (pollCount >= maxPolls) {
+                // Last chance: check intercepted card from fetch calls
+                if (interceptedCard) {
+                  log(`Method 1: Using intercepted card after timeout`);
+                  cleanup();
+                  resolve({ card: interceptedCard, src: 'iframe_fetch_intercept' });
+                  return;
+                }
+                log(`Method 1: Timeout after ${pollCount} polls — no card found in iframe`);
+                cleanup();
+                resolve(null);
+              }
+            } catch (e) {
+              log(`Method 1: Poll error: ${e.message}`);
+              // Might be temporary — keep trying unless at max
+              if (pollCount >= maxPolls) {
+                cleanup();
+                resolve(null);
+              }
+            }
+          }, 500);
+        };
+        
+        iframe.onerror = () => {
+          log('Method 1: Iframe load error');
+          cleanup();
+          resolve(null);
+        };
+        
+        // Safety timeout
+        setTimeout(() => {
+          if (!resolved) {
+            if (interceptedCard) {
+              log('Method 1: Using intercepted card at safety timeout');
+              cleanup();
+              resolve({ card: interceptedCard, src: 'iframe_fetch_intercept_timeout' });
+            } else {
+              log('Method 1: Overall timeout');
+              cleanup();
+              resolve(null);
+            }
+          }
+        }, 12000);
+        
+        document.body.appendChild(iframe);
+      });
+      
+      if (result) {
+        foundCard = result.card;
+        source = `iframe:${result.src}`;
+      }
+    } catch (e) {
+      log('Method 1: Error:', e.message);
+    }
+
+    // ========================================================
+    // Method 1b: If iframe failed, try a tiny popup window
+    // (can't be blocked by X-Frame-Options/CSP frame-ancestors)
+    // ========================================================
+    if (!foundCard) {
+      try {
+        log('Method 1b: Trying popup window for /klantenkaarten');
+        statusEl.textContent = 'Bonuskaart ophalen (popup)...';
+        
+        const popup = window.open('https://www.ah.nl/klantenkaarten', '_blank', 
+          'width=1,height=1,left=-9999,top=-9999,menubar=no,toolbar=no,location=no,status=no');
+        
+        if (popup) {
+          const popResult = await new Promise((resolve) => {
+            let pollCount = 0;
+            const maxPolls = 20;
+            let resolved = false;
+            
+            const cleanup = () => {
+              resolved = true;
+              if (interval) clearInterval(interval);
+              try { popup.close(); } catch (e) {}
+            };
+            
+            const interval = setInterval(() => {
+              pollCount++;
+              if (resolved) return;
+              
+              try {
+                const popDoc = popup.document;
+                if (!popDoc || !popDoc.body) {
+                  if (pollCount >= maxPolls) { cleanup(); resolve(null); }
+                  return;
+                }
+                
+                const result = scanDomForCard(popDoc);
+                if (result) {
+                  log(`Method 1b: Found card via popup DOM (${result.src}) after ${pollCount} polls`);
+                  cleanup();
+                  resolve(result);
+                  return;
+                }
+                
+                // Visible text scan
+                const clone = popDoc.body.cloneNode(true);
+                clone.querySelectorAll('script, style, svg, noscript').forEach(el => el.remove());
+                const cards = extractBonusCards(clone.textContent || '');
+                if (cards.length === 1) {
+                  log(`Method 1b: Found card in popup visible text after ${pollCount} polls`);
+                  cleanup();
+                  resolve({ card: cards[0], src: 'popup_visible_text' });
+                  return;
+                }
+                
+                if (pollCount >= maxPolls) {
+                  log('Method 1b: Timeout');
+                  cleanup();
+                  resolve(null);
+                }
+              } catch (e) {
+                // Cross-origin errors if popup navigated away
+                if (pollCount >= maxPolls) { cleanup(); resolve(null); }
+              }
+            }, 500);
+            
+            setTimeout(() => {
+              if (!resolved) { cleanup(); resolve(null); }
+            }, 12000);
+          });
+          
+          if (popResult) {
+            foundCard = popResult.card;
+            source = `popup:${popResult.src}`;
+          }
+        } else {
+          log('Method 1b: Popup blocked');
         }
-        if (foundCard) break;
+      } catch (e) {
+        log('Method 1b: Error:', e.message);
+      }
+    }
+
+    // ========================================================
+    // Method 2: Try AH member REST API (JSON — most reliable if it works)
+    // ========================================================
+    if (!foundCard) {
+      try {
+        log('Method 2: Trying AH member REST API');
+        const apiRes = await fetch('https://www.ah.nl/service/rest/delegate?url=/mobile-services/member/v3/info', {
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (apiRes.ok) {
+          const json = await apiRes.json();
+          const cardNum = json?.bonusCard?.cardNumber || json?.bonusCardNumber 
+            || json?.loyaltyCard?.cardNumber || json?.member?.bonusCard?.cardNumber;
+          log('Method 2: API response keys:', Object.keys(json || {}));
+          if (cardNum && isValidBonusCard(cardNum.toString())) {
+            foundCard = cleanCardNumber(cardNum.toString());
+            source = 'member_api';
+          } else {
+            const jsonStr = JSON.stringify(json);
+            const cards = extractBonusCards(jsonStr);
+            if (cards.length === 1) {
+              foundCard = cards[0];
+              source = 'member_api_scan';
+            } else {
+              log(`Method 2: API scan found ${cards.length} candidates`);
+            }
+          }
+        } else {
+          log(`Method 2: API returned ${apiRes.status}`);
+        }
+      } catch (e) {
+        log('Method 2: API error:', e.message);
+      }
+    }
+
+    // ========================================================
+    // Method 3: Check current page DOM (user might be on /klantenkaarten already)
+    // ========================================================
+    if (!foundCard) {
+      log('Method 3: Scanning current page DOM');
+      const result = scanDomForCard(document);
+      if (result) {
+        foundCard = result.card;
+        source = `dom:${result.src}`;
       }
     }
     
