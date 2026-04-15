@@ -364,6 +364,11 @@ function Dashboard({ syncVersion }) {
             {t('total_spent')}
           </h3>
           <div className="value">€{(insights.total_spent || 0).toFixed(2)}</div>
+          {insights.priced_items != null && insights.total_purchases > 0 && insights.priced_items < insights.total_purchases && (
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              {t('price_coverage')} ({insights.priced_items}/{insights.total_purchases})
+            </div>
+          )}
         </div>
 
         {insights.total_co2_kg != null && (

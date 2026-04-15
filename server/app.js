@@ -1395,7 +1395,8 @@ app.get('/api/user/purchases/summary', requireAHEmail, async (req, res) => {
     res.json({
       total_purchases: purchases.length,
       unique_products: new Set(purchases.map(p => p.product_id)).size,
-      total_spent: purchases.reduce((sum, p) => sum + (p.price || 0), 0)
+      total_spent: purchases.reduce((sum, p) => sum + (Number(p.price) || 0) * (Number(p.quantity) || 1), 0),
+      priced_items: purchases.filter(p => p.price != null).length
     })
   } catch (err) {
     res.status(500).json({ error: 'fetch_failed', message: err.message })
@@ -1554,7 +1555,8 @@ app.get('/api/user/insights', requireAHEmail, async (req, res) => {
       best_purchase_obj: best ? { product_id: best.product_id, product_name: best.product_name, sustainability_score: best.sustainability_score, image_url: best.image_url || productsMap.get(best.product_id)?.image_url || null } : null,
       worst_purchase: worst?.product_name || null,
       worst_purchase_obj: worst ? { product_id: worst.product_id, product_name: worst.product_name, sustainability_score: worst.sustainability_score, image_url: worst.image_url || productsMap.get(worst.product_id)?.image_url || null } : null,
-      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
+      total_spent: purchasesWithScores.reduce((sum, p) => sum + (Number(p.price) || 0) * (Number(p.quantity) || 1), 0),
+      priced_items: purchasesWithScores.filter(p => p.price != null).length,
       avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
       total_co2_kg: totalCO2 ? Math.round(totalCO2 * 100) / 100 : null,
       total_weight_kg: totalWeightKg ? Math.round(totalWeightKg * 100) / 100 : null,
@@ -1992,7 +1994,8 @@ app.get('/api/bonus/:cardNumber/suggestions', async (req, res) => {
       best_purchase_obj: best ? { product_id: best.product_id, product_name: best.product_name, sustainability_score: best.sustainability_score, image_url: best.image_url || productsMap.get(best.product_id)?.image_url || null } : null,
       worst_purchase: worst?.product_name || null,
       worst_purchase_obj: worst ? { product_id: worst.product_id, product_name: worst.product_name, sustainability_score: worst.sustainability_score, image_url: worst.image_url || productsMap.get(worst.product_id)?.image_url || null } : null,
-      total_spent: purchasesWithScores.reduce((sum, p) => sum + (p.price || 0), 0),
+      total_spent: purchasesWithScores.reduce((sum, p) => sum + (Number(p.price) || 0) * (Number(p.quantity) || 1), 0),
+      priced_items: purchasesWithScores.filter(p => p.price != null).length,
       avg_co2_per_kg: avgCO2PerKg ? Math.round(avgCO2PerKg * 100) / 100 : null,
       total_co2_kg: totalCO2 ? Math.round(totalCO2 * 100) / 100 : null,
       total_weight_kg: totalWeightKg ? Math.round(totalWeightKg * 100) / 100 : null,
