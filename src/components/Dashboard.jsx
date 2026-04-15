@@ -484,19 +484,25 @@ function Dashboard({ syncVersion }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div
               onClick={() => insights.best_purchase_obj && setSelectedPurchase(insights.best_purchase_obj)}
-              style={{ cursor: insights.best_purchase_obj ? 'pointer' : 'default', padding: '0.75rem', borderRadius: '10px', transition: 'background 0.15s', ':hover': {} }}
+              style={{ cursor: insights.best_purchase_obj ? 'pointer' : 'default', padding: '0.75rem', borderRadius: '10px', transition: 'background 0.15s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
               onMouseEnter={e => { if (insights.best_purchase_obj) e.currentTarget.style.background = 'var(--bg-hover, rgba(255,255,255,0.05))' }}
               onMouseLeave={e => { e.currentTarget.style.background = '' }}
             >
-              <p style={styles.bestPurchase}>🌟 {t('best_purchase')}: {insights.best_purchase}</p>
+              {insights.best_purchase_obj?.image_url && (
+                <img src={insights.best_purchase_obj.image_url} alt="" style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '8px' }} onError={e => { e.target.style.display = 'none' }} />
+              )}
+              <p style={{ ...styles.bestPurchase, textAlign: 'center', margin: 0 }}>🌟 {t('best_purchase')}: {insights.best_purchase}</p>
             </div>
             <div
               onClick={() => insights.worst_purchase_obj && setSelectedPurchase(insights.worst_purchase_obj)}
-              style={{ cursor: insights.worst_purchase_obj ? 'pointer' : 'default', padding: '0.75rem', borderRadius: '10px', transition: 'background 0.15s' }}
+              style={{ cursor: insights.worst_purchase_obj ? 'pointer' : 'default', padding: '0.75rem', borderRadius: '10px', transition: 'background 0.15s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
               onMouseEnter={e => { if (insights.worst_purchase_obj) e.currentTarget.style.background = 'var(--bg-hover, rgba(255,255,255,0.05))' }}
               onMouseLeave={e => { e.currentTarget.style.background = '' }}
             >
-              <p style={styles.worstPurchase}>⚠️ {t('worst_purchase')}: {insights.worst_purchase}</p>
+              {insights.worst_purchase_obj?.image_url && (
+                <img src={insights.worst_purchase_obj.image_url} alt="" style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '8px' }} onError={e => { e.target.style.display = 'none' }} />
+              )}
+              <p style={{ ...styles.worstPurchase, textAlign: 'center', margin: 0 }}>⚠️ {t('worst_purchase')}: {insights.worst_purchase}</p>
             </div>
           </div>
         </div>
