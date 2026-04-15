@@ -2321,6 +2321,7 @@ function isDrinkProduct(product) {
  *   has_image — "true" to only return products with images
  *   category  — filter by AH product category substring
  *   type      — "food" | "drinks" (high-level filter)
+ *   badge     — "bio" | "vegan" | "vegetarian" | "plantaardig" (keurmerk filter)
  */
 app.get('/api/catalog/browse', async (req, res) => {
   try {
@@ -2338,6 +2339,7 @@ app.get('/api/catalog/browse', async (req, res) => {
     const hasImage = req.query.has_image === 'true'
     const typeFilter = req.query.type || null          // 'food' | 'drinks'
     const categoryFilter = req.query.category || null   // raw AH category substring
+    const badgeFilter = req.query.badge || null          // 'bio' | 'vegan' | 'vegetarian' | 'plantaardig'
 
     // Build the query
     const selectFields = enrichedColumnsAvailable
@@ -2370,10 +2372,21 @@ app.get('/api/catalog/browse', async (req, res) => {
       query = query.contains('categories', [`ah:${categoryFilter}`])
     }
 
+    // Badge / keurmerk filter (DB-level boolean filters)
+    if (badgeFilter === 'bio') {
+      query = query.eq('is_organic', true)
+    } else if (badgeFilter === 'vegan') {
+      query = query.eq('is_vegan', true)
+    } else if (badgeFilter === 'vegetarian') {
+      query = query.eq('is_vegetarian', true)
+    }
+    // 'plantaardig' is a JS filter — needs name + category check
+
     // We need to fetch more than `limit` when score-filtering, score-sorting,
     // or type-filtering (food/drinks) because those are computed in JS.
     const needsScoreProcessing = scoreMin != null || scoreMax != null || sort === 'score_asc' || sort === 'score_desc'
-    const needsJsProcessing = needsScoreProcessing || typeFilter != null
+    const needsPlantaardigFilter = badgeFilter === 'plantaardig'
+    const needsJsProcessing = needsScoreProcessing || typeFilter != null || needsPlantaardigFilter
     if (needsJsProcessing) {
       // Fetch a larger batch and filter/sort in JS
       query = query.range(0, 999)
@@ -2414,6 +2427,22 @@ app.get('/api/catalog/browse', async (req, res) => {
       filtered = filtered.filter(p => isDrinkProduct(p))
     } else if (typeFilter === 'food') {
       filtered = filtered.filter(p => !isDrinkProduct(p))
+    }
+
+    // Plantaardig filter: vegan OR name/categories contain "plantaardig" or "vleesvervangers"
+    if (badgeFilter === 'plantaardig') {
+      filtered = filtered.filter(p => {
+        if (p.is_vegan) return true
+        const nameLower = (p.name || '').toLowerCase()
+        if (nameLower.includes('plantaardig')) return true
+        if (Array.isArray(p.categories)) {
+          for (const cat of p.categories) {
+            const cl = cat.toLowerCase()
+            if (cl.includes('plantaardig') || cl.includes('vleesvervangers')) return true
+          }
+        }
+        return false
+      })
     }
     if (scoreMin != null) {
       filtered = filtered.filter(p => p.sustainability_score >= scoreMin)

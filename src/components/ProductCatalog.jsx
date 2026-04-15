@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf, ShoppingBag, ArrowUpDown, Grid3X3, List, UtensilsCrossed, Coffee } from 'lucide-react'
+import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf, ShoppingBag, ArrowUpDown, Grid3X3, List, UtensilsCrossed, Coffee, Sprout, TreePine, Handshake } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 import { variantScoreClass } from '../lib/scoreUtils.js'
@@ -118,6 +118,14 @@ const TYPE_PRESETS = [
   { value: 'drinks', labelKey: 'catalog_type_drinks', icon: Coffee },
 ]
 
+/* ----------- badge / keurmerk filter presets ----------- */
+const BADGE_PRESETS = [
+  { value: null, labelKey: 'catalog_badge_all', icon: null },
+  { value: 'bio', labelKey: 'catalog_badge_bio', icon: TreePine, color: '#16a34a' },
+  { value: 'vegan', labelKey: 'catalog_badge_vegan', icon: Sprout, color: '#7c3aed' },
+  { value: 'plantaardig', labelKey: 'catalog_badge_plantaardig', icon: Leaf, color: '#059669' },
+]
+
 /* =========================================================================
    MAIN COMPONENT
    ========================================================================= */
@@ -131,6 +139,7 @@ function ProductCatalog() {
   const [sort, setSort] = useState('score_desc')
   const [scoreFilter, setScoreFilter] = useState(0) // index into SCORE_PRESETS
   const [typeFilter, setTypeFilter] = useState(0)   // index into TYPE_PRESETS
+  const [badgeFilter, setBadgeFilter] = useState(0)  // index into BADGE_PRESETS
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
 
@@ -153,6 +162,7 @@ function ProductCatalog() {
   const buildUrl = useCallback((pageNum, query) => {
     const preset = SCORE_PRESETS[scoreFilter]
     const typePreset = TYPE_PRESETS[typeFilter]
+    const badgePreset = BADGE_PRESETS[badgeFilter]
     const params = new URLSearchParams()
     params.set('page', pageNum)
     params.set('limit', '24')
@@ -162,8 +172,9 @@ function ProductCatalog() {
     if (preset.min != null) params.set('score_min', preset.min)
     if (preset.max != null) params.set('score_max', preset.max)
     if (typePreset.value) params.set('type', typePreset.value)
+    if (badgePreset.value) params.set('badge', badgePreset.value)
     return `/api/catalog/browse?${params.toString()}`
-  }, [sort, scoreFilter, typeFilter])
+  }, [sort, scoreFilter, typeFilter, badgeFilter])
 
   // Fetch products
   const fetchProducts = useCallback(async (pageNum = 1, query = appliedQuery) => {
@@ -188,7 +199,7 @@ function ProductCatalog() {
   // Initial load & when filters change
   useEffect(() => {
     fetchProducts(1, appliedQuery)
-  }, [sort, scoreFilter, typeFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sort, scoreFilter, typeFilter, badgeFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
   const handleSearchChange = useCallback((e) => {
@@ -387,6 +398,36 @@ function ProductCatalog() {
               >
                 {Icon && <Icon size={13} />}
                 {t(tp.labelKey) || tp.labelKey}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Badge / keurmerk filter pills */}
+        <div style={{
+          display: 'flex', gap: '0.3rem', borderLeft: '1px solid var(--border)',
+          paddingLeft: '0.5rem', marginLeft: '0.15rem'
+        }}>
+          {BADGE_PRESETS.map((bp, idx) => {
+            const active = badgeFilter === idx
+            const Icon = bp.icon
+            const activeColor = bp.color || 'var(--primary, #3b82f6)'
+            return (
+              <button
+                key={idx}
+                onClick={() => setBadgeFilter(idx)}
+                style={{
+                  padding: '0.35rem 0.65rem', borderRadius: '8px', border: '1px solid',
+                  borderColor: active ? activeColor : 'var(--border)',
+                  background: active ? `${activeColor}1a` : 'var(--bg-card)',
+                  color: active ? activeColor : 'var(--text-muted)',
+                  fontSize: '0.8rem', fontWeight: active ? 700 : 500,
+                  cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem'
+                }}
+              >
+                {Icon && <Icon size={13} />}
+                {t(bp.labelKey) || bp.labelKey}
               </button>
             )
           })}
