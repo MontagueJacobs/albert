@@ -541,7 +541,7 @@ function ProductDetailModal({ purchase, onClose }) {
                   background: 'rgba(34, 197, 94, 0.2)', 
                   color: '#22c55e' 
                 }}>
-                  🌿 Bio
+                  🌿 Bio (−45% CO₂)
                 </span>
               )}
               
@@ -639,9 +639,9 @@ function ProductDetailModal({ purchase, onClose }) {
                     <div style={{ fontWeight: '500' }}>{translateCategory(details.co2CategoryLabel || details.co2Category, lang)}</div>
                     {/* Total CO₂ for this product (primary display) */}
                     {details.weightGrams && (
-                      <div style={{ fontWeight: '600', fontSize: '0.95rem', marginTop: '2px' }}>
+                      <div style={{ fontWeight: '700', fontSize: '1.15rem', marginTop: '4px' }}>
                         {(details.co2PerKg * details.weightGrams / 1000).toFixed(2)} kg CO₂
-                        <span style={{ fontWeight: '400', fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+                        <span style={{ fontWeight: '400', fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
                           {lang === 'en' ? 'for this product' : 'voor dit product'}
                           {details.weightSource === 'category_default' || details.weightSource === 'generic_default' || details.weightSource === 'per_stuk_estimate'
                             ? ` (${lang === 'en' ? 'est.' : 'gesch.'} ${details.weightGrams}g)`
@@ -653,6 +653,19 @@ function ProductDetailModal({ purchase, onClose }) {
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
                       {details.co2PerKg.toFixed(1)} kg CO₂ per kg
                     </div>
+                    {/* Bio/organic CO₂ reduction notice */}
+                    {details.co2Method && details.co2Method.includes('organic') && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        marginTop: '6px', padding: '0.3rem 0.55rem',
+                        background: 'rgba(34, 197, 94, 0.12)',
+                        border: '1px solid rgba(34, 197, 94, 0.25)',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem', fontWeight: 600, color: '#22c55e'
+                      }}>
+                        🌿 {lang === 'en' ? 'Bio: −45% CO₂ applied' : 'Bio: −45% CO₂ toegepast'}
+                      </div>
+                    )}
                     {/* Source + confidence in one line */}
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '0.35rem',
@@ -749,9 +762,10 @@ function ProductDetailModal({ purchase, onClose }) {
                                 {ing.categoryConfidence != null && (
                                   <div style={{
                                     fontSize: '0.65rem',
-                                    color: ing.categoryConfidence >= 70 ? '#22c55e'
-                                      : ing.categoryConfidence >= 55 ? '#eab308'
-                                      : '#ef4444'
+                                    fontWeight: 600,
+                                    color: ing.categoryConfidence >= 70 ? '#15803d'
+                                      : ing.categoryConfidence >= 55 ? '#a16207'
+                                      : '#b91c1c'
                                   }}>
                                     {ing.categoryConfidence}% {lang === 'en' ? 'conf.' : 'betr.'}
                                   </div>
