@@ -380,6 +380,13 @@ function ProductDetailModal({ purchase, onClose }) {
   const getScoreBg = (score) => variantScoreBgSubtle(websiteVariant, score)
   const getScoreLabel = (score) => variantScoreLabel(websiteVariant, score)
 
+  // Lock background scroll while modal is open
+  useEffect(() => {
+    const orig = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = orig }
+  }, [])
+
   useEffect(() => {
     async function fetchDetails() {
       if (!purchase) return

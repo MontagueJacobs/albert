@@ -130,18 +130,11 @@ export default function ExperimentReflection({ sessionId, onComplete }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
-  // At least 1 open question must be answered
-  const hasAnyAnswer = QUESTIONS.some(q => responses[q.id] && responses[q.id].trim().length > 0)
-
   const handleTextChange = (questionId, value) => {
     setResponses(prev => ({ ...prev, [questionId]: value }))
   }
 
   const handleSubmit = async () => {
-    if (!hasAnyAnswer) {
-      setError(isNl ? 'Beantwoord ten minste één vraag.' : 'Please answer at least one question.')
-      return
-    }
 
     try {
       setSubmitting(true)
@@ -169,8 +162,8 @@ export default function ExperimentReflection({ sessionId, onComplete }) {
         </h2>
         <p style={styles.subtitle}>
           {isNl 
-            ? 'Deel je ervaring met het experiment.'
-            : 'Share your experience with the experiment.'}
+            ? 'Deel je ervaring met het experiment. (Optioneel)'
+            : 'Share your experience with the experiment. (Optional)'}
         </p>
       </div>
 
@@ -201,10 +194,10 @@ export default function ExperimentReflection({ sessionId, onComplete }) {
       <button
         style={{
           ...styles.submitBtn,
-          ...(!hasAnyAnswer || submitting ? styles.submitBtnDisabled : {})
+          ...(submitting ? styles.submitBtnDisabled : {})
         }}
         onClick={handleSubmit}
-        disabled={!hasAnyAnswer || submitting}
+        disabled={submitting}
       >
         {submitting ? (
           <>
