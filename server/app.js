@@ -3758,70 +3758,43 @@ app.post('/api/origin-scraper/trigger', (req, res) => {
 // Start or resume an experiment session
 app.post('/api/experiment/start', async (req, res) => {
   try {
-    const { bonus_card, anonymous_id } = req.body
-    const identifier = bonus_card || anonymous_id
-    if (!identifier) {
-      return res.status(400).json({ error: 'bonus_card or anonymous_id is required' })
+    const { anonymous_id } = req.body
+    if (!anonymous_id) {
+      return res.status(400).json({ error: 'anonymous_id is required' })
     }
 
-    // Check for existing active (non-complete) session by bonus_card or anonymous_id
+    // Look up existing active session by anonymous_id ONLY.
+    // bonus_card is NOT used for session lookup — it gets linked
+    // via /scrape-complete after the bookmarklet extracts it fresh.
+    // This prevents session cross-contamination on shared devices.
     let existing = null
-    if (bonus_card) {
-      const { data } = await supabase
-        .from('experiment_sessions')
-        .select('*')
-        .eq('bonus_card', bonus_card)
-        .neq('current_step', 'complete')
-        .order('started_at', { ascending: false })
-        .limit(1)
-      if (data?.length) existing = data[0]
-    }
-    if (!existing && anonymous_id) {
-      const { data } = await supabase
-        .from('experiment_sessions')
-        .select('*')
-        .eq('anonymous_id', anonymous_id)
-        .neq('current_step', 'complete')
-        .order('started_at', { ascending: false })
-        .limit(1)
-      if (data?.length) existing = data[0]
-    }
+    const { data } = await supabase
+      .from('experiment_sessions')
+      .select('*')
+      .eq('anonymous_id', anonymous_id)
+      .neq('current_step', 'complete')
+      .order('started_at', { ascending: false })
+      .limit(1)
+    if (data?.length) existing = data[0]
 
     if (existing) {
-      // If we now have a bonus card and the session didn't, link it
-      if (bonus_card && !existing.bonus_card) {
-        await supabase
-          .from('experiment_sessions')
-          .update({ bonus_card, updated_at: new Date().toISOString() })
-          .eq('id', existing.id)
-        existing.bonus_card = bonus_card
-      }
-      // If we now have an anonymous_id and the session didn't, link it
-      if (anonymous_id && !existing.anonymous_id) {
-        await supabase
-          .from('experiment_sessions')
-          .update({ anonymous_id, updated_at: new Date().toISOString() })
-          .eq('id', existing.id)
-        existing.anonymous_id = anonymous_id
-      }
       return res.json({ session: existing, resumed: true })
     }
 
     // Create new session with A/B assignment
-    const ab_variant = assignABVariant(anonymous_id || bonus_card)
+    const ab_variant = assignABVariant(anonymous_id)
     
     const insertData = {
       ab_variant,
       current_step: 'consent',
-      consent_given: false
+      consent_given: false,
+      anonymous_id
     }
     // NOTE: bonus_card is intentionally NOT set on new sessions.
     // It gets attached during scrape-complete with the card freshly extracted
-    // from the user's actual AH session. This prevents localStorage contamination
-    // when consecutive users share the same browser (e.g. in a lab).
-    if (anonymous_id) insertData.anonymous_id = anonymous_id
+    // from the user's actual AH session.
 
-    const { data, error } = await supabase
+    const { data: newSession, error } = await supabase
       .from('experiment_sessions')
       .insert(insertData)
       .select()
@@ -3832,7 +3805,7 @@ app.post('/api/experiment/start', async (req, res) => {
       return res.status(500).json({ error: error.message })
     }
 
-    res.json({ session: data, resumed: false })
+    res.json({ session: newSession, resumed: false })
   } catch (e) {
     console.error('[experiment/start] Exception:', e)
     res.status(500).json({ error: e.message })

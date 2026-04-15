@@ -359,10 +359,11 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     }
   }
 
-  // Start or resume session — works with or without bonus card
+  // Start or resume session — identified by anonymous_id only.
+  // Bonus card is linked later via scrape-complete (not used for lookup).
   useEffect(() => {
     startOrResume()
-  }, [bonusCardNumber])
+  }, []) // mount-only — NOT on bonusCardNumber changes
 
   // Auto-advance past scrape step when redirected back from bookmarklet
   const autoAdvancedRef = useRef(false)
@@ -393,10 +394,11 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     try {
       setLoading(true)
       setError(null)
+      // Session lookup uses ONLY anonymous_id.
+      // bonus_card is never sent here — it gets linked via scrape-complete
+      // after the bookmarklet freshly extracts it from the user's AH session.
+      // This prevents cross-contamination when users share a browser.
       const body = { anonymous_id: getAnonymousId() }
-      if (bonusCardNumber) {
-        body.bonus_card = bonusCardNumber
-      }
       const res = await fetch('/api/experiment/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
