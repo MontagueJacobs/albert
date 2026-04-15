@@ -3931,7 +3931,7 @@ app.post('/api/experiment/:sessionId/scrape-complete', async (req, res) => {
     const { bonus_card } = req.body || {}
 
     const updateData = { 
-      current_step: 'pre_quiz_general',
+      current_step: 'pre_questionnaire',
       updated_at: new Date().toISOString()
     }
     // Link bonus card to session if provided and not yet set
@@ -4194,7 +4194,7 @@ app.post('/api/experiment/:sessionId/pre-questionnaire', async (req, res) => {
       .from('experiment_sessions')
       .update({ 
         pre_questionnaire: responses,
-        current_step: 'learning_dashboard',
+        current_step: 'pre_quiz_general',
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)
