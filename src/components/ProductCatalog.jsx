@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf, ShoppingBag, ArrowUpDown, Grid3X3, List } from 'lucide-react'
+import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf, ShoppingBag, ArrowUpDown, Grid3X3, List, UtensilsCrossed, Coffee } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 import { variantScoreClass } from '../lib/scoreUtils.js'
@@ -111,6 +111,13 @@ const SCORE_PRESETS = [
   { min: 1, max: 3, labelKey: 'catalog_filter_low', color: '#ef4444' },
 ]
 
+/* ----------- type filter presets ----------- */
+const TYPE_PRESETS = [
+  { value: null, labelKey: 'catalog_type_all', icon: null },
+  { value: 'food', labelKey: 'catalog_type_food', icon: UtensilsCrossed },
+  { value: 'drinks', labelKey: 'catalog_type_drinks', icon: Coffee },
+]
+
 /* =========================================================================
    MAIN COMPONENT
    ========================================================================= */
@@ -123,6 +130,7 @@ function ProductCatalog() {
   const [appliedQuery, setAppliedQuery] = useState('')
   const [sort, setSort] = useState('score_desc')
   const [scoreFilter, setScoreFilter] = useState(0) // index into SCORE_PRESETS
+  const [typeFilter, setTypeFilter] = useState(0)   // index into TYPE_PRESETS
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
 
@@ -144,6 +152,7 @@ function ProductCatalog() {
   // Build endpoint URL
   const buildUrl = useCallback((pageNum, query) => {
     const preset = SCORE_PRESETS[scoreFilter]
+    const typePreset = TYPE_PRESETS[typeFilter]
     const params = new URLSearchParams()
     params.set('page', pageNum)
     params.set('limit', '24')
@@ -152,8 +161,9 @@ function ProductCatalog() {
     if (query) params.set('q', query)
     if (preset.min != null) params.set('score_min', preset.min)
     if (preset.max != null) params.set('score_max', preset.max)
+    if (typePreset.value) params.set('type', typePreset.value)
     return `/api/catalog/browse?${params.toString()}`
-  }, [sort, scoreFilter])
+  }, [sort, scoreFilter, typeFilter])
 
   // Fetch products
   const fetchProducts = useCallback(async (pageNum = 1, query = appliedQuery) => {
@@ -178,7 +188,7 @@ function ProductCatalog() {
   // Initial load & when filters change
   useEffect(() => {
     fetchProducts(1, appliedQuery)
-  }, [sort, scoreFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sort, scoreFilter, typeFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
   const handleSearchChange = useCallback((e) => {
@@ -351,6 +361,35 @@ function ProductCatalog() {
               {t(preset.labelKey) || preset.labelKey}
             </button>
           ))}
+        </div>
+
+        {/* Type filter pills (Food / Drinks) */}
+        <div style={{
+          display: 'flex', gap: '0.3rem', borderLeft: '1px solid var(--border)',
+          paddingLeft: '0.5rem', marginLeft: '0.15rem'
+        }}>
+          {TYPE_PRESETS.map((tp, idx) => {
+            const active = typeFilter === idx
+            const Icon = tp.icon
+            return (
+              <button
+                key={idx}
+                onClick={() => setTypeFilter(idx)}
+                style={{
+                  padding: '0.35rem 0.65rem', borderRadius: '8px', border: '1px solid',
+                  borderColor: active ? 'var(--primary, #3b82f6)' : 'var(--border)',
+                  background: active ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card)',
+                  color: active ? 'var(--primary, #3b82f6)' : 'var(--text-muted)',
+                  fontSize: '0.8rem', fontWeight: active ? 700 : 500,
+                  cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem'
+                }}
+              >
+                {Icon && <Icon size={13} />}
+                {t(tp.labelKey) || tp.labelKey}
+              </button>
+            )
+          })}
         </div>
 
         {/* Sort dropdown */}

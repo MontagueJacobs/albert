@@ -2244,19 +2244,64 @@ app.get('/api/products/search', async (req, res) => {
 // FULL CATALOG BROWSE ENDPOINT
 // ============================================================================
 
+/* --- In-memory product score cache (persists for server lifetime) --- */
+const _scoreCache = new Map()   // key: productId → { score, co2Category, rating }
+const SCORE_CACHE_MAX = 20000
+
+function getCachedScore(product) {
+  if (_scoreCache.has(product.id)) return _scoreCache.get(product.id)
+  const evalResult = enrichedColumnsAvailable
+    ? evaluateProductWithRecord(product.name, product)
+    : evaluateProduct(product.name)
+  const entry = {
+    score: evalResult.score ?? null,
+    co2Category: evalResult.co2Category || null,
+    rating: evalResult.rating || null
+  }
+  if (_scoreCache.size < SCORE_CACHE_MAX) _scoreCache.set(product.id, entry)
+  return entry
+}
+
+/* --- Drink categories (AH taxonomy values) --- */
+const DRINK_CATEGORIES = [
+  'frisdrank', 'sappen', 'water', 'sap',
+  'bier', 'wijn', 'aperitieven', 'sterke drank', 'alcohol',
+  'koffie', 'thee',
+  'energy', 'sportdrank', 'limonade', 'siroop'
+]
+
+function isDrinkProduct(product) {
+  // Check categories array (stored as ah:MainCategory, ah_sub:SubCategory)
+  if (Array.isArray(product.categories)) {
+    for (const cat of product.categories) {
+      const lower = cat.toLowerCase()
+      if (DRINK_CATEGORIES.some(d => lower.includes(d))) return true
+    }
+  }
+  // Fallback: check product name for common drink keywords
+  const name = (product.name || '').toLowerCase()
+  const drinkWords = ['cola', 'fanta', 'sprite', 'pepsi', 'limonade', 'ice tea',
+    'energy drink', 'sportdrank', 'tonic', 'bier', 'wijn', 'whisky', 'vodka',
+    'rum ', 'gin ', 'cognac', 'jenever', 'likeur', 'prosecco', 'champagne',
+    'cava', 'sap ', 'jus ', 'smoothie', 'koffie', 'coffee', 'thee ', 'tea ',
+    'espresso', 'cappuccino', 'latte', 'siroop', 'sirop']
+  return drinkWords.some(w => name.includes(w))
+}
+
 /**
  * GET /api/catalog/browse
  *
  * Paginated, filterable product catalog.
  * Query params:
- *   q        — text search (ilike on normalized_name)
- *   page     — 1-based page number (default 1)
- *   limit    — items per page (default 24, max 100)
- *   sort     — "name" | "score_asc" | "score_desc" | "price_asc" | "price_desc" (default "name")
+ *   q         — text search (ilike on normalized_name)
+ *   page      — 1-based page number (default 1)
+ *   limit     — items per page (default 24, max 100)
+ *   sort      — "name" | "score_asc" | "score_desc" | "price_asc" | "price_desc" (default "name")
  *   score_min — minimum sustainability score (1-10, 10 = best)
  *   score_max — maximum sustainability score (1-10, 1 = worst)
  *   has_image — "true" to only return products with images
  *   category  — filter by AH product category substring
+ *   type      — "food" | "drinks" (high-level filter)
  */
 app.get('/api/catalog/browse', async (req, res) => {
   try {
@@ -2272,6 +2317,8 @@ app.get('/api/catalog/browse', async (req, res) => {
     const scoreMin = req.query.score_min != null ? parseInt(req.query.score_min) : null
     const scoreMax = req.query.score_max != null ? parseInt(req.query.score_max) : null
     const hasImage = req.query.has_image === 'true'
+    const typeFilter = req.query.type || null          // 'food' | 'drinks'
+    const categoryFilter = req.query.category || null   // raw AH category substring
 
     // Build the query
     const selectFields = enrichedColumnsAvailable
@@ -2299,10 +2346,16 @@ app.get('/api/catalog/browse', async (req, res) => {
       query = query.order('name', { ascending: true })
     }
 
-    // We need to fetch more than `limit` when score-filtering or score-sorting
-    // because scores are computed in JS. For score filters we fetch a bigger batch.
+    // Category filter (AH taxonomy substring match via Supabase cs/ilike on categories array)
+    if (categoryFilter) {
+      query = query.contains('categories', [`ah:${categoryFilter}`])
+    }
+
+    // We need to fetch more than `limit` when score-filtering, score-sorting,
+    // or type-filtering (food/drinks) because those are computed in JS.
     const needsScoreProcessing = scoreMin != null || scoreMax != null || sort === 'score_asc' || sort === 'score_desc'
-    if (needsScoreProcessing) {
+    const needsJsProcessing = needsScoreProcessing || typeFilter != null
+    if (needsJsProcessing) {
       // Fetch a larger batch and filter/sort in JS
       query = query.range(0, 999)
     } else {
@@ -2313,12 +2366,9 @@ app.get('/api/catalog/browse', async (req, res) => {
 
     if (error) throw error
 
-    // Add sustainability scores
+    // Add sustainability scores (using cache for speed)
     const withScores = (data || []).map(p => {
-      const evalResult = enrichedColumnsAvailable
-        ? evaluateProductWithRecord(p.name, p)
-        : evaluateProduct(p.name)
-      const score = evalResult.score != null ? evalResult.score : null
+      const cached = getCachedScore(p)
       return {
         id: p.id,
         name: p.name,
@@ -2333,14 +2383,19 @@ app.get('/api/catalog/browse', async (req, res) => {
         nutri_score: p.nutri_score || null,
         origin_country: p.origin_country || null,
         categories: p.categories || [],
-        sustainability_score: score,
-        co2_category: evalResult.co2Category || null,
-        rating: evalResult.rating || null
+        sustainability_score: cached.score,
+        co2_category: cached.co2Category,
+        rating: cached.rating
       }
     })
 
-    // Apply score filters in JS
+    // Apply type filter (food / drinks) in JS
     let filtered = withScores
+    if (typeFilter === 'drinks') {
+      filtered = filtered.filter(p => isDrinkProduct(p))
+    } else if (typeFilter === 'food') {
+      filtered = filtered.filter(p => !isDrinkProduct(p))
+    }
     if (scoreMin != null) {
       filtered = filtered.filter(p => p.sustainability_score >= scoreMin)
     }
@@ -2357,7 +2412,7 @@ app.get('/api/catalog/browse', async (req, res) => {
 
     // Paginate in JS if we fetched a bigger batch
     let results, totalCount
-    if (needsScoreProcessing) {
+    if (needsJsProcessing) {
       totalCount = filtered.length
       results = filtered.slice(offset, offset + limit)
     } else {
