@@ -18,6 +18,7 @@
  *
  * Ingredient enrichment (uses Playwright-based product_detail_scraper.py):
  *   --enrich                      Enrich products missing ingredients (standalone)
+ *   --enrich-images                Rescrape products missing images
  *   --enrich-after                Auto-enrich after running the API scrape
  *   --enrich-limit 50             Max products to enrich (default: 20)
  *   --enrich-delay 5              Seconds between requests (default: 3)
@@ -637,6 +638,146 @@ function scrapeProductDetailsBatch(urls, { headless = true, delay = 3, verbose =
 }
 
 /**
+ * Rescrape products in Supabase that are missing image_url.
+ * Uses the same Playwright batch scraper — only updates image_url and price.
+ *
+ * @param {object} supabase  - Supabase client
+ * @param {object} opts      - { limit, delay, source, verbose, headless }
+ */
+async function enrichImages(supabase, opts = {}) {
+  const {
+    limit = 20,
+    delay = 3,
+    source = null,
+    verbose = false,
+    headless = true,
+  } = opts
+
+  console.log('╔══════════════════════════════════════════════════════╗')
+  console.log('║       Image Enrichment                             ║')
+  console.log('╚══════════════════════════════════════════════════════╝')
+  console.log()
+
+  // Query products missing image_url (paginate to bypass Supabase 1000-row limit)
+  const PAGE = 1000
+  let products = []
+
+  for (let offset = 0; products.length < limit; offset += PAGE) {
+    const batchSize = Math.min(PAGE, limit - products.length)
+    let query = supabase
+      .from('products')
+      .select('id, name, url')
+      .is('image_url', null)
+
+    if (source) {
+      query = query.eq('source', source)
+    }
+
+    query = query.order('updated_at', { ascending: false }).range(offset, offset + batchSize - 1)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('  ✗ Supabase query error:', error.message)
+      return
+    }
+
+    if (!data || data.length === 0) break
+    products.push(...data)
+    if (data.length < batchSize) break
+  }
+
+  if (!products || products.length === 0) {
+    console.log('  ✓ No products missing images!')
+    return
+  }
+
+  // Build URL list and index by URL for later matching
+  const urlToProduct = new Map()
+  const urls = []
+  for (const p of products) {
+    const productUrl = p.url || `https://www.ah.nl/producten/product/${p.id}`
+    urls.push(productUrl)
+    urlToProduct.set(productUrl, p)
+  }
+
+  console.log(`  Found ${products.length} products missing images (limit: ${limit})`)
+  console.log(`  Delay between requests: ${delay}s`)
+  console.log(`  Browser: ${headless ? 'headless' : 'VISIBLE — log in when the browser opens'}`)
+  console.log(`  Python: ${PYTHON_CMD}`)
+  console.log()
+
+  for (let i = 0; i < products.length; i++) {
+    console.log(`  ${(i + 1).toString().padStart(3)}. ${products[i].name}`)
+  }
+  console.log()
+
+  let success = 0, failed = 0, skipped = 0
+
+  const onResult = async (detail) => {
+    const p = urlToProduct.get(detail.url)
+    if (!p) {
+      console.log(`    ? No matching product for URL: ${detail.url}`)
+      return
+    }
+
+    if (!detail.success) {
+      console.log(`  ✗ ${p.name}: Failed${detail.error ? ' — ' + detail.error : ''}`)
+      failed++
+      return
+    }
+
+    const updateData = {}
+    if (detail.image_url) updateData.image_url = detail.image_url
+    if (detail.price != null) updateData.price = detail.price
+    // Also opportunistically save any other data the scraper found
+    if (detail.is_vegan != null) updateData.is_vegan = detail.is_vegan
+    if (detail.is_vegetarian != null) updateData.is_vegetarian = detail.is_vegetarian
+    if (detail.is_organic != null) updateData.is_organic = detail.is_organic
+    if (detail.is_fairtrade != null) updateData.is_fairtrade = detail.is_fairtrade
+    if (detail.nutri_score) updateData.nutri_score = detail.nutri_score
+    if (detail.origin_country) updateData.origin_country = detail.origin_country
+    if (detail.origin_by_month) updateData.origin_by_month = detail.origin_by_month
+    if (detail.brand) updateData.brand = detail.brand
+
+    if (!detail.image_url) {
+      console.log(`  ~ ${p.name}: no image found on page`)
+      skipped++
+      return
+    }
+
+    updateData.updated_at = new Date().toISOString()
+
+    const { error: updateError } = await supabase
+      .from('products')
+      .update(updateData)
+      .eq('id', p.id)
+
+    if (updateError) {
+      console.log(`  ✗ ${p.name}: DB error — ${updateError.message}`)
+      failed++
+    } else {
+      console.log(`  ✓ ${p.name}: image saved`)
+      success++
+    }
+  }
+
+  const streamed = await scrapeProductDetailsBatch(urls, { headless, delay, verbose, onResult })
+
+  if (streamed < products.length) {
+    console.log(`  ⚠ ${products.length - streamed} products did not produce a result (scraper interrupted?)`)
+  }
+
+  console.log()
+  console.log(`  ── Image enrichment summary ──`)
+  console.log(`     Images found: ${success}`)
+  console.log(`     No image:     ${skipped}`)
+  console.log(`     Failed:       ${failed}`)
+  console.log(`     Streamed:     ${streamed} / ${products.length}`)
+  console.log(`     ★ All saved results are already in Supabase`)
+}
+
+/**
  * Enrich products in Supabase that are missing ingredient data.
  * Uses the Playwright-based product_detail_scraper.py in batch mode —
  * one browser session for all products (no restart between pages).
@@ -763,6 +904,8 @@ async function enrichProducts(supabase, opts = {}) {
       if (detail.origin_by_month) updateData.origin_by_month = detail.origin_by_month
       if (detail.brand) updateData.brand = detail.brand
       if (detail.allergens && detail.allergens.length) updateData.allergens = detail.allergens
+      if (detail.image_url) updateData.image_url = detail.image_url
+      if (detail.price != null) updateData.price = detail.price
 
       const hasIngredients = !!detail.ingredients
       updateData.details_scrape_status = hasIngredients ? 'success' : 'incomplete'
@@ -823,6 +966,7 @@ function parseArgs() {
     list: false,
     // Enrichment options
     enrich: false,          // standalone enrichment mode
+    enrichImages: false,     // rescrape products missing images
     enrichAfter: false,     // auto-enrich after scrape
     enrichLimit: 20,        // max products to enrich
     enrichDelay: 3,         // seconds between enrichment requests
@@ -884,6 +1028,9 @@ function parseArgs() {
       case '--enrich':
         opts.enrich = true
         break
+      case '--enrich-images':
+        opts.enrichImages = true
+        break
       case '--enrich-after':
         opts.enrichAfter = true
         break
@@ -921,6 +1068,7 @@ Custom categories:
 
 Ingredient enrichment (uses Playwright browser scraper):
   --enrich            Enrich products missing ingredients (standalone, no API scrape)
+  --enrich-images     Rescrape products missing images (standalone)
   --enrich-after      Auto-enrich after running the API scrape
   --enrich-limit <n>  Max products to enrich per run (default: 20)
   --enrich-delay <s>  Seconds between enrichment requests (default: 3)
@@ -942,6 +1090,7 @@ Examples:
   node server/ah_category_scraper.js --all-food --dry-run      # All food, no DB write
   node server/ah_category_scraper.js --all                     # Everything
   node server/ah_category_scraper.js --enrich --enrich-limit 50  # Enrich 50 products
+  node server/ah_category_scraper.js --enrich-images --enrich-limit 100  # Rescrape 100 missing images
   node server/ah_category_scraper.js --preset zuivel --enrich-after  # Scrape + enrich
 `)
         process.exit(0)
@@ -994,20 +1143,30 @@ async function main() {
   }
 
   // ── Standalone enrichment mode ────────────────────────────────────
-  if (opts.enrich) {
+  if (opts.enrich || opts.enrichImages) {
     const supabase = connectSupabase()
     if (!supabase) {
       console.error('Missing Supabase credentials. Cannot enrich.')
       process.exit(1)
     }
-    await enrichProducts(supabase, {
-      limit: opts.enrichLimit,
-      delay: opts.enrichDelay,
-      source: opts.source || null,
-      verbose: opts.verbose,
-      force: opts.enrichForce,
-      headless: opts.headless,
-    })
+    if (opts.enrichImages) {
+      await enrichImages(supabase, {
+        limit: opts.enrichLimit,
+        delay: opts.enrichDelay,
+        source: opts.source || null,
+        verbose: opts.verbose,
+        headless: opts.headless,
+      })
+    } else {
+      await enrichProducts(supabase, {
+        limit: opts.enrichLimit,
+        delay: opts.enrichDelay,
+        source: opts.source || null,
+        verbose: opts.verbose,
+        force: opts.enrichForce,
+        headless: opts.headless,
+      })
+    }
     console.log('\n── Done! ──────────────────────────────────────────────\n')
     return
   }

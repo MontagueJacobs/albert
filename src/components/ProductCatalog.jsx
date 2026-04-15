@@ -102,13 +102,13 @@ const SORT_OPTIONS = [
   { value: 'price_desc', labelKey: 'catalog_sort_price_high' },
 ]
 
-/* ----------- score filter presets ----------- */
+/* ----------- score filter presets (1-10 scale, 10 = best) ----------- */
 const SCORE_PRESETS = [
   { min: null, max: null, labelKey: 'catalog_filter_all' },
-  { min: 1, max: 2, labelKey: 'catalog_filter_great', color: '#16a34a' },
-  { min: 3, max: 3, labelKey: 'catalog_filter_good', color: '#65a30d' },
+  { min: 8, max: 10, labelKey: 'catalog_filter_great', color: '#16a34a' },
+  { min: 6, max: 7, labelKey: 'catalog_filter_good', color: '#65a30d' },
   { min: 4, max: 5, labelKey: 'catalog_filter_ok', color: '#eab308' },
-  { min: 6, max: 7, labelKey: 'catalog_filter_low', color: '#ef4444' },
+  { min: 1, max: 3, labelKey: 'catalog_filter_low', color: '#ef4444' },
 ]
 
 /* =========================================================================

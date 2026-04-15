@@ -2253,8 +2253,8 @@ app.get('/api/products/search', async (req, res) => {
  *   page     — 1-based page number (default 1)
  *   limit    — items per page (default 24, max 100)
  *   sort     — "name" | "score_asc" | "score_desc" | "price_asc" | "price_desc" (default "name")
- *   score_min — minimum sustainability score (1-7, 1 = best)
- *   score_max — maximum sustainability score (1-7, 7 = worst)
+ *   score_min — minimum sustainability score (1-10, 10 = best)
+ *   score_max — maximum sustainability score (1-10, 1 = worst)
  *   has_image — "true" to only return products with images
  *   category  — filter by AH product category substring
  */
@@ -2348,11 +2348,11 @@ app.get('/api/catalog/browse', async (req, res) => {
       filtered = filtered.filter(p => p.sustainability_score <= scoreMax)
     }
 
-    // Apply score sort in JS (1 = best, 7 = worst)
+    // Apply score sort in JS (10 = best, 1 = worst)
     if (sort === 'score_desc') {
-      filtered.sort((a, b) => a.sustainability_score - b.sustainability_score)
+      filtered.sort((a, b) => (b.sustainability_score ?? 0) - (a.sustainability_score ?? 0))
     } else if (sort === 'score_asc') {
-      filtered.sort((a, b) => b.sustainability_score - a.sustainability_score)
+      filtered.sort((a, b) => (a.sustainability_score ?? 0) - (b.sustainability_score ?? 0))
     }
 
     // Paginate in JS if we fetched a bigger batch
