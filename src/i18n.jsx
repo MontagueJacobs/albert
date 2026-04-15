@@ -54,8 +54,8 @@ const TRANSLATIONS = {
     tips_title: 'Tips voor lagere CO₂-voetafdruk:',
     tips: [
       '🌱 Kies vaker voor plantaardige producten',
-      '🥬 Verminder rood vlees consumptie',
-      '🥜 Probeer peulvruchten als eiwitbron',
+      '🥩 Verminder rood vlees consumptie',
+      '🫘 Probeer peulvruchten als eiwitbron',
       '🧀 Kies zuivel met mate'
     ],
     total_purchases: 'Totaal aankopen',
@@ -430,8 +430,8 @@ const TRANSLATIONS = {
     tips_title: 'Tips for lower carbon footprint:',
     tips: [
       '🌱 Choose more plant-based products',
-      '🥬 Reduce red meat consumption',
-      '🥜 Try legumes as protein source',
+      '🥩 Reduce red meat consumption',
+      '🫘 Try legumes as protein source',
       '🧀 Consume dairy in moderation'
     ],
     total_purchases: 'Total purchases',

@@ -359,22 +359,20 @@ function Dashboard({ syncVersion }) {
           </div>
         </div>
 
+        {insights.total_spent > 0 && (
         <div className="stat-card">
           <h3>
             <DollarSign size={18} style={{ display: 'inline', marginRight: '5px' }} />
             {t('total_spent')}
           </h3>
-          <div className="value">
-            {insights.total_spent > 0
-              ? `€${insights.total_spent.toFixed(2)}`
-              : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-          </div>
-          {insights.total_spent > 0 && insights.priced_items != null && insights.total_purchases > 0 && insights.priced_items < insights.total_purchases && (
+          <div className="value">€{insights.total_spent.toFixed(2)}</div>
+          {insights.priced_items != null && insights.total_purchases > 0 && insights.priced_items < insights.total_purchases && (
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
               {t('price_coverage')} ({insights.priced_items}/{insights.total_purchases})
             </div>
           )}
         </div>
+        )}
 
         {insights.total_co2_kg != null && (
           <div className="stat-card">
