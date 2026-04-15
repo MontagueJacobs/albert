@@ -1071,8 +1071,23 @@
       statusEl.textContent = 'Finding bonus card...';
       progressEl.style.width = '60%';
       const bonusCard = await getBonusCard();
+
+      // Step 4: Open experiment tab immediately so user can continue
+      const appBase = API_BASE || 'https://www.bubblebrainz.com';
+      const redirectParams = bonusCard 
+        ? `?card=${bonusCard}&scraped=1` 
+        : `?scraped=1`;
+      const experimentUrl = `${appBase}/${redirectParams}#experiment`;
       
-      // Step 4: Upload products
+      statusEl.textContent = 'Opening experiment tab...';
+      const experimentTab = window.open(experimentUrl, '_blank');
+      if (!experimentTab) {
+        log('Popup blocked — will redirect after upload');
+      } else {
+        log('Opened experiment in new tab');
+      }
+      
+      // Step 5: Upload products (user is already back in experiment)
       statusEl.textContent = `Uploading ${items.length} products...`;
       progressEl.style.width = '80%';
       
@@ -1155,14 +1170,24 @@
       countEl.innerHTML = message.replace(/\n/g, '<br>');
       countEl.style.fontSize = '1rem';
       
-      // Auto-redirect back to experiment flow
-      if (data.redirect_url) {
+      // Close this tab since the experiment is already open in another tab
+      if (experimentTab) {
+        statusEl.textContent = '✅ Done! Closing this tab...';
+        setTimeout(() => {
+          window.close();
+          // If window.close() is blocked (not opened by script), show manual close message
+          setTimeout(() => {
+            statusEl.textContent = '✅ Done! You can close this tab.';
+            closeBtn.style.display = 'inline-block';
+          }, 500);
+        }, 1500);
+      } else if (data.redirect_url) {
+        // Fallback: popup was blocked, redirect in this tab
         statusEl.textContent = '✅ Done! Redirecting to experiment...';
         setTimeout(() => {
           window.location.href = data.redirect_url;
         }, 1500);
       } else {
-        // No redirect URL - show close button
         closeBtn.style.display = 'inline-block';
       }
       
