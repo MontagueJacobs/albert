@@ -29,7 +29,7 @@
   
   // Check if on AH website
   if (!window.location.href.includes('ah.nl')) {
-    alert('🌱 Duurzaam Boodschappen\n\nGa naar ah.nl/producten/eerder-gekocht en probeer opnieuw!');
+    alert('🌱 Sustainable Shopping\n\nGo to ah.nl/producten/eerder-gekocht and try again!');
     return;
   }
   
@@ -64,8 +64,8 @@
         box-shadow: 0 20px 60px rgba(0,0,0,0.5);
       ">
         <div style="font-size: 48px; margin-bottom: 16px;">🌱</div>
-        <h2 style="margin: 0 0 8px; font-size: 1.5rem;">Duurzaam Boodschappen</h2>
-        <p id="ss-status" style="color: #9ca3af; margin-bottom: 24px;">Producten scannen...</p>
+        <h2 style="margin: 0 0 8px; font-size: 1.5rem;">Sustainable Shopping</h2>
+        <p id="ss-status" style="color: #9ca3af; margin-bottom: 24px;">Scanning products...</p>
         <div style="
           background: #334155;
           border-radius: 8px;
@@ -80,7 +80,7 @@
             transition: width 0.3s;
           "></div>
         </div>
-        <p id="ss-count" style="color: #22c55e; font-size: 1.25rem; font-weight: 600;">0 producten gevonden</p>
+        <p id="ss-count" style="color: #22c55e; font-size: 1.25rem; font-weight: 600;">0 products found</p>
         <button id="ss-close" style="
           margin-top: 24px;
           padding: 12px 32px;
@@ -91,7 +91,7 @@
           cursor: pointer;
           font-size: 1rem;
           display: none;
-        ">Sluiten</button>
+        ">Close</button>
       </div>
     </div>
   `;
@@ -348,7 +348,7 @@
     
     // Method 1: Try to fetch FRESH from klantenkaarten page (most reliable)
     try {
-      statusEl.textContent = 'Bonuskaart ophalen van AH...';
+      statusEl.textContent = 'Retrieving bonus card from AH...';
       log('Method 1: Fetching from /klantenkaarten');
       const res = await fetch('https://www.ah.nl/klantenkaarten', { 
         credentials: 'include',
@@ -495,7 +495,7 @@
     const maxIterations = 50; // Safety limit
     const scrollStep = window.innerHeight * 0.8; // Scroll ~80% of viewport at a time
     
-    statusEl.textContent = 'Scrollen om alle producten te laden...';
+    statusEl.textContent = 'Scrolling to load all products...';
     
     while (sameCountTimes < 3 && iterations < maxIterations) {
       iterations++;
@@ -516,19 +516,19 @@
       
       // Count products
       const items = extractProducts();
-      countEl.textContent = `${items.length} producten gevonden`;
+      countEl.textContent = `${items.length} products found`;
       
       // Calculate progress (10-50% during scrolling phase)
       const scrollProgress = Math.min(currentScroll / maxScroll, 1);
       progressEl.style.width = (10 + scrollProgress * 40) + '%';
       
-      statusEl.textContent = `Laden... (${items.length} producten)`;
+      statusEl.textContent = `Loading... (${items.length} products)`;
       
       if (items.length === lastCount) {
         sameCountTimes++;
         // If count hasn't changed, we might be at the end
         if (sameCountTimes === 1) {
-          statusEl.textContent = 'Controleren of alles geladen is...';
+          statusEl.textContent = 'Checking if everything is loaded...';
         }
       } else {
         sameCountTimes = 0;
@@ -555,31 +555,31 @@
   async function syncProducts() {
     try {
       // Step 1: Scan visible products
-      statusEl.textContent = 'Producten scannen...';
+      statusEl.textContent = 'Scanning products...';
       progressEl.style.width = '10%';
       
       let items = extractProducts();
-      countEl.textContent = `${items.length} producten gevonden`;
-      
+      countEl.textContent = `${items.length} products found`;
+
       // Step 2: Auto-scroll to load all
-      statusEl.textContent = 'Alle producten laden...';
+      statusEl.textContent = 'Loading all products...';
       await autoScroll();
       items = extractProducts();
       
       if (!items.length) {
-        statusEl.textContent = '⚠️ Geen producten gevonden';
-        countEl.textContent = 'Ga naar ah.nl/producten/eerder-gekocht';
+        statusEl.textContent = '⚠️ No products found';
+        countEl.textContent = 'Go to ah.nl/producten/eerder-gekocht';
         closeBtn.style.display = 'inline-block';
         return;
       }
       
       // Step 3: Get bonus card
-      statusEl.textContent = 'Bonuskaart zoeken...';
+      statusEl.textContent = 'Finding bonus card...';
       progressEl.style.width = '60%';
       const bonusCard = await getBonusCard();
       
       // Step 4: Upload products
-      statusEl.textContent = `${items.length} producten uploaden...`;
+      statusEl.textContent = `Uploading ${items.length} products...`;
       progressEl.style.width = '80%';
       
       const payload = {
@@ -624,29 +624,29 @@
         // Show both error code and detail if available
         const errMsg = data?.detail 
           ? `${data.error}: ${data.detail}` 
-          : (data?.error || 'Upload mislukt');
+          : (data?.error || 'Upload failed');
         throw new Error(errMsg);
       }
       
       // Success!
       const stored = data.stored || items.length;
       const purchasesRecorded = data.purchasesRecorded || 0;
-      statusEl.textContent = '✅ Gelukt!';
+      statusEl.textContent = '✅ Done!';
       
-      let message = `${stored} producten gesynct`;
+      let message = `${stored} products synced`;
       
       // Show purchase recording result
       if (purchasesRecorded > 0) {
-        message += `\n✅ ${purchasesRecorded} aankopen opgeslagen`;
+        message += `\n✅ ${purchasesRecorded} purchases saved`;
       } else if (data.purchaseError) {
         console.error('[Bookmarklet] Purchase error:', data.purchaseError);
-        message += '\n⚠️ Aankopen niet opgeslagen: ' + (data.purchaseError.message || 'onbekende fout');
+        message += '\n⚠️ Purchases not saved: ' + (data.purchaseError.message || 'unknown error');
       }
       
       if (bonusCard) {
         message += '\n\n🎫 Bonuskaart: ••••' + bonusCard.slice(-4);
       } else {
-        message += '\n\n⚠️ Geen bonuskaart gevonden. Ga eerst naar ah.nl/mijn/klantenkaarten';
+        message += '\n\n⚠️ No bonus card found. Go to ah.nl/mijn/klantenkaarten first';
       }
       
       countEl.innerHTML = message.replace(/\n/g, '<br>');
@@ -654,7 +654,7 @@
       
       // Auto-redirect back to experiment flow
       if (data.redirect_url) {
-        statusEl.textContent = '✅ Gelukt! Doorsturen naar experiment...';
+        statusEl.textContent = '✅ Done! Redirecting to experiment...';
         setTimeout(() => {
           window.location.href = data.redirect_url;
         }, 1500);
@@ -665,7 +665,7 @@
       
     } catch (e) {
       console.error('[Bookmarklet] Sync failed:', e);
-      statusEl.textContent = '❌ Fout: ' + e.message;
+      statusEl.textContent = '❌ Error: ' + e.message;
       countEl.style.color = '#ef4444';
     }
     

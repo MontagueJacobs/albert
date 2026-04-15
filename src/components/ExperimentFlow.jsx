@@ -583,7 +583,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                   <li>Informatie bekijken over de CO₂-impact van voedsel en je eigen aankopen</li>
                   <li>Reflecteren op wat je hebt geleerd</li>
                 </ul>
-                <p style={{ marginTop: '0.75rem' }}>Het duurt ongeveer <strong>15-25 minuten</strong>. Je antwoorden worden anoniem opgeslagen voor wetenschappelijk onderzoek.</p>
+                <p style={{ marginTop: '0.75rem' }}>Het duurt ongeveer <strong>10 minuten</strong>. Je antwoorden worden anoniem opgeslagen voor wetenschappelijk onderzoek.</p>
               </>
             ) : (
               <>
@@ -597,7 +597,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                   <li>View information about food CO₂ impact and your own purchases</li>
                   <li>Reflect on what you have learned</li>
                 </ul>
-                <p style={{ marginTop: '0.75rem' }}>It takes about <strong>15-25 minutes</strong>. Your answers are stored anonymously for scientific research.</p>
+                <p style={{ marginTop: '0.75rem' }}>It takes about <strong>10 minutes</strong>. Your answers are stored anonymously for scientific research.</p>
               </>
             )}
           </div>

@@ -3662,9 +3662,43 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
     })
     
     // Combine, filter out products without CO2 data, and shuffle
-    const allRankingProducts = [...fromPurchases, ...fromOther]
+    let allRankingProducts = [...fromPurchases, ...fromOther]
       .filter(p => p.co2PerKg != null && p.co2PerKg > 0)
       .sort(() => Math.random() - 0.5)
+
+    // Must-include product: Tony's Chocolonely Reep puur 70%
+    const MUST_INCLUDE_ID = 'wi193227'
+    if (!allRankingProducts.some(p => p.id === MUST_INCLUDE_ID)) {
+      const { data: mustProduct } = await supabase
+        .from('products')
+        .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, ingredients, nutrition_text, nutrition_json')
+        .eq('id', MUST_INCLUDE_ID)
+        .single()
+      if (mustProduct) {
+        const enrichedData = getEnrichedData(mustProduct)
+        const evaluation = evaluateProduct(mustProduct.name, enrichedData)
+        if (evaluation.co2PerKg > 0) {
+          // Replace a random catalog product (not a purchased one) or append
+          const catalogIdx = allRankingProducts.findIndex(p => p.source === 'catalog')
+          const mustEntry = {
+            id: mustProduct.id,
+            name: mustProduct.name,
+            image_url: mustProduct.image_url,
+            source: 'catalog',
+            actual_score: evaluation.score,
+            co2PerKg: evaluation.co2PerKg,
+            enriched: evaluation.enriched
+          }
+          if (catalogIdx >= 0) {
+            allRankingProducts[catalogIdx] = mustEntry
+          } else {
+            allRankingProducts.push(mustEntry)
+          }
+          // Re-shuffle after insertion
+          allRankingProducts = allRankingProducts.sort(() => Math.random() - 0.5)
+        }
+      }
+    }
     
     console.log(`[ranking-products] Card ${bonusCard}: purchases=${fromPurchases.length}, catalog=${fromOther.length}, total=${allRankingProducts.length}`)
     
@@ -4649,6 +4683,32 @@ app.post('/api/ingest/scrape', async (req, res) => {
         }
 
         purchasesRecorded = purchaseRecords.length
+
+        // Backfill null prices in user_purchases from products table
+        // (eerder-gekocht page often doesn't show prices)
+        try {
+          const nullPriceIds = cleaned.filter(p => p.price == null && p.id).map(p => p.id)
+          if (nullPriceIds.length > 0) {
+            const { data: pricedProducts } = await supabase
+              .from('products')
+              .select('id, price')
+              .in('id', nullPriceIds)
+              .not('price', 'is', null)
+            if (pricedProducts?.length > 0) {
+              for (const pp of pricedProducts) {
+                await supabase
+                  .from('user_purchases')
+                  .update({ price: pp.price })
+                  .eq('bonus_card_number', bonusCard)
+                  .eq('product_id', pp.id)
+                  .is('price', null)
+              }
+              console.log(`[Ingest] Backfilled ${pricedProducts.length} prices from products table`)
+            }
+          }
+        } catch (e) {
+          console.error('[Ingest] Price backfill error:', e.message)
+        }
       } else {
         console.log('[Ingest] No bonusCard - skipping user_purchases insert')
       }
