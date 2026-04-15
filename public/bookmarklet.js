@@ -355,58 +355,95 @@
       return { doc, text: doc.body?.textContent || '' };
     }
 
-    // Method 1: Try /klantenkaarten/bonuskaart page (most specific)
+    // Method 0: Try AH member REST API (returns JSON — most reliable if available)
     try {
       statusEl.textContent = 'Retrieving bonus card from AH...';
-      log('Method 1: Fetching from /klantenkaarten/bonuskaart');
-      const res = await fetch('https://www.ah.nl/klantenkaarten/bonuskaart', { 
+      log('Method 0: Trying AH member REST API');
+      const apiRes = await fetch('https://www.ah.nl/service/rest/delegate?url=/mobile-services/member/v3/info', {
         credentials: 'include',
         cache: 'no-store'
       });
-      
-      if (res.ok) {
-        const html = await res.text();
-        const { doc, text } = getVisibleText(html);
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        // The member info may contain bonusCard or loyaltyCard
+        const cardNum = json?.bonusCard?.cardNumber || json?.bonusCardNumber 
+          || json?.loyaltyCard?.cardNumber || json?.member?.bonusCard?.cardNumber;
+        log('Method 0: API response keys:', Object.keys(json || {}));
+        if (cardNum && isValidBonusCard(cardNum.toString())) {
+          foundCard = cleanCardNumber(cardNum.toString());
+          source = 'member_api';
+          log(`Method 0: Got card from member API`);
+        } else {
+          // Scan entire JSON for any 13-digit number
+          const jsonStr = JSON.stringify(json);
+          const cards = extractBonusCards(jsonStr);
+          if (cards.length === 1) {
+            foundCard = cards[0];
+            source = 'member_api_scan';
+            log(`Method 0: Found card by scanning API response`);
+          } else if (cards.length > 1) {
+            log(`Method 0: Found ${cards.length} candidates in API, skipping`);
+          }
+        }
+      } else {
+        log(`Method 0: API returned ${apiRes.status}`);
+      }
+    } catch (e) {
+      log('Method 0: API error:', e.message);
+    }
+
+    // Method 1: Try /klantenkaarten/bonuskaart page (most specific)
+    if (!foundCard) {
+      try {
+        log('Method 1: Fetching from /klantenkaarten/bonuskaart');
+        const res = await fetch('https://www.ah.nl/klantenkaarten/bonuskaart', { 
+          credentials: 'include',
+          cache: 'no-store'
+        });
         
-        // Look for "Kaartnummer" label and grab the number near it
-        const labels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
-        for (const label of labels) {
-          if (label.textContent?.trim() === 'Kaartnummer') {
-            const parent = label.closest('tr, div, dl, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
-            if (parent) {
-              const cards = extractBonusCards(parent.textContent || '');
-              log('Method 1: Found Kaartnummer row, extracted:', cards.map(c => '****' + c.slice(-4)));
-              if (cards.length > 0) {
-                foundCard = cards[0];
-                source = 'bonuskaart_page_kaartnummer';
-                break;
+        if (res.ok) {
+          const html = await res.text();
+          const { doc, text } = getVisibleText(html);
+          
+          // Look for "Kaartnummer" label and grab the number near it
+          const labels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
+          for (const label of labels) {
+            const labelText = label.textContent?.trim().toLowerCase();
+            if (labelText === 'kaartnummer' || labelText === 'bonuskaartnummer' || labelText === 'card number') {
+              const parent = label.closest('tr, div, dl, section, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
+              if (parent) {
+                const cards = extractBonusCards(parent.textContent || '');
+                log('Method 1: Found label row, extracted:', cards.map(c => '****' + c.slice(-4)));
+                if (cards.length > 0) {
+                  foundCard = cards[0];
+                  source = 'bonuskaart_page_label';
+                  break;
+                }
               }
             }
           }
-        }
-        
-        // Fallback: scan visible text only (NOT raw HTML with JS bundles)
-        if (!foundCard) {
-          const cards = extractBonusCards(text);
-          log(`Method 1: Visible text scan found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
-          if (cards.length === 1) {
-            foundCard = cards[0];
-            source = 'bonuskaart_page_visible_text';
-          } else if (cards.length >= 2 && cards.length <= 5) {
-            // Few candidates — likely real; use the first one
-            foundCard = cards[0];
-            source = 'bonuskaart_page_first_of_few';
+          
+          // Fallback: scan visible text only (NOT raw HTML with JS bundles)
+          if (!foundCard) {
+            const cards = extractBonusCards(text);
+            log(`Method 1: Visible text scan found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
+            if (cards.length === 1) {
+              foundCard = cards[0];
+              source = 'bonuskaart_page_visible_text';
+            } else if (cards.length >= 2 && cards.length <= 5) {
+              foundCard = cards[0];
+              source = 'bonuskaart_page_first_of_few';
+            }
           }
-          // If > 5, too noisy — skip
+        } else {
+          log(`Method 1: Fetch failed with status ${res.status}`);
         }
-      } else {
-        log(`Method 1: Fetch failed with status ${res.status}`);
+      } catch (e) {
+        log('Method 1: Fetch error:', e.message);
       }
-    } catch (e) {
-      log('Method 1: Fetch error:', e.message);
     }
     
-    // Method 2: Try /klantenkaarten page (broader, but same visible-text filtering)
+    // Method 2: Try /klantenkaarten page
     if (!foundCard) {
       try {
         log('Method 2: Fetching from /klantenkaarten');
@@ -419,24 +456,22 @@
           const html = await res.text();
           const { doc, text } = getVisibleText(html);
           
-          // Look for "Kaartnummer" label
           const labels = doc.querySelectorAll('span, td, th, div, dt, dd, p, label');
           for (const label of labels) {
-            if (label.textContent?.trim() === 'Kaartnummer') {
-              const parent = label.closest('tr, div, dl, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
+            const labelText = label.textContent?.trim().toLowerCase();
+            if (labelText === 'kaartnummer' || labelText === 'bonuskaartnummer' || labelText === 'card number') {
+              const parent = label.closest('tr, div, dl, section, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
               if (parent) {
                 const cards = extractBonusCards(parent.textContent || '');
-                log('Method 2: Found Kaartnummer row, extracted:', cards.map(c => '****' + c.slice(-4)));
                 if (cards.length > 0) {
                   foundCard = cards[0];
-                  source = 'klantenkaarten_kaartnummer';
+                  source = 'klantenkaarten_label';
                   break;
                 }
               }
             }
           }
           
-          // Specific AH selectors
           if (!foundCard) {
             const cardEl = doc.querySelector('[data-testid="bonus-card-number"], .bonus-card-number, [class*="cardNumber"], [class*="bonusCard"]');
             if (cardEl) {
@@ -448,10 +483,9 @@
             }
           }
           
-          // Fallback: scan visible text only  
           if (!foundCard) {
             const cards = extractBonusCards(text);
-            log(`Method 2: Visible text scan found ${cards.length} potential cards:`, cards.map(c => '****' + c.slice(-4)));
+            log(`Method 2: Visible text scan found ${cards.length} cards:`, cards.map(c => '****' + c.slice(-4)));
             if (cards.length === 1) {
               foundCard = cards[0];
               source = 'klantenkaarten_visible_text';
@@ -460,82 +494,149 @@
               source = 'klantenkaarten_first_of_few';
             }
           }
-        } else {
-          log(`Method 2: Fetch failed with status ${res.status}`);
         }
       } catch (e) {
-        log('Method 2: Fetch error:', e.message);
+        log('Method 2: error:', e.message);
       }
     }
     
-    // Method 3: Check current page DOM (visible text of eerder-gekocht page)
+    // Method 3: Check current page DOM
     if (!foundCard) {
       log('Method 3: Checking current page DOM');
+      const selectors = [
+        '[data-testid="bonus-card-number"]',
+        '[data-testid*="bonuskaart"]',
+        '.bonus-card-number',
+        '[class*="bonusCardNumber"]',
+        '[class*="bonus-card"] [class*="number"]'
+      ];
       
-      // Check for Kaartnummer label on current page
-      const labels = document.querySelectorAll('span, td, th, div, dt, dd, p, label');
-      for (const label of labels) {
-        if (label.textContent?.trim() === 'Kaartnummer') {
-          const parent = label.closest('tr, div, dl, [class*="table"], [class*="row"], [class*="card"], [class*="detail"]');
-          if (parent) {
-            const cards = extractBonusCards(parent.textContent || '');
-            if (cards.length > 0) {
-              foundCard = cards[0];
-              source = 'dom_kaartnummer_row';
-              log('Method 3: Found via Kaartnummer row');
-              break;
-            }
+      for (const selector of selectors) {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const cards = extractBonusCards(el.textContent || '');
+          if (cards.length > 0) {
+            foundCard = cards[0];
+            source = `dom:${selector}`;
+            break;
           }
         }
-      }
-      
-      // Specific AH DOM selectors
-      if (!foundCard) {
-        const selectors = [
-          '[data-testid="bonus-card-number"]',
-          '[data-testid*="bonuskaart"]',
-          '.bonus-card-number',
-          '[class*="bonusCardNumber"]',
-          '[class*="bonus-card"] [class*="number"]'
-        ];
-        
-        for (const selector of selectors) {
-          const elements = document.querySelectorAll(selector);
-          for (const el of elements) {
-            const cards = extractBonusCards(el.textContent || '');
-            if (cards.length > 0) {
-              foundCard = cards[0];
-              source = `dom_selector:${selector}`;
-              log(`Method 3: Found card via ${selector}`);
-              break;
-            }
-          }
-          if (foundCard) break;
-        }
+        if (foundCard) break;
       }
     }
     
-    // Method 4: Check URL params on current page
+    // Method 4: MANUAL ENTRY FALLBACK — prompt user to type their card number
+    // This is the guaranteed fallback when all automatic methods fail.
     if (!foundCard) {
-      log('Method 4: Checking URL params');
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const cardParam = urlParams.get('bonuskaart') || urlParams.get('card');
-        if (isValidBonusCard(cardParam)) {
-          foundCard = cleanCardNumber(cardParam);
-          source = 'url_param';
-        }
-      } catch (e) {}
+      log('All automatic methods failed — asking user for manual entry');
+      foundCard = await promptForBonusCard();
+      if (foundCard) {
+        source = 'manual_entry';
+      }
     }
     
     // Log final result
     if (foundCard) {
       log(`SUCCESS: Found bonus card ****${foundCard.slice(-4)} via ${source}`);
     } else {
-      log('FAILED: No bonus card found by any method');
+      log('FAILED: No bonus card found by any method (user cancelled manual entry)');
     }
     
     return foundCard;
+  }
+  
+  // Prompt the user to manually enter their bonus card number
+  function promptForBonusCard() {
+    return new Promise((resolve) => {
+      // Create modal overlay
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        position: fixed; inset: 0; z-index: 2147483647;
+        background: rgba(15, 23, 42, 0.95);
+        display: flex; align-items: center; justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      `;
+      
+      modal.innerHTML = `
+        <div style="
+          background: #1e293b; border-radius: 16px; padding: 2rem;
+          max-width: 420px; width: 90%; color: #f3f4f6;
+          box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        ">
+          <h3 style="margin: 0 0 0.5rem; font-size: 1.2rem; color: #22c55e;">
+            🎫 Bonuskaartnummer nodig
+          </h3>
+          <p style="margin: 0 0 0.5rem; font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">
+            We konden je bonuskaartnummer niet automatisch ophalen.
+            Vul het hieronder in (13 cijfers).
+          </p>
+          <p style="margin: 0 0 1rem; font-size: 0.8rem; color: #64748b; line-height: 1.4;">
+            Je vindt het op <a href="https://www.ah.nl/klantenkaarten/bonuskaart" target="_blank" 
+            style="color: #38bdf8; text-decoration: underline;">ah.nl/klantenkaarten/bonuskaart</a>,
+            op je fysieke bonuskaart, of in de AH app onder "Bonuskaart".
+          </p>
+          <input id="ss-card-input" type="text" inputmode="numeric" maxlength="17" 
+            placeholder="bijv. 2621 0000 12345"
+            style="
+              width: 100%; padding: 0.75rem 1rem; font-size: 1.1rem;
+              border: 2px solid #334155; border-radius: 10px;
+              background: #0f172a; color: #f3f4f6;
+              letter-spacing: 2px; text-align: center;
+              outline: none; box-sizing: border-box;
+            " />
+          <p id="ss-card-error" style="
+            margin: 0.5rem 0 0; font-size: 0.8rem; color: #ef4444;
+            min-height: 1.2rem;
+          "></p>
+          <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+            <button id="ss-card-skip" style="
+              flex: 1; padding: 0.7rem; border: 1px solid #334155;
+              border-radius: 10px; background: transparent;
+              color: #94a3b8; cursor: pointer; font-size: 0.9rem;
+            ">Overslaan</button>
+            <button id="ss-card-submit" style="
+              flex: 2; padding: 0.7rem; border: none;
+              border-radius: 10px; background: #22c55e;
+              color: white; cursor: pointer; font-weight: 600;
+              font-size: 0.9rem;
+            ">Bevestigen</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      const input = modal.querySelector('#ss-card-input');
+      const errorEl = modal.querySelector('#ss-card-error');
+      const submitBtn = modal.querySelector('#ss-card-submit');
+      const skipBtn = modal.querySelector('#ss-card-skip');
+      
+      input.focus();
+      
+      const trySubmit = () => {
+        const cleaned = input.value.replace(/[\s\-\.]/g, '');
+        if (!/^\d{13}$/.test(cleaned)) {
+          errorEl.textContent = 'Voer een geldig 13-cijferig kaartnummer in';
+          input.style.borderColor = '#ef4444';
+          return;
+        }
+        modal.remove();
+        resolve(cleaned);
+      };
+      
+      submitBtn.addEventListener('click', trySubmit);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') trySubmit();
+      });
+      input.addEventListener('input', () => {
+        errorEl.textContent = '';
+        input.style.borderColor = '#334155';
+      });
+      skipBtn.addEventListener('click', () => {
+        modal.remove();
+        resolve(null);
+      });
+    });
   }
   
   // ============================================
