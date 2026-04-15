@@ -105,8 +105,8 @@ const TRANSLATIONS = {
         body: 'De uiteindelijke CO₂-waarde (kg CO₂-eq per kg product) wordt omgezet naar een score van 1 tot 10 (10 = best, 1 = slechtst) volgens onderstaande tabel:'
       },
       {
-        title: '5. Beoordeling & labels',
-        body: 'Op basis van de score wordt een beoordeling gegeven: Uitstekend (9-10), Goed (7-8), Gemiddeld (5-6), Hoog (3-4), of Zeer hoog (1-2). Elk product krijgt ook een betrouwbaarheidsscore (0-100%) op basis van kruisvalidatie tussen bronnen, steekproefgrootte en datavariantie. Aanvullende informatie zoals biologisch, veganistisch, Fair Trade en herkomst wordt apart getoond als context maar beïnvloedt de score niet.'
+        title: '5. Beoordeling & keurmerken',
+        body: 'Op basis van de score wordt een beoordeling gegeven: Uitstekend (9-10), Goed (7-8), Gemiddeld (5-6), Hoog (3-4), of Zeer hoog (1-2). Elk product krijgt ook een betrouwbaarheidsscore (0-100%) op basis van kruisvalidatie tussen bronnen, steekproefgrootte en datavariantie. Biologische producten krijgen een reductie van 45% op hun CO₂-uitstoot, op basis van EU-onderzoek naar biologische landbouw (geen synthetische meststoffen, betere koolstofopslag in de bodem). Dit kan de score met 1-2 punten verhogen. Overige informatie zoals veganistisch, Fair Trade en herkomst wordt apart getoond als context.'
       },
       {
         title: '6. Landelijk gemiddelde',
@@ -480,8 +480,8 @@ const TRANSLATIONS = {
         body: 'The final CO₂ value (kg CO₂-eq per kg of product) is converted to a score from 1 to 10 (10 = best, 1 = worst) using the following thresholds:'
       },
       {
-        title: '5. Ratings & labels',
-        body: 'Based on the score, a rating is assigned: Excellent (9-10), Good (7-8), Average (5-6), High (3-4), or Very High (1-2). Each product also receives a confidence score (0-100%) based on cross-validation between sources, sample size, and data variance. Supplementary information such as organic, vegan, Fair Trade, and origin is displayed separately as context but does not affect the score.'
+        title: '5. Ratings & certifications',
+        body: 'Based on the score, a rating is assigned: Excellent (9-10), Good (7-8), Average (5-6), High (3-4), or Very High (1-2). Each product also receives a confidence score (0-100%) based on cross-validation between sources, sample size, and data variance. Organic/Bio products receive a 45% reduction in their CO₂ emissions, based on EU research into organic farming (no synthetic fertilizers, better soil carbon sequestration). This can raise the score by 1-2 points. Other information such as vegan, Fair Trade, and origin is displayed separately as context.'
       },
       {
         title: '6. National baseline',

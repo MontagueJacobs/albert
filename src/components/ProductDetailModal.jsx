@@ -652,50 +652,34 @@ function ProductDetailModal({ purchase, onClose }) {
                     {/* Per-kg rate as secondary info */}
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
                       {details.co2PerKg.toFixed(1)} kg CO₂ per kg
-                      {details.co2Min != null && details.co2Max != null && details.co2Min !== details.co2Max && (
-                        <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>
-                          {' '}({details.co2Min.toFixed(1)} – {details.co2Max.toFixed(1)})
-                        </span>
-                      )}
                     </div>
+                    {/* Source + confidence in one line */}
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '0.35rem',
                       fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px'
                     }}>
                       <span style={{
                         display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%',
-                        background: details.co2Valid === false ? '#f97316' : '#22c55e'
+                        background: details.confidence >= 70 ? '#22c55e'
+                          : details.confidence >= 55 ? '#eab308'
+                          : details.confidence != null ? '#ef4444'
+                          : '#6b7280'
                       }} />
                       {details.methodology
                         ? `${lang === 'en' ? 'Source' : 'Bron'}: ${details.methodology.primary}`
                         : (lang === 'en' ? 'Source: Agribalyse v3.2' : 'Bron: Agribalyse v3.2')}
-                    </div>
-                    {/* Confidence badge */}
-                    {details.confidence != null && (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '0.4rem',
-                        fontSize: '0.7rem', marginTop: '6px',
-                        padding: '0.25rem 0.5rem',
-                        background: details.confidence >= 70 ? 'rgba(34, 197, 94, 0.12)'
-                          : details.confidence >= 55 ? 'rgba(234, 179, 8, 0.12)'
-                          : 'rgba(239, 68, 68, 0.12)',
-                        borderRadius: '6px',
-                        border: `1px solid ${details.confidence >= 70 ? 'rgba(34, 197, 94, 0.25)' : details.confidence >= 55 ? 'rgba(234, 179, 8, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`
-                      }}>
+                      {details.confidence != null && (
                         <span style={{
                           fontWeight: '600',
+                          marginLeft: '0.2rem',
                           color: details.confidence >= 70 ? '#22c55e'
                             : details.confidence >= 55 ? '#eab308'
                             : '#ef4444'
                         }}>
-                          {details.confidence}%
+                          · {details.confidence}% {lang === 'en' ? 'confidence' : 'betrouwbaarheid'}
                         </span>
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          {lang === 'en' ? 'confidence' : 'betrouwbaarheid'}
-                          {details.confidenceLabel && ` · ${details.confidenceLabel}`}
-                        </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
                     {/* Cross-validation info */}
                     {details.methodology?.validation && details.methodology?.validationValue != null && (
                       <div style={{
@@ -762,9 +746,14 @@ function ProductDetailModal({ purchase, onClose }) {
                                 <div style={{ fontWeight: '600' }}>
                                   {contribution.toFixed(2)} kg CO₂
                                 </div>
-                                {ing.co2Min != null && ing.co2Max != null && ing.co2Min !== ing.co2Max && (
-                                  <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
-                                    {(ing.co2Min * ing.weightFraction).toFixed(2)} – {(ing.co2Max * ing.weightFraction).toFixed(2)}
+                                {ing.categoryConfidence != null && (
+                                  <div style={{
+                                    fontSize: '0.65rem',
+                                    color: ing.categoryConfidence >= 70 ? '#22c55e'
+                                      : ing.categoryConfidence >= 55 ? '#eab308'
+                                      : '#ef4444'
+                                  }}>
+                                    {ing.categoryConfidence}% {lang === 'en' ? 'conf.' : 'betr.'}
                                   </div>
                                 )}
                               </div>
