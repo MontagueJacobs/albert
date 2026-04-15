@@ -3796,6 +3796,14 @@ app.post('/api/experiment/start', async (req, res) => {
           .eq('id', existing.id)
         existing.bonus_card = bonus_card
       }
+      // If we now have an anonymous_id and the session didn't, link it
+      if (anonymous_id && !existing.anonymous_id) {
+        await supabase
+          .from('experiment_sessions')
+          .update({ anonymous_id, updated_at: new Date().toISOString() })
+          .eq('id', existing.id)
+        existing.anonymous_id = anonymous_id
+      }
       return res.json({ session: existing, resumed: true })
     }
 

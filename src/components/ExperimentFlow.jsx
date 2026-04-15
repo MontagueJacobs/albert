@@ -407,11 +407,9 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     try {
       setLoading(true)
       setError(null)
-      const body = {}
+      const body = { anonymous_id: getAnonymousId() }
       if (bonusCardNumber) {
         body.bonus_card = bonusCardNumber
-      } else {
-        body.anonymous_id = getAnonymousId()
       }
       const res = await fetch('/api/experiment/start', {
         method: 'POST',
