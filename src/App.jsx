@@ -63,17 +63,18 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
   //   </button>
   // )
 
-  const ABToggle = () => (
-    <button
-      className="theme-toggle-btn"
-      onClick={() => setVariantOverride(websiteVariant === 'A' ? 'B' : 'A')}
-      title={`Currently variant ${websiteVariant || '?'} — click to switch`}
-      style={{ minWidth: 'auto' }}
-    >
-      <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{websiteVariant === 'B' ? 'B' : 'A'}</span>
-      <span>A/B</span>
-    </button>
-  )
+  // ABToggle hidden — A/B testing disabled, variant A forced
+  // const ABToggle = () => (
+  //   <button
+  //     className="theme-toggle-btn"
+  //     onClick={() => setVariantOverride(websiteVariant === 'A' ? 'B' : 'A')}
+  //     title={`Currently variant ${websiteVariant || '?'} — click to switch`}
+  //     style={{ minWidth: 'auto' }}
+  //   >
+  //     <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{websiteVariant === 'B' ? 'B' : 'A'}</span>
+  //     <span>A/B</span>
+  //   </button>
+  // )
 
   const navigateTo = (tab) => {
     setActiveTab(tab)
@@ -102,7 +103,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <img src="/radboud-logo.png" alt="Radboud Universiteit" className="radboud-logo" />
           </div>
           <div className="header-actions">
-            <ABToggle />
+            {/* <ABToggle /> */}
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -127,7 +128,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <img src="/radboud-logo.png" alt="Radboud Universiteit" className="radboud-logo" />
           </div>
           <div className="header-actions">
-            <ABToggle />
+            {/* <ABToggle /> */}
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -165,7 +166,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </div>
           
           <div className="header-actions">
-            <ABToggle />
+            {/* <ABToggle /> */}
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
@@ -247,7 +248,7 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         </button>
         
         <div className="header-actions">
-          <ABToggle />
+          {/* <ABToggle /> */}
           <button className="lang-btn" onClick={handleToggleLanguage}>
             {lang === 'nl' ? 'EN' : 'NL'}
           </button>

@@ -152,6 +152,32 @@ const POST_QUESTIONS = [
       { value: 4, label: 'Probably yes', labelNl: 'Waarschijnlijk wel' },
       { value: 5, label: 'Definitely yes', labelNl: 'Zeker wel' }
     ]
+  },
+  {
+    id: 'organic_co2_belief_post',
+    text: 'After using this tool, to what extent do you agree: "Organic (bio) products have significantly lower CO₂ emissions than non-organic products."',
+    textNl: 'Na het gebruik van deze tool, in hoeverre bent u het eens met: "Biologische producten hebben aanzienlijk lagere CO₂-uitstoot dan niet-biologische producten."',
+    type: 'scale',
+    options: [
+      { value: 1, label: 'Strongly disagree', labelNl: 'Helemaal mee oneens' },
+      { value: 2, label: 'Disagree', labelNl: 'Mee oneens' },
+      { value: 3, label: 'Neutral', labelNl: 'Neutraal' },
+      { value: 4, label: 'Agree', labelNl: 'Mee eens' },
+      { value: 5, label: 'Strongly agree', labelNl: 'Helemaal mee eens' }
+    ]
+  },
+  {
+    id: 'organic_label_indicator_post',
+    text: 'After using this tool, to what extent do you agree: "I use organic labels as an indicator of environmental impact."',
+    textNl: 'Na het gebruik van deze tool, in hoeverre bent u het eens met: "Ik gebruik biologische keurmerken als indicator voor milieu-impact."',
+    type: 'scale',
+    options: [
+      { value: 1, label: 'Strongly disagree', labelNl: 'Helemaal mee oneens' },
+      { value: 2, label: 'Disagree', labelNl: 'Mee oneens' },
+      { value: 3, label: 'Neutral', labelNl: 'Neutraal' },
+      { value: 4, label: 'Agree', labelNl: 'Mee eens' },
+      { value: 5, label: 'Strongly agree', labelNl: 'Helemaal mee eens' }
+    ]
   }
 ]
 

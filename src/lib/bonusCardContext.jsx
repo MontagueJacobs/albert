@@ -170,7 +170,8 @@ export function BonusCardProvider({ children }) {
       userInfo,
       loading,
       isAuthenticated: !!bonusCardNumber,
-      websiteVariant: variantOverride || userInfo?.website_variant || null,
+      websiteVariant: 'A', // forced to A — A/B testing disabled for now
+        // websiteVariant: variantOverride || userInfo?.website_variant || null,
       setVariantOverride,
       login,
       logout,
