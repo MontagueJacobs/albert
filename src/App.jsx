@@ -47,7 +47,7 @@ const features = [
 function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, syncVersion, questionnaireType, theme, toggleTheme }) {
   const { t, lang, setLang } = useI18n()
   const isNl = lang === 'nl'
-  const { bonusCardNumber, isAuthenticated: isBonusAuth, login: bonusLogin, logout: bonusLogout, websiteVariant, setVariantOverride } = useBonusCard()
+  const { bonusCardNumber, isAuthenticated: isBonusAuth, login: bonusLogin, logout: bonusLogout, resetSession, websiteVariant, setVariantOverride } = useBonusCard()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleToggleLanguage = useCallback(() => {
@@ -107,6 +107,9 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
             </button>
+            <button className="exit-btn" onClick={resetSession} title={isNl ? 'Sessie beëindigen' : 'End session'}>
+              {isNl ? 'Exit' : 'Exit'}
+            </button>
           </div>
         </header>
         <main className="page-content">
@@ -131,6 +134,9 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             {/* <ABToggle /> */}
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
+            </button>
+            <button className="exit-btn" onClick={resetSession} title={isNl ? 'Sessie beëindigen' : 'End session'}>
+              {isNl ? 'Exit' : 'Exit'}
             </button>
           </div>
         </header>
@@ -169,6 +175,9 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             {/* <ABToggle /> */}
             <button className="lang-btn" onClick={handleToggleLanguage}>
               {lang === 'nl' ? 'EN' : 'NL'}
+            </button>
+            <button className="exit-btn" onClick={resetSession} title={isNl ? 'Sessie beëindigen' : 'End session'}>
+              {isNl ? 'Exit' : 'Exit'}
             </button>
           </div>
         </header>
@@ -251,6 +260,9 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           {/* <ABToggle /> */}
           <button className="lang-btn" onClick={handleToggleLanguage}>
             {lang === 'nl' ? 'EN' : 'NL'}
+          </button>
+          <button className="exit-btn" onClick={resetSession} title={isNl ? 'Sessie beëindigen' : 'End session'}>
+            {isNl ? 'Exit' : 'Exit'}
           </button>
         </div>
       </header>

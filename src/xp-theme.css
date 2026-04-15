@@ -110,6 +110,21 @@
   font-weight: 600;
 }
 
+[data-theme="xp"] .exit-btn {
+  background: linear-gradient(180deg, #F0D0D0 0%, #D4A0A0 100%);
+  color: #8B0000;
+  border: 1px solid #8E7676;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 #F5E0E0, 0 1px 2px rgba(40,10,10,.18);
+  text-shadow: none;
+  font-weight: 600;
+}
+
+[data-theme="xp"] .exit-btn:hover {
+  background: linear-gradient(180deg, #E0B0B0 0%, #C48080 100%);
+  color: #600000;
+}
+
 [data-theme="xp"] .lang-btn:hover,
 [data-theme="xp"] .auth-btn:hover {
   background: linear-gradient(180deg, #F5F0E0 0%, #D0CBB4 100%);

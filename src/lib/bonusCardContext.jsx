@@ -141,6 +141,16 @@ export function BonusCardProvider({ children }) {
     setUserInfo(null)
     localStorage.removeItem('ah_bonus_card')
   }, [])
+
+  const resetSession = useCallback(() => {
+    // Clear all session-related localStorage keys
+    localStorage.removeItem('ah_bonus_card')
+    localStorage.removeItem('ah_session_id')
+    localStorage.removeItem('ab_variant_override')
+    localStorage.removeItem('experiment_anonymous_id')
+    // Reload the page to fully reset all in-memory state
+    window.location.href = window.location.pathname
+  }, [])
   
   const refresh = useCallback(() => {
     if (bonusCardNumber) {
@@ -175,6 +185,7 @@ export function BonusCardProvider({ children }) {
       setVariantOverride,
       login,
       logout,
+      resetSession,
       refresh,
       bonusFetch,
     }}>

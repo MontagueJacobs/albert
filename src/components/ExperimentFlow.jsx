@@ -80,6 +80,20 @@ const PRE_LIKERT_QUESTIONS = [
     textNl: 'Ik houd actief rekening met de milieu-impact bij het kopen van voedsel.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
+  },
+  {
+    id: 'organic_co2_belief',
+    text: 'Organic (bio) products have significantly lower CO₂ emissions than non-organic products.',
+    textNl: 'Biologische producten hebben aanzienlijk lagere CO₂-uitstoot dan niet-biologische producten.',
+    low: 'Strongly disagree', lowNl: 'Helemaal oneens',
+    high: 'Strongly agree', highNl: 'Helemaal eens'
+  },
+  {
+    id: 'organic_label_indicator',
+    text: 'I use organic labels as an indicator of environmental impact.',
+    textNl: 'Ik gebruik biologische keurmerken als indicator voor milieu-impact.',
+    low: 'Strongly disagree', lowNl: 'Helemaal oneens',
+    high: 'Strongly agree', highNl: 'Helemaal eens'
   }
 ]
 
@@ -131,6 +145,20 @@ const POST_LIKERT_QUESTIONS = [
     id: 'post_q7',
     text: 'The quizzes helped me learn about the environmental impact of food.',
     textNl: 'De quizzen hebben me geholpen om te leren over de milieu-impact van voedsel.',
+    low: 'Strongly disagree', lowNl: 'Helemaal oneens',
+    high: 'Strongly agree', highNl: 'Helemaal eens'
+  },
+  {
+    id: 'organic_co2_belief_post',
+    text: 'After this study: Organic (bio) products have significantly lower CO₂ emissions than non-organic products.',
+    textNl: 'Na dit onderzoek: Biologische producten hebben aanzienlijk lagere CO₂-uitstoot dan niet-biologische producten.',
+    low: 'Strongly disagree', lowNl: 'Helemaal oneens',
+    high: 'Strongly agree', highNl: 'Helemaal eens'
+  },
+  {
+    id: 'organic_label_indicator_post',
+    text: 'After this study: I use organic labels as an indicator of environmental impact.',
+    textNl: 'Na dit onderzoek: Ik gebruik biologische keurmerken als indicator voor milieu-impact.',
     low: 'Strongly disagree', lowNl: 'Helemaal oneens',
     high: 'Strongly agree', highNl: 'Helemaal eens'
   }

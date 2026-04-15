@@ -32,6 +32,12 @@ const QUESTIONS = [
     text: 'What would you improve about this tool?',
     textNl: 'Wat zou u verbeteren aan deze tool?',
     type: 'open'
+  },
+  {
+    id: 'ref_local_farmers',
+    text: 'Would you like to know which local farmers can supply to your door or a location close to you? Please enter your email if so.',
+    textNl: 'Wilt u weten welke lokale boeren bij u aan de deur of op een locatie dichtbij u kunnen leveren? Vul dan uw e-mailadres in.',
+    type: 'email'
   }
 ]
 
@@ -182,6 +188,23 @@ export default function ExperimentReflection({ sessionId, onComplete }) {
             <textarea
               style={styles.textarea}
               placeholder={isNl ? 'Typ hier...' : 'Type here...'}
+              value={responses[q.id] || ''}
+              onChange={(e) => handleTextChange(q.id, e.target.value)}
+              onFocus={(e) => { e.target.style.borderColor = '#3b82f6' }}
+              onBlur={(e) => { e.target.style.borderColor = 'var(--border, #334155)' }}
+            />
+          )}
+
+          {q.type === 'email' && (
+            <input
+              type="email"
+              style={{
+                ...styles.textarea,
+                minHeight: 'auto',
+                height: '48px',
+                resize: 'none'
+              }}
+              placeholder={isNl ? 'uw@email.nl' : 'your@email.com'}
               value={responses[q.id] || ''}
               onChange={(e) => handleTextChange(q.id, e.target.value)}
               onFocus={(e) => { e.target.style.borderColor = '#3b82f6' }}
