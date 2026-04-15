@@ -674,6 +674,7 @@ async function enrichProducts(supabase, opts = {}) {
         .is('ingredients', null)
         .not('details_scrape_status', 'eq', 'failed')
         .not('details_scrape_status', 'eq', 'non_food')
+        .not('details_scrape_status', 'eq', 'incomplete')
     }
 
     if (source) {
@@ -745,7 +746,13 @@ async function enrichProducts(supabase, opts = {}) {
     } else {
       const updateData = {}
       if (detail.ingredients) updateData.ingredients = detail.ingredients
-      if (detail.nutrition_text) updateData.nutrition_text = detail.nutrition_text
+      if (detail.nutrition_text) {
+        // Reject garbage header text (not actual nutrition data)
+        const nt = detail.nutrition_text.toLowerCase()
+        if (!nt.startsWith('voedingswaarden, dieet') && (nt.length >= 30 || nt.includes('kcal'))) {
+          updateData.nutrition_text = detail.nutrition_text
+        }
+      }
       if (detail.nutrition_json) updateData.nutrition_json = detail.nutrition_json
       if (detail.is_vegan != null) updateData.is_vegan = detail.is_vegan
       if (detail.is_vegetarian != null) updateData.is_vegetarian = detail.is_vegetarian

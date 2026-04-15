@@ -1100,6 +1100,12 @@ class AHProductDetailScraper:
             
             # Parse structured nutrition values from the text
             if result.get('nutrition_text'):
+                # Reject garbage header text that isn't actual nutrition data
+                nt_lower = result['nutrition_text'].lower()
+                if nt_lower.startswith('voedingswaarden, dieet') or len(nt_lower) < 30 and 'kcal' not in nt_lower:
+                    result['nutrition_text'] = None
+
+            if result.get('nutrition_text'):
                 result['nutrition_json'] = self._parse_nutrition_values(result['nutrition_text'])
             
             # ================================================================
