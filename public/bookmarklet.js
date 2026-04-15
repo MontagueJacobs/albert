@@ -46,25 +46,23 @@
   overlay.innerHTML = `
     <div style="
       position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.95);
+      top: 16px;
+      right: 16px;
       z-index: 999999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      pointer-events: auto;
     ">
       <div style="
         background: #1e293b;
-        border-radius: 20px;
-        padding: 32px;
-        max-width: 400px;
+        border-radius: 16px;
+        padding: 20px 24px;
+        min-width: 280px;
         text-align: center;
         color: #f3f4f6;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
       ">
-        <div style="font-size: 48px; margin-bottom: 16px;">🌱</div>
-        <h2 style="margin: 0 0 8px; font-size: 1.5rem;">Sustainable Shopping</h2>
+        <div style="font-size: 28px; margin-bottom: 8px;">🌱</div>
+        <h2 style="margin: 0 0 6px; font-size: 1.1rem;">Sustainable Shopping</h2>
         <p id="ss-status" style="color: #9ca3af; margin-bottom: 24px;">Scanning products...</p>
         <div style="
           background: #334155;
