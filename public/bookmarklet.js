@@ -984,62 +984,126 @@
   
   async function autoScroll() {
     let lastCount = 0;
-    let sameCountTimes = 0;
-    let iterations = 0;
-    const maxIterations = 50; // Safety limit
-    const scrollStep = window.innerHeight * 0.8; // Scroll ~80% of viewport at a time
+    let sameCountRounds = 0;
+    const maxRounds = 8;        // Full-page passes before giving up
+    const scrollStep = Math.max(window.innerHeight * 0.6, 400); // 60% of viewport
+    const scrollPause = 1200;   // ms to wait after each scroll step
+    const loadMorePause = 2000; // ms to wait after clicking "load more"
     
     statusEl.textContent = 'Scrolling to load all products...';
     
-    while (sameCountTimes < 3 && iterations < maxIterations) {
-      iterations++;
+    // Helper: click any "load more" / "toon meer" / "bekijk meer" button on AH
+    function clickLoadMore() {
+      const btns = document.querySelectorAll('button, a[role="button"], [class*="load-more"], [class*="show-more"]');
+      let clicked = false;
+      btns.forEach(btn => {
+        const txt = (btn.textContent || '').toLowerCase().trim();
+        if (txt.match(/^(toon meer|bekijk meer|meer laden|laad meer|load more|show more|meer tonen|meer producten)$/)) {
+          btn.click();
+          clicked = true;
+          console.log('[Bookmarklet] Clicked load-more button:', txt);
+        }
+      });
+      // Also look for AH-specific pagination/load-more by data attributes
+      const ahLoadMore = document.querySelector('[data-testid="load-more"]') ||
+                         document.querySelector('[data-testhook="load-more"]') ||
+                         document.querySelector('button[class*="more"]');
+      if (ahLoadMore && !clicked) {
+        const txt = (ahLoadMore.textContent || '').toLowerCase();
+        if (txt.includes('meer') || txt.includes('more') || txt.includes('laden') || txt.includes('load')) {
+          ahLoadMore.click();
+          clicked = true;
+          console.log('[Bookmarklet] Clicked AH load-more:', txt);
+        }
+      }
+      return clicked;
+    }
+    
+    for (let round = 0; round < maxRounds && sameCountRounds < 3; round++) {
+      // ---- Incremental scroll from current position to bottom ----
+      let scrollIterations = 0;
+      const maxScrollIter = 200; // safety cap per round
       
-      // Scroll down in increments (more reliable for lazy loading)
-      const currentScroll = window.scrollY;
-      const maxScroll = document.body.scrollHeight - window.innerHeight;
-      
-      if (currentScroll < maxScroll) {
-        // Scroll down by one viewport height
+      while (scrollIterations < maxScrollIter) {
+        scrollIterations++;
+        const beforeHeight = document.body.scrollHeight;
+        const currentScroll = window.scrollY;
+        const maxScroll = beforeHeight - window.innerHeight;
+        
+        if (currentScroll >= maxScroll - 10) break; // reached bottom
+        
         window.scrollBy({ top: scrollStep, behavior: 'smooth' });
-        await new Promise(r => setTimeout(r, 800)); // Wait for scroll animation
+        await new Promise(r => setTimeout(r, scrollPause));
+        
+        // Update product count periodically
+        if (scrollIterations % 3 === 0) {
+          const items = extractProducts();
+          countEl.textContent = `${items.length} products found`;
+          statusEl.textContent = `Scrolling... (${items.length} products)`;
+          
+          // Update progress bar (10-50% range)
+          const progress = Math.min(currentScroll / Math.max(maxScroll, 1), 1);
+          progressEl.style.width = (10 + progress * 40) + '%';
+        }
       }
       
-      // Also try scrolling to absolute bottom to trigger any remaining loads
-      window.scrollTo(0, document.body.scrollHeight);
-      await new Promise(r => setTimeout(r, 1200)); // Wait for content to load
+      // ---- At the bottom: try clicking load-more buttons ----
+      const didClickMore = clickLoadMore();
+      if (didClickMore) {
+        statusEl.textContent = 'Loading more products...';
+        await new Promise(r => setTimeout(r, loadMorePause));
+        // After loading more, the page may have grown — scroll again
+        // But first scroll down a bit to trigger any new lazy loads
+        window.scrollBy({ top: scrollStep, behavior: 'smooth' });
+        await new Promise(r => setTimeout(r, scrollPause));
+      }
       
-      // Count products
+      // ---- Wait a bit at the bottom for any final lazy loads ----
+      await new Promise(r => setTimeout(r, 1500));
+      
+      // ---- Count products after this full pass ----
       const items = extractProducts();
-      countEl.textContent = `${items.length} products found`;
+      const newCount = items.length;
+      countEl.textContent = `${newCount} products found`;
+      statusEl.textContent = `Pass ${round + 1}: ${newCount} products found`;
       
-      // Calculate progress (10-50% during scrolling phase)
-      const scrollProgress = Math.min(currentScroll / maxScroll, 1);
-      progressEl.style.width = (10 + scrollProgress * 40) + '%';
+      console.log(`[Bookmarklet] Round ${round + 1}: ${newCount} products (was ${lastCount})`);
       
-      statusEl.textContent = `Loading... (${items.length} products)`;
-      
-      if (items.length === lastCount) {
-        sameCountTimes++;
-        // If count hasn't changed, we might be at the end
-        if (sameCountTimes === 1) {
+      if (newCount === lastCount && !didClickMore) {
+        sameCountRounds++;
+        if (sameCountRounds === 1) {
           statusEl.textContent = 'Checking if everything is loaded...';
+          // One more slow scroll through everything to catch stragglers
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          await new Promise(r => setTimeout(r, 500));
         }
       } else {
-        sameCountTimes = 0;
-        lastCount = items.length;
-      }
-      
-      // If we're at max scroll and count hasn't changed, we're probably done
-      if (currentScroll >= maxScroll - 100 && items.length === lastCount) {
-        sameCountTimes++;
+        sameCountRounds = 0;
+        lastCount = newCount;
+        // Scroll back to top to start next pass (page may have grown)
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        await new Promise(r => setTimeout(r, 500));
       }
     }
+    
+    // Final pass: one more quick scroll to make sure nothing was missed
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    await new Promise(r => setTimeout(r, 300));
+    for (let pos = 0; pos < document.body.scrollHeight; pos += scrollStep) {
+      window.scrollTo({ top: pos, behavior: 'instant' });
+      await new Promise(r => setTimeout(r, 400));
+    }
+    await new Promise(r => setTimeout(r, 1000));
+    
+    const finalItems = extractProducts();
+    lastCount = finalItems.length;
+    countEl.textContent = `${lastCount} products found`;
     
     // Scroll back to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
     progressEl.style.width = '55%';
     
-    console.log(`[Bookmarklet] Auto-scroll complete: ${lastCount} products found in ${iterations} iterations`);
+    console.log(`[Bookmarklet] Auto-scroll complete: ${lastCount} products found`);
   }
   
   // ============================================
