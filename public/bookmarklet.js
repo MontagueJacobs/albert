@@ -984,7 +984,9 @@
   
   async function autoScroll() {
     const scrollStep = Math.max(window.innerHeight * 0.7, 500); // 70% of viewport
-    const scrollPause = 800;   // ms to wait after each scroll step
+    // Use 'instant' scroll — user is in another tab so smooth animations
+    // get throttled by the browser (background tabs limit timers to ~1s)
+    const scrollPause = 600;   // ms to wait for lazy loads after each jump
     
     statusEl.textContent = 'Scrolling to load all products...';
     
@@ -1014,7 +1016,7 @@
       return clicked;
     }
     
-    // Single pass: scroll from top to bottom
+    // Single pass: scroll from top to bottom using instant jumps
     let scrollIterations = 0;
     const maxScrollIter = 300; // safety cap
     
@@ -1025,7 +1027,7 @@
       
       if (currentScroll >= maxScroll - 10) break; // reached bottom
       
-      window.scrollBy({ top: scrollStep, behavior: 'smooth' });
+      window.scrollBy({ top: scrollStep, behavior: 'instant' });
       await new Promise(r => setTimeout(r, scrollPause));
       
       // Click load-more buttons as we encounter them
@@ -1048,7 +1050,7 @@
       for (let i = 0; i < 5; i++) {
         const maxScroll = document.body.scrollHeight - window.innerHeight;
         if (window.scrollY >= maxScroll - 10) break;
-        window.scrollBy({ top: scrollStep, behavior: 'smooth' });
+        window.scrollBy({ top: scrollStep, behavior: 'instant' });
         await new Promise(r => setTimeout(r, scrollPause));
       }
     }
@@ -1060,7 +1062,7 @@
     countEl.textContent = `${finalItems.length} products found`;
     
     // Scroll back to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
     progressEl.style.width = '55%';
     
     console.log(`[Bookmarklet] Auto-scroll complete: ${finalItems.length} products found in ${scrollIterations} steps`);
