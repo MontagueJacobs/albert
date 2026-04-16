@@ -4036,13 +4036,41 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
       const validItems = enriched
         .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
 
+      // Helper: check if two product names are too similar
+      function tooSimilar(a, b) {
+        const na = a.toLowerCase().replace(/\bah\b/g, '').replace(/[^a-z0-9]/g, '')
+        const nb = b.toLowerCase().replace(/\bah\b/g, '').replace(/[^a-z0-9]/g, '')
+        if (na === nb) return true
+        // One is a substring of the other (e.g. "planted steak" vs "planted steak puntjes")
+        if (na.includes(nb) || nb.includes(na)) return true
+        // Share a long common prefix (>60% of the shorter name)
+        const minLen = Math.min(na.length, nb.length)
+        let common = 0
+        for (let i = 0; i < minLen; i++) {
+          if (na[i] === nb[i]) common++; else break
+        }
+        if (minLen > 4 && common / minLen > 0.6) return true
+        return false
+      }
+
+      // Helper: check if item is too similar to any already-picked item
+      function conflictsWithPicked(item, picked) {
+        return picked.some(p => tooSimilar(item.name, p.name))
+      }
+
       if (validItems.length <= 6) {
         // Not enough to be picky — use them all, shuffled
-        items = validItems.sort(() => Math.random() - 0.5)
+        // But still remove near-duplicates
+        const filtered = []
+        for (const item of validItems.sort(() => Math.random() - 0.5)) {
+          if (!conflictsWithPicked(item, filtered)) filtered.push(item)
+        }
+        items = filtered
       } else {
         // Stratified selection: sort by CO2, divide into 6 equal buckets,
         // pick one random item from each bucket (like the hand-picked pools
         // which span low → high CO2)
+        // Also ensure no two picks are too similar
         validItems.sort((a, b) => a.co2PerKg - b.co2PerKg)
         const bucketSize = validItems.length / 6
         items = []
@@ -4050,8 +4078,10 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
           const start = Math.floor(b * bucketSize)
           const end = Math.floor((b + 1) * bucketSize)
           const bucket = validItems.slice(start, end)
-          const pick = bucket[Math.floor(Math.random() * bucket.length)]
-          items.push(pick)
+          // Shuffle bucket, then pick first non-conflicting item
+          bucket.sort(() => Math.random() - 0.5)
+          const pick = bucket.find(item => !conflictsWithPicked(item, items))
+          if (pick) items.push(pick)
         }
         // Shuffle so user doesn't see them pre-sorted
         items.sort(() => Math.random() - 0.5)

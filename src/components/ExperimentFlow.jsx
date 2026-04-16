@@ -169,7 +169,7 @@ const styles = {
     boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)'
   },
   progressFill: {
-    background: 'linear-gradient(90deg, #22c55e, #3b82f6)',
+    background: '#86efac',
     height: '100%',
     transition: 'width 0.5s ease',
     borderRadius: '9999px',
