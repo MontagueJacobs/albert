@@ -6,7 +6,7 @@
 /* ---------- XP colour tokens ---------- */
 [data-theme="xp"] {
   /* Core Luna palette — warm / parchment tint */
-  --xp-blue:         #0080FF;
+  --xp-blue:         #6B8FA3;
   --xp-blue-dark:    #0060CC;
   --xp-blue-light:   #3399FF;
   --xp-blue-lighter: #66B2FF;
