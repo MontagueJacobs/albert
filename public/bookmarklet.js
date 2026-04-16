@@ -983,12 +983,8 @@
   // ============================================
   
   async function autoScroll() {
-    let lastCount = 0;
-    let sameCountRounds = 0;
-    const maxRounds = 8;        // Full-page passes before giving up
-    const scrollStep = Math.max(window.innerHeight * 0.6, 400); // 60% of viewport
-    const scrollPause = 1200;   // ms to wait after each scroll step
-    const loadMorePause = 2000; // ms to wait after clicking "load more"
+    const scrollStep = Math.max(window.innerHeight * 0.7, 500); // 70% of viewport
+    const scrollPause = 800;   // ms to wait after each scroll step
     
     statusEl.textContent = 'Scrolling to load all products...';
     
@@ -1004,7 +1000,6 @@
           console.log('[Bookmarklet] Clicked load-more button:', txt);
         }
       });
-      // Also look for AH-specific pagination/load-more by data attributes
       const ahLoadMore = document.querySelector('[data-testid="load-more"]') ||
                          document.querySelector('[data-testhook="load-more"]') ||
                          document.querySelector('button[class*="more"]');
@@ -1019,91 +1014,56 @@
       return clicked;
     }
     
-    for (let round = 0; round < maxRounds && sameCountRounds < 3; round++) {
-      // ---- Incremental scroll from current position to bottom ----
-      let scrollIterations = 0;
-      const maxScrollIter = 200; // safety cap per round
+    // Single pass: scroll from top to bottom
+    let scrollIterations = 0;
+    const maxScrollIter = 300; // safety cap
+    
+    while (scrollIterations < maxScrollIter) {
+      scrollIterations++;
+      const currentScroll = window.scrollY;
+      const maxScroll = document.body.scrollHeight - window.innerHeight;
       
-      while (scrollIterations < maxScrollIter) {
-        scrollIterations++;
-        const beforeHeight = document.body.scrollHeight;
-        const currentScroll = window.scrollY;
-        const maxScroll = beforeHeight - window.innerHeight;
-        
-        if (currentScroll >= maxScroll - 10) break; // reached bottom
-        
-        window.scrollBy({ top: scrollStep, behavior: 'smooth' });
-        await new Promise(r => setTimeout(r, scrollPause));
-        
-        // Update product count periodically
-        if (scrollIterations % 3 === 0) {
-          const items = extractProducts();
-          countEl.textContent = `${items.length} products found`;
-          statusEl.textContent = `Scrolling... (${items.length} products)`;
-          
-          // Update progress bar (10-50% range)
-          const progress = Math.min(currentScroll / Math.max(maxScroll, 1), 1);
-          progressEl.style.width = (10 + progress * 40) + '%';
-        }
-      }
+      if (currentScroll >= maxScroll - 10) break; // reached bottom
       
-      // ---- At the bottom: try clicking load-more buttons ----
-      const didClickMore = clickLoadMore();
-      if (didClickMore) {
-        statusEl.textContent = 'Loading more products...';
-        await new Promise(r => setTimeout(r, loadMorePause));
-        // After loading more, the page may have grown — scroll again
-        // But first scroll down a bit to trigger any new lazy loads
-        window.scrollBy({ top: scrollStep, behavior: 'smooth' });
-        await new Promise(r => setTimeout(r, scrollPause));
-      }
+      window.scrollBy({ top: scrollStep, behavior: 'smooth' });
+      await new Promise(r => setTimeout(r, scrollPause));
       
-      // ---- Wait a bit at the bottom for any final lazy loads ----
-      await new Promise(r => setTimeout(r, 1500));
+      // Click load-more buttons as we encounter them
+      clickLoadMore();
       
-      // ---- Count products after this full pass ----
-      const items = extractProducts();
-      const newCount = items.length;
-      countEl.textContent = `${newCount} products found`;
-      statusEl.textContent = `Pass ${round + 1}: ${newCount} products found`;
-      
-      console.log(`[Bookmarklet] Round ${round + 1}: ${newCount} products (was ${lastCount})`);
-      
-      if (newCount === lastCount && !didClickMore) {
-        sameCountRounds++;
-        if (sameCountRounds === 1) {
-          statusEl.textContent = 'Checking if everything is loaded...';
-          // One more slow scroll through everything to catch stragglers
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          await new Promise(r => setTimeout(r, 500));
-        }
-      } else {
-        sameCountRounds = 0;
-        lastCount = newCount;
-        // Scroll back to top to start next pass (page may have grown)
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        await new Promise(r => setTimeout(r, 500));
+      // Update product count every few steps
+      if (scrollIterations % 4 === 0) {
+        const items = extractProducts();
+        countEl.textContent = `${items.length} products found`;
+        statusEl.textContent = `Scrolling... (${items.length} products)`;
+        const progress = Math.min(currentScroll / Math.max(maxScroll, 1), 1);
+        progressEl.style.width = (10 + progress * 40) + '%';
       }
     }
     
-    // Final pass: one more quick scroll to make sure nothing was missed
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    await new Promise(r => setTimeout(r, 300));
-    for (let pos = 0; pos < document.body.scrollHeight; pos += scrollStep) {
-      window.scrollTo({ top: pos, behavior: 'instant' });
-      await new Promise(r => setTimeout(r, 400));
+    // At the bottom: one last check for load-more buttons
+    if (clickLoadMore()) {
+      await new Promise(r => setTimeout(r, 1500));
+      // Scroll down a bit more to load any newly added content
+      for (let i = 0; i < 5; i++) {
+        const maxScroll = document.body.scrollHeight - window.innerHeight;
+        if (window.scrollY >= maxScroll - 10) break;
+        window.scrollBy({ top: scrollStep, behavior: 'smooth' });
+        await new Promise(r => setTimeout(r, scrollPause));
+      }
     }
+    
+    // Brief wait for final lazy loads
     await new Promise(r => setTimeout(r, 1000));
     
     const finalItems = extractProducts();
-    lastCount = finalItems.length;
-    countEl.textContent = `${lastCount} products found`;
+    countEl.textContent = `${finalItems.length} products found`;
     
     // Scroll back to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
     progressEl.style.width = '55%';
     
-    console.log(`[Bookmarklet] Auto-scroll complete: ${lastCount} products found`);
+    console.log(`[Bookmarklet] Auto-scroll complete: ${finalItems.length} products found in ${scrollIterations} steps`);
   }
   
   // ============================================
