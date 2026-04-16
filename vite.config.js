@@ -10,6 +10,9 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true
       }
+    },
+    watch: {
+      ignored: ['**/server/.ah_browser_profile/**', '**/node_modules/**', '**/.git/**']
     }
   }
 })
