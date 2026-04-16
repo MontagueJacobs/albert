@@ -12,7 +12,21 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><p id="loading-msg" style="padding:2rem;font-family:monospace;color:#666">Loading app…</p></div>
+    <script>
+      // Catch any uncaught module-level errors and display them
+      window.addEventListener('error', function(e) {
+        var el = document.getElementById('loading-msg');
+        if (el) el.innerHTML = '<h2 style="color:red">JS Error</h2><pre style="color:#c00;white-space:pre-wrap">' + e.message + '\n\n' + (e.filename || '') + ':' + (e.lineno || '') + '</pre>';
+        else document.body.innerHTML = '<pre style="color:red;padding:2rem">' + e.message + '</pre>';
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        var el = document.getElementById('loading-msg');
+        var msg = e.reason ? (e.reason.stack || e.reason.message || String(e.reason)) : 'Unknown promise rejection';
+        if (el) el.innerHTML = '<h2 style="color:red">Promise Error</h2><pre style="color:#c00;white-space:pre-wrap">' + msg + '</pre>';
+        else document.body.innerHTML = '<pre style="color:red;padding:2rem">' + msg + '</pre>';
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
