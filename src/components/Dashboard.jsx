@@ -244,7 +244,7 @@ function Dashboard({ syncVersion }) {
     )
   }
 
-  // Not logged in - show sync prompt
+  // Not logged in - show experiment prompt
   if (!isUserConnected) {
     return (
       <div style={styles.loginPrompt}>
@@ -255,10 +255,10 @@ function Dashboard({ syncVersion }) {
         </p>
         <button 
           className="btn btn-primary btn-lg"
-          onClick={() => window.location.href = '/bookmarklet.html'}
+          onClick={() => { window.location.hash = 'experiment' }}
         >
           <RefreshCw size={20} />
-          {t('sync_account') || 'Sync Account'}
+          {t('tab_experiment') || 'Start Experiment'}
         </button>
       </div>
     )
