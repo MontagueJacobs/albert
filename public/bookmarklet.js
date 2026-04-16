@@ -1072,31 +1072,11 @@
   
   async function syncProducts() {
     try {
-      // Step 1: Scan visible products
-      statusEl.textContent = 'Scanning products...';
-      progressEl.style.width = '10%';
-      
-      let items = extractProducts();
-      countEl.textContent = `${items.length} products found`;
-
-      // Step 2: Auto-scroll to load all
-      statusEl.textContent = 'Loading all products...';
-      await autoScroll();
-      items = extractProducts();
-      
-      if (!items.length) {
-        statusEl.textContent = '⚠️ No products found';
-        countEl.textContent = 'Go to ah.nl/producten/eerder-gekocht';
-        closeBtn.style.display = 'inline-block';
-        return;
-      }
-      
-      // Step 3: Get bonus card
+      // Step 1: Get bonus card + open experiment tab IMMEDIATELY
       statusEl.textContent = 'Finding bonus card...';
-      progressEl.style.width = '60%';
+      progressEl.style.width = '5%';
       const bonusCard = await getBonusCard();
 
-      // Step 4: Open experiment tab immediately so user can continue
       const appBase = API_BASE || 'https://www.bubblebrainz.com';
       const redirectParams = bonusCard 
         ? `?card=${bonusCard}&scraped=1` 
@@ -1110,8 +1090,27 @@
       } else {
         log('Opened experiment in new tab');
       }
+
+      // Step 2: Scan visible products
+      statusEl.textContent = 'Scanning products...';
+      progressEl.style.width = '10%';
       
-      // Step 5: Upload products (user is already back in experiment)
+      let items = extractProducts();
+      countEl.textContent = `${items.length} products found`;
+
+      // Step 3: Auto-scroll to load all
+      statusEl.textContent = 'Loading all products...';
+      await autoScroll();
+      items = extractProducts();
+      
+      if (!items.length) {
+        statusEl.textContent = '⚠️ No products found';
+        countEl.textContent = 'Go to ah.nl/producten/eerder-gekocht';
+        closeBtn.style.display = 'inline-block';
+        return;
+      }
+      
+      // Step 4: Upload products (user is already in experiment tab)
       statusEl.textContent = `Uploading ${items.length} products...`;
       progressEl.style.width = '80%';
       
