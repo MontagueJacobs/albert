@@ -227,7 +227,7 @@ const styles = {
     width: '20px',
     height: '20px',
     marginTop: '2px',
-    accentColor: '#22c55e',
+    accentColor: '#6FAF8F',
     flexShrink: 0
   },
   startBtn: {
