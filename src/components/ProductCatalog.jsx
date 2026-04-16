@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf, ShoppingBag, ArrowUpDown, Grid3X3, List, UtensilsCrossed, Coffee, Sprout, TreePine, Handshake } from 'lucide-react'
+import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf, ShoppingBag, ArrowUpDown, Grid3X3, List, UtensilsCrossed, Coffee, Sprout, TreePine } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
 import { variantScoreClass } from '../lib/scoreUtils.js'
