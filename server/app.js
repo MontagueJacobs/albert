@@ -4032,11 +4032,30 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
         }
       }))
 
-      // Filter valid CO2 data, shuffle, take up to 6
-      items = enriched
+      // Filter valid CO2 data, then pick 6 with a spread of CO2 values
+      const validItems = enriched
         .filter(item => item.co2PerKg != null && item.co2PerKg > 0)
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 6)
+
+      if (validItems.length <= 6) {
+        // Not enough to be picky — use them all, shuffled
+        items = validItems.sort(() => Math.random() - 0.5)
+      } else {
+        // Stratified selection: sort by CO2, divide into 6 equal buckets,
+        // pick one random item from each bucket (like the hand-picked pools
+        // which span low → high CO2)
+        validItems.sort((a, b) => a.co2PerKg - b.co2PerKg)
+        const bucketSize = validItems.length / 6
+        items = []
+        for (let b = 0; b < 6; b++) {
+          const start = Math.floor(b * bucketSize)
+          const end = Math.floor((b + 1) * bucketSize)
+          const bucket = validItems.slice(start, end)
+          const pick = bucket[Math.floor(Math.random() * bucket.length)]
+          items.push(pick)
+        }
+        // Shuffle so user doesn't see them pre-sorted
+        items.sort(() => Math.random() - 0.5)
+      }
     }
 
     // Filter out any used IDs (safety)
