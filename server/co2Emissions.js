@@ -2398,6 +2398,280 @@ function compareToBaseline(userAvgCO2PerKg, region = 'netherlands') {
   }
 }
 
+// ============================================================================
+// AH STORE CATEGORY → CO₂ CATEGORY MAPPING
+// When the name/ingredient matching fails, we can infer a CO₂ category from
+// the AH store taxonomy stored in the product's `categories` array.
+// ============================================================================
+const AH_CATEGORY_TO_CO2 = {
+  // ===== MAIN CATEGORIES (used as fallback when no sub-category matches) =====
+  'ah:Vlees, kip, vis en vega': 'pig_meat',
+  'ah:Vlees': 'pig_meat',
+  'ah:Vleeswaren': 'pig_meat',
+  'ah:Vis': 'fish_farmed',
+  'ah:Zuivel, plantaardig en eieren': 'milk',
+  'ah:Zuivel, eieren': 'milk',
+  'ah:Kaas': 'cheese',
+  'ah:Brood en gebak': 'wheat_rye',
+  'ah:Bakkerij': 'baked_goods',
+  'ah:Aardappel, groente en fruit': 'other_vegetables',
+  'ah:Groente, aardappelen': 'other_vegetables',
+  'ah:Fruit, verse sappen': 'other_fruit',
+  'ah:Pasta, rijst en wereldkeuken': 'wheat_rye',
+  'ah:Pasta, rijst, wereldkeuken': 'wheat_rye',
+  'ah:Sauzen, olie en kruiden': 'sauces_condiments',
+  'ah:Soepen, sauzen, kruiden, olie': 'sauces_condiments',
+  'ah:Frisdrank, sappen en water': 'soft_drinks',
+  'ah:Frisdrank, sappen, water': 'soft_drinks',
+  'ah:Koffie en thee': 'coffee',
+  'ah:Koffie, thee': 'coffee',
+  'ah:Bier en wijn': 'wine',
+  'ah:Bier, wijn, aperitieven': 'wine',
+  'ah:Snoep, koek en chips': 'candy_sweets',
+  'ah:Koek, snoep, chocolade': 'candy_sweets',
+  'ah:Borrel, chips, snacks': 'snacks',
+  'ah:Tussendoortjes': 'snacks',
+  'ah:Diepvries': 'ready_meals',
+  'ah:Maaltijden': 'ready_meals',
+  'ah:Maaltijden, salades': 'ready_meals',
+  'ah:Ontbijtgranen en beleg': 'wheat_rye',
+  'ah:Ontbijtgranen, beleg': 'wheat_rye',
+  'ah:Baby en kind': 'baby_food',
+
+  // ===== SUB-CATEGORIES (preferred — more specific) =====
+  // Meat
+  'ah_sub:Rundergehakt en -tartaar': 'beef_herd',
+  'ah_sub:Biefstuk': 'beef_herd',
+  'ah_sub:Rundvlees overig': 'beef_herd',
+  'ah_sub:Runderreepjes en -blokjes': 'beef_herd',
+  'ah_sub:Lamsvlees': 'lamb_mutton',
+  'ah_sub:Varkensgehakt': 'pig_meat',
+  'ah_sub:Varkenshaas en -filet': 'pig_meat',
+  'ah_sub:Karbonade en schnitzel': 'pig_meat',
+  'ah_sub:Spareribs': 'pig_meat',
+  'ah_sub:Varkensvlees overig': 'pig_meat',
+  'ah_sub:Worst': 'pig_meat',
+  'ah_sub:Rookworst': 'pig_meat',
+  'ah_sub:Braadworst en saucijs': 'pig_meat',
+  'ah_sub:Knakworst en hotdog': 'pig_meat',
+  'ah_sub:Ham': 'pig_meat',
+  'ah_sub:Bacon en spek': 'pig_meat',
+  'ah_sub:Kipfilet': 'poultry_meat',
+  'ah_sub:Kippenpoot en -bout': 'poultry_meat',
+  'ah_sub:Kipgehakt': 'poultry_meat',
+  'ah_sub:Kip panklaar': 'poultry_meat',
+  'ah_sub:Kippenvleugels': 'poultry_meat',
+  'ah_sub:Kip overig': 'poultry_meat',
+  'ah_sub:Kalkoen': 'poultry_meat',
+  'ah_sub:Eend': 'poultry_meat',
+  'ah_sub:Zalm': 'fish_farmed',
+  'ah_sub:Garnalen': 'shrimps_farmed',
+  'ah_sub:Tonijn': 'fish_farmed',
+  'ah_sub:Pangasius en tilapia': 'fish_farmed',
+  'ah_sub:Kabeljauw': 'fish_farmed',
+  'ah_sub:Vis overig': 'fish_farmed',
+  'ah_sub:Vissticks en kibbeling': 'fish_farmed',
+  'ah_sub:Haring en makreel': 'fish_farmed',
+  'ah_sub:Schol en tong': 'fish_farmed',
+  'ah_sub:Gerookte vis': 'fish_farmed',
+  'ah_sub:Vegetarisch en vegan': 'tofu',
+  'ah_sub:Vega gehakt en reepjes': 'tofu',
+  'ah_sub:Vega burgers en schnitzels': 'tofu',
+  'ah_sub:Vega worst en knaks': 'tofu',
+  'ah_sub:Tofu en tempeh': 'tofu',
+  'ah_sub:Vega kip': 'tofu',
+  'ah_sub:Beleg vleeswaren': 'pig_meat',
+  'ah_sub:Filet americain': 'pig_meat',
+  'ah_sub:Salami': 'pig_meat',
+  'ah_sub:Kip en kalkoen beleg': 'poultry_meat',
+  // Dairy
+  'ah_sub:Melk': 'milk',
+  'ah_sub:Halfvolle melk': 'milk',
+  'ah_sub:Volle melk': 'milk',
+  'ah_sub:Magere melk': 'milk',
+  'ah_sub:Karnemelk': 'milk',
+  'ah_sub:Yoghurt': 'milk',
+  'ah_sub:Kwark': 'milk',
+  'ah_sub:Vla': 'milk',
+  'ah_sub:Slagroom en kookroom': 'milk',
+  'ah_sub:Boter': 'butter',
+  'ah_sub:Margarine en halvarine': 'margarine',
+  'ah_sub:Kaas': 'cheese',
+  'ah_sub:Plakken kaas': 'cheese',
+  'ah_sub:Stuk kaas': 'cheese',
+  'ah_sub:Zachte kaas': 'cheese',
+  'ah_sub:Geraspte kaas': 'cheese',
+  'ah_sub:Smeerkaas': 'cheese',
+  'ah_sub:Eieren': 'eggs',
+  'ah_sub:Plantaardige melk': 'soy_milk',
+  'ah_sub:Plantaardige yoghurt': 'soy_milk',
+  'ah_sub:Plantaardige room': 'soy_milk',
+  'ah_sub:Plantaardig beleg': 'tofu',
+  // Bread & bakery
+  'ah_sub:Brood': 'wheat_rye',
+  'ah_sub:Volkoren brood': 'wheat_rye',
+  'ah_sub:Wit brood': 'wheat_rye',
+  'ah_sub:Bruin brood': 'wheat_rye',
+  'ah_sub:Afbakbrood': 'wheat_rye',
+  'ah_sub:Beschuit en crackers': 'wheat_rye',
+  'ah_sub:Croissants': 'wheat_rye',
+  'ah_sub:Broodjes': 'wheat_rye',
+  'ah_sub:Wraps en pitabrood': 'wheat_rye',
+  'ah_sub:Gebak': 'baked_goods',
+  'ah_sub:Taart': 'baked_goods',
+  'ah_sub:Koek': 'baked_goods',
+  // Fruits & vegetables
+  'ah_sub:Aardappelen': 'potatoes',
+  'ah_sub:Tomaten': 'tomatoes',
+  'ah_sub:Komkommer': 'other_vegetables',
+  'ah_sub:Paprika': 'other_vegetables',
+  'ah_sub:Sla': 'other_vegetables',
+  'ah_sub:Champignons': 'other_vegetables',
+  'ah_sub:Broccoli': 'brassicas',
+  'ah_sub:Bloemkool': 'brassicas',
+  'ah_sub:Spinazie': 'brassicas',
+  'ah_sub:Spruitjes': 'brassicas',
+  'ah_sub:Wortelen': 'root_vegetables',
+  'ah_sub:Uien': 'onions_leeks',
+  'ah_sub:Prei': 'onions_leeks',
+  'ah_sub:Courgette': 'other_vegetables',
+  'ah_sub:Groente overig': 'other_vegetables',
+  'ah_sub:Verse groente': 'other_vegetables',
+  'ah_sub:Groentepakketten': 'other_vegetables',
+  'ah_sub:Slamelange en rucola': 'other_vegetables',
+  'ah_sub:Voorverpakte salade': 'other_vegetables',
+  'ah_sub:Avocado': 'other_vegetables',
+  'ah_sub:Appels': 'apples',
+  'ah_sub:Peren': 'apples',
+  'ah_sub:Bananen': 'bananas',
+  'ah_sub:Sinaasappels': 'citrus_fruit',
+  'ah_sub:Mandarijnen': 'citrus_fruit',
+  'ah_sub:Citroenen en limoenen': 'citrus_fruit',
+  'ah_sub:Aardbeien': 'berries_grapes',
+  'ah_sub:Bessen': 'berries_grapes',
+  'ah_sub:Druiven': 'berries_grapes',
+  'ah_sub:Frambozen': 'berries_grapes',
+  'ah_sub:Mango': 'other_fruit',
+  'ah_sub:Ananas': 'other_fruit',
+  'ah_sub:Meloenen': 'other_fruit',
+  'ah_sub:Kiwi': 'other_fruit',
+  'ah_sub:Fruit overig': 'other_fruit',
+  // Pantry
+  'ah_sub:Pasta': 'wheat_rye',
+  'ah_sub:Rijst': 'rice',
+  'ah_sub:Noodles': 'wheat_rye',
+  'ah_sub:Couscous': 'wheat_rye',
+  // Sauces & condiments
+  'ah_sub:Mayonaise en dressing': 'sauces_condiments',
+  'ah_sub:Ketchup en mosterd': 'sauces_condiments',
+  'ah_sub:Pastasaus': 'sauces_condiments',
+  'ah_sub:Woksaus': 'sauces_condiments',
+  'ah_sub:Olijfolie': 'olive_oil',
+  'ah_sub:Zonnebloemolie': 'sunflower_oil',
+  'ah_sub:Kruiden': 'sauces_condiments',
+  'ah_sub:Azijn': 'sauces_condiments',
+  // Drinks
+  'ah_sub:Frisdrank': 'soft_drinks',
+  'ah_sub:Sappen': 'soft_drinks',
+  'ah_sub:Water': 'soft_drinks',
+  'ah_sub:Energie- en sportdrank': 'soft_drinks',
+  'ah_sub:Siroop en limonade': 'soft_drinks',
+  'ah_sub:Ice tea': 'soft_drinks',
+  // Coffee & tea
+  'ah_sub:Koffie': 'coffee',
+  'ah_sub:Koffiebonen': 'coffee',
+  'ah_sub:Koffiecups': 'coffee',
+  'ah_sub:Koffiepads': 'coffee',
+  'ah_sub:Oploskoffie': 'coffee',
+  'ah_sub:Thee': 'tea',
+  // Alcohol
+  'ah_sub:Pils': 'beer',
+  'ah_sub:Speciaal bier': 'beer',
+  'ah_sub:Alcoholvrij bier': 'beer',
+  'ah_sub:Rode wijn': 'wine',
+  'ah_sub:Witte wijn': 'wine',
+  'ah_sub:Rosé': 'wine',
+  'ah_sub:Prosecco en champagne': 'wine',
+  // Snacks
+  'ah_sub:Chips': 'snacks',
+  'ah_sub:Noten en borrelhapjes': 'nuts',
+  'ah_sub:Popcorn': 'snacks',
+  'ah_sub:Chocolade': 'dark_chocolate',
+  'ah_sub:Repen': 'dark_chocolate',
+  'ah_sub:Snoep': 'candy_sweets',
+  'ah_sub:Drop': 'candy_sweets',
+  'ah_sub:Koekjes': 'baked_goods',
+  // Frozen
+  'ah_sub:Diepvries groente': 'other_vegetables',
+  'ah_sub:Diepvries fruit': 'other_fruit',
+  'ah_sub:Diepvries vis': 'fish_farmed',
+  'ah_sub:Diepvries kip': 'poultry_meat',
+  'ah_sub:Diepvries pizza': 'ready_meals',
+  'ah_sub:Diepvries snacks': 'snacks',
+  'ah_sub:Diepvries ijs': 'ice_cream',
+  'ah_sub:Diepvries maaltijden': 'ready_meals',
+  'ah_sub:Diepvries aardappel': 'potatoes',
+  'ah_sub:Diepvries brood': 'wheat_rye',
+  // Ready meals
+  'ah_sub:Maaltijden': 'ready_meals',
+  'ah_sub:Maaltijdpakketten': 'ready_meals',
+  'ah_sub:Magnetron maaltijden': 'ready_meals',
+  'ah_sub:Soep': 'soup',
+  'ah_sub:Soepen': 'soup',
+  // Breakfast
+  'ah_sub:Muesli en granola': 'oatmeal',
+  'ah_sub:Havermout': 'oatmeal',
+  'ah_sub:Cornflakes': 'maize',
+  'ah_sub:Hagelslag en vlokken': 'dark_chocolate',
+  'ah_sub:Pindakaas': 'groundnuts',
+  'ah_sub:Jam': 'spreads',
+  'ah_sub:Honing': 'spreads',
+  'ah_sub:Sandwichspread': 'spreads',
+  // Legumes
+  'ah_sub:Bonen': 'other_pulses',
+  'ah_sub:Linzen': 'other_pulses',
+  'ah_sub:Kikkererwten': 'other_pulses',
+  // Baby
+  'ah_sub:Babyvoeding': 'baby_food',
+  'ah_sub:Flesvoeding': 'baby_food',
+}
+
+/**
+ * Try to infer a CO₂ category from a product's AH store categories array.
+ * Prefers sub-categories (more specific) over main categories (broader).
+ * Falls back to running sub-category text through the keyword system.
+ * @param {string[]} categories - Array of AH categories like ['ah:Vlees', 'ah_sub:Kipfilet']
+ * @returns {string|null} - CO₂ category key (e.g. 'poultry_meat') or null
+ */
+function inferCO2FromAHCategories(categories) {
+  if (!Array.isArray(categories) || categories.length === 0) return null
+
+  // 1. Try sub-categories first (more specific)
+  let mainCategoryMatch = null
+  for (const cat of categories) {
+    if (cat.startsWith('ah_sub:')) {
+      const mapped = AH_CATEGORY_TO_CO2[cat]
+      if (mapped) return mapped
+    } else if (cat.startsWith('ah:') && !mainCategoryMatch) {
+      const mapped = AH_CATEGORY_TO_CO2[cat]
+      if (mapped) mainCategoryMatch = mapped
+    }
+  }
+
+  // 2. Try partial matching on sub-category text via keyword system
+  for (const cat of categories) {
+    if (!cat.startsWith('ah_sub:')) continue
+    const subName = cat.replace('ah_sub:', '').toLowerCase()
+    const co2Cat = getCO2Category(subName)
+    if (co2Cat && co2Cat !== '__non_food__') return co2Cat
+  }
+
+  // 3. Fall back to main category
+  if (mainCategoryMatch) return mainCategoryMatch
+
+  return null
+}
+
 // Export for use in app.js (ES modules)
 export {
   CO2_EMISSIONS_DATA,
@@ -2406,6 +2680,7 @@ export {
   NON_FOOD_KEYWORDS,
   DIETARY_BASELINES,
   CATEGORY_DEFAULT_WEIGHTS,
+  AH_CATEGORY_TO_CO2,
   getCO2Category,
   getCO2Emissions,
   getCO2FromIngredients,
@@ -2417,6 +2692,7 @@ export {
   getCategoryLabel,
   evaluateProductCO2,
   isNonFood,
+  inferCO2FromAHCategories,
   compareToBaseline,
   parseWeightGrams,
   getProductWeight,

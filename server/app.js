@@ -30,7 +30,9 @@ import {
   isNonFood,
   compareToBaseline,
   DIETARY_BASELINES,
-  getProductWeight
+  getProductWeight,
+  CO2_EMISSIONS_DATA,
+  inferCO2FromAHCategories
 } from './co2Emissions.js'
 
 import { findSmartAlternatives, getSmartSuggestions, CATEGORY_SWAPS, RECOMMENDABLE_CATEGORIES } from './suggestionEngine.js'
@@ -1032,6 +1034,21 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const nutritionJson = enrichedData?.nutrition_json || null
   let co2Data = getCO2Emissions(input, ingredientText, nutritionText, nutritionJson)
   
+  // Fallback: if name/ingredient matching failed, try AH store category inference
+  // (uses AH_CATEGORY_TO_CO2 mapping from co2Emissions.js)
+  if (!co2Data.matched && !co2Data.isNonFood && enrichedData?.categories) {
+    const inferredCat = inferCO2FromAHCategories(enrichedData.categories)
+    if (inferredCat && CO2_EMISSIONS_DATA[inferredCat]) {
+      co2Data = {
+        co2PerKg: CO2_EMISSIONS_DATA[inferredCat],
+        category: inferredCat,
+        matched: true,
+        isNonFood: false,
+        method: 'ah_category_inference'
+      }
+    }
+  }
+
   // Safety net: if enrichedData says product is vegan/vegetarian but CO2 matched
   // a meat/fish category, override to 'tofu' (plant-based protein).
   // This catches vegan brands with meat-like names (e.g. "redefine meat pulled beef")
@@ -1224,7 +1241,8 @@ function getEnrichedData(product) {
     product.nutri_score != null || 
     product.origin_country != null ||
     product.origin_by_month != null ||
-    product.ingredients != null
+    product.ingredients != null ||
+    product.categories != null
   
   if (!hasEnrichedData) return null
   
@@ -1242,7 +1260,8 @@ function getEnrichedData(product) {
     nutrition_text: product.nutrition_text,
     nutrition_json: product.nutrition_json,
     image_url: product.image_url,
-    details_scraped_at: product.details_scraped_at
+    details_scraped_at: product.details_scraped_at,
+    categories: product.categories || null
   }
 }
 
@@ -1625,7 +1644,7 @@ app.get('/api/user/purchases/history', requireAHEmail, async (req, res) => {
     if (productIds.length > 0 && enrichedColumnsAvailable) {
       const { data: products, error: enrichError } = await supabase
         .from('products')
-        .select('id, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
+        .select('id, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json, categories')
         .in('id', productIds)
       
       if (enrichError?.message?.includes('does not exist')) {
@@ -1834,7 +1853,7 @@ app.get('/api/bonus/:cardNumber/purchases', async (req, res) => {
     if (productIds.length > 0) {
       const { data: products } = await supabase
         .from('products')
-        .select('id, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json')
+        .select('id, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, image_url, url, unit_size, ingredients, nutrition_text, nutrition_json, categories')
         .in('id', productIds)
       
       if (products) {
@@ -2151,7 +2170,7 @@ app.get('/api/products/popular', async (req, res) => {
     if (enrichedColumnsAvailable) {
       const result = await supabase
         .from('products')
-        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, details_scraped_at, ingredients, nutrition_text, nutrition_json')
+        .select('id, name, normalized_name, url, image_url, price, seen_count, created_at, last_seen_at, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, details_scraped_at, ingredients, nutrition_text, nutrition_json, categories')
         .order('seen_count', { ascending: false })
         .limit(limit)
       
@@ -2208,7 +2227,7 @@ app.get('/api/products/search', async (req, res) => {
     if (enrichedColumnsAvailable) {
       const result = await supabase
         .from('products')
-        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text, nutrition_json')
+        .select('id, name, normalized_name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, origin_country, origin_by_month, brand, ingredients, nutrition_text, nutrition_json, categories')
         .ilike('normalized_name', `%${query.toLowerCase()}%`)
         .limit(50)
       
@@ -3586,7 +3605,7 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
     // Build query - only add exclusion filter if there are purchased IDs
     let productsQuery = supabase
       .from('products')
-      .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, ingredients, nutrition_text, nutrition_json')
+      .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, ingredients, nutrition_text, nutrition_json, categories')
     
     // Only exclude purchased IDs if there are any
     const purchasedIdArray = [...purchasedIds].filter(id => id)
@@ -3629,7 +3648,7 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
       if (p.product_id) {
         const { data: product } = await supabase
           .from('products')
-          .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url, ingredients, nutrition_text, nutrition_json')
+          .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url, ingredients, nutrition_text, nutrition_json, categories')
           .eq('id', p.product_id)
           .single()
         if (product) {
@@ -3673,7 +3692,7 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
     if (!allRankingProducts.some(p => p.id === MUST_INCLUDE_ID)) {
       const { data: mustProduct } = await supabase
         .from('products')
-        .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, ingredients, nutrition_text, nutrition_json')
+        .select('id, name, image_url, is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, ingredients, nutrition_text, nutrition_json, categories')
         .eq('id', MUST_INCLUDE_ID)
         .single()
       if (mustProduct) {
@@ -4182,7 +4201,7 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
         if (p.product_id) {
           const { data: product } = await supabase
             .from('products')
-            .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url, ingredients, nutrition_text, nutrition_json')
+            .select('is_vegan, is_vegetarian, is_organic, is_fairtrade, origin_country, origin_by_month, image_url, ingredients, nutrition_text, nutrition_json, categories')
             .eq('id', p.product_id)
             .single()
           if (product) {
