@@ -849,7 +849,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                     cursor: 'pointer'
                   }}
                 >
-                  🛒 {isNl ? 'Stel je eigen boodschappenlijst samen' : 'Make your own shopping list'}
+                  {isNl ? 'Stel je eigen boodschappenlijst samen' : 'Make your own shopping list'}
                 </button>
               ) : (
                 <div style={{
