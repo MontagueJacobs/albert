@@ -4023,9 +4023,17 @@ app.get('/api/experiment/popular-items', (req, res) => {
   res.json({ items: POPULAR_AH_ITEMS })
 })
 
+// Categories excluded from filler per diet type
+const DIET_EXCLUDED_CATEGORIES = {
+  vegan:       new Set(['meat', 'fish', 'dairy', 'cheese', 'eggs']),
+  vegetarian:  new Set(['meat', 'fish']),
+  flexitarian: new Set(),
+  omnivore:    new Set(),
+  other:       new Set()
+}
+
 // POST self-selected cart: user picked 10 items from the 50 popular items
-// We insert ALL 50 popular items so quiz 2 & 4 have enough products.
-// The user's 10 picks go in first (they are the "core" selection).
+// We insert diet-compatible filler from POPULAR_AH_ITEMS so quiz 2 & 4 have enough.
 app.post('/api/experiment/:sessionId/use-self-selected-cart', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -4044,14 +4052,23 @@ app.post('/api/experiment/:sessionId/use-self-selected-cart', async (req, res) =
       return res.status(400).json({ error: 'Invalid item selections' })
     }
 
-    // Bootstrap: add the remaining 40 popular items as filler so personal
-    // quizzes (quiz 2 & 4) have a large enough pool to draw from.
+    // Read diet from session demographics to filter filler items
+    const { data: sess } = await supabase
+      .from('experiment_sessions')
+      .select('demographics')
+      .eq('id', sessionId)
+      .single()
+    const diet = sess?.demographics?.demo_diet || 'omnivore'
+    const excluded = DIET_EXCLUDED_CATEGORIES[diet] || new Set()
+
+    // Bootstrap: add remaining popular items that fit the user's diet
     const pickedSet = new Set(pickedTerms)
     const fillerTerms = POPULAR_AH_ITEMS
+      .filter(item => !pickedSet.has(item.search) && !excluded.has(item.category))
       .map(item => item.search)
-      .filter(term => !pickedSet.has(term))
     const allTerms = [...pickedTerms, ...fillerTerms]
 
+    console.log(`[Self-Selected Cart] diet="${diet}", ${pickedTerms.length} picks + ${fillerTerms.length} filler = ${allTerms.length} total`)
     const updated = await resolveAndInsertCart(sessionId, allTerms, 'self_selected')
     res.json({ session: updated })
   } catch (e) {
@@ -4079,12 +4096,13 @@ app.post('/api/experiment/:sessionId/use-predefined-cart', async (req, res) => {
 
     const diet = session.demographics?.demo_diet || 'omnivore'
     const coreTerms = PREDEFINED_CARTS[diet] || PREDEFINED_CARTS.omnivore
+    const excluded = DIET_EXCLUDED_CATEGORIES[diet] || new Set()
 
-    // Bootstrap: add the remaining popular items as filler
+    // Bootstrap: add remaining popular items that fit the user's diet
     const coreSet = new Set(coreTerms)
     const fillerTerms = POPULAR_AH_ITEMS
+      .filter(item => !coreSet.has(item.search) && !excluded.has(item.category))
       .map(item => item.search)
-      .filter(term => !coreSet.has(term))
     const allTerms = [...coreTerms, ...fillerTerms]
 
     console.log(`[Predefined Cart] Using diet "${diet}" for session ${sessionId} (${coreTerms.length} core + ${fillerTerms.length} filler = ${allTerms.length} total)`)
