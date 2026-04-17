@@ -3969,15 +3969,23 @@ async function resolveAndInsertCart(sessionId, searchTerms, cartSource) {
     last_seen_at: now
   }))
 
-  // Deduplicate on retry
-  const allIds = purchaseRecords.map(r => r.product_id)
+  // Deduplicate within batch (different search terms can resolve to the same product)
+  const seenInBatch = new Set()
+  const uniqueRecords = purchaseRecords.filter(r => {
+    if (seenInBatch.has(r.product_id)) return false
+    seenInBatch.add(r.product_id)
+    return true
+  })
+
+  // Deduplicate against already-existing rows (retry safety)
+  const allIds = uniqueRecords.map(r => r.product_id)
   const { data: existing } = await supabase
     .from('user_purchases')
     .select('product_id')
     .eq('bonus_card_number', genericCard)
     .in('product_id', allIds)
   const existingIds = new Set((existing || []).map(r => r.product_id))
-  const newRecords = purchaseRecords.filter(r => !existingIds.has(r.product_id))
+  const newRecords = uniqueRecords.filter(r => !existingIds.has(r.product_id))
 
   if (newRecords.length > 0) {
     const { error: insertError } = await supabase
