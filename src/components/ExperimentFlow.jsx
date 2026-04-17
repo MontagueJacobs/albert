@@ -329,7 +329,7 @@ const styles = {
 
 export default function ExperimentFlow({ onComplete, onBack }) {
   const { lang } = useI18n()
-  const { bonusCardNumber } = useBonusCard()
+  const { bonusCardNumber, login: loginBonusCard } = useBonusCard()
   const isNl = lang === 'nl'
 
   const [session, setSession] = useState(null)
@@ -417,6 +417,12 @@ export default function ExperimentFlow({ onComplete, onBack }) {
         try {
           localStorage.removeItem('ah_bonus_card')
         } catch (_) {}
+      }
+
+      // When resuming a session that already has a bonus card (real or CART_*),
+      // restore it into the BonusCard context so the Dashboard can use it.
+      if (data.resumed && data.session.bonus_card && !bonusCardNumber) {
+        loginBonusCard(data.session.bonus_card)
       }
     } catch (e) {
       setError(e.message)
@@ -508,6 +514,10 @@ export default function ExperimentFlow({ onComplete, onBack }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+      // Store the CART_ bonus card so Dashboard can fetch purchases later
+      if (data.session.bonus_card) {
+        loginBonusCard(data.session.bonus_card)
+      }
       setSession(data.session)
     } catch (e) {
       setError(e.message)
@@ -525,6 +535,10 @@ export default function ExperimentFlow({ onComplete, onBack }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+      // Store the CART_ bonus card so Dashboard can fetch purchases later
+      if (data.session.bonus_card) {
+        loginBonusCard(data.session.bonus_card)
+      }
       setSession(data.session)
     } catch (e) {
       setError(e.message)
@@ -898,7 +912,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                           }}
                         >
                           <span style={{ fontSize: '1.1rem' }}>{item.emoji}</span>
-                          <span style={{ flex: 1 }}>{item.nameNl}</span>
+                          <span style={{ flex: 1 }}>{isNl ? item.nameNl : item.nameEn}</span>
                           {selected && <span style={{ color: '#22c55e', fontWeight: 700 }}>✓</span>}
                         </button>
                       )
