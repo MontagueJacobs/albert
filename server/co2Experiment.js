@@ -62,6 +62,127 @@ const AH_POOL_D = [
   { name: 'AH Haverdrink ongezoet',    nameNl: 'AH Haverdrink ongezoet',    image: '🥛', image_url: 'https://static.ah.nl/dam/product/AHI_43545239393536393239?revLabel=1&rendition=200x200_JPG_Q85&fileType=binary' },
 ]
 
+// ===========================================================================
+// CART DATA FOR NON-AH PARTICIPANTS
+// Hierarchy: 1) real scraped data  2) self-selected (pick 10 from 50)  3) predefined by diet
+// All use search terms to look up REAL products from the products table at runtime.
+// ===========================================================================
+
+/**
+ * 50 popular AH items shown to participants who choose "make your own cart".
+ * They pick exactly 10. Each has a search term, display name (NL), category & emoji.
+ */
+export const POPULAR_AH_ITEMS = [
+  // === Meat & Fish (high CO₂) ===
+  { search: 'rundergehakt',        nameNl: 'Rundergehakt',           emoji: '🥩', category: 'meat' },
+  { search: 'biefstuk',            nameNl: 'Biefstuk',              emoji: '🥩', category: 'meat' },
+  { search: 'varkenshaas',         nameNl: 'Varkenshaas',           emoji: '🥩', category: 'meat' },
+  { search: 'spekblokjes',         nameNl: 'Spekblokjes',           emoji: '🥓', category: 'meat' },
+  { search: 'kipfilet',            nameNl: 'Kipfilet',              emoji: '🍗', category: 'meat' },
+  { search: 'kipdrumsticks',       nameNl: 'Kipdrumsticks',         emoji: '🍗', category: 'meat' },
+  { search: 'gehaktbal',           nameNl: 'Gehaktballen',          emoji: '🧆', category: 'meat' },
+  { search: 'zalmfilet',           nameNl: 'Zalmfilet',             emoji: '🐟', category: 'fish' },
+  { search: 'tonijn',              nameNl: 'Tonijn (blik)',         emoji: '🐟', category: 'fish' },
+  { search: 'kibbeling',           nameNl: 'Kibbeling',             emoji: '🐟', category: 'fish' },
+
+  // === Dairy ===
+  { search: 'halfvolle melk',      nameNl: 'Halfvolle melk',        emoji: '🥛', category: 'dairy' },
+  { search: 'karnemelk',           nameNl: 'Karnemelk',             emoji: '🥛', category: 'dairy' },
+  { search: 'yoghurt',             nameNl: 'Yoghurt',               emoji: '🥛', category: 'dairy' },
+  { search: 'slagroom',            nameNl: 'Slagroom',              emoji: '🥛', category: 'dairy' },
+  { search: 'roomboter',           nameNl: 'Roomboter',             emoji: '🧈', category: 'dairy' },
+
+  // === Cheese ===
+  { search: 'jong belegen',        nameNl: 'Jong belegen kaas',     emoji: '🧀', category: 'cheese' },
+  { search: 'goudse kaas',         nameNl: 'Goudse kaas',           emoji: '🧀', category: 'cheese' },
+  { search: 'mozzarella',          nameNl: 'Mozzarella',            emoji: '🧀', category: 'cheese' },
+
+  // === Eggs ===
+  { search: 'scharreleieren',      nameNl: 'Scharreleieren',        emoji: '🥚', category: 'eggs' },
+
+  // === Plant-based ===
+  { search: 'haverdrink',          nameNl: 'Haverdrink',            emoji: '🌾', category: 'plant_based' },
+  { search: 'sojadrink',           nameNl: 'Sojadrink',             emoji: '🌱', category: 'plant_based' },
+  { search: 'hummus',              nameNl: 'Hummus',                emoji: '🫘', category: 'plant_based' },
+  { search: 'tofu',                nameNl: 'Tofu',                  emoji: '🧈', category: 'plant_based' },
+  { search: 'vegetarische burger', nameNl: 'Vegetarische burger',   emoji: '🌱', category: 'plant_based' },
+
+  // === Bread & Grains ===
+  { search: 'volkoren brood',      nameNl: 'Volkoren brood',        emoji: '🍞', category: 'grains' },
+  { search: 'wit brood',           nameNl: 'Wit brood',             emoji: '🍞', category: 'grains' },
+  { search: 'witte rijst',         nameNl: 'Witte rijst',           emoji: '🍚', category: 'grains' },
+  { search: 'penne',               nameNl: 'Pasta penne',           emoji: '🍝', category: 'grains' },
+  { search: 'havermout',           nameNl: 'Havermout',             emoji: '🥣', category: 'grains' },
+
+  // === Vegetables ===
+  { search: 'trostomaten',         nameNl: 'Trostomaten',           emoji: '🍅', category: 'vegetables' },
+  { search: 'broccoli',            nameNl: 'Broccoli',              emoji: '🥦', category: 'vegetables' },
+  { search: 'wortelen',            nameNl: 'Wortelen',              emoji: '🥕', category: 'vegetables' },
+  { search: 'ijsbergsla',          nameNl: 'IJsbergsla',            emoji: '🥬', category: 'vegetables' },
+  { search: 'komkommer',           nameNl: 'Komkommer',             emoji: '🥒', category: 'vegetables' },
+  { search: 'paprika',             nameNl: 'Paprika',               emoji: '🫑', category: 'vegetables' },
+  { search: 'champignons',         nameNl: 'Champignons',           emoji: '🍄', category: 'vegetables' },
+  { search: 'uien',                nameNl: 'Uien',                  emoji: '🧅', category: 'vegetables' },
+
+  // === Legumes ===
+  { search: 'bruine bonen',        nameNl: 'Bruine bonen',          emoji: '🫘', category: 'legumes' },
+  { search: 'kikkererwten',        nameNl: 'Kikkererwten',          emoji: '🫘', category: 'legumes' },
+  { search: 'linzen',              nameNl: 'Linzen',                emoji: '🫘', category: 'legumes' },
+
+  // === Fruit ===
+  { search: 'bananen',             nameNl: 'Bananen',               emoji: '🍌', category: 'fruit' },
+  { search: 'appels',              nameNl: 'Appels',                emoji: '🍎', category: 'fruit' },
+  { search: 'sinaasappels',        nameNl: 'Sinaasappels',          emoji: '🍊', category: 'fruit' },
+  { search: 'aardbeien',           nameNl: 'Aardbeien',             emoji: '🍓', category: 'fruit' },
+
+  // === Snacks & Treats ===
+  { search: 'chocolade reep',      nameNl: 'Chocoladereep',         emoji: '🍫', category: 'snacks' },
+  { search: 'chips naturel',       nameNl: 'Chips naturel',         emoji: '🥔', category: 'snacks' },
+  { search: 'koekjes',             nameNl: 'Koekjes',               emoji: '🍪', category: 'snacks' },
+
+  // === Oils, Spreads & Condiments ===
+  { search: 'olijfolie',           nameNl: 'Olijfolie',             emoji: '🫒', category: 'oils' },
+  { search: 'pindakaas',           nameNl: 'Pindakaas',             emoji: '🥜', category: 'oils' },
+
+  // === Drinks ===
+  { search: 'sinaasappelsap',      nameNl: 'Sinaasappelsap',        emoji: '🧃', category: 'drinks' },
+  { search: 'koffie',              nameNl: 'Koffie',                emoji: '☕', category: 'drinks' },
+]
+
+/**
+ * Predefined carts by diet type — fallback when user skips self-selection.
+ * Each is a list of search terms (subset of POPULAR_AH_ITEMS searches).
+ * The server resolves these to real products at runtime.
+ */
+export const PREDEFINED_CARTS = {
+  omnivore: [
+    'rundergehakt', 'kipfilet', 'zalmfilet',
+    'halfvolle melk', 'jong belegen', 'scharreleieren',
+    'volkoren brood', 'trostomaten', 'bananen', 'koffie'
+  ],
+  flexitarian: [
+    'kipfilet', 'zalmfilet', 'scharreleieren',
+    'halfvolle melk', 'jong belegen',
+    'tofu', 'volkoren brood', 'broccoli', 'bananen', 'koffie'
+  ],
+  vegetarian: [
+    'scharreleieren', 'halfvolle melk', 'jong belegen', 'mozzarella',
+    'tofu', 'hummus',
+    'volkoren brood', 'trostomaten', 'bananen', 'koffie'
+  ],
+  vegan: [
+    'haverdrink', 'sojadrink', 'tofu', 'hummus',
+    'vegetarische burger', 'kikkererwten',
+    'volkoren brood', 'trostomaten', 'bananen', 'koffie'
+  ],
+  // "other" diet falls back to flexitarian
+  other: [
+    'kipfilet', 'zalmfilet', 'scharreleieren',
+    'halfvolle melk', 'jong belegen',
+    'tofu', 'volkoren brood', 'broccoli', 'bananen', 'koffie'
+  ]
+}
+
 /**
  * Calculate CO2/kg for a product name using the existing CO2 engine
  */

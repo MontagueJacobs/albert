@@ -466,6 +466,73 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     }
   }
 
+  // --- Self-selected cart: user picks 10 items from 50 popular AH products ---
+  const [showCartPicker, setShowCartPicker] = useState(false)
+  const [popularItems, setPopularItems] = useState([])
+  const [selectedItems, setSelectedItems] = useState(new Set())
+  const [cartPickerLoading, setCartPickerLoading] = useState(false)
+
+  const handleOpenCartPicker = async () => {
+    setShowCartPicker(true)
+    if (popularItems.length === 0) {
+      try {
+        const res = await fetch('/api/experiment/popular-items')
+        const data = await res.json()
+        if (data.items) setPopularItems(data.items)
+      } catch (e) {
+        console.error('Failed to load popular items:', e)
+      }
+    }
+  }
+
+  const toggleItem = (index) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else if (next.size < 10) {
+        next.add(index)
+      }
+      return next
+    })
+  }
+
+  const handleSubmitSelfSelectedCart = async () => {
+    if (selectedItems.size < 10) return
+    try {
+      setCartPickerLoading(true)
+      const res = await fetch(`/api/experiment/${session.id}/use-self-selected-cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedIndices: [...selectedItems] })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSession(data.session)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setCartPickerLoading(false)
+    }
+  }
+
+  const handleUsePredefinedCart = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch(`/api/experiment/${session.id}/use-predefined-cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSession(data.session)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleQuizComplete = useCallback((updatedSession) => {
     setSession(updatedSession)
   }, [])
@@ -746,6 +813,142 @@ export default function ExperimentFlow({ onComplete, onBack }) {
               >
                 {isNl ? 'Stel de bookmarklet in' : 'Set up the bookmarklet'}
               </a>
+            </div>
+
+            {/* Alternative: no AH account — two options */}
+            <div style={{
+              borderTop: '1px solid var(--border, rgba(255,255,255,0.1))',
+              paddingTop: '1.25rem',
+              marginTop: '1rem'
+            }}>
+              <p style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)', marginBottom: '0.5rem' }}>
+                {isNl ? 'Geen Albert Heijn bonuskaart?' : 'No Albert Heijn bonus card?'}
+              </p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                {isNl
+                  ? 'Je kunt ook deelnemen door zelf een boodschappenlijst samen te stellen.'
+                  : 'You can also participate by making your own shopping list.'}
+              </p>
+
+              {/* Option A: Make your own cart (pick 10 from 50) */}
+              {!showCartPicker ? (
+                <button
+                  onClick={handleOpenCartPicker}
+                  disabled={loading}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🛒 {isNl ? 'Stel je eigen boodschappenlijst samen' : 'Make your own shopping list'}
+                </button>
+              ) : (
+                <div style={{
+                  background: 'var(--bg-card, #1e293b)',
+                  border: '1px solid var(--border, rgba(255,255,255,0.1))',
+                  borderRadius: '12px',
+                  padding: '1.25rem'
+                }}>
+                  <h4 style={{ margin: '0 0 0.25rem', fontSize: '1rem', color: 'var(--text)' }}>
+                    {isNl ? 'Kies 10 producten die je regelmatig koopt' : 'Pick 10 products you regularly buy'}
+                  </h4>
+                  <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    {isNl
+                      ? `${selectedItems.size}/10 geselecteerd`
+                      : `${selectedItems.size}/10 selected`}
+                  </p>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: '0.5rem',
+                    maxHeight: '350px',
+                    overflowY: 'auto',
+                    marginBottom: '1rem'
+                  }}>
+                    {popularItems.map((item, idx) => {
+                      const selected = selectedItems.has(idx)
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => toggleItem(idx)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0.5rem 0.6rem',
+                            background: selected ? 'rgba(34, 197, 94, 0.2)' : 'var(--bg-secondary, #334155)',
+                            border: selected ? '2px solid #22c55e' : '1px solid var(--border, rgba(255,255,255,0.08))',
+                            borderRadius: '8px',
+                            color: 'var(--text)',
+                            cursor: (!selected && selectedItems.size >= 10) ? 'not-allowed' : 'pointer',
+                            opacity: (!selected && selectedItems.size >= 10) ? 0.4 : 1,
+                            fontSize: '0.82rem',
+                            textAlign: 'left',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <span style={{ fontSize: '1.1rem' }}>{item.emoji}</span>
+                          <span style={{ flex: 1 }}>{item.nameNl}</span>
+                          {selected && <span style={{ color: '#22c55e', fontWeight: 700 }}>✓</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <button
+                    onClick={handleSubmitSelfSelectedCart}
+                    disabled={selectedItems.size < 10 || cartPickerLoading}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      background: selectedItems.size >= 10 ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'var(--bg-secondary, #334155)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      cursor: selectedItems.size >= 10 ? 'pointer' : 'not-allowed',
+                      opacity: cartPickerLoading ? 0.6 : 1
+                    }}
+                  >
+                    {cartPickerLoading
+                      ? (isNl ? 'Bezig...' : 'Loading...')
+                      : (isNl ? `Bevestig (${selectedItems.size}/10)` : `Confirm (${selectedItems.size}/10)`)}
+                  </button>
+                </div>
+              )}
+
+              {/* Option B: Skip — get a predefined cart based on diet */}
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--border, rgba(255,255,255,0.08))' }}>
+                <button
+                  onClick={handleUsePredefinedCart}
+                  disabled={loading}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.6rem 1rem',
+                    background: 'transparent',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border, rgba(255,255,255,0.15))',
+                    borderRadius: '8px',
+                    fontWeight: 400,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isNl ? 'Sla over — wijs mij een standaardlijst toe' : 'Skip — assign me a default list'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

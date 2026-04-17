@@ -49,7 +49,9 @@ import {
   POST_QUESTIONNAIRE_QUESTIONS,
   DEMOGRAPHICS_QUESTIONS,
   EXPERIMENT_STEPS,
-  getNextStep
+  getNextStep,
+  POPULAR_AH_ITEMS,
+  PREDEFINED_CARTS
 } from './co2Experiment.js'
 
 // Ensure .env is loaded from the webapp root regardless of cwd
@@ -3900,6 +3902,163 @@ app.post('/api/experiment/:sessionId/demographics', async (req, res) => {
   }
 })
 
+// ======================== CART SOURCE HELPERS ========================
+// Shared helper: resolve search terms to real products from DB, insert as user_purchases
+async function resolveAndInsertCart(sessionId, searchTerms, cartSource) {
+  const genericCard = 'CART_' + sessionId.replace(/-/g, '').slice(0, 12)
+
+  // Look up real products from the products table for each search term
+  const resolvedProducts = []
+  for (const term of searchTerms) {
+    const { data: matches } = await supabase
+      .from(SUPABASE_PRODUCTS_TABLE)
+      .select('id, name, url, price, image_url')
+      .ilike('normalized_name', `%${term}%`)
+      .limit(1)
+
+    if (matches && matches.length > 0) {
+      const p = matches[0]
+      resolvedProducts.push({
+        product_id: p.id,
+        product_name: p.name,
+        product_url: p.url || null,
+        price: p.price || null,
+        search_term: term
+      })
+    } else {
+      console.warn(`[Cart] No product found for search: "${term}"`)
+    }
+  }
+
+  if (resolvedProducts.length < 5) {
+    throw new Error(`Only found ${resolvedProducts.length} products in the database. Need at least 5.`)
+  }
+
+  console.log(`[Cart] Resolved ${resolvedProducts.length}/${searchTerms.length} products from DB for ${cartSource}`)
+
+  const now = new Date().toISOString()
+  const purchaseRecords = resolvedProducts.map(p => ({
+    bonus_card_number: genericCard,
+    product_id: p.product_id,
+    product_name: p.product_name,
+    product_url: p.product_url,
+    price: p.price,
+    quantity: 1,
+    source: cartSource,
+    purchased_at: now,
+    scraped_at: now,
+    last_seen_at: now
+  }))
+
+  // Deduplicate on retry
+  const allIds = purchaseRecords.map(r => r.product_id)
+  const { data: existing } = await supabase
+    .from('user_purchases')
+    .select('product_id')
+    .eq('bonus_card_number', genericCard)
+    .in('product_id', allIds)
+  const existingIds = new Set((existing || []).map(r => r.product_id))
+  const newRecords = purchaseRecords.filter(r => !existingIds.has(r.product_id))
+
+  if (newRecords.length > 0) {
+    const { error: insertError } = await supabase
+      .from('user_purchases')
+      .insert(newRecords)
+    if (insertError) throw insertError
+  }
+
+  console.log(`[Cart] Inserted ${newRecords.length} new purchases for session ${sessionId} (card: ${genericCard})`)
+
+  // Update session
+  const updatePayload = {
+    bonus_card: genericCard,
+    cart_source: cartSource,
+    current_step: 'pre_questionnaire',
+    updated_at: now
+  }
+  let { data: updated, error: updateError } = await supabase
+    .from('experiment_sessions')
+    .update(updatePayload)
+    .eq('id', sessionId)
+    .select()
+    .single()
+
+  // If cart_source column doesn't exist yet, retry without it
+  if (updateError && updateError.message?.includes('cart_source')) {
+    console.warn('[Cart] cart_source column not found, updating without it')
+    const { cart_source, ...fallback } = updatePayload
+    ;({ data: updated, error: updateError } = await supabase
+      .from('experiment_sessions')
+      .update(fallback)
+      .eq('id', sessionId)
+      .select()
+      .single())
+  }
+
+  if (updateError) throw updateError
+  return updated
+}
+
+// GET the 50 popular items list (so client can render the picker)
+app.get('/api/experiment/popular-items', (req, res) => {
+  res.json({ items: POPULAR_AH_ITEMS })
+})
+
+// POST self-selected cart: user picked 10 items from the 50 popular items
+app.post('/api/experiment/:sessionId/use-self-selected-cart', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    const { selectedIndices } = req.body || {}
+
+    if (!selectedIndices || !Array.isArray(selectedIndices) || selectedIndices.length < 10) {
+      return res.status(400).json({ error: 'Please select at least 10 items' })
+    }
+
+    // Map indices to search terms
+    const searchTerms = selectedIndices
+      .filter(i => i >= 0 && i < POPULAR_AH_ITEMS.length)
+      .map(i => POPULAR_AH_ITEMS[i].search)
+
+    if (searchTerms.length < 10) {
+      return res.status(400).json({ error: 'Invalid item selections' })
+    }
+
+    const updated = await resolveAndInsertCart(sessionId, searchTerms, 'self_selected')
+    res.json({ session: updated })
+  } catch (e) {
+    console.error('[Self-Selected Cart] Exception:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST predefined cart: auto-assigned based on diet from demographics
+app.post('/api/experiment/:sessionId/use-predefined-cart', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+
+    // Get session to read demographics diet choice
+    const { data: session, error: sessionError } = await supabase
+      .from('experiment_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
+
+    if (sessionError || !session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    const diet = session.demographics?.demo_diet || 'omnivore'
+    const searchTerms = PREDEFINED_CARTS[diet] || PREDEFINED_CARTS.omnivore
+
+    console.log(`[Predefined Cart] Using diet "${diet}" for session ${sessionId}`)
+    const updated = await resolveAndInsertCart(sessionId, searchTerms, 'predefined')
+    res.json({ session: updated })
+  } catch (e) {
+    console.error('[Predefined Cart] Exception:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Mark scrape step complete and advance to first pre-quiz
 app.post('/api/experiment/:sessionId/scrape-complete', async (req, res) => {
   try {
@@ -3908,6 +4067,7 @@ app.post('/api/experiment/:sessionId/scrape-complete', async (req, res) => {
 
     const updateData = { 
       current_step: 'pre_questionnaire',
+      cart_source: 'scraped',
       updated_at: new Date().toISOString()
     }
     // Link bonus card to session if provided and not yet set
@@ -3915,12 +4075,23 @@ app.post('/api/experiment/:sessionId/scrape-complete', async (req, res) => {
       updateData.bonus_card = bonus_card
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('experiment_sessions')
       .update(updateData)
       .eq('id', sessionId)
       .select()
       .single()
+
+    // If cart_source column doesn't exist yet, retry without it
+    if (error && error.message?.includes('cart_source')) {
+      const { cart_source, ...fallback } = updateData
+      ;({ data, error } = await supabase
+        .from('experiment_sessions')
+        .update(fallback)
+        .eq('id', sessionId)
+        .select()
+        .single())
+    }
 
     if (error) {
       return res.status(500).json({ error: error.message })
