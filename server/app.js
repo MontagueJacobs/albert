@@ -4024,6 +4024,8 @@ app.get('/api/experiment/popular-items', (req, res) => {
 })
 
 // POST self-selected cart: user picked 10 items from the 50 popular items
+// We insert ALL 50 popular items so quiz 2 & 4 have enough products.
+// The user's 10 picks go in first (they are the "core" selection).
 app.post('/api/experiment/:sessionId/use-self-selected-cart', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -4034,15 +4036,23 @@ app.post('/api/experiment/:sessionId/use-self-selected-cart', async (req, res) =
     }
 
     // Map indices to search terms
-    const searchTerms = selectedIndices
+    const pickedTerms = selectedIndices
       .filter(i => i >= 0 && i < POPULAR_AH_ITEMS.length)
       .map(i => POPULAR_AH_ITEMS[i].search)
 
-    if (searchTerms.length < 10) {
+    if (pickedTerms.length < 10) {
       return res.status(400).json({ error: 'Invalid item selections' })
     }
 
-    const updated = await resolveAndInsertCart(sessionId, searchTerms, 'self_selected')
+    // Bootstrap: add the remaining 40 popular items as filler so personal
+    // quizzes (quiz 2 & 4) have a large enough pool to draw from.
+    const pickedSet = new Set(pickedTerms)
+    const fillerTerms = POPULAR_AH_ITEMS
+      .map(item => item.search)
+      .filter(term => !pickedSet.has(term))
+    const allTerms = [...pickedTerms, ...fillerTerms]
+
+    const updated = await resolveAndInsertCart(sessionId, allTerms, 'self_selected')
     res.json({ session: updated })
   } catch (e) {
     console.error('[Self-Selected Cart] Exception:', e)
@@ -4051,6 +4061,7 @@ app.post('/api/experiment/:sessionId/use-self-selected-cart', async (req, res) =
 })
 
 // POST predefined cart: auto-assigned based on diet from demographics
+// Inserts ALL 50 popular items (diet-specific ones first) so quiz 2 & 4 have enough.
 app.post('/api/experiment/:sessionId/use-predefined-cart', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -4067,10 +4078,17 @@ app.post('/api/experiment/:sessionId/use-predefined-cart', async (req, res) => {
     }
 
     const diet = session.demographics?.demo_diet || 'omnivore'
-    const searchTerms = PREDEFINED_CARTS[diet] || PREDEFINED_CARTS.omnivore
+    const coreTerms = PREDEFINED_CARTS[diet] || PREDEFINED_CARTS.omnivore
 
-    console.log(`[Predefined Cart] Using diet "${diet}" for session ${sessionId}`)
-    const updated = await resolveAndInsertCart(sessionId, searchTerms, 'predefined')
+    // Bootstrap: add the remaining popular items as filler
+    const coreSet = new Set(coreTerms)
+    const fillerTerms = POPULAR_AH_ITEMS
+      .map(item => item.search)
+      .filter(term => !coreSet.has(term))
+    const allTerms = [...coreTerms, ...fillerTerms]
+
+    console.log(`[Predefined Cart] Using diet "${diet}" for session ${sessionId} (${coreTerms.length} core + ${fillerTerms.length} filler = ${allTerms.length} total)`)
+    const updated = await resolveAndInsertCart(sessionId, allTerms, 'predefined')
     res.json({ session: updated })
   } catch (e) {
     console.error('[Predefined Cart] Exception:', e)
