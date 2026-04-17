@@ -141,7 +141,7 @@ export const POPULAR_AH_ITEMS = [
   { search: 'koekjes',             nameNl: 'Koekjes',               nameEn: 'Cookies',              emoji: '🍪', category: 'snacks' },
 
   // === Oils, Spreads & Condiments ===
-  { search: 'olijfolie',           nameNl: 'Olijfolie',             nameEn: 'Olive Oil',            emoji: '🫒', category: 'oils' },
+  { search: 'AH Olijfolie',        nameNl: 'Olijfolie',             nameEn: 'Olive Oil',            emoji: '🫒', category: 'oils' },
   { search: 'pindakaas',           nameNl: 'Pindakaas',             nameEn: 'Peanut Butter',        emoji: '🥜', category: 'oils' },
 
   // === Drinks ===

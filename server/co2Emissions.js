@@ -792,7 +792,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   'fish_farmed': [
     'zalm', 'forel', 'tilapia', 'pangasius', 'zeebaars',
     'dorade', 'salmon', 'trout', 'vis', 'fish',
-    'tonijn', 'tuna', 'makreel', 'haring', 'sardine',
+    'tonijn', 'tuna', 'tonijnstukken', 'makreel', 'haring', 'sardine',
     'kabeljauw', 'cod', 'heek', 'schol', 'bot',
     'kibbeling', 'lekkerbekje', 'visstick'
   ],
@@ -811,7 +811,10 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'karnemelk', 'buttermilk', 'creme fraiche', 'zure room',
     'zuivel', 'drinkyoghurt', 'optimel', 'chocomel',
     'wei', 'whey', 'weipoeder', 'lactose', 'caseïne', 'caseine',
-    'room', 'magere melk', 'volle melk', 'halfvolle melk'
+    'room', 'magere melk', 'volle melk', 'halfvolle melk',
+    // Compound flavored-dairy names (must beat flavor keywords like 'chocola')
+    'chocoladevla', 'vanillevla', 'aardbeienvla',
+    'chocolademelk', 'aardbeienmelk', 'bananenmelk'
   ],
   'butter': [
     'boter', 'butter', 'roomboter', 'kruidenboter', 'knoflookboter'
@@ -970,7 +973,10 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Beverages & Other
   'coffee': ['koffie', 'coffee', 'espresso', 'cappuccino', 'latte'],
-  'dark_chocolate': ['chocola', 'chocolate', 'chocolonely', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella'],
+  'dark_chocolate': ['chocola', 'chocolate', 'chocolonely', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella',
+    // Compound names that are definitely chocolate products, not flavored drinks
+    'chocoladereep', 'chocoladerepen', 'chocoladetablet', 'chocolade letter'
+  ],
   'wine': [
     'wijn', 'wine', 'prosecco', 'champagne', 'port', 'sherry',
     'cabernet', 'sauvignon', 'merlot', 'syrah', 'shiraz', 'pinot',
@@ -1178,6 +1184,14 @@ const CATEGORY_PRIORITY = {
   'candy_sweets': 9,
   'ice_cream': 9,
   'desserts': 9,
+  // Drink / dairy product types — these describe what the product IS, so they
+  // must beat flavor-ingredient keywords like 'chocola', 'vanille', 'aardbei'.
+  // E.g. "Alpro Sojadrink chocolade" is a soy drink, not a chocolate bar.
+  'soy_milk': 9,
+  'milk': 9,
+  'yoghurt': 9,
+  'soft_drinks': 9,
+  'juice': 9,
   'sauces_condiments': 8,
   'spreads': 8,
   'baby_food': 8,
@@ -1185,7 +1199,6 @@ const CATEGORY_PRIORITY = {
   'beer': 7,
   'spirits': 7,
   'tea': 7,
-  'soft_drinks': 7,
   'coffee': 7,
   'wine': 7,
   'dark_chocolate': 7,
@@ -2097,42 +2110,45 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
     }
   }
   
-  // Check if the product name matches a processed category where
-  // the name-based CO2 is more accurate than ingredient analysis
-  const nameCategory = getCO2Category(productName)
-  if (nameCategory && NAME_OVERRIDE_CATEGORIES.has(nameCategory) && CO2_EMISSIONS_DATA[nameCategory]) {
-    const nameEmission = getEmission(nameCategory)
-    const catConf = CATEGORY_CONFIDENCE[nameCategory]
-    const prodConf = computeProductConfidence(catConf ? catConf.confidence : 50, 'name', {})
-    return {
-      co2PerKg: CO2_EMISSIONS_DATA[nameCategory],
-      co2Min: nameEmission ? nameEmission.rangeMin : CO2_EMISSIONS_DATA[nameCategory],
-      co2Max: nameEmission ? nameEmission.rangeMax : CO2_EMISSIONS_DATA[nameCategory],
-      co2Valid: nameEmission ? nameEmission.valid : true,
-      category: nameCategory,
-      matched: true,
-      isNonFood: false,
-      method: 'name',
-      confidence: prodConf.confidence,
-      confidenceLabel: prodConf.label,
-      methodology: {
-        primary: catConf ? catConf.primary : 'Agribalyse v3.2',
-        primaryValue: catConf ? catConf.primaryValue : null,
-        validation: catConf?.validationSource || null,
-        validationValue: catConf?.validationValue || null,
-        method: 'product name (category override)',
-        factors: prodConf.factors
-      }
-    }
-  }
-  
-  // Try ingredient-based scoring (most accurate for composite products)
-  if (ingredientText && typeof ingredientText === 'string' && ingredientText.length > 5) {
+  // Try ingredient-based scoring first (most accurate for composite products)
+  const hasIngredients = ingredientText && typeof ingredientText === 'string' && ingredientText.length > 5
+  if (hasIngredients) {
     const ingredientResult = getCO2FromIngredients(ingredientText, nutritionText, nutritionJson)
     if (ingredientResult.matched) {
       return {
         ...ingredientResult,
         isNonFood: false
+      }
+    }
+  }
+
+  // Name override: only when NO ingredient list is available, use well-known
+  // product-name categories (wine, beer, cheese, chocolate, etc.) as a reliable fallback
+  if (!hasIngredients) {
+    const nameCategory = getCO2Category(productName)
+    if (nameCategory && NAME_OVERRIDE_CATEGORIES.has(nameCategory) && CO2_EMISSIONS_DATA[nameCategory]) {
+      const nameEmission = getEmission(nameCategory)
+      const catConf = CATEGORY_CONFIDENCE[nameCategory]
+      const prodConf = computeProductConfidence(catConf ? catConf.confidence : 50, 'name', {})
+      return {
+        co2PerKg: CO2_EMISSIONS_DATA[nameCategory],
+        co2Min: nameEmission ? nameEmission.rangeMin : CO2_EMISSIONS_DATA[nameCategory],
+        co2Max: nameEmission ? nameEmission.rangeMax : CO2_EMISSIONS_DATA[nameCategory],
+        co2Valid: nameEmission ? nameEmission.valid : true,
+        category: nameCategory,
+        matched: true,
+        isNonFood: false,
+        method: 'name',
+        confidence: prodConf.confidence,
+        confidenceLabel: prodConf.label,
+        methodology: {
+          primary: catConf ? catConf.primary : 'Agribalyse v3.2',
+          primaryValue: catConf ? catConf.primaryValue : null,
+          validation: catConf?.validationSource || null,
+          validationValue: catConf?.validationValue || null,
+          method: 'product name (category override, no ingredients)',
+          factors: prodConf.factors
+        }
       }
     }
   }
