@@ -482,7 +482,10 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     setShowCartPicker(true)
     if (popularItems.length === 0) {
       try {
-        const res = await fetch('/api/experiment/popular-items')
+        const url = session?.id
+          ? `/api/experiment/popular-items?sessionId=${session.id}`
+          : '/api/experiment/popular-items'
+        const res = await fetch(url)
         const data = await res.json()
         if (data.items) setPopularItems(data.items)
       } catch (e) {

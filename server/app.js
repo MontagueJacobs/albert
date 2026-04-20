@@ -4026,9 +4026,28 @@ async function resolveAndInsertCart(sessionId, searchTerms, cartSource) {
   return updated
 }
 
-// GET the 50 popular items list (so client can render the picker)
-app.get('/api/experiment/popular-items', (req, res) => {
-  res.json({ items: POPULAR_AH_ITEMS })
+// GET the popular items list (so client can render the picker)
+// Optionally filtered by the user's diet from their session demographics
+app.get('/api/experiment/popular-items', async (req, res) => {
+  const { sessionId } = req.query
+  let items = POPULAR_AH_ITEMS
+
+  if (sessionId) {
+    try {
+      const { data: sess } = await supabase
+        .from('experiment_sessions')
+        .select('demographics')
+        .eq('id', sessionId)
+        .single()
+      const diet = sess?.demographics?.demo_diet || 'omnivore'
+      const excluded = DIET_EXCLUDED_CATEGORIES[diet] || new Set()
+      if (excluded.size > 0) {
+        items = POPULAR_AH_ITEMS.filter(i => !excluded.has(i.category))
+      }
+    } catch (_) { /* if lookup fails, return all items */ }
+  }
+
+  res.json({ items })
 })
 
 // Categories excluded from filler per diet type

@@ -261,6 +261,9 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
             ))}
           </div>
         </section>
+
+        {/* How It Works — inline on homepage */}
+        <HowItWorks />
       </div>
     )
   }
