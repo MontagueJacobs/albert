@@ -982,8 +982,8 @@ export default function ExperimentFlow({ onComplete, onBack }) {
             quizNumber={1}
             title={isNl ? 'Rangschik deze producten op CO₂-uitstoot' : 'Rank these products by CO₂ emissions'}
             subtitle={isNl 
-              ? 'Sorteer van HOOGSTE naar LAAGSTE CO₂-uitstoot per kg product.'
-              : 'Sort from HIGHEST to LOWEST CO₂ emissions per kg of product.'}
+              ? 'Sorteer van LAAGSTE (groen) naar HOOGSTE (rood) CO₂-uitstoot per kg product.'
+              : 'Sort from LOWEST (green) to HIGHEST (red) CO₂ emissions per kg of product.'}
             onComplete={handleQuizComplete}
             showResults={false}
           />
