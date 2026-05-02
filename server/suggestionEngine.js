@@ -213,6 +213,8 @@ export async function findSmartAlternatives({
   productName,
   co2Category,
   currentScore,
+  currentPrice = null,
+  currentUnitSize = null,
   evaluateProduct,
   getEnrichedData,
   lang = 'nl',
@@ -280,7 +282,9 @@ export async function findSmartAlternatives({
 
   // Score and sort candidates
   const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, swapInfo.ahSubCategories, {
-    allowSameScore: strictMilkSwap
+    allowSameScore: strictMilkSwap,
+    currentPrice,
+    currentUnitSize
   })
 
   result.alternatives = scored.slice(0, maxResults)
@@ -318,7 +322,7 @@ export function getSmartSuggestions(productName, co2Category, score, lang = 'nl'
 // ---------------------------------------------------------------
 
 /** Standard product columns to select from Supabase */
-const PRODUCT_COLUMNS = 'id, name, url, image_url, price, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, ingredients, nutrition_text, nutrition_json, origin_country, brand, categories'
+const PRODUCT_COLUMNS = 'id, name, url, image_url, price, unit_size, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, ingredients, nutrition_text, nutrition_json, origin_country, brand, categories'
 
 /**
  * Query plant-based products by AH subcategory.
@@ -524,6 +528,68 @@ function isInPreferredSubcategory(candidate, preferredSubCategories) {
   )
 }
 
+// -- Package quantity matching -----------------------------------
+
+function normalizePackageQuantity(unitSize, productName = '') {
+  const raw = `${unitSize || ''} ${productName || ''}`.toLowerCase()
+  if (!raw.trim()) return null
+
+  const normalizeNumber = (value) => parseFloat(String(value).replace(',', '.'))
+  const explicitUnit = String(unitSize || '').toLowerCase()
+
+  const multi = explicitUnit.match(/(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(ml|cl|l|liter|liters|g|gr|gram|kg|stuks?|pieces?|pcs?)\b/)
+  if (multi) {
+    const count = normalizeNumber(multi[1])
+    const size = normalizeNumber(multi[2])
+    return normalizeSingleQuantity(count * size, multi[3])
+  }
+
+  const single = explicitUnit.match(/(\d+(?:[.,]\d+)?)\s*-?\s*(ml|cl|l|liter|liters|g|gr|gram|kg|stuks?|pieces?|pcs?)\b/)
+  if (single) {
+    return normalizeSingleQuantity(normalizeNumber(single[1]), single[2])
+  }
+
+  return null
+}
+
+function normalizeSingleQuantity(amount, unit) {
+  if (!Number.isFinite(amount) || amount <= 0 || !unit) return null
+  const normalizedUnit = unit.toLowerCase()
+  if (['ml', 'cl', 'l', 'liter', 'liters'].includes(normalizedUnit)) {
+    const ml = normalizedUnit === 'l' || normalizedUnit.startsWith('liter')
+      ? amount * 1000
+      : normalizedUnit === 'cl'
+        ? amount * 10
+        : amount
+    return { amount: ml, unit: 'ml' }
+  }
+  if (['g', 'gr', 'gram', 'kg'].includes(normalizedUnit)) {
+    const grams = normalizedUnit === 'kg' ? amount * 1000 : amount
+    return { amount: grams, unit: 'g' }
+  }
+  if (/^(stuks?|pieces?|pcs?)$/.test(normalizedUnit)) {
+    return { amount, unit: 'count' }
+  }
+  return null
+}
+
+function quantityMatches(sourceQuantity, candidateQuantity) {
+  if (!sourceQuantity) return true
+  if (!candidateQuantity) return false
+  if (sourceQuantity.unit !== candidateQuantity.unit) return false
+  const tolerance = Math.max(1, sourceQuantity.amount * 0.02)
+  return Math.abs(sourceQuantity.amount - candidateQuantity.amount) <= tolerance
+}
+
+function compareNullableNumberAsc(a, b) {
+  const aOk = Number.isFinite(a)
+  const bOk = Number.isFinite(b)
+  if (aOk && bOk) return a - b
+  if (aOk) return -1
+  if (bOk) return 1
+  return 0
+}
+
 // -- Core scoring & sorting ---------------------------------------
 
 /**
@@ -538,6 +604,9 @@ function isInPreferredSubcategory(candidate, preferredSubCategories) {
  * Filters out candidates with null score or worse score than current.
  */
 function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, sourceName, preferredSubCategories, options = {}) {
+  const sourceQuantity = normalizePackageQuantity(options.currentUnitSize, sourceName)
+  const currentPrice = Number.isFinite(Number(options.currentPrice)) ? Number(options.currentPrice) : null
+
   return candidates
     .map(c => {
       const enriched = getEnrichedData(c)
@@ -547,12 +616,17 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
         ? evaluation.score - currentScore
         : 0
       const inPreferred = isInPreferredSubcategory(c, preferredSubCategories || [])
+      const candidateQuantity = normalizePackageQuantity(c.unit_size, c.name)
+      const price = Number.isFinite(Number(c.price)) ? Number(c.price) : null
+      const priceDelta = price != null && currentPrice != null ? price - currentPrice : null
+      const priceComparable = priceDelta != null ? priceDelta <= 0 : false
 
       let rankScore = 0
       if (inPreferred) rankScore += 40
       rankScore += relevance * 25
       rankScore += improvement * 3
       rankScore += (evaluation.score != null) ? evaluation.score * 1 : 0
+      if (priceComparable) rankScore += 4
 
       return {
         id: c.id,
@@ -560,6 +634,8 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
         url: c.url,
         image_url: c.image_url,
         price: c.price,
+        priceNumeric: price,
+        unit_size: c.unit_size,
         score: evaluation.score,
         co2Category: evaluation.co2Category,
         co2PerKg: evaluation.co2PerKg,
@@ -569,6 +645,10 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
         is_fairtrade: c.is_fairtrade,
         isSwapCategory: true,
         improvement,
+        quantity: candidateQuantity,
+        quantityMatch: quantityMatches(sourceQuantity, candidateQuantity),
+        priceDelta,
+        priceComparable,
         relevance,
         rankScore
       }
@@ -576,7 +656,15 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
     .filter(c => {
       if (c.score == null) return false
       if (options.allowSameScore ? c.score < currentScore : c.score <= currentScore) return false
+      if (!c.quantityMatch) return false
       return true
     })
-    .sort((a, b) => b.rankScore - a.rankScore)
+    .sort((a, b) => {
+      const co2Compare = compareNullableNumberAsc(a.co2PerKg, b.co2PerKg)
+      if (co2Compare !== 0) return co2Compare
+      if (a.priceComparable !== b.priceComparable) return a.priceComparable ? -1 : 1
+      const priceCompare = compareNullableNumberAsc(a.priceNumeric, b.priceNumeric)
+      if (priceCompare !== 0) return priceCompare
+      return b.rankScore - a.rankScore
+    })
 }
