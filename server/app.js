@@ -216,7 +216,9 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV || 'development'
+    env: process.env.NODE_ENV || 'development',
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || null,
+    recommendationEngine: 'milk-strict-v2'
   })
 })
 
@@ -850,9 +852,11 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     return milkAltHints.some(hint => haystack.includes(hint))
   }
 
-  // Pre-score only plant-based catalog products as the alternative pool
+  // Pre-score plant-based catalog products as the alternative pool.
+  // Milk alternatives are often scraped from the dairy catalog (`api_zuivel`),
+  // so include those when they are clearly plant-based milk/drink products.
   const scoredPlantBased = catalogProducts
-    .filter(p => p.source === 'api_plantbased')
+    .filter(p => p.source === 'api_plantbased' || (p.source === 'api_zuivel' && isMilkAlternative(p)))
     .map(p => {
       const enriched = getEnrichedData(p)
       const evaluation = evaluateProduct(p.name, enriched)
@@ -873,7 +877,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
 
     // Prefer alternatives from matching subcategories, then any plant-based
     const alternatives = scoredPlantBased
-      .filter(alt => alt.score > product.score + 1)
+      .filter(alt => origCategory === 'milk' ? alt.score >= product.score : alt.score > product.score + 1)
       .filter(alt => origCategory !== 'milk' || isMilkAlternative(alt))
       .sort((a, b) => {
         // Preferred-subcategory products first
@@ -3236,6 +3240,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       improvements,
       alternatives,
       suggestionTip,
+      recommendationEngine: 'milk-strict-v2',
       enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
       hasEnrichedData: evaluation.hasEnrichedData,

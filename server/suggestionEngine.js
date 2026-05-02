@@ -235,30 +235,34 @@ export async function findSmartAlternatives({
 
   // Build candidate pool from plant-based products only
   let candidates = []
+  const strictMilkSwap = co2Category === 'milk'
 
   // Strategy A: Query by AH subcategory (most precise)
   if (swapInfo.ahSubCategories.length > 0) {
-    const subCatResults = await queryBySubcategory(supabase, swapInfo.ahSubCategories, productId, 80)
+    const subCatResults = await queryBySubcategory(supabase, swapInfo.ahSubCategories, productId, 80, strictMilkSwap)
     candidates.push(...subCatResults)
   }
 
   // Strategy B: Keyword search within plant-based pool
-  if (swapInfo.keywords.length > 0) {
-    const kwResults = await queryPlantBasedByKeywords(supabase, swapInfo.keywords, productId, 60)
+  const keywordPool = strictMilkSwap
+    ? Array.from(new Set([...swapInfo.keywords, ...MILK_ALT_HINTS]))
+    : swapInfo.keywords
+  if (keywordPool.length > 0) {
+    const kwResults = await queryPlantBasedByKeywords(supabase, keywordPool, productId, 80, strictMilkSwap)
     candidates.push(...kwResults)
   }
 
   // Strategy C: Food-form matching from the source product name
   const nameKws = extractFoodFormKeywords(productName)
   if (nameKws.length > 0) {
-    const nameResults = await queryPlantBasedByKeywords(supabase, nameKws, productId, 40)
+    const nameResults = await queryPlantBasedByKeywords(supabase, nameKws, productId, 40, strictMilkSwap)
     candidates.push(...nameResults)
   }
 
   // Strategy D: If very few results, broaden to all plant-based products
   if (candidates.length < maxResults * 2) {
-    const broadResults = await queryAllPlantBased(supabase, productId, 80)
-    candidates.push(...broadResults)
+    const broadResults = await queryAllPlantBased(supabase, productId, strictMilkSwap ? 300 : 80, strictMilkSwap)
+    candidates.push(...(strictMilkSwap ? broadResults.filter(isMilkAlternativeCandidate) : broadResults))
   }
 
   // Deduplicate by id
@@ -270,15 +274,14 @@ export async function findSmartAlternatives({
   })
 
   // Keep milk swaps focused on plant-based milk/drink products
-  if (co2Category === 'milk') {
-    const milkCandidates = candidates.filter(isMilkAlternativeCandidate)
-    if (milkCandidates.length > 0) {
-      candidates = milkCandidates
-    }
+  if (strictMilkSwap) {
+    candidates = candidates.filter(isMilkAlternativeCandidate)
   }
 
   // Score and sort candidates
-  const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, swapInfo.ahSubCategories)
+  const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, swapInfo.ahSubCategories, {
+    allowSameScore: strictMilkSwap
+  })
 
   result.alternatives = scored.slice(0, maxResults)
   return result
@@ -321,7 +324,7 @@ const PRODUCT_COLUMNS = 'id, name, url, image_url, price, is_vegan, is_vegetaria
  * Query plant-based products by AH subcategory.
  * Searches the categories[] array field for 'ah_sub:SubCategoryName'.
  */
-async function queryBySubcategory(supabase, subCategories, excludeId, limit) {
+async function queryBySubcategory(supabase, subCategories, excludeId, limit, includeDairySource = false) {
   if (!subCategories || subCategories.length === 0) return []
 
   const orFilter = subCategories.map(sub =>
@@ -329,11 +332,16 @@ async function queryBySubcategory(supabase, subCategories, excludeId, limit) {
   ).join(',')
 
   try {
-    const { data } = await supabase
+    let query = supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
-      .eq('source', 'api_plantbased')
       .neq('id', excludeId || '')
+
+    query = includeDairySource
+      ? query.in('source', ['api_plantbased', 'api_zuivel'])
+      : query.eq('source', 'api_plantbased')
+
+    const { data } = await query
       .or(orFilter)
       .limit(limit)
 
@@ -347,7 +355,7 @@ async function queryBySubcategory(supabase, subCategories, excludeId, limit) {
  * Query plant-based products by keyword on normalized_name.
  * Only searches within source = 'api_plantbased'.
  */
-async function queryPlantBasedByKeywords(supabase, keywords, excludeId, limit) {
+async function queryPlantBasedByKeywords(supabase, keywords, excludeId, limit, includeDairySource = false) {
   if (!keywords || keywords.length === 0) return []
 
   const orFilter = keywords.map(kw => {
@@ -356,18 +364,23 @@ async function queryPlantBasedByKeywords(supabase, keywords, excludeId, limit) {
   }).join(',')
 
   try {
-    const { data } = await supabase
+    let query = supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
-      .eq('source', 'api_plantbased')
       .neq('id', excludeId || '')
+
+    query = includeDairySource
+      ? query.in('source', ['api_plantbased', 'api_zuivel'])
+      : query.eq('source', 'api_plantbased')
+
+    const { data } = await query
       .or(orFilter)
       .limit(limit)
 
     return data || []
   } catch (e) {
     if (keywords.length > 10) {
-      return queryPlantBasedByKeywords(supabase, keywords.slice(0, 10), excludeId, limit)
+      return queryPlantBasedByKeywords(supabase, keywords.slice(0, 10), excludeId, limit, includeDairySource)
     }
     return []
   }
@@ -376,13 +389,18 @@ async function queryPlantBasedByKeywords(supabase, keywords, excludeId, limit) {
 /**
  * Get all plant-based products as a broad fallback.
  */
-async function queryAllPlantBased(supabase, excludeId, limit) {
+async function queryAllPlantBased(supabase, excludeId, limit, includeDairySource = false) {
   try {
-    const { data } = await supabase
+    let query = supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
-      .eq('source', 'api_plantbased')
       .neq('id', excludeId || '')
+
+    query = includeDairySource
+      ? query.in('source', ['api_plantbased', 'api_zuivel'])
+      : query.eq('source', 'api_plantbased')
+
+    const { data } = await query
       .limit(limit)
 
     return data || []
@@ -519,7 +537,7 @@ function isInPreferredSubcategory(candidate, preferredSubCategories) {
  *
  * Filters out candidates with null score or worse score than current.
  */
-function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, sourceName, preferredSubCategories) {
+function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, sourceName, preferredSubCategories, options = {}) {
   return candidates
     .map(c => {
       const enriched = getEnrichedData(c)
@@ -557,7 +575,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
     })
     .filter(c => {
       if (c.score == null) return false
-      if (c.score <= currentScore) return false
+      if (options.allowSameScore ? c.score < currentScore : c.score <= currentScore) return false
       return true
     })
     .sort((a, b) => b.rankScore - a.rankScore)
