@@ -831,6 +831,24 @@ function analyzeUserProfile(purchases) {
  */
 function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
   const suggestions = []
+  const milkAltHints = [
+    'melk', 'drink', 'barista',
+    'haver', 'havermelk', 'haverdrink',
+    'soja', 'sojamelk', 'sojadrink',
+    'amandel', 'amandelmelk',
+    'rijst', 'rijstdrink',
+    'erwt', 'erwtendrink',
+    'kokos', 'kokosmelk',
+    'cashew', 'hazelnoot', 'spelt'
+  ]
+  const isMilkAlternative = (candidate) => {
+    const name = (candidate?.name || '').toLowerCase()
+    const categoryText = Array.isArray(candidate?.categories)
+      ? candidate.categories.join(' ').toLowerCase()
+      : ''
+    const haystack = `${name} ${categoryText}`
+    return milkAltHints.some(hint => haystack.includes(hint))
+  }
 
   // Pre-score only plant-based catalog products as the alternative pool
   const scoredPlantBased = catalogProducts
@@ -856,6 +874,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     // Prefer alternatives from matching subcategories, then any plant-based
     const alternatives = scoredPlantBased
       .filter(alt => alt.score > product.score + 1)
+      .filter(alt => origCategory !== 'milk' || isMilkAlternative(alt))
       .sort((a, b) => {
         // Preferred-subcategory products first
         const aPref = a.categories?.some(c => preferredSubs.has(c)) ? 1 : 0

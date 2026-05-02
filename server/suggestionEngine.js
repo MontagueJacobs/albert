@@ -269,6 +269,14 @@ export async function findSmartAlternatives({
     return true
   })
 
+  // Keep milk swaps focused on plant-based milk/drink products
+  if (co2Category === 'milk') {
+    const milkCandidates = candidates.filter(isMilkAlternativeCandidate)
+    if (milkCandidates.length > 0) {
+      candidates = milkCandidates
+    }
+  }
+
   // Score and sort candidates
   const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, swapInfo.ahSubCategories)
 
@@ -395,6 +403,26 @@ const FOOD_FORMS = [
   'drink', 'drinkontbijt', 'toetje', 'dessert',
   'ijs', 'snack', 'spread',
 ]
+
+const MILK_ALT_HINTS = [
+  'melk', 'drink', 'barista',
+  'haver', 'havermelk', 'haverdrink',
+  'soja', 'sojamelk', 'sojadrink',
+  'amandel', 'amandelmelk',
+  'rijst', 'rijstdrink',
+  'erwt', 'erwtendrink',
+  'kokos', 'kokosmelk',
+  'cashew', 'hazelnoot', 'spelt'
+]
+
+function isMilkAlternativeCandidate(candidate) {
+  const name = (candidate?.name || '').toLowerCase()
+  const categoryText = Array.isArray(candidate?.categories)
+    ? candidate.categories.join(' ').toLowerCase()
+    : ''
+  const haystack = `${name} ${categoryText}`
+  return MILK_ALT_HINTS.some(hint => haystack.includes(hint))
+}
 
 /**
  * Extract food-form keywords from a product name.
