@@ -223,27 +223,6 @@ app.get('/api/health', (req, res) => {
 // AH user check/register removed — users table dropped, bonus card is the only auth method
 
 // ============================================================================
-// PASSWORD-BASED AUTHENTICATION ENDPOINTS (Deprecated)
-// user_ah_credentials table removed - use bonus card instead
-// ============================================================================
-
-// Register new user with email and password (disabled)
-app.post('/api/auth/register', async (req, res) => {
-  res.status(501).json({ 
-    error: 'not_supported', 
-    message: 'Email-based registration is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
-  })
-})
-
-// Login with email and password (disabled)
-app.post('/api/auth/login', async (req, res) => {
-  res.status(501).json({ 
-    error: 'not_supported', 
-    message: 'Email-based login is no longer supported. Use the bookmarklet to sync your AH purchases with your bonus card.' 
-  })
-})
-
-// ============================================================================
 // BOOKMARKLET SCRIPT ROUTE
 // Serve the bookmarklet.js with CORS for cross-origin loading from ah.nl
 // ============================================================================
@@ -512,25 +491,6 @@ function extractProductFromUrl(url, originalName, store = 'ah') {
 
 // Data file path - DEPRECATED: Now using Supabase for all purchases
 // const DATA_FILE = path.join(__dirname, 'purchases.json')
-
-// LEGACY: This database is no longer used for scoring
-// Kept only for search results display (icons)
-// Actual scoring comes from enriched data (kenmerken + herkomst)
-const SUSTAINABILITY_DB = {
-  categories: {
-    organic: { icon: '🌱' },
-    local: { icon: '🏡' },
-    plant_based: { icon: '🥬' },
-    fair_trade: { icon: '🤝' },
-    fruit: { icon: '🍎' },
-    vegetable: { icon: '🥕' },
-    dairy: { icon: '🥛' },
-    grain: { icon: '🌾' },
-    legume: { icon: '🫘' },
-    beverage: { icon: '🥤' }
-  },
-  products: {}  // No longer used - products come from database
-}
 
 // NOTE: All keyword-based matching has been removed
 // Scoring and attributes now only come from scraped enriched data (kenmerken + herkomst sections)
@@ -1322,21 +1282,6 @@ function searchProducts(query = '') {
     }
   }
 
-  if (results.length === 0) {
-    for (const name of Object.keys(SUSTAINABILITY_DB.products)) {
-      const candidate = normalizeProductName(name)
-      if (!candidate.includes(normalized)) continue
-      const evalResult = evaluateProduct(name)
-      results.push({
-        name,
-        score: evalResult.score,
-        categories: SUSTAINABILITY_DB.products[name].categories || [],
-        rank: 1,
-        id: `legacy-${name}`
-      })
-    }
-  }
-
   results.sort((a, b) => {
     if (b.rank !== a.rank) return b.rank - a.rank
     if (a.score !== b.score) return b.score - a.score
@@ -1366,17 +1311,6 @@ function minutes(ms) {
 
 // User profile, credentials, and link-bonus-card routes removed — users table dropped
 // Bonus card is the sole identification method (stored client-side, passed per request)
-
-// Legacy stub: /api/user/link-bonus-card
-app.post('/api/user/link-bonus-card', async (req, res) => {
-  const { bonusCardNumber } = req.body
-  if (!bonusCardNumber) {
-    return res.status(400).json({ error: 'missing_bonus_card', message: 'Bonus card number is required' })
-  }
-  // Just acknowledge - no server-side storage needed
-  // Bonus card is stored in localStorage and passed with each request
-  res.json({ success: true, message: 'Bonus card acknowledged (stored client-side)', bonusCard: bonusCardNumber.slice(-4).padStart(13, '•') })
-})
 
 // Get user's purchase history
 app.get('/api/user/purchases', requireAHEmail, async (req, res) => {
@@ -2327,7 +2261,7 @@ function isDrinkProduct(product) {
  *   has_image — "true" to only return products with images
  *   category  — filter by AH product category substring
  *   type      — "food" | "drinks" (high-level filter)
- *   badge     — "bio" | "vegan" | "vegetarian" | "plantaardig" (keurmerk filter)
+ *   badge     — comma-separated badges: "bio", "vegan", "vegetarian", "animal"
  */
 app.get('/api/catalog/browse', async (req, res) => {
   try {
@@ -2345,7 +2279,15 @@ app.get('/api/catalog/browse', async (req, res) => {
     const hasImage = req.query.has_image === 'true'
     const typeFilter = req.query.type || null          // 'food' | 'drinks'
     const categoryFilter = req.query.category || null   // raw AH category substring
-    const badgeFilter = req.query.badge || null          // 'bio' | 'vegan' | 'vegetarian' | 'plantaardig'
+    const badgeFilterRaw = typeof req.query.badge === 'string' ? req.query.badge : ''
+    let badgeFilters = badgeFilterRaw
+      .split(',')
+      .map(v => v.trim().toLowerCase())
+      .filter(Boolean)
+    badgeFilters = [...new Set(badgeFilters)].filter(v => ['bio', 'vegan', 'vegetarian', 'animal'].includes(v))
+    if (badgeFilters.includes('vegan') && badgeFilters.includes('animal')) {
+      badgeFilters = badgeFilters.filter(v => v !== 'animal')
+    }
 
     // Build the query
     const selectFields = enrichedColumnsAvailable
@@ -2378,21 +2320,22 @@ app.get('/api/catalog/browse', async (req, res) => {
       query = query.contains('categories', [`ah:${categoryFilter}`])
     }
 
-    // Badge / keurmerk filter (DB-level boolean filters)
-    if (badgeFilter === 'bio') {
+    // Badge / keurmerk filters (DB-level boolean filters; combined with AND)
+    if (badgeFilters.includes('bio')) {
       query = query.eq('is_organic', true)
-    } else if (badgeFilter === 'vegan') {
+    }
+    if (badgeFilters.includes('vegan')) {
       query = query.eq('is_vegan', true)
-    } else if (badgeFilter === 'vegetarian') {
+    }
+    if (badgeFilters.includes('vegetarian')) {
       query = query.eq('is_vegetarian', true)
     }
-    // 'plantaardig' is a JS filter — needs name + category check
 
     // We need to fetch more than `limit` when score-filtering, score-sorting,
     // or type-filtering (food/drinks) because those are computed in JS.
     const needsScoreProcessing = scoreMin != null || scoreMax != null || sort === 'score_asc' || sort === 'score_desc'
-    const needsPlantaardigFilter = badgeFilter === 'plantaardig'
-    const needsJsProcessing = needsScoreProcessing || typeFilter != null || needsPlantaardigFilter
+    const needsAnimalFilter = badgeFilters.includes('animal')
+    const needsJsProcessing = needsScoreProcessing || typeFilter != null || needsAnimalFilter
     if (needsJsProcessing) {
       // Fetch a larger batch and filter/sort in JS
       query = query.range(0, 999)
@@ -2435,19 +2378,26 @@ app.get('/api/catalog/browse', async (req, res) => {
       filtered = filtered.filter(p => !isDrinkProduct(p))
     }
 
-    // Plantaardig filter: vegan OR name/categories contain "plantaardig" or "vleesvervangers"
-    if (badgeFilter === 'plantaardig') {
+    // Animal filter: only products with clear animal-origin indicators
+    if (badgeFilters.includes('animal')) {
+      const ANIMAL_TERMS = [
+        'zuivel', 'dairy', 'melk', 'milk', 'kaas', 'cheese', 'ei', 'eieren', 'egg', 'eggs',
+        'yoghurt', 'yogurt', 'boter', 'butter', 'room', 'cream',
+        'vlees', 'meat', 'kip', 'chicken', 'rund', 'beef', 'varken', 'pork', 'ham', 'bacon', 'worst', 'salami',
+        'vis', 'fish', 'zalm', 'salmon', 'tonijn', 'tuna', 'garnal', 'shrimp', 'seafood'
+      ]
+
       filtered = filtered.filter(p => {
-        if (p.is_vegan) return true
-        const nameLower = (p.name || '').toLowerCase()
-        if (nameLower.includes('plantaardig')) return true
-        if (Array.isArray(p.categories)) {
-          for (const cat of p.categories) {
-            const cl = cat.toLowerCase()
-            if (cl.includes('plantaardig') || cl.includes('vleesvervangers')) return true
-          }
-        }
-        return false
+        if (p.is_vegan) return false
+        if (p.is_vegetarian) return true
+
+        const haystack = [
+          p.name || '',
+          Array.isArray(p.categories) ? p.categories.join(' ') : '',
+          p.ingredients || ''
+        ].join(' ').toLowerCase()
+
+        return ANIMAL_TERMS.some(term => haystack.includes(term))
       })
     }
     if (scoreMin != null) {

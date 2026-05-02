@@ -120,10 +120,10 @@ const TYPE_PRESETS = [
 
 /* ----------- badge / keurmerk filter presets ----------- */
 const BADGE_PRESETS = [
-  { value: null, labelKey: 'catalog_badge_all', icon: null },
   { value: 'bio', labelKey: 'catalog_badge_bio', icon: TreePine, color: '#16a34a' },
   { value: 'vegan', labelKey: 'catalog_badge_vegan', icon: Sprout, color: '#7c3aed' },
-  { value: 'plantaardig', labelKey: 'catalog_badge_plantaardig', icon: Leaf, color: '#059669' },
+  { value: 'vegetarian', labelKey: 'catalog_badge_vegetarian', icon: Leaf, color: '#059669' },
+  { value: 'animal', labelKey: 'catalog_badge_animal', icon: null, color: '#b45309' },
 ]
 
 /* =========================================================================
@@ -139,7 +139,7 @@ function ProductCatalog() {
   const [sort, setSort] = useState('score_desc')
   const [scoreFilter, setScoreFilter] = useState(0) // index into SCORE_PRESETS
   const [typeFilter, setTypeFilter] = useState(0)   // index into TYPE_PRESETS
-  const [badgeFilter, setBadgeFilter] = useState(0)  // index into BADGE_PRESETS
+  const [badgeFilters, setBadgeFilters] = useState([])
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
 
@@ -162,7 +162,6 @@ function ProductCatalog() {
   const buildUrl = useCallback((pageNum, query) => {
     const preset = SCORE_PRESETS[scoreFilter]
     const typePreset = TYPE_PRESETS[typeFilter]
-    const badgePreset = BADGE_PRESETS[badgeFilter]
     const params = new URLSearchParams()
     params.set('page', pageNum)
     params.set('limit', '24')
@@ -172,9 +171,9 @@ function ProductCatalog() {
     if (preset.min != null) params.set('score_min', preset.min)
     if (preset.max != null) params.set('score_max', preset.max)
     if (typePreset.value) params.set('type', typePreset.value)
-    if (badgePreset.value) params.set('badge', badgePreset.value)
+    if (badgeFilters.length > 0) params.set('badge', badgeFilters.join(','))
     return `/api/catalog/browse?${params.toString()}`
-  }, [sort, scoreFilter, typeFilter, badgeFilter])
+  }, [sort, scoreFilter, typeFilter, badgeFilters])
 
   // Fetch products
   const fetchProducts = useCallback(async (pageNum = 1, query = appliedQuery) => {
@@ -199,7 +198,23 @@ function ProductCatalog() {
   // Initial load & when filters change
   useEffect(() => {
     fetchProducts(1, appliedQuery)
-  }, [sort, scoreFilter, typeFilter, badgeFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sort, scoreFilter, typeFilter, badgeFilters]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleBadgeFilter = useCallback((value) => {
+    setBadgeFilters((prev) => {
+      if (prev.includes(value)) {
+        return prev.filter((v) => v !== value)
+      }
+
+      let next = [...prev, value]
+      if (value === 'vegan') {
+        next = next.filter((v) => v !== 'animal')
+      } else if (value === 'animal') {
+        next = next.filter((v) => v !== 'vegan')
+      }
+      return next
+    })
+  }, [])
 
   // Debounced search
   const handleSearchChange = useCallback((e) => {
@@ -408,14 +423,28 @@ function ProductCatalog() {
           display: 'flex', gap: '0.3rem', borderLeft: '1px solid var(--border)',
           paddingLeft: '0.5rem', marginLeft: '0.15rem'
         }}>
-          {BADGE_PRESETS.map((bp, idx) => {
-            const active = badgeFilter === idx
+          <button
+            onClick={() => setBadgeFilters([])}
+            style={{
+              padding: '0.35rem 0.65rem', borderRadius: '8px', border: '1px solid',
+              borderColor: badgeFilters.length === 0 ? 'var(--primary, #3b82f6)' : 'var(--border)',
+              background: badgeFilters.length === 0 ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card)',
+              color: badgeFilters.length === 0 ? 'var(--primary, #3b82f6)' : 'var(--text-muted)',
+              fontSize: '0.8rem', fontWeight: badgeFilters.length === 0 ? 700 : 500,
+              cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s'
+            }}
+          >
+            {t('catalog_badge_all') || 'All'}
+          </button>
+
+          {BADGE_PRESETS.map((bp) => {
+            const active = badgeFilters.includes(bp.value)
             const Icon = bp.icon
             const activeColor = bp.color || 'var(--primary, #3b82f6)'
             return (
               <button
-                key={idx}
-                onClick={() => setBadgeFilter(idx)}
+                key={bp.value}
+                onClick={() => toggleBadgeFilter(bp.value)}
                 style={{
                   padding: '0.35rem 0.65rem', borderRadius: '8px', border: '1px solid',
                   borderColor: active ? activeColor : 'var(--border)',
