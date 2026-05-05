@@ -2,26 +2,16 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Loader2, Leaf, ShoppingBag, ArrowUpDown, Grid3X3, List, UtensilsCrossed, Coffee, Sprout, TreePine } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
 import { useBonusCard } from '../lib/bonusCardContext.jsx'
-import { variantScoreClass } from '../lib/scoreUtils.js'
+import { variantScoreClass, getScoreColor as getExactScoreColor, getScoreBgSubtle as getExactScoreBgSubtle } from '../lib/scoreUtils.js'
 import ProductDetailModal from './ProductDetailModal'
 
 /* ----------- score colour helpers ----------- */
 function scoreColor(score) {
-  if (score == null) return 'var(--text-muted, #9ca3af)'
-  if (score >= 9) return '#16a34a'
-  if (score >= 7) return '#65a30d'
-  if (score >= 5) return '#eab308'
-  if (score >= 3) return '#f97316'
-  return '#ef4444'
+  return getExactScoreColor(score)
 }
 
 function scoreBg(score) {
-  if (score == null) return 'rgba(156, 163, 175, 0.15)'
-  if (score >= 9) return 'rgba(22, 163, 74, 0.15)'
-  if (score >= 7) return 'rgba(101, 163, 13, 0.15)'
-  if (score >= 5) return 'rgba(234, 179, 8, 0.15)'
-  if (score >= 3) return 'rgba(249, 115, 22, 0.15)'
-  return 'rgba(239, 68, 68, 0.15)'
+  return getExactScoreBgSubtle(score)
 }
 
 function scoreLabel(score, t) {

@@ -1,4 +1,5 @@
 import { useI18n } from '../i18n.jsx'
+import { getScoreColor } from '../lib/scoreUtils.js'
 import { Leaf, Database, FlaskConical, BarChart3, Search, Scale, Info, ArrowRightLeft, Lightbulb } from 'lucide-react';
 
 const sectionIcons = [Database, Search, FlaskConical, BarChart3, Scale, Leaf, ArrowRightLeft, Lightbulb];
@@ -104,16 +105,16 @@ const styles = {
 }
 
 const scoreRows = [
-  { score: 10, co2: '< 1',     color: '#22c55e' },
-  { score: 9,  co2: '1 – 2',   color: '#22c55e' },
-  { score: 8,  co2: '2 – 4',   color: '#84cc16' },
-  { score: 7,  co2: '4 – 6',   color: '#84cc16' },
-  { score: 6,  co2: '6 – 10',  color: '#eab308' },
-  { score: 5,  co2: '10 – 18', color: '#eab308' },
-  { score: 4,  co2: '18 – 28', color: '#f97316' },
-  { score: 3,  co2: '28 – 45', color: '#f97316' },
-  { score: 2,  co2: '45 – 80', color: '#ef4444' },
-  { score: 1,  co2: '> 80',    color: '#ef4444' },
+  { score: 10, co2: '< 1',     color: getScoreColor(10) },
+  { score: 9,  co2: '1 – 2',   color: getScoreColor(9) },
+  { score: 8,  co2: '2 – 4',   color: getScoreColor(8) },
+  { score: 7,  co2: '4 – 6',   color: getScoreColor(7) },
+  { score: 6,  co2: '6 – 10',  color: getScoreColor(6) },
+  { score: 5,  co2: '10 – 18', color: getScoreColor(5) },
+  { score: 4,  co2: '18 – 28', color: getScoreColor(4) },
+  { score: 3,  co2: '28 – 45', color: getScoreColor(3) },
+  { score: 2,  co2: '45 – 80', color: getScoreColor(2) },
+  { score: 1,  co2: '> 80',    color: getScoreColor(1) },
 ]
 
 function HowItWorks() {

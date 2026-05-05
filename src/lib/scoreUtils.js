@@ -1,31 +1,43 @@
 /**
  * Shared score display helpers.
  * 
- * Variant A (treatment): colored CO₂ scores (green / yellow / red)
+ * Variant A (treatment): colored CO₂ scores with a distinct hue for each score
  * Variant B (control):   neutral gray CO₂ scores (same numbers, no color coding)
  */
 
 // ─── Variant A: colored ───────────────────────────────────────
 
+const SCORE_STYLES = {
+  10: { color: '#059669', bg: 'rgba(5, 150, 105, 0.20)', subtleBg: 'rgba(5, 150, 105, 0.14)' },
+  9: { color: '#16a34a', bg: 'rgba(22, 163, 74, 0.20)', subtleBg: 'rgba(22, 163, 74, 0.14)' },
+  8: { color: '#65a30d', bg: 'rgba(101, 163, 13, 0.20)', subtleBg: 'rgba(101, 163, 13, 0.14)' },
+  7: { color: '#84cc16', bg: 'rgba(132, 204, 22, 0.18)', subtleBg: 'rgba(132, 204, 22, 0.12)' },
+  6: { color: '#ca8a04', bg: 'rgba(202, 138, 4, 0.20)', subtleBg: 'rgba(202, 138, 4, 0.14)' },
+  5: { color: '#eab308', bg: 'rgba(234, 179, 8, 0.20)', subtleBg: 'rgba(234, 179, 8, 0.14)' },
+  4: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.20)', subtleBg: 'rgba(245, 158, 11, 0.14)' },
+  3: { color: '#f97316', bg: 'rgba(249, 115, 22, 0.20)', subtleBg: 'rgba(249, 115, 22, 0.14)' },
+  2: { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.20)', subtleBg: 'rgba(239, 68, 68, 0.14)' },
+  1: { color: '#b91c1c', bg: 'rgba(185, 28, 28, 0.20)', subtleBg: 'rgba(185, 28, 28, 0.14)' }
+}
+
+function getScoreStyle(score) {
+  if (score == null) return null
+  const numeric = Number(score)
+  if (!Number.isFinite(numeric)) return null
+  const normalized = Math.min(10, Math.max(1, Math.round(numeric)))
+  return SCORE_STYLES[normalized]
+}
+
 export function getScoreColor(score) {
-  if (score == null) return '#6b7280'
-  if (score >= 7) return '#22c55e'
-  if (score >= 5) return '#eab308'
-  return '#ef4444'
+  return getScoreStyle(score)?.color || '#6b7280'
 }
 
 export function getScoreBg(score) {
-  if (score == null) return 'rgba(107, 114, 128, 0.1)'
-  if (score >= 7) return 'rgba(34, 197, 94, 0.2)'
-  if (score >= 5) return 'rgba(234, 179, 8, 0.2)'
-  return 'rgba(239, 68, 68, 0.2)'
+  return getScoreStyle(score)?.bg || 'rgba(107, 114, 128, 0.1)'
 }
 
 export function getScoreBgSubtle(score) {
-  if (score == null) return 'rgba(107, 114, 128, 0.1)'
-  if (score >= 7) return 'rgba(34, 197, 94, 0.15)'
-  if (score >= 5) return 'rgba(234, 179, 8, 0.15)'
-  return 'rgba(239, 68, 68, 0.15)'
+  return getScoreStyle(score)?.subtleBg || 'rgba(107, 114, 128, 0.1)'
 }
 
 export function getScoreLabel(score) {

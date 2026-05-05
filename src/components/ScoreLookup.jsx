@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Search, Info, CheckCircle2, XCircle } from 'lucide-react'
 import { useI18n } from '../i18n.jsx'
+import { getScoreColor, getScoreBgSubtle } from '../lib/scoreUtils.js'
 
 // Dark mode styles
 const darkStyles = {
@@ -44,9 +45,18 @@ const darkStyles = {
 
 function ScoreBadge({ score }) {
   const numeric = Number(score) || 0
-  const cls = numeric >= 7 ? 'score-high' : numeric >= 5 ? 'score-medium' : 'score-low'
   return (
-    <span className={`score-badge ${cls}`} aria-label={`score ${numeric}`}>{numeric}</span>
+    <span
+      className="score-badge"
+      aria-label={`score ${numeric}`}
+      style={{
+        background: getScoreBgSubtle(numeric),
+        color: getScoreColor(numeric),
+        border: `1px solid ${getScoreColor(numeric)}33`
+      }}
+    >
+      {numeric}
+    </span>
   )
 }
 
