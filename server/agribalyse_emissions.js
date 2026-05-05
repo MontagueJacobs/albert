@@ -110,6 +110,7 @@ const AGRIBALYSE_EMISSIONS = {
   dark_chocolate:  { mean: 18.70, min:  5.32, max: 46.65, n:  39, note: 'Dark chocolate (>50% cocoa). Agribalyse raw 9.06 = mean across all chocolate incl. milk chocolate/confections (30-50% cocoa). For dark chocolate bars: Poore & Nemecek 2018 gives 18.7. OWID 46.65 incl. full land-use change' },
 
   // Processed categories
+  salt:            { mean:  2.96, min:  0.37, max: 13.20, n: 134, note: 'Salt and mineral condiments. Same Agribalyse source bucket as sauces/condiments/herbs/spices, split for clearer ingredient labels' },
   sauces_condiments:{ mean: 2.96, min:  0.37, max: 13.20, n: 134, note: 'Sauces, condiments, herbs, spices, salt, cooking aids' },
   ready_meals:     { mean:  7.29, min:  0.56, max: 52.40, n: 192, note: 'Composed dishes, pizzas, sandwiches, salads, entrées' },
   soup:            { mean:  2.11, min:  0.10, max:  9.95, n:  36, note: 'All soup types' },

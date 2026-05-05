@@ -387,7 +387,7 @@ const CATEGORY_CODE_LABELS = {
   'coffee': 'Koffie', 'dark_chocolate': 'Chocolade', 'butter': 'Boter', 'margarine': 'Margarine',
   'wine': 'Wijn', 'soy_milk': 'Plantaardige Melk', 'cassava': 'Cassave',
   'beer': 'Bier', 'spirits': 'Sterke Drank', 'tea': 'Thee', 'soft_drinks': 'Frisdranken',
-  'sauces_condiments': 'Sauzen & Kruiden', 'ready_meals': 'Kant-en-klaar', 'soup': 'Soep',
+  'salt': 'Zout', 'sauces_condiments': 'Sauzen & Kruiden', 'ready_meals': 'Kant-en-klaar', 'soup': 'Soep',
   'candy_sweets': 'Snoep & Drop', 'ice_cream': 'IJs', 'baked_goods': 'Gebak & Koek',
   'desserts': 'Desserts', 'spreads': 'Broodbeleg', 'baby_food': 'Babyvoeding', 'snacks': 'Snacks',
 }

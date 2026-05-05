@@ -227,6 +227,7 @@ const CATEGORY_DEFAULT_WEIGHTS = {
   'soft_drinks': 1500,
   
   // Processed
+  'salt': 500,
   'sauces_condiments': 500,
   'ready_meals': 400,
   'soup': 500,
@@ -995,6 +996,9 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'sourcy', 'bar le duc', 'chaudfontaine'
   ],
   'soy_milk': ['sojamelk', 'soy milk', 'sojadrink', 'havermelk', 'oat milk', 'amandelmelk', 'almond milk', 'plantaardig melk', 'rijstmelk', 'kokomelk', 'alpro'],
+
+  // Salt & mineral condiments
+  'salt': ['zout', 'salt', 'zeezout', 'sea salt', 'joodzout', 'natriumchloride'],
   
   // Sauces, Condiments & Spices
   'sauces_condiments': [
@@ -1006,7 +1010,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'ketjap', 'worcestershire', 'bearnaise', 'tartaar saus',
     'azijn', 'balsamico', 'kruiden', 'specerijen',
     'kaneel', 'nootmuskaat', 'komijn', 'kerrie', 'paprikapoeder',
-    'oregano', 'basilicum', 'tijm', 'rozemarijn', 'zout', 'zeezout', 'joodzout'
+    'oregano', 'basilicum', 'tijm', 'rozemarijn'
   ],
   
   // Ready meals & Soups
@@ -1193,6 +1197,7 @@ const CATEGORY_PRIORITY = {
   'soft_drinks': 9,
   'juice': 9,
   'sauces_condiments': 8,
+  'salt': 8,
   'spreads': 8,
   'baby_food': 8,
   // Medium: specific food types
@@ -2285,6 +2290,7 @@ const CATEGORY_LABELS = {
   'spirits': 'Sterke Drank',
   'tea': 'Thee',
   'soft_drinks': 'Frisdranken',
+  'salt': 'Zout',
   'sauces_condiments': 'Sauzen & Kruiden',
   'ready_meals': 'Kant-en-klaar',
   'soup': 'Soep',
