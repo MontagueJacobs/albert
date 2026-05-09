@@ -944,28 +944,6 @@ export default function ExperimentFlow({ onComplete, onBack }) {
                 </div>
               )}
 
-              {/* Option B: Skip — get a predefined cart based on diet */}
-              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--border, rgba(255,255,255,0.08))' }}>
-                <button
-                  onClick={handleUsePredefinedCart}
-                  disabled={loading}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    padding: '0.6rem 1rem',
-                    background: 'transparent',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border, rgba(255,255,255,0.15))',
-                    borderRadius: '8px',
-                    fontWeight: 400,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {isNl ? 'Sla over — wijs mij een standaardlijst toe' : 'Skip — assign me a default list'}
-                </button>
-              </div>
             </div>
           </div>
         </div>
