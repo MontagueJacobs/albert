@@ -98,7 +98,7 @@ const AGRIBALYSE_EMISSIONS = {
   cane_sugar:      { mean:  3.20, min:  2.00, max:  4.50, n:   1, note: 'Cane sugar — using OWID (Poore & Nemecek 2018) value; Agribalyse had only n=1 (1.04) which omits tropical land-use change' },
 
   // Beverages
-  coffee:          { mean: 28.53, min: 10.00, max: 28.53, n:   9, note: 'Roasted/instant coffee as purchased at retail. Uses Poore & Nemecek / OWID full supply-chain value including land-use change; Agribalyse brewed coffee underestimates grocery coffee because it is mostly water and stops before some upstream tropical impacts' },
+  coffee:          { mean: 16.50, min: 10.00, max: 28.53, n:   9, note: 'Roasted ground/instant coffee as purchased at retail. Agribalyse brewed coffee is mostly water and not comparable to dry grocery coffee; Poore & Nemecek 2018 gives 16.5 for roasted beans. OWID 28.53 incl. full land-use change is retained as validation/range, not the primary estimate' },
   tea:             { mean:  0.20, min:  0.04, max:  0.42, n:   7, note: 'Brewed tea, herbal infusions' },
   wine:            { mean:  1.60, min:  1.22, max:  2.23, n:  14, note: 'Red, white, rosé, champagne' },
   beer:            { mean:  1.33, min:  1.05, max:  1.74, n:  22, note: 'All beer types' },
@@ -107,7 +107,7 @@ const AGRIBALYSE_EMISSIONS = {
   soy_milk:        { mean:  0.80, min:  0.38, max:  1.52, n:  11, note: 'Soy, oat, rice, almond, coconut drinks' },
 
   // Chocolate
-  dark_chocolate:  { mean: 46.65, min:  5.32, max: 46.65, n:  39, note: 'Chocolate/cocoa products. Uses Poore & Nemecek / OWID full supply-chain value including tropical land-use change; Agribalyse chocolate averages can undercount cocoa-driven deforestation and mix lower-cocoa confectionery with chocolate bars' },
+  dark_chocolate:  { mean: 18.70, min:  5.32, max: 46.65, n:  39, note: 'Dark chocolate / cocoa-rich chocolate. Agribalyse raw mean across chocolate products is lower and mixes cocoa percentages; Poore & Nemecek 2018 gives 18.7 for dark chocolate bars. OWID 46.65 incl. full land-use change is retained as validation/range, not the primary estimate' },
 
   // Processed categories
   salt:            { mean:  2.96, min:  0.37, max: 13.20, n: 134, note: 'Salt and mineral condiments. Same Agribalyse source bucket as sauces/condiments/herbs/spices, split for clearer ingredient labels' },
