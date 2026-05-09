@@ -1102,7 +1102,9 @@ function evaluateProduct(productName = '', enrichedData = null, lang = 'nl') {
   const ingredientText = enrichedData?.ingredients || null
   const nutritionText = enrichedData?.nutrition_text || null
   const nutritionJson = enrichedData?.nutrition_json || null
-  let co2Data = getCO2Emissions(input, ingredientText, nutritionText, nutritionJson)
+  let co2Data = getCO2Emissions(input, ingredientText, nutritionText, nutritionJson, {
+    originCountry: enrichedData?.origin_country || null
+  })
   
   // Fallback: if name/ingredient matching failed, try AH store category inference
   // (uses AH_CATEGORY_TO_CO2 mapping from co2Emissions.js)

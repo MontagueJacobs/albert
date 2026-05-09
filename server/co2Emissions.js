@@ -832,7 +832,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   ],
   
   // Oils
-  'palm_oil': ['palmolie', 'palm oil', 'palmvet'],
+  'palm_oil': ['palmolie', 'palm oil', 'palmvet', 'kokosolie', 'coconut oil', 'kokosvet', 'coconut fat'],
   'soybean_oil': ['sojaolie', 'soybean oil', 'soja-olie'],
   'olive_oil': ['olijfolie', 'olive oil', 'olijven', 'olijf', 'kalamata', 'zwarte olijven', 'groene olijven'],
   'rapeseed_oil': ['raapzaadolie', 'raapolie', 'koolzaadolie', 'rapeseed oil', 'canola'],
@@ -970,10 +970,10 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Sugar
   'cane_sugar': ['rietsuiker', 'cane sugar', 'ruwe suiker', 'muscovado'],
-  'beet_sugar': ['suiker', 'sugar', 'kristalsuiker', 'poedersuiker', 'basterdsuiker', 'bietsuiker'],
+  'beet_sugar': ['suiker', 'sugar', 'kristalsuiker', 'poedersuiker', 'basterdsuiker', 'bietsuiker', 'maltodextrine', 'maltodextrin', 'glucosestroop', 'glucose syrup', 'dextrose'],
   
   // Beverages & Other
-  'coffee': ['koffie', 'coffee', 'espresso', 'cappuccino', 'latte'],
+  'coffee': ['koffie', 'coffee', 'oploskoffie', 'instant koffie', 'instant coffee', 'espresso', 'cappuccino', 'cappucino', 'latte'],
   'dark_chocolate': ['chocola', 'chocolate', 'chocolonely', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella',
     // Compound names that are definitely chocolate products, not flavored drinks
     'chocoladereep', 'chocoladerepen', 'chocoladetablet', 'chocolade letter'
@@ -2103,7 +2103,98 @@ const NAME_OVERRIDE_CATEGORIES = new Set([
   'cheese',                         // Aging, high milk-to-cheese ratio
 ])
 
-function getCO2Emissions(productName, ingredientText = null, nutritionText = null, nutritionJson = null) {
+function isDutchOrigin(originCountry) {
+  if (!originCountry) return false
+  const raw = Array.isArray(originCountry) ? originCountry.join(' ') : String(originCountry)
+  return /\b(nederland|netherlands|holland|nl)\b/i.test(raw)
+}
+
+function replaceCategoryEmission(co2Data, category, methodSuffix) {
+  const emission = getEmission(category)
+  const catConf = CATEGORY_CONFIDENCE[category]
+  const prodConf = computeProductConfidence(catConf ? catConf.confidence : 50, co2Data.method || 'name', {
+    hasNutrition: co2Data.method === 'ingredients',
+    matchedIngredients: co2Data.matchedIngredients,
+    totalIngredients: co2Data.totalIngredients
+  })
+
+  return {
+    ...co2Data,
+    co2PerKg: CO2_EMISSIONS_DATA[category],
+    co2Min: emission ? emission.rangeMin : CO2_EMISSIONS_DATA[category],
+    co2Max: emission ? emission.rangeMax : CO2_EMISSIONS_DATA[category],
+    co2Valid: emission ? emission.valid : true,
+    category,
+    method: `${co2Data.method || 'name'}_${methodSuffix}`,
+    confidence: prodConf.confidence,
+    confidenceLabel: prodConf.label,
+    methodology: {
+      primary: catConf ? catConf.primary : 'Agribalyse v3.2',
+      primaryValue: catConf ? catConf.primaryValue : null,
+      validation: catConf?.validationSource || null,
+      validationValue: catConf?.validationValue || null,
+      method: `${co2Data.method || 'name'} + origin adjustment`,
+      factors: prodConf.factors
+    }
+  }
+}
+
+function applyContextualEmissionOverrides(co2Data, context = {}) {
+  if (!co2Data?.matched) return co2Data
+
+  // Dutch supermarket beef is predominantly dairy-herd / dual-purpose beef.
+  // Treat beef explicitly produced in the Netherlands as `beef_dairy`; imported
+  // or unknown-origin beef remains the higher imported/beef-herd mix.
+  if (!isDutchOrigin(context.originCountry)) return co2Data
+
+  const beefHerdCO2 = CO2_EMISSIONS_DATA.beef_herd
+  const dairyBeefCO2 = CO2_EMISSIONS_DATA.beef_dairy
+  if (!beefHerdCO2 || !dairyBeefCO2) return co2Data
+
+  if (Array.isArray(co2Data.ingredientBreakdown) && co2Data.ingredientBreakdown.some(i => i.category === 'beef_herd')) {
+    let delta = 0
+    const dairyEmission = getEmission('beef_dairy')
+    const adjustedBreakdown = co2Data.ingredientBreakdown.map(ing => {
+      if (ing.category !== 'beef_herd') return ing
+      delta += (dairyBeefCO2 - beefHerdCO2) * ing.weightFraction
+      return {
+        ...ing,
+        category: 'beef_dairy',
+        co2PerKg: dairyBeefCO2,
+        sources: dairyEmission ? dairyEmission.sources : ing.sources,
+        co2Min: dairyEmission ? dairyEmission.rangeMin : dairyBeefCO2,
+        co2Max: dairyEmission ? dairyEmission.rangeMax : dairyBeefCO2,
+        categoryConfidence: CATEGORY_CONFIDENCE.beef_dairy?.confidence ?? ing.categoryConfidence
+      }
+    })
+
+    let dominantCategory = co2Data.category === 'beef_herd' ? 'beef_dairy' : co2Data.category
+    let dominantContribution = 0
+    for (const ing of adjustedBreakdown) {
+      const contribution = (ing.co2PerKg || 0) * (ing.weightFraction || 0)
+      if (contribution > dominantContribution) {
+        dominantContribution = contribution
+        dominantCategory = ing.category
+      }
+    }
+
+    return {
+      ...co2Data,
+      co2PerKg: Math.round(Math.max(0, co2Data.co2PerKg + delta) * 100) / 100,
+      category: dominantCategory,
+      method: `${co2Data.method || 'ingredients'}_origin_adjusted`,
+      ingredientBreakdown: adjustedBreakdown
+    }
+  }
+
+  if (co2Data.category === 'beef_herd') {
+    return replaceCategoryEmission(co2Data, 'beef_dairy', 'origin_adjusted')
+  }
+
+  return co2Data
+}
+
+function getCO2Emissions(productName, ingredientText = null, nutritionText = null, nutritionJson = null, context = {}) {
   // First: exclude non-food items by name
   if (isNonFood(productName)) {
     return {
@@ -2120,10 +2211,10 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
   if (hasIngredients) {
     const ingredientResult = getCO2FromIngredients(ingredientText, nutritionText, nutritionJson)
     if (ingredientResult.matched) {
-      return {
+      return applyContextualEmissionOverrides({
         ...ingredientResult,
         isNonFood: false
-      }
+      }, context)
     }
   }
 
@@ -2135,7 +2226,7 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
       const nameEmission = getEmission(nameCategory)
       const catConf = CATEGORY_CONFIDENCE[nameCategory]
       const prodConf = computeProductConfidence(catConf ? catConf.confidence : 50, 'name', {})
-      return {
+      return applyContextualEmissionOverrides({
         co2PerKg: CO2_EMISSIONS_DATA[nameCategory],
         co2Min: nameEmission ? nameEmission.rangeMin : CO2_EMISSIONS_DATA[nameCategory],
         co2Max: nameEmission ? nameEmission.rangeMax : CO2_EMISSIONS_DATA[nameCategory],
@@ -2154,7 +2245,7 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
           method: 'product name (category override, no ingredients)',
           factors: prodConf.factors
         }
-      }
+      }, context)
     }
   }
   
@@ -2180,7 +2271,7 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
   const fallbackEmission = getEmission(category)
   const catConf = CATEGORY_CONFIDENCE[category]
   const prodConf = computeProductConfidence(catConf ? catConf.confidence : 50, 'name', {})
-  return {
+  return applyContextualEmissionOverrides({
     co2PerKg: CO2_EMISSIONS_DATA[category],
     co2Min: fallbackEmission ? fallbackEmission.rangeMin : CO2_EMISSIONS_DATA[category],
     co2Max: fallbackEmission ? fallbackEmission.rangeMax : CO2_EMISSIONS_DATA[category],
@@ -2199,7 +2290,7 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
       method: 'product name matching',
       factors: prodConf.factors
     }
-  }
+  }, context)
 }
 
 /**
@@ -2316,7 +2407,9 @@ function getCategoryLabel(category) {
  */
 function evaluateProductCO2(productName, enrichedData = null) {
   const ingredientText = enrichedData?.ingredients || null
-  const co2Data = getCO2Emissions(productName, ingredientText)
+  const co2Data = getCO2Emissions(productName, ingredientText, enrichedData?.nutrition_text || null, enrichedData?.nutrition_json || null, {
+    originCountry: enrichedData?.origin_country || null
+  })
   const score = co2ToScore(co2Data.co2PerKg)
   const rating = getCO2Rating(score)
   
