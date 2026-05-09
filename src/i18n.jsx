@@ -132,8 +132,8 @@ const TRANSLATIONS = {
       5: 'Kaas, garnalen, chocolade',
       4: 'Lamsvlees, boter',
       3: 'Rundvlees',
-      2: 'Rundvlees (import)',
-      1: '—'
+      2: 'Geen huidige AH-catalogusvoorbeelden',
+      1: 'Geen huidige AH-catalogusvoorbeelden'
     },
     how_sources: 'Primaire databron: Agribalyse v3.2 (ADEME, 2023). Kruisvalidatie: Our World in Data — Poore & Nemecek (Science, 2018). Dieetbasislijn: FAOSTAT (2021), USDA FoodData Central. Rundvlees gecorrigeerd voor Nederlandse importmix (WWF-NL, 2024). Alle waarden zijn in kg CO₂-equivalenten en omvatten de gehele productieketen.',
     sync_title: 'Albert Heijn account synchroniseren',
@@ -509,8 +509,8 @@ const TRANSLATIONS = {
       5: 'Cheese, shrimp, chocolate',
       4: 'Lamb, butter',
       3: 'Beef',
-      2: 'Beef (imported)',
-      1: '—'
+      2: 'No current AH catalog examples',
+      1: 'No current AH catalog examples'
     },
     how_sources: 'Primary data source: Agribalyse v3.2 (ADEME, 2023). Cross-validation: Our World in Data — Poore & Nemecek (Science, 2018). Dietary baseline: FAOSTAT (2021), USDA FoodData Central. Beef adjusted for Dutch import mix (WWF-NL, 2024). All values are in kg CO₂ equivalents and cover the entire production chain.',
     sync_title: 'Sync your Albert Heijn account',
