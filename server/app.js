@@ -218,7 +218,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || 'development',
     commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || null,
-    recommendationEngine: 'milk-strict-v3-price-quantity'
+    recommendationEngine: 'milk-strict-v4-score-unit-price'
   })
 })
 
@@ -843,13 +843,44 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     'kokos', 'kokosmelk',
     'cashew', 'hazelnoot', 'spelt'
   ]
+  const plantMilkSignals = [
+    'plantaardig', 'plantbased', 'plant-based', 'vegan', 'veganistisch',
+    'haver', 'havermelk', 'haverdrink', 'oat', 'oatly',
+    'soja', 'sojamelk', 'sojadrink', 'soy',
+    'amandel', 'amandelmelk', 'almond',
+    'rijst', 'rijstdrink', 'rice',
+    'erwt', 'erwtendrink', 'pea',
+    'kokos', 'kokosmelk', 'coconut',
+    'cashew', 'hazelnoot', 'spelt',
+    'alpro', 'provamel', 'ah terra'
+  ]
   const isMilkAlternative = (candidate) => {
     const name = (candidate?.name || '').toLowerCase()
     const categoryText = Array.isArray(candidate?.categories)
       ? candidate.categories.join(' ').toLowerCase()
       : ''
     const haystack = `${name} ${categoryText}`
-    return milkAltHints.some(hint => haystack.includes(hint))
+    const isMilkLike = milkAltHints.some(hint => haystack.includes(hint))
+    const isPlantBased = candidate?.source === 'api_plantbased'
+      || candidate?.is_vegan === true
+      || plantMilkSignals.some(signal => haystack.includes(signal))
+    return isMilkLike && isPlantBased
+  }
+  const unitPrice = (candidate) => {
+    const price = Number(candidate?.price)
+    const rawUnitSize = String(candidate?.unit_size || '').toLowerCase()
+    if (!Number.isFinite(price)) return null
+    const match = rawUnitSize.match(/(\d+(?:[.,]\d+)?)\s*-?\s*(ml|cl|l|liter|g|gr|gram|kg)\b/)
+    if (!match) return null
+    const amount = Number(match[1].replace(',', '.'))
+    if (!Number.isFinite(amount) || amount <= 0) return null
+    const unit = match[2]
+    const baseAmount = unit === 'l' || unit === 'liter' || unit === 'kg'
+      ? amount
+      : unit === 'cl'
+        ? amount / 100
+        : amount / 1000
+    return baseAmount > 0 ? price / baseAmount : null
   }
 
   // Pre-score plant-based catalog products as the alternative pool.
@@ -877,9 +908,15 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
 
     // Prefer alternatives from matching subcategories, then any plant-based
     const alternatives = scoredPlantBased
-      .filter(alt => origCategory === 'milk' ? alt.score >= product.score : alt.score > product.score + 1)
+      .filter(alt => origCategory === 'milk' ? alt.score > product.score : alt.score > product.score + 1)
       .filter(alt => origCategory !== 'milk' || isMilkAlternative(alt))
       .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        const aUnitPrice = unitPrice(a)
+        const bUnitPrice = unitPrice(b)
+        if (aUnitPrice != null && bUnitPrice != null && aUnitPrice !== bUnitPrice) return aUnitPrice - bUnitPrice
+        if (aUnitPrice != null && bUnitPrice == null) return -1
+        if (aUnitPrice == null && bUnitPrice != null) return 1
         // Preferred-subcategory products first
         const aPref = a.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
         const bPref = b.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
@@ -3242,7 +3279,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       improvements,
       alternatives,
       suggestionTip,
-      recommendationEngine: 'milk-strict-v3-price-quantity',
+      recommendationEngine: 'milk-strict-v4-score-unit-price',
       enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
       hasEnrichedData: evaluation.hasEnrichedData,

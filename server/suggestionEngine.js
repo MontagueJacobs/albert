@@ -282,7 +282,6 @@ export async function findSmartAlternatives({
 
   // Score and sort candidates
   const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, swapInfo.ahSubCategories, {
-    allowSameScore: strictMilkSwap,
     currentPrice,
     currentUnitSize
   })
@@ -322,7 +321,7 @@ export function getSmartSuggestions(productName, co2Category, score, lang = 'nl'
 // ---------------------------------------------------------------
 
 /** Standard product columns to select from Supabase */
-const PRODUCT_COLUMNS = 'id, name, url, image_url, price, unit_size, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, ingredients, nutrition_text, nutrition_json, origin_country, brand, categories'
+const PRODUCT_COLUMNS = 'id, name, url, image_url, price, unit_size, source, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, ingredients, nutrition_text, nutrition_json, origin_country, brand, categories'
 
 /**
  * Query plant-based products by AH subcategory.
@@ -437,13 +436,29 @@ const MILK_ALT_HINTS = [
   'cashew', 'hazelnoot', 'spelt'
 ]
 
+const PLANT_MILK_SIGNALS = [
+  'plantaardig', 'plantbased', 'plant-based', 'vegan', 'veganistisch',
+  'haver', 'havermelk', 'haverdrink', 'oat', 'oatly',
+  'soja', 'sojamelk', 'sojadrink', 'soy',
+  'amandel', 'amandelmelk', 'almond',
+  'rijst', 'rijstdrink', 'rice',
+  'erwt', 'erwtendrink', 'pea',
+  'kokos', 'kokosmelk', 'coconut',
+  'cashew', 'hazelnoot', 'spelt',
+  'alpro', 'provamel', 'ah terra'
+]
+
 function isMilkAlternativeCandidate(candidate) {
   const name = (candidate?.name || '').toLowerCase()
   const categoryText = Array.isArray(candidate?.categories)
     ? candidate.categories.join(' ').toLowerCase()
     : ''
   const haystack = `${name} ${categoryText}`
-  return MILK_ALT_HINTS.some(hint => haystack.includes(hint))
+  const isMilkLike = MILK_ALT_HINTS.some(hint => haystack.includes(hint))
+  const isPlantBased = candidate?.source === 'api_plantbased'
+    || candidate?.is_vegan === true
+    || PLANT_MILK_SIGNALS.some(signal => haystack.includes(signal))
+  return isMilkLike && isPlantBased
 }
 
 /**
@@ -590,6 +605,17 @@ function compareNullableNumberAsc(a, b) {
   return 0
 }
 
+function calculateUnitPrice(price, quantity) {
+  if (!Number.isFinite(price) || !quantity?.amount || !quantity?.unit) return null
+  if (quantity.unit === 'ml' || quantity.unit === 'g') {
+    return price / quantity.amount * 1000
+  }
+  if (quantity.unit === 'count') {
+    return price / quantity.amount
+  }
+  return null
+}
+
 // -- Core scoring & sorting ---------------------------------------
 
 /**
@@ -618,6 +644,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       const inPreferred = isInPreferredSubcategory(c, preferredSubCategories || [])
       const candidateQuantity = normalizePackageQuantity(c.unit_size, c.name)
       const price = Number.isFinite(Number(c.price)) ? Number(c.price) : null
+      const unitPrice = calculateUnitPrice(price, candidateQuantity)
       const priceDelta = price != null && currentPrice != null ? price - currentPrice : null
       const priceComparable = priceDelta != null ? priceDelta <= 0 : false
 
@@ -635,7 +662,9 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
         image_url: c.image_url,
         price: c.price,
         priceNumeric: price,
+        unitPrice,
         unit_size: c.unit_size,
+        source: c.source,
         score: evaluation.score,
         co2Category: evaluation.co2Category,
         co2PerKg: evaluation.co2PerKg,
@@ -655,11 +684,15 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
     })
     .filter(c => {
       if (c.score == null) return false
-      if (options.allowSameScore ? c.score < currentScore : c.score <= currentScore) return false
+      if (c.score <= currentScore) return false
       if (!c.quantityMatch) return false
       return true
     })
     .sort((a, b) => {
+      const scoreCompare = compareNullableNumberAsc(b.score, a.score)
+      if (scoreCompare !== 0) return scoreCompare
+      const unitPriceCompare = compareNullableNumberAsc(a.unitPrice, b.unitPrice)
+      if (unitPriceCompare !== 0) return unitPriceCompare
       const co2Compare = compareNullableNumberAsc(a.co2PerKg, b.co2PerKg)
       if (co2Compare !== 0) return co2Compare
       if (a.priceComparable !== b.priceComparable) return a.priceComparable ? -1 : 1
