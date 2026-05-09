@@ -95,6 +95,17 @@ const scrapeState = {
   logs: []
 }
 
+const clientErrorState = {
+  entries: []
+}
+
+function appendClientError(entry) {
+  clientErrorState.entries.push(entry)
+  if (clientErrorState.entries.length > MAX_LOG_ENTRIES) {
+    clientErrorState.entries = clientErrorState.entries.slice(clientErrorState.entries.length - MAX_LOG_ENTRIES)
+  }
+}
+
 function appendSyncLog(stream, chunk) {
   const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk)
   const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
@@ -219,6 +230,45 @@ app.get('/api/health', (req, res) => {
     env: process.env.NODE_ENV || 'development',
     commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || null,
     recommendationEngine: 'milk-strict-v4-score-unit-price'
+  })
+})
+
+// ============================================================================
+// CLIENT ERROR TELEMETRY (lightweight)
+// ==========================================================================
+app.post('/api/client-errors', (req, res) => {
+  try {
+    const payload = req.body || {}
+    const entry = {
+      timestamp: new Date().toISOString(),
+      type: String(payload.type || 'client_error').slice(0, 100),
+      message: String(payload.message || '').slice(0, 1000),
+      stack: String(payload.stack || '').slice(0, 8000),
+      url: String(payload.url || '').slice(0, 1000),
+      hash: String(payload.hash || '').slice(0, 200),
+      userAgent: String(payload.userAgent || '').slice(0, 500),
+      language: String(payload.language || '').slice(0, 50),
+      experimentStep: String(payload.experimentStep || '').slice(0, 100),
+      sessionIdSuffix: String(payload.sessionIdSuffix || '').slice(0, 50),
+      anonymousIdSuffix: String(payload.anonymousIdSuffix || '').slice(0, 50),
+      bonusCardSuffix: String(payload.bonusCardSuffix || '').slice(0, 50),
+      recoverableRemoveChild: Boolean(payload.recoverableRemoveChild)
+    }
+
+    appendClientError(entry)
+    console.error('[ClientErrorTelemetry]', JSON.stringify(entry))
+
+    return res.status(202).json({ ok: true })
+  } catch (err) {
+    console.error('[ClientErrorTelemetry] failed to record client error:', err?.message || err)
+    return res.status(500).json({ ok: false })
+  }
+})
+
+app.get('/api/client-errors/recent', (req, res) => {
+  return res.json({
+    count: clientErrorState.entries.length,
+    entries: clientErrorState.entries
   })
 })
 

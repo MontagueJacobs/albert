@@ -649,7 +649,7 @@ export default function ExperimentFlow({ onComplete, onBack }) {
   const stepText = isNl ? stepLabel?.nl : stepLabel?.en
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} data-experiment-step={step || ''}>
       {/* Progress Bar — shown for all steps except consent and complete */}
       {step !== 'consent' && step !== 'complete' && step !== 'intro' && (
         <div style={styles.progressContainer}>
