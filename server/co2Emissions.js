@@ -815,7 +815,11 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'room', 'magere melk', 'volle melk', 'halfvolle melk',
     // Compound flavored-dairy names (must beat flavor keywords like 'chocola')
     'chocoladevla', 'vanillevla', 'aardbeienvla',
-    'chocolademelk', 'aardbeienmelk', 'bananenmelk'
+    'chocolademelk', 'chocolate milk', 'chocoladedrink', 'cacaodrank',
+    'aardbeienmelk', 'bananenmelk',
+    // Prepared coffee-with-milk drinks. Dry/instant coffee still matches
+    // `coffee`; these names are for ready-to-drink milk beverages.
+    'latte macchiato', 'caffe latte', 'caffè latte', 'koffiedrink', 'ijskoffie'
   ],
   'butter': [
     'boter', 'butter', 'roomboter', 'kruidenboter', 'knoflookboter'
@@ -973,7 +977,17 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   'beet_sugar': ['suiker', 'sugar', 'kristalsuiker', 'poedersuiker', 'basterdsuiker', 'bietsuiker', 'maltodextrine', 'maltodextrin', 'glucosestroop', 'glucose syrup', 'dextrose'],
   
   // Beverages & Other
-  'coffee': ['koffie', 'coffee', 'oploskoffie', 'instant koffie', 'instant coffee', 'espresso', 'cappuccino', 'cappucino', 'latte'],
+  // Dry coffee products/ingredients. Prepared drinks such as cappuccino/latte
+  // should be scored from ingredients where possible (e.g. 4-13% coffee + milk/water),
+  // not as if the whole beverage were dry coffee beans.
+  'coffee': [
+    'koffiebonen', 'coffee beans', 'koffieboon',
+    'gemalen koffie', 'ground coffee', 'filterkoffie',
+    'oploskoffie', 'instant koffie', 'instant coffee',
+    'koffiepoeder', 'coffee powder', 'espresso bonen', 'espresso beans',
+    'koffiecups', 'koffiepads', 'coffee pods', 'coffee capsules',
+    'koffie', 'coffee'
+  ],
   'dark_chocolate': ['chocola', 'chocolate', 'chocolonely', 'cacao', 'cocoa', 'hagelslag', 'chocopasta', 'nutella',
     // Compound names that are definitely chocolate products, not flavored drinks
     'chocoladereep', 'chocoladerepen', 'chocoladetablet', 'chocolade letter'
