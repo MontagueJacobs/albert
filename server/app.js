@@ -2498,16 +2498,25 @@ app.get('/api/catalog/browse', async (req, res) => {
         'vlees', 'meat', 'kip', 'chicken', 'rund', 'beef', 'varken', 'pork', 'ham', 'bacon', 'worst', 'salami',
         'vis', 'fish', 'zalm', 'salmon', 'tonijn', 'tuna', 'garnal', 'shrimp', 'seafood'
       ]
+      const PLANT_BASED_TERMS = [
+        'vegan', 'veganistisch', 'veganic', 'vegetarisch', 'vegetarian',
+        'plant-based', 'plant based', 'plantbased', 'plantaardig', 'plantaardige',
+        'vleesvervanger', 'vleesvervangers', 'vleesvervanging', 'vleesvrij', 'meat free',
+        'beyond meat', 'garden gourmet', 'vivera', 'de vegetarische slager', 'vegetarische slager',
+        'the vegetarian butcher', 'planted', 'like meat', 'likemeat', 'no meat', 'next level meat',
+        'redefine meat', 'quorn', 'valess', 'ah terra'
+      ]
 
       filtered = filtered.filter(p => {
-        if (p.is_vegan) return false
-        if (p.is_vegetarian) return true
-
         const haystack = [
           p.name || '',
+          p.brand || '',
           Array.isArray(p.categories) ? p.categories.join(' ') : '',
           p.ingredients || ''
         ].join(' ').toLowerCase()
+
+        const hasPlantBasedIndicator = p.is_vegan === true || PLANT_BASED_TERMS.some(term => haystack.includes(term))
+        if (hasPlantBasedIndicator) return false
 
         return ANIMAL_TERMS.some(term => haystack.includes(term))
       })
