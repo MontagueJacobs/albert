@@ -1009,7 +1009,8 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'dubbelfris', 'ice tea', 'fuze', 'spa', 'mineraalwater', 'bronwater',
     'sourcy', 'bar le duc', 'chaudfontaine'
   ],
-  'soy_milk': ['sojamelk', 'soy milk', 'sojadrink', 'havermelk', 'oat milk', 'amandelmelk', 'almond milk', 'plantaardig melk', 'rijstmelk', 'kokomelk', 'alpro'],
+  //meant to be plant-based alternatives to dairy products, kept like this for now
+  'soy_milk': ['sojamelk', 'soy milk', 'sojadrink', 'soja drink', 'havermelk', 'haverdrink', 'haver drink', 'haver drank', 'oat milk', 'amandelmelk', 'almond milk', 'amandeldrink','plantaardige', 'plantaardig alternatief', 'rijstmelk', 'rijst drink', 'kokosmelk', 'coconut milk', 'kokosdrink', 'alpro', 'oatly!'],
 
   // Salt & mineral condiments
   'salt': ['zout', 'salt', 'zeezout', 'sea salt', 'joodzout', 'natriumchloride'],

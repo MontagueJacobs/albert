@@ -2502,6 +2502,9 @@ app.get('/api/catalog/browse', async (req, res) => {
         'vegan', 'veganistisch', 'veganic', 'vegetarisch', 'vegetarian',
         'plant-based', 'plant based', 'plantbased', 'plantaardig', 'plantaardige',
         'vleesvervanger', 'vleesvervangers', 'vleesvervanging', 'vleesvrij', 'meat free',
+        'kokosmelk', 'coconut milk', 'havermelk', 'oat milk', 'sojamelk', 'soy milk',
+        'amandelmelk', 'almond milk', 'rijstmelk', 'rice milk', 'lupinemelk',
+        'oatly', 'alpro', 'oatsome', 'joya', 'provamel',
         'beyond meat', 'garden gourmet', 'vivera', 'de vegetarische slager', 'vegetarische slager',
         'the vegetarian butcher', 'planted', 'like meat', 'likemeat', 'no meat', 'next level meat',
         'redefine meat', 'quorn', 'valess', 'ah terra'
