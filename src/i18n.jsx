@@ -115,11 +115,11 @@ const TRANSLATIONS = {
       },
       {
         title: '7. Slimme alternatieven',
-        body: 'Ons aanbevelingssysteem zoekt actief naar duurzamere alternatieven via vier zoekstrategieën. Eerst doorzoeken we 25 wisselcategorieën: rundvlees → plantaardig gehakt, zuivel → havermelk/sojamelk, kaas → plantaardige kaas, boter → margarine, enzovoort. Daarna zoeken we in verwante categorieën (bijv. varkensvlees → kip). Vervolgens gebruiken we naam-herkenning om vergelijkbare productvormen te vinden — "gehakt" levert "vegan gehakt", "melk" levert "havermelk". Tot slot vullen we aan met populaire, duurzame producten. Alleen producten die daadwerkelijk beter scoren worden getoond.'
+        body: 'Ons aanbevelingssysteem zoekt actief naar duurzamere alternatieven via gerichte wisselcategorieën en AH-subcategorieën: rundvlees → plantaardig gehakt/burgers, melk → haver- of sojadrink, kaas → plantaardige kaas of spreads, enzovoort. Daarnaast gebruiken we productvorm-woorden zoals "gehakt", "burger" of "melk" om relevante vervangers te vinden. Alleen producten die daadwerkelijk beter scoren en een vergelijkbare hoeveelheid hebben worden getoond.'
       },
       {
         title: '8. Relevantie & tips',
-        body: 'Alternatieven worden gerangschikt op relevantie. We herkennen productvorm-woorden (gehakt, burger, melk, yoghurt, kaas, etc.) en geven bonuspunten aan alternatieven met een vergelijkbare productvorm. De uiteindelijke rangorde combineert: wisselcategorie-bonus, naamrelevantie, CO₂-verbetering, en absolute score. Bij elke categorie tonen we een gepersonaliseerde tip — bijvoorbeeld dat plantaardig gehakt tot 90% minder CO₂ uitstoot dan rundvlees, of dat havermelk slechts een derde van de uitstoot van zuivel heeft.'
+        body: 'Relevantie wordt eerst afgedwongen door alleen passende categorieën, subcategorieën en productvormen te selecteren. Daarna is de rangorde eenvoudig: alternatieven worden eerst gesorteerd op de laagste kg CO₂ per kg product en daarna op de laagste prijs per kg of liter. Bij elke categorie tonen we een gepersonaliseerde tip — bijvoorbeeld dat plantaardig gehakt tot 90% minder CO₂ uitstoot dan rundvlees, of dat havermelk slechts een derde van de uitstoot van zuivel heeft.'
       }
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Voorbeeld' },
@@ -492,11 +492,11 @@ const TRANSLATIONS = {
       },
       {
         title: '7. Smart alternatives',
-        body: 'Our recommendation engine actively searches for more sustainable alternatives using four search strategies. First, we search across 25 swap categories: beef → plant-based mince, dairy → oat milk/soy milk, cheese → plant-based cheese, butter → margarine, and so on. Next, we search related categories (e.g., pork → chicken). Then we use name recognition to find similar product forms — "gehakt" (mince) yields "vegan gehakt", "melk" (milk) yields "havermelk" (oat milk). Finally, we supplement with popular, sustainable products. Only products that genuinely score better are shown.'
+        body: 'Our recommendation engine searches for more sustainable alternatives using targeted swap categories and AH subcategories: beef → plant-based mince/burgers, milk → oat or soy drink, cheese → plant-based cheese or spreads, and so on. It also uses product-form words such as "mince", "burger", or "milk" to find relevant substitutes. Only products that genuinely score better and have a comparable quantity are shown.'
       },
       {
         title: '8. Relevance & tips',
-        body: 'Alternatives are ranked by relevance. We recognize product-form words (mince, burger, milk, yoghurt, cheese, etc.) and give bonus points to alternatives with a similar product form. The final ranking combines: swap-category bonus, name relevance, CO₂ improvement, and absolute score. For each category we show a personalized tip — for example, that plant-based mince produces up to 90% less CO₂ than beef, or that oat milk has only a third of dairy\'s emissions.'
+        body: 'Relevance is enforced first by selecting only matching categories, subcategories, and product forms. The final ranking is then simple: alternatives are sorted first by the lowest kg CO₂ per kg product, and then by the lowest price per kg or litre. For each category we show a personalized tip — for example, that plant-based mince produces up to 90% less CO₂ than beef, or that oat milk has only a third of dairy\'s emissions.'
       }
     ],
     how_table_headers: { score: 'Score', co2: 'kg CO₂ / kg', example: 'Example' },

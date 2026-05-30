@@ -281,9 +281,10 @@ export async function findSmartAlternatives({
   }
 
   // Score and sort candidates
-  const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, swapInfo.ahSubCategories, {
+  const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, {
     currentPrice,
-    currentUnitSize
+    currentUnitSize,
+    requireFormMatch: ['beef_herd', 'beef_dairy', 'lamb_mutton', 'pig_meat', 'poultry_meat'].includes(co2Category)
   })
 
   result.alternatives = scored.slice(0, maxResults)
@@ -531,6 +532,36 @@ function nameRelevance(sourceName, candidateName) {
   return Math.max(tokenScore, formBonus)
 }
 
+const FOOD_FORM_GROUPS = [
+  ['gehakt', 'gehackt', 'rul', 'mince', 'minced'],
+  ['burger', 'burgers'],
+  ['worst', 'rookworst', 'sausage', 'saucisse'],
+  ['filet', 'filets', 'kipfilet'],
+  ['schnitzel', 'schnitzels'],
+  ['steak', 'biefstuk'],
+  ['bal', 'balletjes', 'balls', 'meatballs'],
+  ['stukjes', 'stuckjes', 'pieces', 'chunks'],
+  ['reepjes', 'strips'],
+  ['blokjes', 'cubes'],
+  ['sticks', 'nuggets'],
+  ['shoarma', 'gyros', 'kebab'],
+  ['spekjes', 'bacon'],
+  ['plakjes', 'slices']
+]
+
+function hasCompatibleFoodForm(sourceName, candidateName) {
+  const source = (sourceName || '').toLowerCase()
+  const candidate = (candidateName || '').toLowerCase()
+
+  for (const group of FOOD_FORM_GROUPS) {
+    const sourceHasGroup = group.some(term => source.includes(term))
+    if (!sourceHasGroup) continue
+    return group.some(term => candidate.includes(term))
+  }
+
+  return true
+}
+
 // -- Subcategory relevance ----------------------------------------
 
 /**
@@ -621,15 +652,16 @@ function calculateUnitPrice(price, quantity) {
 /**
  * Score and sort candidate products for recommendation quality.
  *
- * Scoring factors:
- *   1. Preferred AH subcategory match (+40)
- *   2. Name relevance / food-form match (x25)
- *   3. CO2 improvement over the current product (x3)
- *   4. Absolute CO2 score -- lower is better (x1)
+ * Methodology:
+ *   1. Keep only relevant alternatives found by the search strategies above.
+ *   2. Keep only products that score better than the current product.
+ *   3. Keep only comparable package quantities where the source quantity is known.
+ *   4. Rank by lowest kg CO2e / kg product, then by lowest price per kg/L.
  *
- * Filters out candidates with null score or worse score than current.
+ * This deliberately avoids weighted relevance bonuses in the final ranking.
+ * Relevance is handled before ranking by category/subcategory and keyword search.
  */
-function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, sourceName, preferredSubCategories, options = {}) {
+function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, sourceName, options = {}) {
   const sourceQuantity = normalizePackageQuantity(options.currentUnitSize, sourceName)
   const currentPrice = Number.isFinite(Number(options.currentPrice)) ? Number(options.currentPrice) : null
 
@@ -641,19 +673,11 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       const improvement = (evaluation.score != null && currentScore != null)
         ? evaluation.score - currentScore
         : 0
-      const inPreferred = isInPreferredSubcategory(c, preferredSubCategories || [])
       const candidateQuantity = normalizePackageQuantity(c.unit_size, c.name)
       const price = Number.isFinite(Number(c.price)) ? Number(c.price) : null
       const unitPrice = calculateUnitPrice(price, candidateQuantity)
       const priceDelta = price != null && currentPrice != null ? price - currentPrice : null
       const priceComparable = priceDelta != null ? priceDelta <= 0 : false
-
-      let rankScore = 0
-      if (inPreferred) rankScore += 40
-      rankScore += relevance * 25
-      rankScore += improvement * 3
-      rankScore += (evaluation.score != null) ? evaluation.score * 1 : 0
-      if (priceComparable) rankScore += 4
 
       return {
         id: c.id,
@@ -678,26 +702,22 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
         quantityMatch: quantityMatches(sourceQuantity, candidateQuantity),
         priceDelta,
         priceComparable,
-        relevance,
-        rankScore
+        relevance
       }
     })
     .filter(c => {
       if (c.score == null) return false
+      if (!Number.isFinite(c.co2PerKg)) return false
       if (c.score <= currentScore) return false
       if (!c.quantityMatch) return false
+      if (options.requireFormMatch && !hasCompatibleFoodForm(sourceName, c.name)) return false
       return true
     })
     .sort((a, b) => {
-      const scoreCompare = compareNullableNumberAsc(b.score, a.score)
-      if (scoreCompare !== 0) return scoreCompare
-      const unitPriceCompare = compareNullableNumberAsc(a.unitPrice, b.unitPrice)
-      if (unitPriceCompare !== 0) return unitPriceCompare
       const co2Compare = compareNullableNumberAsc(a.co2PerKg, b.co2PerKg)
       if (co2Compare !== 0) return co2Compare
-      if (a.priceComparable !== b.priceComparable) return a.priceComparable ? -1 : 1
-      const priceCompare = compareNullableNumberAsc(a.priceNumeric, b.priceNumeric)
-      if (priceCompare !== 0) return priceCompare
-      return b.rankScore - a.rankScore
+      const unitPriceCompare = compareNullableNumberAsc(a.unitPrice, b.unitPrice)
+      if (unitPriceCompare !== 0) return unitPriceCompare
+      return String(a.name || '').localeCompare(String(b.name || ''), 'nl', { sensitivity: 'base' })
     })
 }

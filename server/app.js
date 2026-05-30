@@ -229,7 +229,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || 'development',
     commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || null,
-    recommendationEngine: 'milk-strict-v4-score-unit-price'
+    recommendationEngine: 'co2-price-v1'
   })
 })
 
@@ -3340,7 +3340,7 @@ app.get('/api/product/:productId/details', async (req, res) => {
       improvements,
       alternatives,
       suggestionTip,
-      recommendationEngine: 'milk-strict-v4-score-unit-price',
+      recommendationEngine: 'co2-price-v1',
       enrichedFactors: evaluation.enriched || [],
       suggestions: evaluation.suggestions,
       hasEnrichedData: evaluation.hasEnrichedData,
