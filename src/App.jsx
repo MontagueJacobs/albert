@@ -3,7 +3,6 @@ import { TrendingUp, ShoppingBag, Award, RefreshCw, Search as SearchIcon, Menu, 
 import Dashboard from './components/Dashboard'
 import ProductCatalog from './components/ProductCatalog'
 import HowItWorks from './components/HowItWorks'
-import ScoreLookup from './components/ScoreLookup'
 import BonusCardLanding from './components/BonusCardLanding'
 import Questionnaire from './components/Questionnaire'
 import ExperimentFlow from './components/ExperimentFlow'
@@ -20,13 +19,6 @@ const features = [
     titleKey: 'tab_dashboard',
     descKey: 'feature_dashboard_desc',
     color: '#3b82f6'
-  },
-  {
-    id: 'lookup',
-    emoji: '🔍',
-    titleKey: 'tab_lookup',
-    descKey: 'feature_lookup_desc',
-    color: '#8b5cf6'
   },
   {
     id: 'experiment',
@@ -334,7 +326,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
         
         <div className="content-card">
           {activeTab === 'dashboard' && <Dashboard syncVersion={syncVersion} />}
-          {activeTab === 'lookup' && <ScoreLookup />}
           {activeTab === 'catalog' && <ProductCatalog />}
           {activeTab === 'how' && <HowItWorks />}
         </div>
@@ -349,7 +340,7 @@ function App() {
     const hash = window.location.hash.slice(1) // Remove #
     // Handle questionnaire with params like #questionnaire?type=pre
     const tabPart = hash.split('?')[0]
-    const validTabs = ['home', 'dashboard', 'lookup', 'catalog', 'how', 'questionnaire', 'experiment']
+    const validTabs = ['home', 'dashboard', 'catalog', 'how', 'questionnaire', 'experiment']
     return validTabs.includes(tabPart) ? tabPart : 'home'
   })
   
@@ -404,7 +395,7 @@ function App() {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
       const tabPart = hash.split('?')[0]
-      const validTabs = ['home', 'dashboard', 'lookup', 'catalog', 'how', 'questionnaire', 'experiment']
+      const validTabs = ['home', 'dashboard', 'catalog', 'how', 'questionnaire', 'experiment']
       setActiveTab(validTabs.includes(tabPart) ? tabPart : 'home')
       
       // Update questionnaire type if on questionnaire page
