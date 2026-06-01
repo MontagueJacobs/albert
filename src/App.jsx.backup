@@ -6,7 +6,6 @@ import PurchaseList from './components/PurchaseList'
 import ProfileSuggestions from './components/ProfileSuggestions'
 import HowItWorks from './components/HowItWorks'
 import AccountSync from './components/AccountSync'
-import ScoreLookup from './components/ScoreLookup'
 import UserMenu from './components/UserMenu'
 import AuthModal from './components/AuthModal'
 import { AuthProvider } from './lib/authContext'
@@ -75,14 +74,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, p
         </button>
 
         <button
-          className={`tab ${activeTab === 'lookup' ? 'active' : ''}`}
-          onClick={() => setActiveTab('lookup')}
-        >
-          <SearchIcon size={18} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '5px' }} />
-          {t('tab_lookup')}
-        </button>
-
-        <button
           className={`tab ${activeTab === 'sync' ? 'active' : ''}`}
           onClick={() => setActiveTab('sync')}
         >
@@ -110,7 +101,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, p
       {activeTab === 'add' && <AddPurchase onPurchaseAdded={onPurchaseAdded} />}
       {activeTab === 'dashboard' && <Dashboard insights={insights} />}
       {activeTab === 'suggestions' && <ProfileSuggestions refreshKey={syncVersion} />}
-      {activeTab === 'lookup' && <ScoreLookup />}
       {activeTab === 'sync' && <AccountSync onSyncCompleted={onSyncCompleted} />}
       {activeTab === 'history' && <PurchaseList purchases={purchases} />}
       {activeTab === 'how' && <HowItWorks />}

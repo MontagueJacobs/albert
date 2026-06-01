@@ -1348,61 +1348,6 @@ function evaluateProductWithRecord(productName, productRecord = null) {
   return evaluateProduct(productName, enrichedData)
 }
 
-function searchProducts(query = '') {
-  const normalized = normalizeProductName(query)
-  if (!normalized) return []
-
-  const catalogIndex = getCatalogIndex()
-  const results = []
-  const seen = new Set()
-
-  for (const entry of catalogIndex) {
-    let bestRank = 0
-    for (const candidate of entry.normalizedNames) {
-      if (!candidate) continue
-      let rank = 0
-      if (candidate === normalized) {
-        rank = 5
-      } else if (candidate.startsWith(normalized) || normalized.startsWith(candidate)) {
-        rank = 4
-      } else if (candidate.includes(normalized) || normalized.includes(candidate)) {
-        rank = 3
-      } else {
-        const tokens = normalized.split(' ')
-        if (tokens.length > 1 && tokens.every((token) => candidate.includes(token))) {
-          rank = 2
-        } else if (tokens.some((token) => token && candidate.includes(token))) {
-          rank = Math.max(rank, 1)
-        }
-      }
-      if (rank > bestRank) {
-        bestRank = rank
-      }
-    }
-
-    if (bestRank > 0 && !seen.has(entry.id)) {
-      const displayName = entry.names[0]
-      const evalResult = evaluateProduct(displayName)
-      results.push({
-        name: displayName,
-        score: evalResult.score,
-        categories: entry.categories || [],
-        rank: bestRank,
-        id: entry.id
-      })
-      seen.add(entry.id)
-    }
-  }
-
-  results.sort((a, b) => {
-    if (b.rank !== a.rank) return b.rank - a.rank
-    if (a.score !== b.score) return b.score - a.score
-    return a.name.localeCompare(b.name)
-  })
-
-  return results.slice(0, 10)
-}
-
 function getRating(avgScore) {
   // CO2-based scale: 1-10 where 10 = most sustainable (lowest CO2)
   // 10: < 1 kg CO2/kg (water, plain vegetables)
@@ -2391,6 +2336,7 @@ app.get('/api/catalog/browse', async (req, res) => {
     const hasImage = req.query.has_image === 'true'
     const typeFilter = req.query.type || null          // 'food' | 'drinks'
     const categoryFilter = req.query.category || null   // raw AH category substring
+    const excludePack = req.query.exclude_pack === 'true'
     const badgeFilterRaw = typeof req.query.badge === 'string' ? req.query.badge : ''
     let badgeFilters = badgeFilterRaw
       .split(',')
@@ -2447,7 +2393,7 @@ app.get('/api/catalog/browse', async (req, res) => {
     // or type-filtering (food/drinks) because those are computed in JS.
     const needsScoreProcessing = scoreMin != null || scoreMax != null || sort === 'score_asc' || sort === 'score_desc'
     const needsAnimalFilter = badgeFilters.includes('animal')
-    const needsJsProcessing = needsScoreProcessing || typeFilter != null || needsAnimalFilter
+    const needsJsProcessing = needsScoreProcessing || typeFilter != null || needsAnimalFilter || excludePack
     if (needsJsProcessing) {
       // Fetch a larger batch and filter/sort in JS
       query = query.range(0, 999)
@@ -2488,6 +2434,11 @@ app.get('/api/catalog/browse', async (req, res) => {
       filtered = filtered.filter(p => isDrinkProduct(p))
     } else if (typeFilter === 'food') {
       filtered = filtered.filter(p => !isDrinkProduct(p))
+    }
+
+    // Exclude pack products
+    if (excludePack) {
+      filtered = filtered.filter(p => !p.name.toLowerCase().includes('-pack'))
     }
 
     // Animal filter: only products with clear animal-origin indicators
@@ -3392,7 +3343,7 @@ app.post('/api/purchases', (req, res) => {
   })
 })
 
-// Support both GET and POST for score lookup
+// Product score details used by the score breakdown modal
 app.get('/api/score', (req, res) => {
   const { product, item, lang } = req.query
   const language = lang === 'en' ? 'en' : 'nl'
@@ -3406,26 +3357,6 @@ app.get('/api/score', (req, res) => {
   }
 
   const evaluation = evaluateProduct(input || product, null, language)
-  res.json(evaluation)
-})
-
-app.get('/api/score/search', (req, res) => {
-  // Accept query or q as the search param for compatibility
-  const { query, q } = req.query
-  const term = typeof query === 'string' && query.length > 0 ? query : (typeof q === 'string' ? q : '')
-  const results = searchProducts(term)
-  res.json({ results })
-})
-
-app.post('/api/score', (req, res) => {
-  const { product, item } = req.body || {}
-  const input = typeof product === 'string' && product.trim().length > 0
-    ? product
-    : (typeof item === 'string' ? item : '')
-  if (!input || input.trim().length === 0) {
-    return res.status(400).json({ error: 'missing_product' })
-  }
-  const evaluation = evaluateProduct(input)
   res.json(evaluation)
 })
 

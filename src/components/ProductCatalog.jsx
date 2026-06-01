@@ -148,11 +148,6 @@ function ProductCatalog() {
   const debounceRef = useRef(null)
   const scrollRef = useRef(null)
 
-  // Filter out products with "-pack" in the name
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => !p.name.toLowerCase().includes('-pack'))
-  }, [products])
-
   // Build endpoint URL
   const buildUrl = useCallback((pageNum, query) => {
     const preset = SCORE_PRESETS[scoreFilter]
@@ -167,6 +162,7 @@ function ProductCatalog() {
     if (preset.max != null) params.set('score_max', preset.max)
     if (typePreset.value) params.set('type', typePreset.value)
     if (badgeFilters.length > 0) params.set('badge', badgeFilters.join(','))
+    params.set('exclude_pack', 'true')
     return `/api/catalog/browse?${params.toString()}`
   }, [sort, scoreFilter, typeFilter, badgeFilters])
 
@@ -511,8 +507,8 @@ function ProductCatalog() {
       }}>
         <span>
           {loading ? (t('loading') || 'Loading...') :
-            filteredProducts.length === 0 ? (t('catalog_no_results') || 'No products found') :
-              `${filteredProducts.length} ${t('catalog_products_found') || 'products'}`
+            totalCount === 0 ? (t('catalog_no_results') || 'No products found') :
+              `${totalCount} ${t('catalog_products_found') || 'products'}`
           }
           {appliedQuery && !loading && (
             <span> — "{appliedQuery}"</span>
@@ -557,7 +553,7 @@ function ProductCatalog() {
       )}
 
       {/* Empty state */}
-      {!loading && !error && filteredProducts.length === 0 && (
+      {!loading && !error && products.length === 0 && (
         <div style={{
           padding: '3rem 2rem', textAlign: 'center',
           background: 'var(--bg-card)', borderRadius: '16px',
@@ -574,13 +570,13 @@ function ProductCatalog() {
       )}
 
       {/* Product grid */}
-      {!loading && !error && filteredProducts.length > 0 && viewMode === 'grid' && (
+      {!loading && !error && products.length > 0 && viewMode === 'grid' && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))',
           gap: '0.75rem'
         }}>
-          {filteredProducts.map(product => (
+          {products.map(product => (
             <div
               key={product.id}
               onClick={() => openProduct(product)}
@@ -693,9 +689,9 @@ function ProductCatalog() {
       )}
 
       {/* Product list view */}
-      {!loading && !error && filteredProducts.length > 0 && viewMode === 'list' && (
+      {!loading && !error && products.length > 0 && viewMode === 'list' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {filteredProducts.map(product => (
+          {products.map(product => (
             <div
               key={product.id}
               onClick={() => openProduct(product)}

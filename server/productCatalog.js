@@ -5,7 +5,7 @@
  *  - categories: sustainability flags (must map to SUSTAINABILITY_DB categories)
  *  - adjustments: additional nudges that capture nuances (e.g. high emissions)
  *  - suggestions: tailored tips we can surface in the UI
- *  - notes: short explanation presented in the score lookup tool
+ *  - notes: short explanation of the catalog entry
  */
 
 export const PRODUCT_CATALOG = [
