@@ -2304,6 +2304,29 @@ function isDrinkProduct(product) {
   return drinkWords.some(w => name.includes(w))
 }
 
+function normalizeCatalogSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function shouldExcludeForCatalogSearch(product, searchQuery) {
+  const normalizedQuery = normalizeCatalogSearchText(searchQuery)
+  if (!normalizedQuery.includes('melk') && !normalizedQuery.includes('milk')) return false
+
+  const text = normalizeCatalogSearchText(product.__search_text || product.name || '')
+  const name = normalizeCatalogSearchText(product.name || '')
+  const isActualMilkMatch = /(^|[^a-z])melk([^a-z]|$)|\b\w+melk\b|\bmelk(?:drink|drank|poeder)\b|\bmilk\b|\b\w+milk\b/.test(name)
+  if (!isActualMilkMatch) return true
+
+  const isChocolateProduct = /chocolade|chocolate|cacao|cocoa/.test(text)
+  if (!isChocolateProduct) return false
+
+  const isChocolateMilk = /chocolademelk|chocolade\s+melkdrank|chocolate\s+milk|cacaodrank|cacao\s+drink/.test(text)
+  return !isChocolateMilk
+}
+
 /**
  * GET /api/catalog/browse
  *
@@ -2393,7 +2416,8 @@ app.get('/api/catalog/browse', async (req, res) => {
     // or type-filtering (food/drinks) because those are computed in JS.
     const needsScoreProcessing = scoreMin != null || scoreMax != null || sort === 'score_asc' || sort === 'score_desc'
     const needsAnimalFilter = badgeFilters.includes('animal')
-    const needsJsProcessing = needsScoreProcessing || typeFilter != null || needsAnimalFilter || excludePack
+    const needsSearchPostFilter = searchQuery && /melk|milk/i.test(searchQuery)
+    const needsJsProcessing = needsScoreProcessing || typeFilter != null || needsAnimalFilter || excludePack || needsSearchPostFilter
     if (needsJsProcessing) {
       // Fetch a larger batch and filter/sort in JS
       query = query.range(0, 999)
@@ -2424,12 +2448,21 @@ app.get('/api/catalog/browse', async (req, res) => {
         categories: p.categories || [],
         sustainability_score: cached.score,
         co2_category: cached.co2Category,
-        rating: cached.rating
+        rating: cached.rating,
+        __search_text: [
+          p.name || '',
+          p.normalized_name || '',
+          p.brand || '',
+          Array.isArray(p.categories) ? p.categories.join(' ') : ''
+        ].join(' ')
       }
     })
 
     // Apply type filter (food / drinks) in JS
     let filtered = withScores
+    if (needsSearchPostFilter) {
+      filtered = filtered.filter(p => !shouldExcludeForCatalogSearch(p, searchQuery))
+    }
     if (typeFilter === 'drinks') {
       filtered = filtered.filter(p => isDrinkProduct(p))
     } else if (typeFilter === 'food') {
@@ -2502,6 +2535,8 @@ app.get('/api/catalog/browse', async (req, res) => {
       totalCount = count
       results = filtered
     }
+
+    results = results.map(({ __search_text, ...product }) => product)
 
     res.json({
       products: results,
