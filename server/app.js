@@ -6263,4 +6263,4 @@ await catalogReady
   })
 
 export default app
-export { ensureCatalogLoaded, minutes, calculateScore, evaluateProduct, searchProducts, getCatalogMeta }
+export { ensureCatalogLoaded, minutes, calculateScore, evaluateProduct, getCatalogMeta }
