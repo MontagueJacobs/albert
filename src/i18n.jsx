@@ -133,7 +133,7 @@ const TRANSLATIONS = {
       2: 'Geen huidige AH-catalogusvoorbeelden',
       1: 'Geen huidige AH-catalogusvoorbeelden'
     },
-    how_sources: 'Primaire databron: Agribalyse v3.2 (ADEME, 2023). Kruisvalidatie: Our World in Data — Poore & Nemecek (Science, 2018). Dieetbasislijn: FAOSTAT (2021), USDA FoodData Central. Rundvlees gecorrigeerd voor Nederlandse importmix (WWF-NL, 2024). Alle waarden zijn in kg CO₂-equivalenten en omvatten de gehele productieketen.',
+    how_sources: 'Primaire databron: ADEME AGRIBALYSE v3.2 (vereenvoudigde dataset: data.ademe.fr/agribalyse-31-synthese, Etalab Open License). Kruisvalidatie: Our World in Data — Poore & Nemecek (Science, 2018). Dieetbasislijn: FAOSTAT (2021), USDA FoodData Central. Rundvlees gecorrigeerd voor Nederlandse importmix (WWF-NL, 2024). Alle waarden zijn in kg CO₂-equivalenten en omvatten de gehele productieketen.',
     sync_title: 'Albert Heijn account synchroniseren',
     sync_description: 'Synchroniseer je Albert Heijn aankopen om je CO₂-profiel bij te werken.',
     sync_mode_auto: 'Automatisch',
@@ -435,7 +435,7 @@ const TRANSLATIONS = {
       2: 'No current AH catalog examples',
       1: 'No current AH catalog examples'
     },
-    how_sources: 'Primary data source: Agribalyse v3.2 (ADEME, 2023). Cross-validation: Our World in Data — Poore & Nemecek (Science, 2018). Dietary baseline: FAOSTAT (2021), USDA FoodData Central. Beef adjusted for Dutch import mix (WWF-NL, 2024). All values are in kg CO₂ equivalents and cover the entire production chain.',
+    how_sources: 'Primary data source: ADEME AGRIBALYSE v3.2 (simplified dataset: data.ademe.fr/agribalyse-31-synthese, Etalab Open License). Cross-validation: Our World in Data — Poore & Nemecek (Science, 2018). Dietary baseline: FAOSTAT (2021), USDA FoodData Central. Beef adjusted for Dutch import mix (WWF-NL, 2024). All values are in kg CO₂ equivalents and cover the entire production chain.',
     sync_title: 'Sync your Albert Heijn account',
     sync_description: 'Sync your Albert Heijn purchases to update your CO₂ profile.',
     sync_mode_auto: 'Automatic',

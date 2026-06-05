@@ -216,6 +216,9 @@ const CATEGORY_DEFAULT_WEIGHTS = {
   // Sugars
   'cane_sugar': 1000,
   'beet_sugar': 1000,
+  'starches': 800,
+  'syrups_glucose': 500,
+  'emulsifiers_gums': 200,
   'dark_chocolate': 200,
   
   // Beverages
@@ -843,7 +846,10 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   'sunflower_oil': ['zonnebloemolie', 'sunflower oil'],
   
   // Grains
-  'rice': ['rijst', 'rice', 'risotto', 'basmati', 'jasmine', 'sushi'],
+  'rice': [
+    'rijsteiwit', 'rijst eiwit', 'rijst-eiwit', 'rice protein',
+    'rijst', 'rice', 'risotto', 'basmati', 'jasmine', 'sushi'
+  ],
   'wheat_rye': [
     'brood', 'bread', 'toast', 'croissant', 'stokbrood', 'baguette',
     'wrap', 'tortilla', 'pita', 'naan', 'bagel',
@@ -879,7 +885,8 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'vegan burger', 'vegan gehakt', 'vegaburger', 'vegetarische schnitzel',
     'beyond meat', 'impossible', 'vivera', 'garden gourmet',
     'vega stuk', 'vega schnitzel', 'vega burger', 'vega gehakt',
-    'sojaprotein', 'soja-eiwit', 'tarwe-eiwit', 'erwtenprotein',
+    'sojaeiwit', 'soja eiwit', 'soja-eiwit', 'soy protein', 'sojaprotein', 'soja protein',
+    'tarwe-eiwit', 'tarwe eiwit', 'erwtenprotein', 'erwteneiwit', 'erwten eiwit',
     // Vegan brands that use meat-like names (must beat 'beef', 'gehakt' etc.)
     'redefine meat', 'vegetarische slager', 'de vegetarische slager',
     'the vegetarian butcher', 'planted chicken', 'planted pork',
@@ -974,7 +981,10 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Sugar
   'cane_sugar': ['rietsuiker', 'cane sugar', 'ruwe suiker', 'muscovado'],
-  'beet_sugar': ['suiker', 'sugar', 'kristalsuiker', 'poedersuiker', 'basterdsuiker', 'bietsuiker', 'maltodextrine', 'maltodextrin', 'glucosestroop', 'glucose syrup', 'dextrose'],
+  'beet_sugar': ['suiker', 'sugar', 'kristalsuiker', 'poedersuiker', 'basterdsuiker', 'bietsuiker'],
+  'starches': ['zetmeel', 'starch', 'maizena', 'maïzena', 'fecule', 'fécule', 'tapioca', 'aardappelzetmeel', 'tarwezetmeel', 'gemodificeerd zetmeel', 'modified starch'],
+  'syrups_glucose': ['glucosestroop', 'glucose syrup', 'dextrose', 'maltodextrine', 'maltodextrin', 'isoglucose', 'invertsuikerstroop', 'invert syrup', 'suikerstroop', 'siroop', 'syrup'],
+  'emulsifiers_gums': ['lecithine', 'lecithin', 'xanthaangom', 'xanthan', 'guargom', 'guar gum', 'pectine', 'pectin', 'carrageen', 'carrageenan', 'cellulosegom', 'cellulose gum', 'arabische gom', 'gum arabic', 'stabilisator', 'stabilizer', 'emulgator', 'emulsifier'],
   
   // Beverages & Other
   // Dry coffee products/ingredients. Prepared drinks such as cappuccino/latte
@@ -2118,6 +2128,22 @@ const NAME_OVERRIDE_CATEGORIES = new Set([
   'cheese',                         // Aging, high milk-to-cheese ratio
 ])
 
+/**
+ * Composite/processed categories that should NEVER be used as name-based fallbacks.
+ * These products must be scored via ingredient list parsing. If no ingredient list
+ * is available, they return unmatched rather than getting a misleading category mean.
+ *
+ * Single-ingredient categories (beef, apple, rice, etc.) are fine as name fallbacks
+ * because their mean is a defensible estimate for any product in that category.
+ * Composite categories (chips, pizza, sauce, cake) are not — the actual composition
+ * varies enormously and only ingredient-based scoring gives a meaningful estimate.
+ */
+const COMPOSITE_CATEGORIES = new Set([
+  'sauces_condiments', 'ready_meals', 'soup',
+  'candy_sweets', 'ice_cream', 'baked_goods', 'breakfast_cereal',
+  'spreads', 'desserts', 'baby_food', 'snacks',
+])
+
 function isDutchOrigin(originCountry) {
   if (!originCountry) return false
   const raw = Array.isArray(originCountry) ? originCountry.join(' ') : String(originCountry)
@@ -2274,6 +2300,26 @@ function getCO2Emissions(productName, ingredientText = null, nutritionText = nul
       co2Max: null,
       co2Valid: null,
       category: null,
+      matched: false,
+      isNonFood: false,
+      method: 'name',
+      confidence: null,
+      confidenceLabel: null,
+      methodology: null
+    }
+  }
+
+  // Composite/processed categories must not be used as name-based fallbacks.
+  // Their CO2 depends entirely on their composition, not their product type.
+  // Only ingredient-based scoring is meaningful for these — return unmatched
+  // so the caller knows no reliable estimate is available without an ingredient list.
+  if (COMPOSITE_CATEGORIES.has(category)) {
+    return {
+      co2PerKg: null,
+      co2Min: null,
+      co2Max: null,
+      co2Valid: null,
+      category,
       matched: false,
       isNonFood: false,
       method: 'name',

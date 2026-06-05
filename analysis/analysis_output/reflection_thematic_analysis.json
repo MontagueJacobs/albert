@@ -1,0 +1,228 @@
+{
+  "total_rows_analyzed": 177,
+  "per_question_counts": {
+    "ref_surprise": 33,
+    "ref_reflection": 37,
+    "ref_improvement": 30,
+    "ref_system_feedback": 41,
+    "ref_trust_comparison": 36
+  },
+  "language_mix": {
+    "en": 68,
+    "mixed": 19,
+    "nl": 90
+  },
+  "theme_counts": {
+    "learned_high_impact_items": 39,
+    "trust_better_than_labels": 21,
+    "clarity_positive": 35,
+    "ranking_instruction_confusion": 18,
+    "category_specific_comparison_request": 6,
+    "request_more_explanation": 5,
+    "request_more_dimensions": 11,
+    "request_immediate_feedback": 6
+  },
+  "top_words": [
+    [
+      "uitstoot",
+      23
+    ],
+    [
+      "producten",
+      21
+    ],
+    [
+      "wel",
+      20
+    ],
+    [
+      "impact",
+      17
+    ],
+    [
+      "products",
+      16
+    ],
+    [
+      "product",
+      13
+    ],
+    [
+      "andere",
+      12
+    ],
+    [
+      "some",
+      11
+    ],
+    [
+      "ranking",
+      11
+    ],
+    [
+      "other",
+      10
+    ],
+    [
+      "duidelijk",
+      10
+    ],
+    [
+      "goed",
+      10
+    ],
+    [
+      "think",
+      9
+    ],
+    [
+      "like",
+      9
+    ],
+    [
+      "what",
+      9
+    ],
+    [
+      "food",
+      9
+    ],
+    [
+      "die",
+      9
+    ],
+    [
+      "wat",
+      9
+    ],
+    [
+      "milieu",
+      9
+    ],
+    [
+      "naar",
+      9
+    ],
+    [
+      "per",
+      8
+    ],
+    [
+      "keurmerken",
+      8
+    ],
+    [
+      "sommige",
+      8
+    ],
+    [
+      "eerste",
+      8
+    ],
+    [
+      "maybe",
+      7
+    ],
+    [
+      "system",
+      7
+    ],
+    [
+      "easier",
+      7
+    ],
+    [
+      "liked",
+      7
+    ],
+    [
+      "labels",
+      7
+    ],
+    [
+      "dacht",
+      7
+    ],
+    [
+      "heb",
+      7
+    ],
+    [
+      "maken",
+      7
+    ],
+    [
+      "zoals",
+      7
+    ],
+    [
+      "how",
+      6
+    ],
+    [
+      "clear",
+      6
+    ],
+    [
+      "make",
+      6
+    ],
+    [
+      "amount",
+      6
+    ],
+    [
+      "emissions",
+      6
+    ],
+    [
+      "eco",
+      6
+    ],
+    [
+      "beter",
+      6
+    ]
+  ],
+  "theme_by_question": {
+    "ref_improvement": {
+      "learned_high_impact_items": 7,
+      "category_specific_comparison_request": 4,
+      "ranking_instruction_confusion": 3,
+      "clarity_positive": 6,
+      "request_more_explanation": 3,
+      "request_more_dimensions": 3,
+      "trust_better_than_labels": 6,
+      "request_immediate_feedback": 4
+    },
+    "ref_system_feedback": {
+      "learned_high_impact_items": 7,
+      "trust_better_than_labels": 1,
+      "clarity_positive": 18,
+      "request_more_explanation": 2,
+      "request_more_dimensions": 2,
+      "ranking_instruction_confusion": 12,
+      "request_immediate_feedback": 2,
+      "category_specific_comparison_request": 1
+    },
+    "ref_trust_comparison": {
+      "clarity_positive": 9,
+      "ranking_instruction_confusion": 2,
+      "trust_better_than_labels": 10,
+      "request_more_dimensions": 2,
+      "category_specific_comparison_request": 1,
+      "learned_high_impact_items": 3
+    },
+    "ref_surprise": {
+      "learned_high_impact_items": 11,
+      "request_more_dimensions": 1
+    },
+    "ref_reflection": {
+      "ranking_instruction_confusion": 1,
+      "clarity_positive": 2,
+      "learned_high_impact_items": 11,
+      "trust_better_than_labels": 4,
+      "request_more_dimensions": 3
+    }
+  }
+}

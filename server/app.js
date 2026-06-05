@@ -4662,7 +4662,6 @@ app.post('/api/experiment/:sessionId/reflection', async (req, res) => {
       .from('experiment_sessions')
       .update({ 
         reflection: responses,
-        post_questionnaire_open: responses,
         current_step: 'complete',
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

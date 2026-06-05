@@ -224,7 +224,7 @@ def extract_qualitative_responses(data: dict) -> list:
     responses = []
     
     for session in data.get('sessions', []):
-        reflection = session.get('_post_questionnaire_open') or session.get('_reflection') or {}
+        reflection = session.get('_reflection') or session.get('_post_questionnaire_open') or {}
         if reflection:
             entry = {
                 'session_id': session.get('id'),

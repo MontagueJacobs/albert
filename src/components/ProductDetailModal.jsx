@@ -215,6 +215,8 @@ const INGREDIENT_TRANSLATIONS = {
   // Grains & flour
   'tarwebloem': 'wheat flour', 'tarwemeel': 'wheat flour', 'tarwe': 'wheat',
   'bloem': 'flour', 'meel': 'flour', 'rogge': 'rye', 'spelt': 'spelt',
+  'rijsteiwit': 'rice protein', 'rijst eiwit': 'rice protein', 'rijst-eiwit': 'rice protein',
+  'sojaeiwit': 'soy protein', 'soja eiwit': 'soy protein', 'soja-eiwit': 'soy protein',
   'rijst': 'rice', 'haver': 'oats', 'havermout': 'oatmeal', 'gerst': 'barley',
   'mais': 'corn', 'maïs': 'corn', 'griesmeel': 'semolina',
   'durumtarwe': 'durum wheat', 'durumtarwegriesmeel': 'durum wheat semolina',
@@ -667,7 +669,7 @@ function ProductDetailModal({ purchase, onClose }) {
                       }} />
                       {details.methodology
                         ? `${lang === 'en' ? 'Source' : 'Bron'}: ${details.methodology.primary}`
-                        : (lang === 'en' ? 'Source: Agribalyse v3.2' : 'Bron: Agribalyse v3.2')}
+                        : (lang === 'en' ? 'Source: ADEME Agribalyse v3.2 (Open Licence)' : 'Bron: ADEME Agribalyse v3.2 (Open Licentie)')}
                       {details.confidence != null && (
                         <span style={{
                           fontWeight: '600',

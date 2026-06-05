@@ -42,6 +42,18 @@ This generates:
 - `analysis_output/analysis_report.txt` - Statistical analysis report
 - `analysis_output/*.png` - Visualization charts
 
+### Export Feedback in Readable Format
+If you already have `analysis_output/experiment_data_full.json`, export all open-ended feedback to readable files:
+
+```bash
+python export_feedback_readable.py
+```
+
+This generates:
+- `analysis_output/feedback_readable.md` - grouped by session, easy to read
+- `analysis_output/feedback_readable.txt` - plain text version
+- `analysis_output/feedback_responses.csv` - one row per response
+
 ## Key Metrics
 
 ### Quiz Score Interpretation
