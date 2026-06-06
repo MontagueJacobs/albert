@@ -2262,18 +2262,26 @@ app.get('/api/products/search', async (req, res) => {
 /* --- In-memory product score cache (persists for server lifetime) --- */
 const _scoreCache = new Map()   // key: productId → { score, co2Category, rating }
 const SCORE_CACHE_MAX = 20000
+const SCORE_CACHE_VERSION = '2026-06-06-maple-syrup-v2'
 
 function getCachedScore(product) {
-  if (_scoreCache.has(product.id)) return _scoreCache.get(product.id)
+  const cached = _scoreCache.get(product.id)
+  if (cached?.version === SCORE_CACHE_VERSION) return cached
+
   const evalResult = enrichedColumnsAvailable
     ? evaluateProductWithRecord(product.name, product)
     : evaluateProduct(product.name)
+
   const entry = {
     score: evalResult.score ?? null,
     co2Category: evalResult.co2Category || null,
-    rating: evalResult.rating || null
+    rating: evalResult.rating || null,
+    version: SCORE_CACHE_VERSION
   }
-  if (_scoreCache.size < SCORE_CACHE_MAX) _scoreCache.set(product.id, entry)
+  if (_scoreCache.size < SCORE_CACHE_MAX || _scoreCache.has(product.id)) {
+    _scoreCache.set(product.id, entry)
+  }
+
   return entry
 }
 
