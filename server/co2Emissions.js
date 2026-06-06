@@ -71,9 +71,7 @@ const DIETARY_BASELINES = {
   },
   netherlands: {
     label: 'Netherlands Average',
-    year: 2021,
     co2PerDay: 7.68,         // kg CO2-eq/person/day from food
-    co2PerYear: 2802,        // kg CO2-eq/person/year from food
     co2PerKg: 2.86,          // weighted avg kg CO2-eq per kg of food consumed
     foodKgPerDay: 2.68,      // kg of food consumed per person per day
     breakdown: {
@@ -192,7 +190,7 @@ const CATEGORY_DEFAULT_WEIGHTS = {
   'eggs': 600,          // 10 stuks
   
   // Oils
-  'olive_oil': 500,
+    'olive_oil': 500,
   'sunflower_oil': 1000,
   'rapeseed_oil': 1000,
   'soybean_oil': 1000,
@@ -843,7 +841,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   'soybean_oil': ['sojaolie', 'soybean oil', 'soja-olie'],
   'olive_oil': ['olijfolie', 'olive oil', 'olijven', 'olijf', 'kalamata', 'zwarte olijven', 'groene olijven'],
   'rapeseed_oil': ['raapzaadolie', 'raapolie', 'koolzaadolie', 'rapeseed oil', 'canola'],
-  'sunflower_oil': ['zonnebloemolie', 'sunflower oil'],
+  'sunflower_oil': ['zonnebloemolie', 'sunflower oil', 'plantaardige olie', 'plantaardig vet', 'vegetable oil', 'vegetable fat'],
   
   // Grains
   'rice': [
@@ -881,7 +879,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   ],
   'tofu': [
     'tofu', 'tahoe', 'tempeh', 'seitan',
-    'plantaardig', 'plantaardige', 'plant-based', 'vegan schnitzel',
+    'vegan schnitzel',
     'vegan burger', 'vegan gehakt', 'vegaburger', 'vegetarische schnitzel',
     'beyond meat', 'impossible', 'vivera', 'garden gourmet',
     'vega stuk', 'vega schnitzel', 'vega burger', 'vega gehakt',
@@ -1185,7 +1183,7 @@ const FALLBACK_CATEGORIES = [
   // Grain/bread keywords
   { keywords: ['graan', 'grain', 'ontbijt', 'breakfast', 'cereal', 'muesli'], category: 'wheat_rye' },
   // Oil keywords
-  { keywords: ['olie', 'oil'], category: 'olive_oil' },
+  { keywords: ['olijfolie', 'olive oil'], category: 'olive_oil' },
   // Juice/drink keywords
   { keywords: ['sap', 'juice', 'drank', 'drink', 'smoothie', 'vruchtendrank'], category: 'soft_drinks' },
   // Fish keywords
