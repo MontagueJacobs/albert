@@ -733,15 +733,17 @@ function ProductDetailModal({ purchase, onClose }) {
                             <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
                                 <span style={{ fontWeight: '600', fontSize: '0.85rem', textTransform: 'capitalize' }}>
-                                  {ing.category
-                                    ? translateCategory(getCategoryLabelFromCode(ing.category), lang)
-                                    : translateIngredient(ing.name, lang)}
+                                  {translateIngredient(ing.name, lang)}
                                 </span>
-                                {ing.category && (
-                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginLeft: '0.35rem', fontWeight: 400, textTransform: 'capitalize' }}>
-                                    ({translateIngredient(ing.name, lang)})
-                                  </span>
-                                )}
+                                {ing.category && (() => {
+                                  const catLabel = translateCategory(getCategoryLabelFromCode(ing.category), lang)
+                                  const ingLabel = translateIngredient(ing.name, lang)
+                                  return catLabel.toLowerCase() !== ingLabel.toLowerCase() ? (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginLeft: '0.35rem', fontWeight: 400, textTransform: 'capitalize' }}>
+                                      ({catLabel})
+                                    </span>
+                                  ) : null
+                                })()}
                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
                                   {(ing.weightFraction * 100).toFixed(0)}%
                                 </span>
