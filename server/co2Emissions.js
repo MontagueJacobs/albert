@@ -1017,8 +1017,9 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'dubbelfris', 'ice tea', 'fuze', 'spa', 'mineraalwater', 'bronwater',
     'sourcy', 'bar le duc', 'chaudfontaine'
   ],
-  //meant to be plant-based alternatives to dairy products, kept like this for now
-  'soy_milk': ['sojamelk', 'soy milk', 'sojadrink', 'soja drink', 'havermelk', 'haverdrink', 'haver drink', 'haver drank', 'oat milk', 'amandelmelk', 'almond milk', 'amandeldrink','plantaardige', 'plantaardig alternatief', 'rijstmelk', 'rijst drink', 'kokosmelk', 'coconut milk', 'kokosdrink', 'alpro', 'oatly!'],
+  // Plant-based dairy alternatives. Keep keywords specific to drinks/milk products;
+  // do not use generic 'plantaardige' because it wrongly captures 'plantaardige olie'.
+  'soy_milk': ['sojamelk', 'soy milk', 'sojadrink', 'soja drink', 'havermelk', 'haverdrink', 'haver drink', 'haver drank', 'oat milk', 'amandelmelk', 'almond milk', 'amandeldrink', 'plantaardig alternatief', 'rijstmelk', 'rijst drink', 'kokosmelk', 'coconut milk', 'kokosdrink', 'alpro', 'oatly!'],
 
   // Salt & mineral condiments
   'salt': ['zout', 'salt', 'zeezout', 'sea salt', 'joodzout', 'natriumchloride'],
