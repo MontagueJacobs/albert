@@ -104,9 +104,7 @@ function parseWeightGrams(unitSize) {
   if (!unitSize || typeof unitSize !== 'string') return null
   
   const s = unitSize.trim().toLowerCase().replace(',', '.')
-  
-  // Handle multi-pack format: "6 x 330 ml" → multiply count × volume
-  const multiMatch = s.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(kilogram|gram|liter|milliliter|centiliter|deciliter|kg|g|l|ml|cl|dl)\b/)
+  const multiMatch = s.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(kilogram|gram|liter|milliliter|centiliter|deciliter|stuks?|st|kg|g|l|ml|cl|dl)\b/)
   if (multiMatch) {
     const count = parseInt(multiMatch[1])
     const value = parseFloat(multiMatch[2])
@@ -208,6 +206,7 @@ const CATEGORY_DEFAULT_WEIGHTS = {
   'peas': 450,
   'other_pulses': 400,
   'groundnuts': 250,
+  'sunflower_seeds': 200,
   'nuts': 200,
   'soymilk': 1000,
   
@@ -865,6 +864,7 @@ const PRODUCT_CATEGORY_KEYWORDS = {
   
   // Legumes
   'groundnuts': ['pinda', 'peanut', 'pindakaas', 'peanut butter'],
+  'sunflower_seeds': ['zonnebloempitten', 'zonnebloempit', 'sunflower seeds', 'sunflower seed'],
   'other_pulses': [
     'bonen', 'beans', 'kidney', 'zwarte bonen', 'witte bonen',
     'linzen', 'lentils', 'kikkererwten', 'chickpeas', 'hummus',
@@ -1191,6 +1191,7 @@ const FALLBACK_CATEGORIES = [
   { keywords: ['vis', 'fish', 'zeevruchten', 'seafood'], category: 'fish_farmed' },
   // Legume keywords
   { keywords: ['bonen', 'linzen', 'peulvrucht', 'pulse'], category: 'other_pulses' },
+  { keywords: ['zonnebloempitten', 'zonnebloempit', 'sunflower seed', 'sunflower seeds'], category: 'sunflower_seeds' },
   // Nut keywords
   { keywords: ['noten', 'noot', 'nut'], category: 'nuts' },
   // Snack fallback
@@ -1204,6 +1205,7 @@ const FALLBACK_CATEGORIES = [
 const CATEGORY_PRIORITY = {
   // Highest: plant-based overrides (vegan brand names must beat meat keywords)
   'tofu': 11,
+  'sunflower_seeds': 8,
   // High priority: processed food categories (product type > ingredient)
   'ready_meals': 10,
   'soup': 10,
@@ -1327,6 +1329,8 @@ function parseIngredients(ingredientText) {
   // "Allergie-informatie Bevat:...", "Kan bevatten:...", "Waarvan toegevoegde..."
   text = text
     .replace(/\s*allergie-informatie\b.*/si, '')
+    .replace(/\s*\.?\s*kan\s+sporen\s+bevatten\b.*$/si, '')
+    .replace(/\s*\.?\s*may\s+contain\b.*$/si, '')
     .replace(/\s*(Kan bevatten|Bevat|Allergenen)\s*[:].*/si, '')
     .replace(/\s*voedingswaarde\b.*/si, '')
     .replace(/\s*\.?\s*waarvan toegevoegde\b.*/si, '')
@@ -2412,6 +2416,7 @@ const CATEGORY_LABELS = {
   'maize': 'Maïs',
   'oatmeal': 'Haver',
   'groundnuts': 'Pinda\'s',
+  'sunflower_seeds': 'Zonnebloempitten',
   'other_pulses': 'Peulvruchten',
   'peas': 'Erwten',
   'nuts': 'Noten',

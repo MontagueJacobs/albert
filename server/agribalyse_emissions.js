@@ -79,6 +79,7 @@ const AGRIBALYSE_EMISSIONS = {
   peas:            { mean:  0.93, min:  0.54, max:  2.20, n:   6, note: 'Green peas, split peas' },
   tofu:            { mean:  2.02, min:  0.54, max:  3.93, n:  31, note: 'Includes plant-based meat alternatives' },
   groundnuts:      { mean:  4.16, min:  4.06, max:  4.20, n:   5, note: 'Peanuts, peanut butter' },
+  sunflower_seeds: { mean:  2.91, min:  2.91, max:  2.91, n:   2, note: 'Sunflower seed [2.91]; Sunflower seed, grilled, salted [2.91]' },
   nuts:            { mean:  3.43, min:  1.25, max:  7.39, n:  44, note: 'Almonds, walnuts, cashews, hazelnuts, seeds' },
 
   // Fruits
