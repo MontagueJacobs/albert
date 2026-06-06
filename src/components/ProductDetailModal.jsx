@@ -647,11 +647,15 @@ function ProductDetailModal({ purchase, onClose }) {
                     color: 'var(--text)'
                   }}>
                     <div style={{ fontWeight: '500' }}>{translateCategory(details.co2CategoryLabel || details.co2Category, lang)}</div>
-                    {/* Total CO₂ for this product (primary display) */}
+                    {/* Per-kg rate as primary display */}
+                    <div style={{ fontWeight: '700', fontSize: '1.15rem', marginTop: '4px' }}>
+                      {details.co2PerKg.toFixed(1)} kg CO₂ per kg
+                    </div>
+                    {/* Total CO₂ for this product (secondary display) */}
                     {details.weightGrams && (
-                      <div style={{ fontWeight: '700', fontSize: '1.15rem', marginTop: '4px' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
                         {(details.co2PerKg * details.weightGrams / 1000).toFixed(2)} kg CO₂
-                        <span style={{ fontWeight: '400', fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+                        <span style={{ marginLeft: '0.4rem' }}>
                           {lang === 'en' ? 'for this product' : 'voor dit product'}
                           {details.weightSource === 'category_default' || details.weightSource === 'generic_default' || details.weightSource === 'per_stuk_estimate'
                             ? ` (${lang === 'en' ? 'est.' : 'gesch.'} ${details.weightGrams}g)`
@@ -659,10 +663,6 @@ function ProductDetailModal({ purchase, onClose }) {
                         </span>
                       </div>
                     )}
-                    {/* Per-kg rate as secondary info */}
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
-                      {details.co2PerKg.toFixed(1)} kg CO₂ per kg
-                    </div>
                     {/* Source + confidence in one line */}
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '0.35rem',
