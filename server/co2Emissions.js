@@ -1080,11 +1080,16 @@ const PRODUCT_CATEGORY_KEYWORDS = {
     'griesmeelpudding', 'toetje', 'dessert', 'crème', 'creme dessert'
   ],
   
-  // Spreads
+  // Spreads (composite — no single-ingredient name fallback)
   'spreads': [
-    'jam', 'confituur', 'marmelade', 'honing', 'honey',
-    'stroop', 'sandwichspread', 'smeerkaas', 'leverworst'
+    'jam', 'confituur', 'marmelade',
+    'sandwichspread', 'smeerkaas', 'leverworst'
   ],
+
+  // Single-ingredient sweeteners — exact AGRIBALYSE entries
+  'honey': ['honing', 'honey', 'bijenhoning', 'honingstroop'],
+  'maple_syrup': ['ahornsiroop', 'ahornstroop', 'maple syrup', 'maple syrup', 'ahorn siroop'],
+  'agave_syrup': ['agavesiroop', 'agave siroop', 'agave syrup', 'agave'],
   
   // Snacks
   'snacks': [
@@ -1206,6 +1211,9 @@ const CATEGORY_PRIORITY = {
   // Highest: plant-based overrides (vegan brand names must beat meat keywords)
   'tofu': 11,
   'sunflower_seeds': 8,
+  'maple_syrup': 9,   // must beat AH "Koffie en thee" category tag
+  'honey': 9,
+  'agave_syrup': 9,
   // High priority: processed food categories (product type > ingredient)
   'ready_meals': 10,
   'soup': 10,
@@ -2129,6 +2137,7 @@ const NAME_OVERRIDE_CATEGORIES = new Set([
   'coffee', 'tea',                  // Roasting, drying, long-distance transport
   'dark_chocolate',                 // Cacao processing, fermentation
   'cheese',                         // Aging, high milk-to-cheese ratio
+  'honey', 'maple_syrup', 'agave_syrup', // Single-ingredient sweeteners — must override AH "Koffie en thee" category
 ])
 
 /**
@@ -2417,6 +2426,9 @@ const CATEGORY_LABELS = {
   'oatmeal': 'Haver',
   'groundnuts': 'Pinda\'s',
   'sunflower_seeds': 'Zonnebloempitten',
+  'honey': 'Honing',
+  'maple_syrup': 'Ahornsiroop',
+  'agave_syrup': 'Agavesiroop',
   'other_pulses': 'Peulvruchten',
   'peas': 'Erwten',
   'nuts': 'Noten',

@@ -2476,12 +2476,18 @@ app.get('/api/catalog/browse', async (req, res) => {
 
     // Animal filter: only products with clear animal-origin indicators
     if (badgeFilters.includes('animal')) {
-      const ANIMAL_TERMS = [
-        'zuivel', 'dairy', 'melk', 'milk', 'kaas', 'cheese', 'ei', 'eieren', 'egg', 'eggs',
+      // Use left-side word-boundary regexes so Dutch compounds like "kipfilet", "zalmfilet",
+      // "rundvlees" still match, but short terms like 'ei', 'ham', 'vis', 'kip', 'room'
+      // no longer false-match inside unrelated words ("klein", "champignon", "andijvie").
+      const ANIMAL_PATTERNS = [
+        'zuivel', 'dairy', 'melk', 'milk', 'kaas', 'cheese',
+        'ei', 'eieren', 'egg', 'eggs',
         'yoghurt', 'yogurt', 'boter', 'butter', 'room', 'cream',
-        'vlees', 'meat', 'kip', 'chicken', 'rund', 'beef', 'varken', 'pork', 'ham', 'bacon', 'worst', 'salami',
-        'vis', 'fish', 'zalm', 'salmon', 'tonijn', 'tuna', 'garnal', 'shrimp', 'seafood'
-      ]
+        'vlees', 'meat', 'kip', 'chicken', 'rund', 'beef',
+        'varken', 'pork', 'ham', 'spek', 'bacon', 'worst', 'salami',
+        'vis', 'fish', 'zalm', 'salmon', 'tonijn', 'tuna', 'garnalen', 'garnaal', 'shrimp', 'seafood'
+      ].map(t => new RegExp(`\\b${t}`, 'i'))
+
       const PLANT_BASED_TERMS = [
         'vegan', 'veganistisch', 'veganic', 'vegetarisch', 'vegetarian',
         'plant-based', 'plant based', 'plantbased', 'plantaardig', 'plantaardige',
@@ -2509,7 +2515,7 @@ app.get('/api/catalog/browse', async (req, res) => {
         const hasPlantBasedIndicator = p.is_vegan === true || PLANT_BASED_TERMS.some(term => haystack.includes(term))
         if (hasPlantBasedIndicator) return false
 
-        return ANIMAL_TERMS.some(term => haystack.includes(term))
+        return ANIMAL_PATTERNS.some(re => re.test(haystack))
       })
     }
     if (scoreMin != null) {

@@ -311,6 +311,9 @@ const CATEGORY_LABEL_TRANSLATIONS = {
   'Haver': 'Oats',
   "Pinda's": 'Peanuts',
   'Zonnebloempitten': 'Sunflower Seeds',
+  'Honing': 'Honey',
+  'Ahornsiroop': 'Maple Syrup',
+  'Agavesiroop': 'Agave Syrup',
   'Peulvruchten': 'Legumes',
   'Erwten': 'Peas',
   'Noten': 'Nuts',
@@ -382,6 +385,9 @@ const CATEGORY_CODE_LABELS = {
   'sunflower_oil': 'Zonnebloemolie', 'rice': 'Rijst', 'wheat_rye': 'Tarwe & Rogge',
   'barley': 'Gerst', 'maize': 'Maïs', 'oatmeal': 'Haver', 'groundnuts': "Pinda's",
   'sunflower_seeds': 'Zonnebloempitten',
+  'honey': 'Honing',
+  'maple_syrup': 'Ahornsiroop',
+  'agave_syrup': 'Agavesiroop',
   'other_pulses': 'Peulvruchten', 'peas': 'Erwten', 'nuts': 'Noten',
   'tofu': 'Tofu & Plantaardig', 'berries_grapes': 'Bessen & Druiven',
   'citrus_fruit': 'Citrusfruit', 'bananas': 'Bananen', 'apples': 'Appels & Peren',
@@ -830,9 +836,14 @@ function ProductDetailModal({ purchase, onClose }) {
                     
                     <div style={styles.altInfo}>
                       <div style={styles.altName}>{alt.name}</div>
-                      {alt.price > 0 && (
-                        <div style={styles.altPrice}>€{alt.price.toFixed(2)}</div>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {alt.price > 0 && (
+                          <span style={styles.altPrice}>€{alt.price.toFixed(2)}</span>
+                        )}
+                        {alt.unit_size && (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{alt.unit_size}</span>
+                        )}
+                      </div>
                     </div>
                     
                     <div style={{ 
