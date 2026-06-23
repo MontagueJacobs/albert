@@ -916,6 +916,38 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
       || plantMilkSignals.some(signal => haystack.includes(signal))
     return isMilkLike && isPlantBased
   }
+  const cheeseHints = [
+    'kaas', 'cheese', 'belegen', 'jong belegen', 'oud belegen',
+    'gouda', 'cheddar', 'mozzarella', 'parmezaan', 'feta',
+    'plakken', 'geraspt', 'kaasvervanger', 'cheese style'
+  ]
+  const veganCheeseSignals = [
+    'plantaardige kaas', 'plantaardig kaas', 'vegan kaas', 'vegan cheese',
+    'kaasvervanger', 'cheese style', 'zonder melk', 'zonder lactose',
+    'ah terra'
+  ]
+  const isCheeseLike = (candidate) => {
+    const name = (candidate?.name || '').toLowerCase()
+    const normalizedName = (candidate?.normalized_name || '').toLowerCase()
+    const categoryText = Array.isArray(candidate?.categories)
+      ? candidate.categories.join(' ').toLowerCase()
+      : ''
+    const haystack = `${name} ${normalizedName} ${categoryText}`
+    return cheeseHints.some(hint => haystack.includes(hint))
+  }
+  const isVeganCheeseAlternative = (candidate) => {
+    const name = (candidate?.name || '').toLowerCase()
+    const normalizedName = (candidate?.normalized_name || '').toLowerCase()
+    const categoryText = Array.isArray(candidate?.categories)
+      ? candidate.categories.join(' ').toLowerCase()
+      : ''
+    const haystack = `${name} ${normalizedName} ${categoryText}`
+    const hasCheeseSignal = isCheeseLike(candidate)
+    const hasPlantSignal = candidate?.source === 'api_plantbased'
+      || candidate?.is_vegan === true
+      || veganCheeseSignals.some(signal => haystack.includes(signal))
+    return hasCheeseSignal && hasPlantSignal
+  }
   const unitPrice = (candidate) => {
     const price = Number(candidate?.price)
     const rawUnitSize = String(candidate?.unit_size || '').toLowerCase()
@@ -970,6 +1002,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     // Simple ranking: lowest CO2 per kg first, then lowest unit price
     const sortedAlternatives = scoredPlantBased
       .filter(alt => origCategory !== 'milk' || isMilkAlternative(alt))
+      .filter(alt => origCategory !== 'cheese' || (isVeganCheeseAlternative(alt) && !isMilkAlternative(alt)))
       .sort((a, b) => {
         const aCo2 = Number.isFinite(a.evaluation?.co2PerKg) ? a.evaluation.co2PerKg : Number.POSITIVE_INFINITY
         const bCo2 = Number.isFinite(b.evaluation?.co2PerKg) ? b.evaluation.co2PerKg : Number.POSITIVE_INFINITY

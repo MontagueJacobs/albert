@@ -297,6 +297,13 @@ export async function findSmartAlternatives({
     candidates = candidates.filter(isMilkAlternativeCandidate)
   }
 
+  // Keep cheese swaps focused on vegan cheese alternatives (exclude milk drinks)
+  if (co2Category === 'cheese') {
+    candidates = candidates
+      .filter(c => !isMilkAlternativeCandidate(c))
+      .filter(isVeganCheeseCandidate)
+  }
+
   // Score and sort candidates with a simple ranking:
   // 1) lowest CO2 per kg, 2) lowest unit price.
   const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, {
@@ -468,6 +475,18 @@ const PLANT_MILK_SIGNALS = [
   'alpro', 'provamel', 'ah terra'
 ]
 
+const CHEESE_HINTS = [
+  'kaas', 'cheese', 'belegen', 'jong belegen', 'oud belegen',
+  'gouda', 'cheddar', 'mozzarella', 'parmezaan', 'feta',
+  'plakken', 'geraspt', 'kaasvervanger', 'cheese style'
+]
+
+const VEGAN_CHEESE_SIGNALS = [
+  'plantaardige kaas', 'plantaardig kaas', 'vegan kaas', 'vegan cheese',
+  'kaasvervanger', 'cheese style', 'zonder melk', 'zonder lactose',
+  'ah terra'
+]
+
 function isMilkAlternativeCandidate(candidate) {
   const name = (candidate?.name || '').toLowerCase()
   const categoryText = Array.isArray(candidate?.categories)
@@ -479,6 +498,30 @@ function isMilkAlternativeCandidate(candidate) {
     || candidate?.is_vegan === true
     || PLANT_MILK_SIGNALS.some(signal => haystack.includes(signal))
   return isMilkLike && isPlantBased
+}
+
+function isCheeseLikeProduct(candidate) {
+  const name = (candidate?.name || '').toLowerCase()
+  const normalizedName = (candidate?.normalized_name || '').toLowerCase()
+  const categoryText = Array.isArray(candidate?.categories)
+    ? candidate.categories.join(' ').toLowerCase()
+    : ''
+  const haystack = `${name} ${normalizedName} ${categoryText}`
+  return CHEESE_HINTS.some(hint => haystack.includes(hint))
+}
+
+function isVeganCheeseCandidate(candidate) {
+  const name = (candidate?.name || '').toLowerCase()
+  const normalizedName = (candidate?.normalized_name || '').toLowerCase()
+  const categoryText = Array.isArray(candidate?.categories)
+    ? candidate.categories.join(' ').toLowerCase()
+    : ''
+  const haystack = `${name} ${normalizedName} ${categoryText}`
+  const hasCheeseSignal = isCheeseLikeProduct(candidate)
+  const hasPlantSignal = candidate?.source === 'api_plantbased'
+    || candidate?.is_vegan === true
+    || VEGAN_CHEESE_SIGNALS.some(signal => haystack.includes(signal))
+  return hasCheeseSignal && hasPlantSignal
 }
 
 /**
