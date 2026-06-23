@@ -882,6 +882,7 @@ function analyzeUserProfile(purchases) {
  */
 function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
   const suggestions = []
+  const co2TieTolerance = 0.5
   const milkAltHints = [
     'melk', 'drink', 'barista',
     'haver', 'havermelk', 'haverdrink',
@@ -931,6 +932,16 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
         : amount / 1000
     return baseAmount > 0 ? price / baseAmount : null
   }
+  const recommendationNameKey = (candidateName) => {
+    const name = String(candidateName || '').toLowerCase()
+    if (!name) return ''
+    return name
+      .replace(/\b\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(ml|cl|l|liter|liters|g|gr|gram|kg|stuks?|pieces?|pcs?)\b/g, ' ')
+      .replace(/\b\d+(?:[.,]\d+)?\s*(ml|cl|l|liter|liters|g|gr|gram|kg|stuks?|pieces?|pcs?)\b/g, ' ')
+      .replace(/\b(multipack|duopack|voordeelverpakking|voordeelpak|pack)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
 
   // Pre-score plant-based catalog products as the alternative pool.
   // Milk alternatives are often scraped from the dairy catalog (`api_zuivel`),
@@ -957,18 +968,17 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     const preferredSubs = new Set((swapInfo?.ahSubCategories || []).map(s => 'ah_sub:' + s))
 
     // Simple ranking: lowest CO2 per kg first, then lowest unit price
-    const alternatives = scoredPlantBased
+    const sortedAlternatives = scoredPlantBased
       .filter(alt => origCategory !== 'milk' || isMilkAlternative(alt))
       .sort((a, b) => {
         const aCo2 = Number.isFinite(a.evaluation?.co2PerKg) ? a.evaluation.co2PerKg : Number.POSITIVE_INFINITY
         const bCo2 = Number.isFinite(b.evaluation?.co2PerKg) ? b.evaluation.co2PerKg : Number.POSITIVE_INFINITY
-        if (aCo2 !== bCo2) return aCo2 - bCo2
+        const co2Diff = aCo2 - bCo2
+        if (Math.abs(co2Diff) > co2TieTolerance) return co2Diff
 
         const aUnitPrice = unitPrice(a)
         const bUnitPrice = unitPrice(b)
         if (aUnitPrice != null && bUnitPrice != null && aUnitPrice !== bUnitPrice) return aUnitPrice - bUnitPrice
-        if (aUnitPrice != null && bUnitPrice == null) return -1
-        if (aUnitPrice == null && bUnitPrice != null) return 1
 
         const aPrice = Number.isFinite(Number(a.price)) ? Number(a.price) : null
         const bPrice = Number.isFinite(Number(b.price)) ? Number(b.price) : null
@@ -976,9 +986,21 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
         if (aPrice != null && bPrice == null) return -1
         if (aPrice == null && bPrice != null) return 1
 
+        if (aUnitPrice != null && bUnitPrice == null) return -1
+        if (aUnitPrice == null && bUnitPrice != null) return 1
+
         return String(a.name || '').localeCompare(String(b.name || ''), 'nl', { sensitivity: 'base' })
       })
-      .slice(0, 5)
+
+    const alternatives = []
+    const seenKeys = new Set()
+    for (const alternative of sortedAlternatives) {
+      const dedupeKey = recommendationNameKey(alternative?.name)
+      if (dedupeKey && seenKeys.has(dedupeKey)) continue
+      if (dedupeKey) seenKeys.add(dedupeKey)
+      alternatives.push(alternative)
+      if (alternatives.length >= 5) break
+    }
 
     if (alternatives.length > 0) {
       const bestAlt = alternatives[0]

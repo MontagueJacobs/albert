@@ -339,7 +339,9 @@ export function getSmartSuggestions(productName, co2Category, score, lang = 'nl'
 // ---------------------------------------------------------------
 
 /** Standard product columns to select from Supabase */
-const PRODUCT_COLUMNS = 'id, name, url, image_url, price, unit_size, source, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, ingredients, nutrition_text, nutrition_json, origin_country, brand, categories'
+const PRODUCT_COLUMNS = 'id, name, normalized_name, url, image_url, price, unit_size, source, is_vegan, is_vegetarian, is_organic, is_fairtrade, nutri_score, ingredients, nutrition_text, nutrition_json, origin_country, brand, categories'
+
+const CO2_TIE_TOLERANCE = 0.5
 
 /**
  * Query plant-based products by AH subcategory.
@@ -358,9 +360,9 @@ async function queryBySubcategory(supabase, subCategories, excludeId, limit, inc
       .select(PRODUCT_COLUMNS)
       .neq('id', excludeId || '')
 
-    query = includeDairySource
-      ? query.in('source', ['api_plantbased', 'api_zuivel'])
-      : query.eq('source', 'api_plantbased')
+    if (!includeDairySource) {
+      query = query.eq('source', 'api_plantbased')
+    }
 
     const { data } = await query
       .or(orFilter)
@@ -390,9 +392,9 @@ async function queryPlantBasedByKeywords(supabase, keywords, excludeId, limit, i
       .select(PRODUCT_COLUMNS)
       .neq('id', excludeId || '')
 
-    query = includeDairySource
-      ? query.in('source', ['api_plantbased', 'api_zuivel'])
-      : query.eq('source', 'api_plantbased')
+    if (!includeDairySource) {
+      query = query.eq('source', 'api_plantbased')
+    }
 
     const { data } = await query
       .or(orFilter)
@@ -417,9 +419,9 @@ async function queryAllPlantBased(supabase, excludeId, limit, includeDairySource
       .select(PRODUCT_COLUMNS)
       .neq('id', excludeId || '')
 
-    query = includeDairySource
-      ? query.in('source', ['api_plantbased', 'api_zuivel'])
-      : query.eq('source', 'api_plantbased')
+    if (!includeDairySource) {
+      query = query.eq('source', 'api_plantbased')
+    }
 
     const { data } = await query
       .limit(limit)
@@ -665,6 +667,21 @@ function calculateUnitPrice(price, quantity) {
   return null
 }
 
+function recommendationNameKey(candidate) {
+  const normalized = String(candidate?.normalized_name || '').trim().toLowerCase()
+  if (normalized) return normalized
+
+  const name = String(candidate?.name || '').toLowerCase()
+  if (!name) return ''
+
+  return name
+    .replace(/\b\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(ml|cl|l|liter|liters|g|gr|gram|kg|stuks?|pieces?|pcs?)\b/g, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(ml|cl|l|liter|liters|g|gr|gram|kg|stuks?|pieces?|pcs?)\b/g, ' ')
+    .replace(/\b(multipack|duopack|voordeelverpakking|voordeelpak|pack)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // -- Core scoring & sorting ---------------------------------------
 
 /**
@@ -700,6 +717,7 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       return {
         id: c.id,
         name: c.name,
+        normalized_name: c.normalized_name,
         url: c.url,
         image_url: c.image_url,
         price: c.price,
@@ -729,12 +747,34 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       return true
     })
     .sort((a, b) => {
-      const co2Compare = compareNullableNumberAsc(a.co2PerKg, b.co2PerKg)
-      if (co2Compare !== 0) return co2Compare
-      const unitPriceCompare = compareNullableNumberAsc(a.unitPrice, b.unitPrice)
-      if (unitPriceCompare !== 0) return unitPriceCompare
+      const aCo2Ok = Number.isFinite(a.co2PerKg)
+      const bCo2Ok = Number.isFinite(b.co2PerKg)
+      if (aCo2Ok && bCo2Ok) {
+        const co2Diff = a.co2PerKg - b.co2PerKg
+        if (Math.abs(co2Diff) > CO2_TIE_TOLERANCE) return co2Diff
+      } else {
+        const co2Compare = compareNullableNumberAsc(a.co2PerKg, b.co2PerKg)
+        if (co2Compare !== 0) return co2Compare
+      }
+
+      const aUnitPriceOk = Number.isFinite(a.unitPrice)
+      const bUnitPriceOk = Number.isFinite(b.unitPrice)
+      if (aUnitPriceOk && bUnitPriceOk && a.unitPrice !== b.unitPrice) {
+        return a.unitPrice - b.unitPrice
+      }
+
       const priceCompare = compareNullableNumberAsc(a.priceNumeric, b.priceNumeric)
       if (priceCompare !== 0) return priceCompare
+
+      const unitPriceCompare = compareNullableNumberAsc(a.unitPrice, b.unitPrice)
+      if (unitPriceCompare !== 0) return unitPriceCompare
+
       return String(a.name || '').localeCompare(String(b.name || ''), 'nl', { sensitivity: 'base' })
+    })
+    .filter((candidate, _, sorted) => {
+      const key = recommendationNameKey(candidate)
+      if (!key) return true
+      const firstIndex = sorted.findIndex(other => recommendationNameKey(other) === key)
+      return firstIndex === sorted.indexOf(candidate)
     })
 }
