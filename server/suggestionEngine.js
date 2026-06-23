@@ -297,11 +297,11 @@ export async function findSmartAlternatives({
     candidates = candidates.filter(isMilkAlternativeCandidate)
   }
 
-  // Score and sort candidates
+  // Score and sort candidates with a simple ranking:
+  // 1) lowest CO2 per kg, 2) lowest unit price.
   const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, {
     currentPrice,
-    currentUnitSize,
-    requireFormMatch: ['beef_herd', 'beef_dairy', 'lamb_mutton', 'pig_meat', 'poultry_meat'].includes(co2Category)
+    currentUnitSize
   })
 
   result.alternatives = scored.slice(0, maxResults)
@@ -636,11 +636,12 @@ function normalizeSingleQuantity(amount, unit) {
   return null
 }
 
-function quantityMatches(sourceQuantity, candidateQuantity) {
+function quantityMatches(sourceQuantity, candidateQuantity, tolerancePct = 0.02) {
   if (!sourceQuantity) return true
   if (!candidateQuantity) return false
   if (sourceQuantity.unit !== candidateQuantity.unit) return false
-  const tolerance = Math.max(1, sourceQuantity.amount * 0.02)
+  const safeTolerancePct = Number.isFinite(tolerancePct) && tolerancePct >= 0 ? tolerancePct : 0.02
+  const tolerance = Math.max(1, sourceQuantity.amount * safeTolerancePct)
   return Math.abs(sourceQuantity.amount - candidateQuantity.amount) <= tolerance
 }
 
@@ -725,9 +726,6 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
     .filter(c => {
       if (c.score == null) return false
       if (!Number.isFinite(c.co2PerKg)) return false
-      if (c.score <= currentScore) return false
-      if (!c.quantityMatch) return false
-      if (options.requireFormMatch && !hasCompatibleFoodForm(sourceName, c.name)) return false
       return true
     })
     .sort((a, b) => {
