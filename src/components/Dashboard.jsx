@@ -479,7 +479,12 @@ function Dashboard({ syncVersion }) {
               <span>{t('baseline_projected_annual')}</span>
               <span style={{ fontWeight: '600', color: 'var(--text)' }}>
                 ~{(insights.baseline_comparison.userProjectedAnnual / 1000).toFixed(1)} {t('baseline_tonnes')} 
-                <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}> ({t('baseline_nl_avg')}: {(insights.baseline_comparison.baselineAnnual / 1000).toFixed(1)}t)</span>
+                <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>
+                  {' '}
+                  ({t('baseline_nl_avg')}: {Number.isFinite(insights.baseline_comparison.baselineAnnual)
+                    ? `${(insights.baseline_comparison.baselineAnnual / 1000).toFixed(1)}t`
+                    : '—'})
+                </span>
               </span>
             </div>
           )}

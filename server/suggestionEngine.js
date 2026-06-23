@@ -159,6 +159,20 @@ export const CATEGORY_SWAPS = {
 /** Set of all CO2 categories that qualify for recommendations */
 export const RECOMMENDABLE_CATEGORIES = new Set(Object.keys(CATEGORY_SWAPS))
 
+export function isPackProductName(productName) {
+  const name = (productName || '').toLowerCase().trim()
+  if (!name) return false
+
+  return (
+    name.includes('-pack') ||
+    /\bpack\b/.test(name) ||
+    name.includes('multipack') ||
+    name.includes('duopack') ||
+    name.includes('voordeelverpakking') ||
+    name.includes('voordeelpak')
+  )
+}
+
 // Legacy export -- still used by findReplacementSuggestions in app.js
 export const LOW_EMISSION_CATEGORIES = new Set([
   'tomatoes', 'onions_leeks', 'root_vegetables', 'brassicas',
@@ -274,6 +288,9 @@ export async function findSmartAlternatives({
     seen.add(c.id)
     return true
   })
+
+  // Never recommend pack/multipack items
+  candidates = candidates.filter(c => !isPackProductName(c?.name))
 
   // Keep milk swaps focused on plant-based milk/drink products
   if (strictMilkSwap) {

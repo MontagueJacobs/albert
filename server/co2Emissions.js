@@ -71,7 +71,9 @@ const DIETARY_BASELINES = {
   },
   netherlands: {
     label: 'Netherlands Average',
+    year: 2021,
     co2PerDay: 7.68,         // kg CO2-eq/person/day from food
+    co2PerYear: 2803,        // kg CO2-eq/person/year from food (7.68 × 365)
     co2PerKg: 2.86,          // weighted avg kg CO2-eq per kg of food consumed
     foodKgPerDay: 2.68,      // kg of food consumed per person per day
     breakdown: {

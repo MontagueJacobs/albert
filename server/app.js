@@ -35,7 +35,7 @@ import {
   inferCO2FromAHCategories
 } from './co2Emissions.js'
 
-import { findSmartAlternatives, getSmartSuggestions, CATEGORY_SWAPS, RECOMMENDABLE_CATEGORIES } from './suggestionEngine.js'
+import { findSmartAlternatives, getSmartSuggestions, CATEGORY_SWAPS, RECOMMENDABLE_CATEGORIES, isPackProductName as isPackSuggestionName } from './suggestionEngine.js'
 
 import {
   getGenericQuiz1Items,
@@ -52,8 +52,7 @@ import {
   DEMOGRAPHICS_QUESTIONS,
   EXPERIMENT_STEPS,
   getNextStep,
-  POPULAR_AH_ITEMS,
-  PREDEFINED_CARTS
+  POPULAR_AH_ITEMS
 } from './co2Experiment.js'
 
 // Ensure .env is loaded from the webapp root regardless of cwd
@@ -937,6 +936,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
   // Milk alternatives are often scraped from the dairy catalog (`api_zuivel`),
   // so include those when they are clearly plant-based milk/drink products.
   const scoredPlantBased = catalogProducts
+    .filter(p => !isPackSuggestionName(p?.name))
     .filter(p => p.source === 'api_plantbased' || (p.source === 'api_zuivel' && isMilkAlternative(p)))
     .map(p => {
       const enriched = getEnrichedData(p)
@@ -2103,6 +2103,7 @@ app.get('/api/user/suggestions', requireAHEmail, async (req, res) => {
     
     // Also include generic high-score suggestions
     const highScoreSuggestions = catalogProducts
+      .filter(p => !isPackSuggestionName(p?.name))
       .map(p => {
         return {
           name: p.name,
@@ -3628,6 +3629,21 @@ function isLikelyFood(productName) {
   return !NON_FOOD_KEYWORDS.some(keyword => nameLower.includes(keyword))
 }
 
+// Exclude multipacks from quiz items (single items only)
+function isPackProductName(productName) {
+  const name = (productName || '').toLowerCase().trim()
+  if (!name) return false
+
+  return (
+    name.includes('-pack') ||
+    /\bpack\b/.test(name) ||
+    name.includes('multipack') ||
+    name.includes('duopack') ||
+    name.includes('voordeelverpakking') ||
+    name.includes('voordeelpak')
+  )
+}
+
 // Get 7 products for carbon ranking game: up to 4 from user's purchases, rest from products table
 app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
   try {
@@ -3651,7 +3667,9 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
     console.log(`[ranking-products] Card ${bonusCard}: found ${userPurchases?.length || 0} total purchases`)
 
     // Filter for food items only from purchases
-    const foodPurchases = (userPurchases || []).filter(p => isLikelyFood(p.product_name))
+    const foodPurchases = (userPurchases || []).filter(p => (
+      isLikelyFood(p.product_name) && !isPackProductName(p.product_name)
+    ))
     
     // Get unique purchased product IDs
     const purchasedIds = new Set(foodPurchases.map(p => p.product_id).filter(Boolean))
@@ -3684,7 +3702,9 @@ app.get('/api/questionnaire/:bonusCard/ranking-products', async (req, res) => {
     }
 
     // Filter for food items only
-    const allFoodProducts = (allProducts || []).filter(p => isLikelyFood(p.name))
+    const allFoodProducts = (allProducts || []).filter(p => (
+      isLikelyFood(p.name) && !isPackProductName(p.name)
+    ))
     
     // Prefer products with enriched data for more meaningful scoring
     const enrichedProducts = allFoodProducts.filter(p => 
@@ -4165,41 +4185,9 @@ app.post('/api/experiment/:sessionId/use-self-selected-cart', async (req, res) =
   }
 })
 
-// POST predefined cart: auto-assigned based on diet from demographics
-// Inserts ALL 50 popular items (diet-specific ones first) so quiz 2 & 4 have enough.
+// Legacy predefined cart route: disabled for the final experiment flow.
 app.post('/api/experiment/:sessionId/use-predefined-cart', async (req, res) => {
-  try {
-    const { sessionId } = req.params
-
-    // Get session to read demographics diet choice
-    const { data: session, error: sessionError } = await supabase
-      .from('experiment_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single()
-
-    if (sessionError || !session) {
-      return res.status(404).json({ error: 'Session not found' })
-    }
-
-    const diet = session.demographics?.demo_diet || 'omnivore'
-    const coreTerms = PREDEFINED_CARTS[diet] || PREDEFINED_CARTS.omnivore
-    const excluded = DIET_EXCLUDED_CATEGORIES[diet] || new Set()
-
-    // Bootstrap: add remaining popular items that fit the user's diet
-    const coreSet = new Set(coreTerms)
-    const fillerTerms = POPULAR_AH_ITEMS
-      .filter(item => !coreSet.has(item.search) && !excluded.has(item.category))
-      .map(item => item.search)
-    const allTerms = [...coreTerms, ...fillerTerms]
-
-    console.log(`[Predefined Cart] Using diet "${diet}" for session ${sessionId} (${coreTerms.length} core + ${fillerTerms.length} filler = ${allTerms.length} total)`)
-    const updated = await resolveAndInsertCart(sessionId, allTerms, 'predefined')
-    res.json({ session: updated })
-  } catch (e) {
-    console.error('[Predefined Cart] Exception:', e)
-    res.status(500).json({ error: e.message })
-  }
+  res.status(410).json({ error: 'Predefined carts are disabled for this experiment' })
 })
 
 // Mark scrape step complete and advance to first pre-quiz
@@ -4271,12 +4259,59 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
     const quizDataKey = `quiz${quizNum}_data`
     if (session[quizDataKey] && session[quizDataKey].items) {
       // Return existing items (for page refresh / resume)
-      return res.json({ items: session[quizDataKey].items })
+      // For personal quizzes, backfill missing images from products so older cached sessions
+      // can benefit from newly enriched product images.
+      let existingItems = (session[quizDataKey].items || [])
+        .filter(item => !isPackProductName(item?.name))
+
+      if (quizNum === 2 || quizNum === 4) {
+        const missingImageIds = Array.from(new Set(
+          (existingItems || [])
+            .filter(item => item?.source === 'purchased' && !item?.image_url && item?.id)
+            .map(item => item.id)
+        ))
+
+        if (missingImageIds.length > 0) {
+          const { data: productsWithImages } = await supabase
+            .from('products')
+            .select('id, image_url')
+            .in('id', missingImageIds)
+
+          const imageById = new Map((productsWithImages || []).map(p => [p.id, p.image_url]))
+          const backfilledItems = existingItems.map(item => {
+            if (item?.image_url) return item
+            const imageUrl = imageById.get(item?.id)
+            return imageUrl ? { ...item, image_url: imageUrl } : item
+          })
+
+          const changed = backfilledItems.some((item, idx) => item.image_url !== existingItems[idx]?.image_url)
+          if (changed) {
+            existingItems = backfilledItems
+            const updatedQuizData = {
+              ...session[quizDataKey],
+              items: backfilledItems
+            }
+            await supabase
+              .from('experiment_sessions')
+              .update({
+                [quizDataKey]: updatedQuizData,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', sessionId)
+          }
+        }
+      }
+
+      // Keep existing cached items when still valid; otherwise continue to regenerate below.
+      if (existingItems.length >= 4) {
+        return res.json({ items: existingItems })
+      }
     }
 
     // Collect already-used item IDs to prevent overlap
     const usedIds = new Set()
     for (const qn of [1, 2, 3, 4, 5, 6]) {
+      if (qn === quizNum) continue
       const ids = session[`quiz${qn}_item_ids`]
       if (ids) ids.forEach(id => usedIds.add(id))
     }
@@ -4304,7 +4339,7 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
 
       const foodPurchases = (userPurchases || []).filter(p => {
         const nameLower = (p.product_name || '').toLowerCase()
-        return !isNonFood(nameLower)
+        return !isNonFood(nameLower) && !isPackProductName(nameLower)
       })
 
       // Deduplicate by product_id, exclude already-used
@@ -4401,6 +4436,9 @@ app.get('/api/experiment/:sessionId/quiz/:quizNumber/items', async (req, res) =>
         items.sort(() => Math.random() - 0.5)
       }
     }
+
+    // Enforce single-item-only quiz policy (exclude packs)
+    items = items.filter(item => !isPackProductName(item?.name))
 
     // Filter out any used IDs (safety)
     items = items.filter(item => !usedIds.has(item.id))

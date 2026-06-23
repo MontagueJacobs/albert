@@ -33,6 +33,13 @@ const features = [
     titleKey: 'tab_catalog',
     descKey: 'feature_catalog_desc',
     color: '#16a34a'
+  },
+  {
+    id: 'how',
+    emoji: '❓',
+    titleKey: 'tab_how_it_works',
+    descKey: 'feature_how_desc',
+    color: '#8b5cf6'
   }
 ]
 
@@ -254,8 +261,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
           </div>
         </section>
 
-        {/* How It Works — inline on homepage */}
-        <HowItWorks />
       </div>
     )
   }

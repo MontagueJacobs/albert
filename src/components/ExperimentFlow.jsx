@@ -529,27 +529,6 @@ export default function ExperimentFlow({ onComplete, onBack }) {
     }
   }
 
-  const handleUsePredefinedCart = async () => {
-    try {
-      setLoading(true)
-      const res = await fetch(`/api/experiment/${session.id}/use-predefined-cart`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      // Store the CART_ bonus card so Dashboard can fetch purchases later
-      if (data.session.bonus_card) {
-        loginBonusCard(data.session.bonus_card)
-      }
-      setSession(data.session)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleQuizComplete = useCallback((updatedSession) => {
     setSession(updatedSession)
   }, [])
