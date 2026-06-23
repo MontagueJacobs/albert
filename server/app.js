@@ -956,24 +956,22 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     const swapInfo = CATEGORY_SWAPS[origCategory]
     const preferredSubs = new Set((swapInfo?.ahSubCategories || []).map(s => 'ah_sub:' + s))
 
-    // Prefer alternatives from matching subcategories, then any plant-based
+    // Simple ranking: lowest CO2 per kg first, then lowest unit price
     const alternatives = scoredPlantBased
-      .filter(alt => origCategory === 'milk' ? alt.score > product.score : alt.score > product.score + 1)
       .filter(alt => origCategory !== 'milk' || isMilkAlternative(alt))
       .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score
+        const aCo2 = Number.isFinite(a.evaluation?.co2PerKg) ? a.evaluation.co2PerKg : Number.POSITIVE_INFINITY
+        const bCo2 = Number.isFinite(b.evaluation?.co2PerKg) ? b.evaluation.co2PerKg : Number.POSITIVE_INFINITY
+        if (aCo2 !== bCo2) return aCo2 - bCo2
+
         const aUnitPrice = unitPrice(a)
         const bUnitPrice = unitPrice(b)
         if (aUnitPrice != null && bUnitPrice != null && aUnitPrice !== bUnitPrice) return aUnitPrice - bUnitPrice
         if (aUnitPrice != null && bUnitPrice == null) return -1
         if (aUnitPrice == null && bUnitPrice != null) return 1
-        // Preferred-subcategory products first
-        const aPref = a.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
-        const bPref = b.categories?.some(c => preferredSubs.has(c)) ? 1 : 0
-        if (bPref !== aPref) return bPref - aPref
-        return b.score - a.score
+        return String(a.name || '').localeCompare(String(b.name || ''), 'nl', { sensitivity: 'base' })
       })
-      .slice(0, 3)
+      .slice(0, 5)
 
     if (alternatives.length > 0) {
       const bestAlt = alternatives[0]
@@ -1001,7 +999,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
     }
   }
 
-  return suggestions.sort((a, b) => b.improvement - a.improvement).slice(0, 6)
+  return suggestions.sort((a, b) => b.improvement - a.improvement).slice(0, 5)
 }
 
 /**
