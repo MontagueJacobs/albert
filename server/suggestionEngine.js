@@ -733,6 +733,8 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       if (co2Compare !== 0) return co2Compare
       const unitPriceCompare = compareNullableNumberAsc(a.unitPrice, b.unitPrice)
       if (unitPriceCompare !== 0) return unitPriceCompare
+      const priceCompare = compareNullableNumberAsc(a.priceNumeric, b.priceNumeric)
+      if (priceCompare !== 0) return priceCompare
       return String(a.name || '').localeCompare(String(b.name || ''), 'nl', { sensitivity: 'base' })
     })
 }

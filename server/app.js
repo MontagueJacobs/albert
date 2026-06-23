@@ -969,6 +969,13 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
         if (aUnitPrice != null && bUnitPrice != null && aUnitPrice !== bUnitPrice) return aUnitPrice - bUnitPrice
         if (aUnitPrice != null && bUnitPrice == null) return -1
         if (aUnitPrice == null && bUnitPrice != null) return 1
+
+        const aPrice = Number.isFinite(Number(a.price)) ? Number(a.price) : null
+        const bPrice = Number.isFinite(Number(b.price)) ? Number(b.price) : null
+        if (aPrice != null && bPrice != null && aPrice !== bPrice) return aPrice - bPrice
+        if (aPrice != null && bPrice == null) return -1
+        if (aPrice == null && bPrice != null) return 1
+
         return String(a.name || '').localeCompare(String(b.name || ''), 'nl', { sensitivity: 'base' })
       })
       .slice(0, 5)
