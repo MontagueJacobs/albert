@@ -947,6 +947,22 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
       || veganCheeseSignals.some(signal => haystack.includes(signal))
     return hasCheeseSignal && hasPlantSignal
   }
+  const cheeseFormatPreferenceScore = (candidate) => {
+    const name = (candidate?.name || '').toLowerCase()
+    const normalizedName = (candidate?.normalized_name || '').toLowerCase()
+    const categoryText = Array.isArray(candidate?.categories)
+      ? candidate.categories.join(' ').toLowerCase()
+      : ''
+    const haystack = `${name} ${normalizedName} ${categoryText}`
+
+    let score = 0
+    if (/(plantaardige\s+kaas|vegan\s+kaas|cheese\s*style|kaasvervanger)/.test(haystack)) score += 5
+    if (/(plakken|kaas\s+voor\s+beleg|beleg)/.test(haystack)) score += 4
+    if (/(geraspt|rasp|mozzarella|cheddar|gouda|feta|parmezaan)/.test(haystack)) score += 3
+    if (/(smeerkaas|spread)/.test(haystack)) score += 2
+    if (/(burger|schnitzel|worst|gehakt|nuggets|balletjes)/.test(haystack)) score -= 4
+    return score
+  }
   const unitPrice = (candidate) => {
     const price = Number(candidate?.price)
     const rawUnitSize = String(candidate?.unit_size || '').toLowerCase()
@@ -1007,6 +1023,11 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
         const bCo2 = Number.isFinite(b.evaluation?.co2PerKg) ? b.evaluation.co2PerKg : Number.POSITIVE_INFINITY
         const co2Diff = aCo2 - bCo2
         if (Math.abs(co2Diff) > co2TieTolerance) return co2Diff
+
+        if (origCategory === 'cheese') {
+          const formatDiff = cheeseFormatPreferenceScore(b) - cheeseFormatPreferenceScore(a)
+          if (formatDiff !== 0) return formatDiff
+        }
 
         const aUnitPrice = unitPrice(a)
         const bUnitPrice = unitPrice(b)
