@@ -195,11 +195,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
                 <ChevronRight size={18} className="menu-arrow" />
               </button>
             ))}
-            <button className="menu-item" onClick={() => navigateTo('how')}>
-              <span className="menu-emoji">❓</span>
-              <span className="menu-label">{t('tab_how_it_works')}</span>
-              <ChevronRight size={18} className="menu-arrow" />
-            </button>
           </nav>
         </div>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
@@ -309,14 +304,6 @@ function AppShell({ onPurchaseAdded, onSyncCompleted, activeTab, setActiveTab, s
               <ChevronRight size={18} className="menu-arrow" />
             </button>
           ))}
-          <button 
-            className={`menu-item ${activeTab === 'how' ? 'active' : ''}`}
-            onClick={() => navigateTo('how')}
-          >
-            <span className="menu-emoji">❓</span>
-            <span className="menu-label">{t('tab_how_it_works')}</span>
-            <ChevronRight size={18} className="menu-arrow" />
-          </button>
         </nav>
       </div>
       {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
