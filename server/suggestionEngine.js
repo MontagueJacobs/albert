@@ -518,8 +518,7 @@ function isVeganCheeseCandidate(candidate) {
     : ''
   const haystack = `${name} ${normalizedName} ${categoryText}`
   const hasCheeseSignal = isCheeseLikeProduct(candidate)
-  const hasPlantSignal = candidate?.source === 'api_plantbased'
-    || candidate?.is_vegan === true
+  const hasPlantSignal = candidate?.is_vegan === true
     || VEGAN_CHEESE_SIGNALS.some(signal => haystack.includes(signal))
   return hasCheeseSignal && hasPlantSignal
 }

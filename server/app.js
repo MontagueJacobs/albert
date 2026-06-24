@@ -943,8 +943,7 @@ function findReplacementSuggestions(lowScoreProducts, catalogProducts) {
       : ''
     const haystack = `${name} ${normalizedName} ${categoryText}`
     const hasCheeseSignal = isCheeseLike(candidate)
-    const hasPlantSignal = candidate?.source === 'api_plantbased'
-      || candidate?.is_vegan === true
+    const hasPlantSignal = candidate?.is_vegan === true
       || veganCheeseSignals.some(signal => haystack.includes(signal))
     return hasCheeseSignal && hasPlantSignal
   }
