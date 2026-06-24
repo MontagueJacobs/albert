@@ -308,7 +308,8 @@ export async function findSmartAlternatives({
   // 1) lowest CO2 per kg, 2) lowest unit price.
   const scored = scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, productName, {
     currentPrice,
-    currentUnitSize
+    currentUnitSize,
+    targetCategory: co2Category
   })
 
   result.alternatives = scored.slice(0, maxResults)
@@ -521,6 +522,23 @@ function isVeganCheeseCandidate(candidate) {
   const hasPlantSignal = candidate?.is_vegan === true
     || VEGAN_CHEESE_SIGNALS.some(signal => haystack.includes(signal))
   return hasCheeseSignal && hasPlantSignal
+}
+
+function cheeseFormatPreferenceScore(candidate) {
+  const name = (candidate?.name || '').toLowerCase()
+  const normalizedName = (candidate?.normalized_name || '').toLowerCase()
+  const categoryText = Array.isArray(candidate?.categories)
+    ? candidate.categories.join(' ').toLowerCase()
+    : ''
+  const haystack = `${name} ${normalizedName} ${categoryText}`
+
+  let score = 0
+  if (/(plantaardige\s+kaas|vegan\s+kaas|cheese\s*style|kaasvervanger)/.test(haystack)) score += 5
+  if (/(plakken|kaas\s+voor\s+beleg|beleg)/.test(haystack)) score += 4
+  if (/(geraspt|rasp|mozzarella|cheddar|gouda|feta|parmezaan)/.test(haystack)) score += 3
+  if (/(smeerkaas|spread)/.test(haystack)) score += 2
+  if (/(burger|schnitzel|worst|gehakt|nuggets|balletjes)/.test(haystack)) score -= 4
+  return score
 }
 
 /**
@@ -741,6 +759,7 @@ function recommendationNameKey(candidate) {
 function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore, sourceName, options = {}) {
   const sourceQuantity = normalizePackageQuantity(options.currentUnitSize, sourceName)
   const currentPrice = Number.isFinite(Number(options.currentPrice)) ? Number(options.currentPrice) : null
+  const targetCategory = options.targetCategory || null
 
   return candidates
     .map(c => {
@@ -780,7 +799,8 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
         quantityMatch: quantityMatches(sourceQuantity, candidateQuantity),
         priceDelta,
         priceComparable,
-        relevance
+        relevance,
+        cheeseFormatScore: targetCategory === 'cheese' ? cheeseFormatPreferenceScore(c) : 0
       }
     })
     .filter(c => {
@@ -797,6 +817,10 @@ function scoreAndSort(candidates, evaluateProduct, getEnrichedData, currentScore
       } else {
         const co2Compare = compareNullableNumberAsc(a.co2PerKg, b.co2PerKg)
         if (co2Compare !== 0) return co2Compare
+      }
+
+      if (targetCategory === 'cheese' && a.cheeseFormatScore !== b.cheeseFormatScore) {
+        return b.cheeseFormatScore - a.cheeseFormatScore
       }
 
       const aUnitPriceOk = Number.isFinite(a.unitPrice)
